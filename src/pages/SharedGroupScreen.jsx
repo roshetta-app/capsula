@@ -33,8 +33,15 @@
  * already in it), then the group in the same tinted header block as the group page: the
  * folder tile, the name, the drug count, a "Shared group" tag and, inside the block, the
  * note that a Capsula user wrote it. The drug list is unchanged. The old "Open Capsula"
- * link under the list is gone (the top bar has it). The fixed Save bar is step 14.2 and
- * the link problem states are step 14.3.
+ * link under the list is gone (the top bar has it). The link problem states are step 14.3.
+ *
+ * 2026-10-21 (step 14.2, F22): the Save bar. It stays at the bottom of the screen above
+ * the system bar (also when the group is short), and when the list is long it ends up
+ * under the last drug, so it never covers one. States: guest (Save opens the sign-in
+ * sheet), saving, saved ("Saved to your groups" with View, or the 20-of-34 line when a
+ * free account kept only part), group limit (the limit sheet), and three refusals shown as
+ * one slim line inside the bar with Save still there to try again: offline, could not
+ * save, read only. The floating message bars are gone from this page.
  *
  * States (plan section 5, Sharing, Viewer rows):
  *   - loading: placeholder cards.
@@ -49,7 +56,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
-import { Folder } from 'lucide-react'
+import { Folder, Check } from 'lucide-react'
 import SharedDrugCard from '../components/SharedDrugCard'
 import GroupStateMessage from '../components/drugs/groups/GroupStateMessage'
 import { drugRowTitle } from '../components/drugs/groups/groupDrugText'
@@ -57,10 +64,9 @@ import { shimmer } from '../components/drugs/home/shimmer'
 import { useCategories } from '../hooks/useCategories'
 import { markScreenMounted } from '../hooks/useDeepLinkParent'
 import { useAuth } from '../hooks/useAuth'
-import { useToast } from '../context/ToastContext'
 import { useFavouritesContext } from '../context/FavouritesContext'
 import { isDrugGroupsOn } from '../constants/features'
-import { SAVE_READ_ONLY_MESSAGE, savedGroupMessage } from '../components/drugs/groups/groupMessages'
+import { SAVE_OFFLINE_MESSAGE, SAVE_READ_ONLY_MESSAGE, SAVE_ERROR_MESSAGE, savedGroupMessage } from '../components/drugs/groups/groupMessages'
 import { useIsDark } from '../utils/specialtyIcon'
 import { resolveToken } from '../utils/specialtyTokens'
 import { fetchSharedGroup } from '../utils/sharedGroup'
@@ -95,7 +101,6 @@ function SharedGroupBody({ code }) {
   // The first screen of the session has nothing behind it, so no Back button.
   const canGoBack = location.key !== 'default'
   const { user, loading: authLoading } = useAuth()
-  const { toast } = useToast()
   const { promptSignIn, pendingFavourite, groupsStatus, saveSharedGroup, showGroupLimit } = useFavouritesContext()
   const groupsOn = isDrugGroupsOn()
 
@@ -148,6 +153,8 @@ function SharedGroupBody({ code }) {
   // { phase: 'idle' | 'saving' | 'saved', groupId?, saved?, total? }
   const [saveState, setSaveState] = useState({ phase: 'idle' })
   const savingRef = useRef(false)
+  // A refused save, shown as one line inside the Save bar (null when there is none).
+  const [notice, setNotice] = useState(null)
   const signInId = `save:${code}`
   // A guest tapped Save and is signing in. Also true after a sign-in that
   // reloaded the page, because the prompt keeps the request.
@@ -156,6 +163,7 @@ function SharedGroupBody({ code }) {
   const runSave = useCallback(async () => {
     if (savingRef.current || result.status !== 'ok') return
     savingRef.current = true
+    setNotice(null)
     setSaveState({ phase: 'saving' })
     const g = result.group
     const r = await saveSharedGroup({
@@ -164,6 +172,7 @@ function SharedGroupBody({ code }) {
       color: g.color,
       brandIds: drugs.map(d => d.id),
       signInId,
+      quiet: true,
     })
     savingRef.current = false
     if (r.ok) {
@@ -171,10 +180,13 @@ function SharedGroupBody({ code }) {
       return
     }
     setSaveState({ phase: 'idle' })
-    // guest, offline and error already told the person; these two are ours.
+    // guest opened the sign-in sheet and the limit opens its own sheet; the rest
+    // are one line in the bar (the hook was asked not to float its own message).
     if (r.reason === 'limit') showGroupLimit('groups')
-    else if (r.reason === 'read_only') toast.info(SAVE_READ_ONLY_MESSAGE)
-  }, [result, drugs, saveSharedGroup, signInId, showGroupLimit, toast])
+    else if (r.reason === 'read_only') setNotice(SAVE_READ_ONLY_MESSAGE)
+    else if (r.reason === 'offline') setNotice(SAVE_OFFLINE_MESSAGE)
+    else if (r.reason !== 'guest') setNotice(SAVE_ERROR_MESSAGE)
+  }, [result, drugs, saveSharedGroup, signInId, showGroupLimit])
 
   function handleSaveTap() {
     if (authLoading || saveState.phase !== 'idle') return
@@ -371,47 +383,62 @@ function SharedGroupBody({ code }) {
       // Without it the padding below was invalid and the browser dropped all of it.
       '--page-gutter': 'var(--space-4)',
       maxWidth: 680, margin: '0 auto',
-      padding: 'calc(var(--space-3) + env(safe-area-inset-top, 0px)) var(--page-gutter) calc(var(--space-4) + env(safe-area-inset-bottom, 0px))',
+      // Step 14.2: a full-height column, so the Save bar sits at the bottom of the screen
+      // even when the group is short. With a Save bar the bar carries the bottom gap.
+      minHeight: '100dvh', display: 'flex', flexDirection: 'column',
+      padding: `calc(var(--space-3) + env(safe-area-inset-top, 0px)) var(--page-gutter) ${showSave ? '0' : 'calc(var(--space-4) + env(safe-area-inset-bottom, 0px))'}`,
     }}>
       {topBar}
-      {content}
+      <div style={{ flex: '1 0 auto', paddingBottom: showSave ? 'var(--space-4)' : 0 }}>{content}</div>
       {showSave && (
-        <div style={{ marginTop: 'var(--space-5)' }}>
+        <div style={{
+          position: 'sticky', bottom: 0, zIndex: 5,
+          margin: '0 calc(-1 * var(--page-gutter))',
+          padding: 'var(--space-3) var(--page-gutter) calc(var(--space-3) + env(safe-area-inset-bottom, 0px))',
+          backgroundColor: 'var(--color-surface)', borderTop: '1px solid var(--color-border)',
+          fontFamily: 'var(--font-body)',
+        }}>
           {saveState.phase === 'saved' ? (
-            <div style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)',
-              padding: 'var(--space-3)', borderRadius: 'var(--radius-md)',
-              border: '1px solid var(--color-border)', fontFamily: 'var(--font-body)',
-            }}>
-              <span style={{ fontSize: 14, lineHeight: 1.4, color: 'var(--color-text-primary)' }}>
-                {savedGroupMessage(saveState.saved, saveState.total)}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)' }}>
+              <span style={{ display: 'flex', alignItems: 'flex-start', gap: 8, minWidth: 0 }}>
+                <Check size={18} strokeWidth={2.6} color="var(--color-success)" aria-hidden="true" style={{ flexShrink: 0, marginTop: 1 }} />
+                <span role="status" style={{ fontSize: 14, lineHeight: 1.4, color: 'var(--color-text-primary)' }}>
+                  {savedGroupMessage(saveState.saved, saveState.total)}
+                </span>
               </span>
               <button
                 onClick={() => navigate(ROUTES.DRUGS_GROUP(saveState.groupId))}
                 style={{
-                  flexShrink: 0, border: 'none', cursor: 'pointer', padding: '8px 16px',
+                  flexShrink: 0, minHeight: 44, border: 'none', cursor: 'pointer', padding: '0 20px',
                   borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-accent)', color: '#fff',
                   fontSize: 14, fontWeight: 600, fontFamily: 'var(--font-body)',
-                  WebkitTapHighlightColor: 'transparent',
+                  WebkitTapHighlightColor: 'transparent', outline: 'none',
                 }}
               >
                 View
               </button>
             </div>
           ) : (
-            <button
-              onClick={handleSaveTap}
-              disabled={saveBusy}
-              style={{
-                display: 'block', width: '100%', border: 'none', padding: '12px 16px',
-                borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-accent)', color: '#fff',
-                fontSize: 15, fontWeight: 600, fontFamily: 'var(--font-body)',
-                cursor: saveBusy ? 'default' : 'pointer', opacity: saveBusy ? 0.6 : 1,
-                WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              {saveState.phase === 'saving' ? 'Saving…' : 'Save to my groups'}
-            </button>
+            <>
+              {notice && (
+                <div style={{ marginBottom: 'var(--space-2)' }}>
+                  <GroupStateMessage variant="banner" tone="warning" title={notice} />
+                </div>
+              )}
+              <button
+                onClick={handleSaveTap}
+                disabled={saveBusy}
+                style={{
+                  display: 'block', width: '100%', minHeight: 48, border: 'none', padding: '0 16px',
+                  borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-accent)', color: '#fff',
+                  fontSize: 15, fontWeight: 600, fontFamily: 'var(--font-body)',
+                  cursor: saveBusy ? 'default' : 'pointer', opacity: saveBusy ? 0.6 : 1,
+                  WebkitTapHighlightColor: 'transparent', outline: 'none',
+                }}
+              >
+                {saveState.phase === 'saving' ? 'Saving…' : 'Save to my groups'}
+              </button>
+            </>
           )}
         </div>
       )}

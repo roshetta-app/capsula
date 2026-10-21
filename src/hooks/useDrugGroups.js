@@ -81,15 +81,17 @@
  *   showGroupLimit  (kind) => void  opens the limit sheet (Free: with Upgrade; Pro: with OK)
  *   showGroupReadOnly () => void    opens the sheet with the read only message (not counted as a limit hit)
  *   dismissGroupLimit () => void
- *   saveSharedGroup ({ name, description, color, brandIds, signInId }) =>
+ *   saveSharedGroup ({ name, description, color, brandIds, signInId, quiet }) =>
  *                   Promise<{ ok, reason?, group?, saved?, total? }>   (2026-10-19, step 8.3)
  *                   Makes the viewer's own copy of a shared group: a new group
  *                   (new id, not linked to the original, no share link, nothing
  *                   about the owner) with the drugs in the order given. A free
- *                   account keeps the first 20, Pro the first 50; saved/total
+ *                   account keeps the first 20, Pro the first 100; saved/total
  *                   tell the screen when some were left out. If the drugs fail
  *                   to save the new group is removed again. Reasons: guest,
- *                   offline, read_only, limit, invalid, error.
+ *                   offline, read_only, limit, invalid, error. quiet: true (step
+ *                   14.2) skips the floating offline and error messages, because the
+ *                   shared page shows them inside its Save bar.
  *   restoreGroup    (group) => Promise<{ ok, reason? }>   (2026-10-19, step 4.4)
  *                   Puts a just-deleted group back (same id, name, description,
  *                   colour, created date and drugs). The Undo of Delete group.
@@ -109,7 +111,7 @@ import { logUsageEvent } from '../analytics/usageEvents'
 import { readGroupsCache, writeGroupsCache, clearGroupsCache, readGroupChanges, writeGroupChanges } from '../utils/cache'
 import { newId, makeChange, applyChange, applyQueue, addChange, cancelDelete, clearSending, nextToSend, summarizeQueue, retryFailed, discardFailed } from '../utils/groupChanges'
 import { runSync, sendChange, describeEvents } from '../utils/groupSync'
-import { SAVE_OFFLINE_MESSAGE } from '../components/drugs/groups/groupMessages'
+import { SAVE_OFFLINE_MESSAGE, SAVE_ERROR_MESSAGE } from '../components/drugs/groups/groupMessages'
 import {
   DRUG_GROUPS_CAP_FREE,
   DRUG_GROUP_DRUGS_CAP_FREE,
@@ -519,8 +521,8 @@ export function useDrugGroups(fav) {
   // A change that got no answer in time counts as offline. The screen already
   // went back to what it showed; the real list is loaded again in case the
   // change did reach the server after all.
-  const timedOut = useCallback((message = OFFLINE_MESSAGE) => {
-    toast.info(message)
+  const timedOut = useCallback((message = OFFLINE_MESSAGE, quiet = false) => {
+    if (!quiet) toast.info(message)
     if (userRef.current) loadGroups(userRef.current)
     return { ok: false, reason: 'offline' }
   }, [toast, loadGroups])
@@ -545,19 +547,19 @@ export function useDrugGroups(fav) {
   // Returns a refusal ({ ok: false, reason }) or null when the change may go on.
   // signInId: what the sign-in prompt remembers ('new' by default; the shared
   // page passes its own). offlineMessage: the wording for the offline refusal.
-  const refuseChange = useCallback(({ needsEditable = true, signInId = 'new', offlineMessage = OFFLINE_MESSAGE, allowOffline = false } = {}) => {
+  const refuseChange = useCallback(({ needsEditable = true, signInId = 'new', offlineMessage = OFFLINE_MESSAGE, allowOffline = false, quiet = false } = {}) => {
     if (!userRef.current) {
       promptSignIn('groups', signInId)
       return { ok: false, reason: 'guest' }
     }
     // allowOffline (step 17.2b): the change is saved on the phone and sent later.
     if (!allowOffline && isOffline()) {
-      toast.info(offlineMessage)
+      if (!quiet) toast.info(offlineMessage)
       return { ok: false, reason: 'offline' }
     }
     if (!allowOffline && shownFromCacheRef.current) {
       // Only the saved copy is on screen, so we do not know the real list.
-      toast.info(offlineMessage)
+      if (!quiet) toast.info(offlineMessage)
       return { ok: false, reason: 'offline' }
     }
     if (needsEditable && isReadOnlyNow()) return { ok: false, reason: 'read_only' }
@@ -857,8 +859,8 @@ export function useDrugGroups(fav) {
   // shared page lists them A to Z), Pro the first 50. The copy is an ordinary
   // group: new id, no share link, and the shared page never carries the owner.
   // If the drugs fail to save, the new group row is removed again.
-  const saveSharedGroup = useCallback(async ({ name, description = '', color = 'blue', brandIds = [], signInId } = {}) => {
-    const refused = refuseChange({ signInId, offlineMessage: SAVE_OFFLINE_MESSAGE })
+  const saveSharedGroup = useCallback(async ({ name, description = '', color = 'blue', brandIds = [], signInId, quiet = false } = {}) => {
+    const refused = refuseChange({ signInId, offlineMessage: SAVE_OFFLINE_MESSAGE, quiet })
     if (refused) return refused
     const groupCap = isProRef.current ? DRUG_GROUPS_CAP_PRO : DRUG_GROUPS_CAP_FREE
     if (groupsRef.current.length >= groupCap) return { ok: false, reason: 'limit' }
@@ -887,11 +889,11 @@ export function useDrugGroups(fav) {
       copyName = numberedNameIn([...groupsRef.current, { id: null, name: copyName }], fields.name)
     }
     if (error || !data) {
-      if (isTimeout(error)) return timedOut(SAVE_OFFLINE_MESSAGE)
+      if (isTimeout(error)) return timedOut(SAVE_OFFLINE_MESSAGE, quiet)
       if (String(error?.message ?? '').includes('drug_group_limit_reached')) {
         return { ok: false, reason: 'limit' }
       }
-      toast.error('Could not save the group. Check your connection and try again.')
+      if (!quiet) toast.error(SAVE_ERROR_MESSAGE)
       return { ok: false, reason: 'error' }
     }
 
@@ -901,8 +903,8 @@ export function useDrugGroups(fav) {
         .insert(kept.map(brand_id => ({ group_id: data.id, brand_id }))))
       if (itemsError) {
         await withLimit(supabase.from('drug_groups').delete().eq('id', data.id))
-        if (isTimeout(itemsError)) return timedOut(SAVE_OFFLINE_MESSAGE)
-        toast.error('Could not save the group. Check your connection and try again.')
+        if (isTimeout(itemsError)) return timedOut(SAVE_OFFLINE_MESSAGE, quiet)
+        if (!quiet) toast.error(SAVE_ERROR_MESSAGE)
         return { ok: false, reason: 'error' }
       }
     }
