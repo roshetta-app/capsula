@@ -631,7 +631,7 @@ export function useDrugGroups(fav) {
       if (String(error?.message ?? '').includes('drug_group_limit_reached')) {
         return { ok: false, reason: 'limit' }
       }
-      toast.error('Could not create the group. Check your connection and try again.')
+      toast.error("Couldn't create the group. Check your connection and try again.")
       return { ok: false, reason: 'error' }
     }
     const group = mapGroupRow({ ...data, drug_group_items: [] })
@@ -670,7 +670,7 @@ export function useDrugGroups(fav) {
       setGroups(prev => prev.map(g => (g.id === id ? { ...g, name: before.name, description: before.description, color: before.color } : g)))
       if (isTimeout(error)) return timedOut()
       if (isNameClash(error)) return { ok: false, reason: 'name_taken' }
-      toast.error('Could not save the changes. Check your connection and try again.')
+      toast.error("Couldn't save the changes. Check your connection and try again.")
       return { ok: false, reason: 'error' }
     }
     return { ok: true }
@@ -697,7 +697,7 @@ export function useDrugGroups(fav) {
     if (error) {
       setGroups(prev => (prev.some(g => g.id === id) ? prev : newestFirst([...prev, group])))
       if (isTimeout(error)) return timedOut()
-      toast.error('Could not delete the group. Check your connection and try again.')
+      toast.error("Couldn't delete the group. Check your connection and try again.")
       return { ok: false, reason: 'error' }
     }
     return { ok: true, group, index }
@@ -759,7 +759,7 @@ export function useDrugGroups(fav) {
       if (String(error.message ?? '').includes('drug_group_items_limit_reached')) {
         return { ok: false, reason: 'limit' }
       }
-      toast.error('Could not save the drugs. Check your connection and try again.')
+      toast.error("Couldn't save the drugs. Check your connection and try again.")
       return { ok: false, reason: 'error' }
     }
     // Analytics (step 9.5): one event per drug added, after the save worked.
@@ -833,7 +833,7 @@ export function useDrugGroups(fav) {
       if (String(error.message ?? '').includes('drug_group_limit_reached')) {
         return { ok: false, reason: 'limit' }
       }
-      toast.error('Could not restore the group. Check your connection and try again.')
+      toast.error("Couldn't restore the group. Check your connection and try again.")
       return { ok: false, reason: 'error' }
     }
 
@@ -843,7 +843,7 @@ export function useDrugGroups(fav) {
         .insert(group.brandIds.map(brand_id => ({ group_id: group.id, brand_id }))))
       if (itemsError) {
         await withLimit(supabase.from('drug_groups').delete().eq('id', group.id))
-        toast.error('Could not restore the group. Check your connection and try again.')
+        toast.error("Couldn't restore the group. Check your connection and try again.")
         return { ok: false, reason: 'error' }
       }
     }

@@ -118,7 +118,7 @@ export default function FailedChangesSheet({ isOpen, onClose }) {
               Discard
             </button>
             <button onClick={handleRetry} style={{ ...BUTTON, backgroundColor: 'var(--color-accent)', color: '#fff' }}>
-              Retry
+              Try again
             </button>
           </div>
         </div>
@@ -129,7 +129,7 @@ export default function FailedChangesSheet({ isOpen, onClose }) {
         onClose={() => setConfirmOpen(false)}
         onConfirm={handleDiscard}
         title="Discard these changes?"
-        message="They will not be saved. Your groups go back to what is saved on the server."
+        message="They won't be saved. Your groups go back to how they were last saved."
         confirmLabel="Discard"
         confirmingLabel={'Discarding\u2026'}
         destructive

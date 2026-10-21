@@ -280,7 +280,7 @@ export default function DrugGroupScreen() {
     )
   } else if (groupsStatus === 'error' && groups.length === 0) {
     content = (
-      <GroupStateMessage title="Couldn't load your groups" actionLabel="Retry" onAction={reloadGroups} />
+      <GroupStateMessage title="Couldn't load your groups" actionLabel="Try again" onAction={reloadGroups} />
     )
   } else if (!group) {
     content = (

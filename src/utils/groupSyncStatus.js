@@ -6,11 +6,11 @@
 
 export function syncStatusLine({ online, failedCount, waitingCount, syncState }) {
   if (failedCount > 0) {
-    return { tone: 'warning', title: `${failedCount} change${failedCount === 1 ? '' : 's'} could not be saved.` }
+    return { tone: 'warning', title: `${failedCount} change${failedCount === 1 ? '' : 's'} couldn't be saved.` }
   }
   if (!online) return { tone: 'neutral', title: "Offline. Changes are saved on this phone." }
-  if (syncState === 'syncing') return { tone: 'neutral', title: 'Syncing...' }
-  if (waitingCount > 0) return { tone: 'neutral', title: 'Changes are waiting to sync.' }
+  if (syncState === 'syncing') return { tone: 'neutral', title: 'Saving your changes…' }
+  if (waitingCount > 0) return { tone: 'neutral', title: 'Changes are waiting to be saved.' }
   if (syncState === 'saved') return { tone: 'neutral', title: 'All changes saved' }
   return null
 }
@@ -20,10 +20,10 @@ export function syncStatusLine({ online, failedCount, waitingCount, syncState })
 const REASON_TEXT = {
   name_taken: 'That name is already in use.',
   group_gone: 'The group was deleted on another device.',
-  group_limit: 'You have reached the limit of groups.',
+  group_limit: "You've reached the group limit.",
   drug_limit: 'The group is full.',
   read_only: 'Your groups are read only.',
-  error: 'The server could not take it.',
+  error: 'Something went wrong. Try again.',
 }
 
 export function describeFailedChange(change, { groupName = null, drugName = null } = {}) {

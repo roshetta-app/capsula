@@ -236,7 +236,7 @@ function GroupsSection() {
       <GroupStateMessage
         title="Couldn't load your groups"
         body={online ? undefined : "You're offline. Check your connection and try again."}
-        actionLabel="Retry"
+        actionLabel="Try again"
         onAction={reloadGroups}
         flat
       />
@@ -261,7 +261,7 @@ function GroupsSection() {
         )}
         <GroupSyncStatus />
         {groupsLoadError && online && appOnline ? (
-          <GroupStateMessage variant="banner" title="Couldn't refresh your groups" actionLabel="Retry" onAction={reloadGroups} />
+          <GroupStateMessage variant="banner" title="Couldn't refresh your groups" actionLabel="Try again" onAction={reloadGroups} />
         ) : null}
         {groupsView === 'list' ? (
           <div style={LIST_STYLE}>

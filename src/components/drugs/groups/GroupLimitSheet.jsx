@@ -41,7 +41,7 @@ export default function GroupLimitSheet({ isOpen, kind, isPro = false, onClose }
         onClose={onClose}
         icon={Folder}
         headline="Your groups are read only"
-        message={<>Delete a group or go <strong>Pro</strong> to edit them.</>}
+        message={<>Delete a group or upgrade to <strong>Pro</strong> to edit them.</>}
         dismissLabel="Not now"
       />
     )

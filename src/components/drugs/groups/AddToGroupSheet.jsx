@@ -188,7 +188,7 @@ export default function AddToGroupSheet({ isOpen, onClose, drug }) {
       <GroupStateMessage
         flat
         title="Couldn't load your groups"
-        actionLabel="Retry"
+        actionLabel="Try again"
         onAction={reloadGroups}
       />
     )

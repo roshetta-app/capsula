@@ -188,9 +188,9 @@ export default function ShareGroupSheet({ isOpen, onClose, group, onShareChange 
       </div>
     )
   } else if (result.phase === 'offline') {
-    body = <GroupStateMessage title={OFFLINE_SHARE_MESSAGE} actionLabel="Retry" onAction={retry} />
+    body = <GroupStateMessage title={OFFLINE_SHARE_MESSAGE} actionLabel="Try again" onAction={retry} />
   } else if (result.phase === 'error') {
-    body = <GroupStateMessage title="Couldn't check this group's link" actionLabel="Retry" onAction={retry} />
+    body = <GroupStateMessage title="Couldn't check this group's link" actionLabel="Try again" onAction={retry} />
   } else if (result.phase === 'none') {
     body = (
       <>

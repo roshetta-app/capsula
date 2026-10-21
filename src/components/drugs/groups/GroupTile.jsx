@@ -48,7 +48,7 @@ export function ProPill() {
 // The small mark on a group that has changes not yet sent (step 17.6a).
 export function WaitingMark({ size = 14, color = 'var(--color-text-secondary)' }) {
   return (
-    <span role="img" aria-label="Waiting to sync" title="Waiting to sync" style={{ display: 'flex', flexShrink: 0 }}>
+    <span role="img" aria-label="Waiting to save" title="Waiting to save" style={{ display: 'flex', flexShrink: 0 }}>
       <CloudUpload size={size} color={color} aria-hidden="true" />
     </span>
   )

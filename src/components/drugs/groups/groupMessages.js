@@ -29,7 +29,7 @@ export function drugsLimitMessage(isPro) {
 // 2026-10-19 (Drug groups plan, step 8.3): Save to my groups, on the shared page.
 export const SAVE_OFFLINE_MESSAGE = "You're offline. Reconnect to save."
 export const SAVE_READ_ONLY_MESSAGE = 'Your groups are read only. Upgrade to save this group.'
-export const SAVE_ERROR_MESSAGE = 'Could not save the group. Check your connection and try again.'
+export const SAVE_ERROR_MESSAGE = "Couldn't save the group. Check your connection and try again."
 
 export function savedGroupMessage(saved, total) {
   return saved < total

@@ -238,7 +238,7 @@ export default function AddDrugsToGroupScreen() {
       />
     )
   } else if (groupsStatus === 'error' && groups.length === 0) {
-    message = <GroupStateMessage title="Couldn't load your groups" actionLabel="Retry" onAction={reloadGroups} />
+    message = <GroupStateMessage title="Couldn't load your groups" actionLabel="Try again" onAction={reloadGroups} />
   } else if (!group) {
     message = (
       <GroupStateMessage
