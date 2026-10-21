@@ -33,7 +33,16 @@
  * already in it), then the group in the same tinted header block as the group page: the
  * folder tile, the name, the drug count, a "Shared group" tag and, inside the block, the
  * note that a Capsula user wrote it. The drug list is unchanged. The old "Open Capsula"
- * link under the list is gone (the top bar has it). The link problem states are step 14.3.
+ * link under the list is gone (the top bar has it).
+ *
+ * 2026-10-21 (step 14.3, F23): the link problem states (not available, which also covers
+ * a stopped link and a deleted group; offline; could not open) share one centred layout:
+ * the Capsula logo, an icon, a title, one short line and ONE button. Not available says
+ * "This link isn't available" / "The owner may have stopped sharing it, or the link is
+ * incomplete." with "Open Capsula" (it replaces this page, so Back does not return to a
+ * dead link); offline and could not open say what happened with "Try again". The top bar is
+ * not shown in these states (the layout carries the logo and the button); a person who
+ * arrived from inside the app still gets Back.
  *
  * 2026-10-21 (step 14.2, F22): the Save bar. It stays at the bottom of the screen above
  * the system bar (also when the group is short), and when the list is long it ends up
@@ -56,7 +65,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
-import { Folder, Check } from 'lucide-react'
+import { Folder, FolderX, Check, WifiOff, CircleAlert } from 'lucide-react'
 import SharedDrugCard from '../components/SharedDrugCard'
 import GroupStateMessage from '../components/drugs/groups/GroupStateMessage'
 import { drugRowTitle } from '../components/drugs/groups/groupDrugText'
@@ -80,6 +89,48 @@ function SkeletonCard() {
         <div style={shimmer({ width: '55%', height: 14 })} />
         <div style={shimmer({ width: '35%', height: 11 })} />
       </div>
+    </div>
+  )
+}
+
+// One centred layout for every link problem (step 14.3, F23): logo, icon, title, one line,
+// one button. It fills the free height of the page, so there is never a small card at the
+// top with an empty page under it.
+function LinkProblem({ Icon, title, body, actionLabel, onAction }) {
+  return (
+    <div style={{
+      flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      textAlign: 'center', padding: '0 var(--space-2) 12vh', fontFamily: 'var(--font-body)',
+    }}>
+      <img
+        src={`${import.meta.env.BASE_URL}logo.svg`}
+        alt="Capsula"
+        className="capsula-logo"
+        style={{ display: 'block', height: 24, width: 'auto', marginBottom: 'var(--space-6)' }}
+      />
+      <div style={{
+        width: 72, height: 72, borderRadius: '50%', marginBottom: 'var(--space-4)',
+        backgroundColor: 'var(--color-surface-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <Icon size={32} color="var(--color-text-secondary)" strokeWidth={1.6} aria-hidden="true" />
+      </div>
+      <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, lineHeight: 1.3, color: 'var(--color-text-primary)' }}>
+        {title}
+      </h1>
+      <p style={{ margin: 'var(--space-2) 0 var(--space-5)', maxWidth: 320, fontSize: 15, lineHeight: 1.5, color: 'var(--color-text-secondary)' }}>
+        {body}
+      </p>
+      <button
+        onClick={onAction}
+        style={{
+          width: '100%', maxWidth: 320, minHeight: 48, border: 'none', padding: '0 16px',
+          borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-accent)', color: '#fff',
+          fontSize: 15, fontWeight: 600, fontFamily: 'var(--font-body)', cursor: 'pointer',
+          WebkitTapHighlightColor: 'transparent', outline: 'none',
+        }}
+      >
+        {actionLabel}
+      </button>
     </div>
   )
 }
@@ -268,32 +319,39 @@ function SharedGroupBody({ code }) {
     </div>
   )
 
+  // The problem layout carries its own logo and button, so the top bar is only kept for Back.
+  const isProblem = result.status === 'unavailable' || result.status === 'offline' || result.status === 'error'
+
   let content
   if (result.status === 'loading') {
     content = <div><SkeletonCard /><SkeletonCard /><SkeletonCard /></div>
   } else if (result.status === 'unavailable') {
     content = (
-      <GroupStateMessage
+      <LinkProblem
+        Icon={FolderX}
         title="This link isn't available"
-        body="The owner may have stopped sharing it."
-        actionLabel="Go to Drugs"
+        body="The owner may have stopped sharing it, or the link is incomplete."
+        actionLabel="Open Capsula"
         onAction={() => navigate(ROUTES.DRUGS, { replace: true })}
       />
     )
   } else if (result.status === 'offline') {
     content = (
-      <GroupStateMessage
-        title="You're offline. Reconnect to open this group."
-        actionLabel="Retry"
+      <LinkProblem
+        Icon={WifiOff}
+        title="You're offline"
+        body="Reconnect to open this group."
+        actionLabel="Try again"
         onAction={retry}
       />
     )
   } else if (result.status === 'error') {
     content = (
-      <GroupStateMessage
+      <LinkProblem
+        Icon={CircleAlert}
         title="Couldn't open this group"
         body="Check your connection and try again."
-        actionLabel="Retry"
+        actionLabel="Try again"
         onAction={retry}
       />
     )
@@ -388,8 +446,11 @@ function SharedGroupBody({ code }) {
       minHeight: '100dvh', display: 'flex', flexDirection: 'column',
       padding: `calc(var(--space-3) + env(safe-area-inset-top, 0px)) var(--page-gutter) ${showSave ? '0' : 'calc(var(--space-4) + env(safe-area-inset-bottom, 0px))'}`,
     }}>
-      {topBar}
-      <div style={{ flex: '1 0 auto', paddingBottom: showSave ? 'var(--space-4)' : 0 }}>{content}</div>
+      {isProblem ? (canGoBack && <div style={{ minHeight: 44, display: 'flex', alignItems: 'center' }}>{backButton}</div>) : topBar}
+      <div style={{
+        flex: '1 0 auto', paddingBottom: showSave ? 'var(--space-4)' : 0,
+        ...(isProblem ? { display: 'flex', flexDirection: 'column' } : null),
+      }}>{content}</div>
       {showSave && (
         <div style={{
           position: 'sticky', bottom: 0, zIndex: 5,
