@@ -329,7 +329,7 @@ import { titleCaseWords } from '../utils/classSearch'
 import { useCategories } from '../hooks/useCategories'
 import { useBackToTop } from '../hooks/useBackToTop'
 import { useRecentlyViewed } from '../hooks/useRecentlyViewed'
-import { SpecialtyIcon, useIsDark } from '../utils/specialtyIcon'
+import { useIsDark } from '../utils/specialtyIcon'
 import { ROUTES } from '../router'
 import { useBackClose } from '../hooks/useBackClose'
 import { useSearchHistory } from '../hooks/useSearchHistory'
@@ -1113,22 +1113,6 @@ export default function DrugsScreen() {
       )}
 
       <div>
-        {/* The hero folds away and fades when the search opens, and unfolds when it closes. */}
-        <div
-          aria-hidden={searchOpen}
-          style={{
-            display:          'grid',
-            gridTemplateRows: searchOpen ? '0fr' : '1fr',
-            opacity:          searchOpen ? 0 : 1,
-            pointerEvents:    searchOpen ? 'none' : 'auto',
-            transition:       reduceMotion ? 'none' : 'grid-template-rows 220ms ease, opacity 160ms ease',
-          }}
-        >
-          <div style={{ minHeight: 0, overflow: searchOpen || !headerReady ? 'hidden' : 'visible' }}>
-            <DrugsHero heroRef={heroRef} isDark={isDark} onInfoTap={() => setShowInfoSheet(true)} />
-          </div>
-        </div>
-
         {/* The Search area: written once, drawn in every view, so the search
             bar is never rebuilt and the keyboard stays open when typing
             starts (see DrugsSearchSection.jsx). Recently viewed is a shortcut
@@ -1150,6 +1134,25 @@ export default function DrugsScreen() {
           transition:      reduceMotion ? 'none' : 'padding-top 220ms ease, padding-bottom 220ms ease, border-color 160ms ease',
         }}>
         <DrugsSearchSection
+          blockRef={heroRef}
+          top={(
+            // The title area sits inside the tinted header block (step 8.1). It folds away and
+            // fades when the search opens, and unfolds when it closes.
+            <div
+              aria-hidden={searchOpen}
+              style={{
+                display:          'grid',
+                gridTemplateRows: searchOpen ? '0fr' : '1fr',
+                opacity:          searchOpen ? 0 : 1,
+                pointerEvents:    searchOpen ? 'none' : 'auto',
+                transition:       reduceMotion ? 'none' : 'grid-template-rows 220ms ease, opacity 160ms ease',
+              }}
+            >
+              <div style={{ minHeight: 0, overflow: searchOpen || !headerReady ? 'hidden' : 'visible' }}>
+                <DrugsHero onInfoTap={() => setShowInfoSheet(true)} />
+              </div>
+            </div>
+          )}
           searchOpen={searchOpen}
           onSearchFocus={openSearch}
           onSearchCancel={closeSearch}
@@ -1296,44 +1299,24 @@ export default function DrugsScreen() {
 // (the app's blue accent token) rather than var(--color-favourite), which
 // turned out to render red/pink, not blue.
 
-function DrugsHero({ heroRef, isDark, onInfoTap }) {
+function DrugsHero({ onInfoTap }) {
+  // 2026-10-22 (UI refresh plan, step 8.1): the title area of the tinted header block.
+  // A small CAPSULA label with the info button at the right, then the big title. The blue
+  // pill circle is gone (the label names the app). The block, its tint and the search field
+  // under it live in DrugsSearchSection.jsx.
   return (
-    <div ref={heroRef} style={{
-      marginTop:    'var(--space-4)',
-      marginBottom: 'var(--space-3)',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, height: 44 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
-          <div style={{
-            width:           32,
-            height:          32,
-            borderRadius:    '50%',
-            backgroundColor: 'var(--color-accent)',
-            display:         'flex',
-            alignItems:      'center',
-            justifyContent:  'center',
-            flexShrink:      0,
-          }}>
-            <SpecialtyIcon iconType="lucide" iconValue="Pill" size={16} color="#fff" />
-          </div>
+    <div style={{ paddingBottom: 'var(--space-3)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, minHeight: 44 }}>
+        <span style={{
+          fontSize:      11,
+          fontWeight:    700,
+          letterSpacing: '1.4px',
+          color:         'var(--color-accent-text)',
+        }}>
+          CAPSULA
+        </span>
 
-          {/* 2026-10-20 (plan step 11.1): flat header, no card and no subtitle. */}
-          <h1 style={{
-            fontSize:      24,
-            lineHeight:    1.15,
-            fontWeight:    700,
-            color:         'var(--color-text-primary)',
-            margin:        0,
-            letterSpacing: '-0.3px',
-            minWidth:      0,
-          }}>
-            Drugs
-          </h1>
-        </div>
-
-        {/* Action-button slot — 2026-08-09: now holds the info button that
-            opens DrugsInfoSheet (sources + disclaimer). Supersedes the
-            earlier "intentionally empty, deferred to area 2" note. */}
+        {/* The info button opens DrugsInfoSheet (sources and disclaimer). */}
         <button
           onClick={onInfoTap}
           aria-label="About this drug library"
@@ -1348,18 +1331,29 @@ function DrugsHero({ heroRef, isDark, onInfoTap }) {
             background:              'none',
             border:                  'none',
             cursor:                  'pointer',
-            color:                   'var(--color-text-tertiary)',
+            color:                   'var(--color-text-secondary)',
             flexShrink:              0,
             WebkitTapHighlightColor: 'transparent',
           }}
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <circle cx="12" cy="12" r="10"/>
             <line x1="12" y1="16" x2="12" y2="12"/>
             <line x1="12" y1="8" x2="12.01" y2="8"/>
           </svg>
         </button>
       </div>
+
+      <h1 style={{
+        fontSize:      26,
+        lineHeight:    1.15,
+        fontWeight:    700,
+        color:         'var(--color-text-primary)',
+        margin:        0,
+        letterSpacing: '-0.3px',
+      }}>
+        Drugs
+      </h1>
     </div>
   )
 }
@@ -1390,67 +1384,36 @@ function StickyDrugsHeader({ watchRef, query, onQueryChange, onSearchFocus, plac
 
   return (
     <ScrollRevealHeader watchRef={watchRef}>
+      {/* 2026-10-22 (UI refresh plan, step 8.1, D6): one slim row. The search field with its
+          filter button, and the small mode chip beside it (same pop-up as before). The old
+          title row with the blue circle is gone. */}
       <div style={{ width: '100%', maxWidth: 680, margin: '0 auto' }}>
         <div style={{
-          display:        'flex',
-          alignItems:     'center',
-          justifyContent: 'space-between',
-          gap:            8,
-          padding:        '8px var(--page-gutter, var(--space-6)) 0',
-          height:         44,
-          boxSizing:      'border-box',
-          marginTop:      5,
+          display:    'flex',
+          alignItems: 'center',
+          gap:        8,
+          padding:    '8px var(--page-gutter, var(--space-6))',
+          boxSizing:  'border-box',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 }}>
-            <div style={{
-              width:           28,
-              height:          28,
-              borderRadius:    '50%',
-              backgroundColor: 'var(--color-accent)',
-              display:         'flex',
-              alignItems:      'center',
-              justifyContent:  'center',
-              flexShrink:      0,
-            }}>
-              <SpecialtyIcon iconType="lucide" iconValue="Pill" size={15} color="#fff" />
-            </div>
-            <div style={{
-              fontSize:      18,
-              fontWeight:    700,
-              color:         'var(--color-text-primary)',
-              letterSpacing: '-0.2px',
-              minWidth:      0,
-            }}>
-              Drugs
-            </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <SearchBar
+              value={query}
+              onChange={onQueryChange}
+              onInputFocus={onSearchFocus}
+              placeholder={placeholder}
+              onFilter={onFilter}
+              filterDisabled={filterDisabled}
+              hasActiveFilters={hasActiveFilters}
+              compact
+            />
           </div>
-
-          {/* The Search Mode button, same as the Search card's; it opens the
-              same Search Mode pop-up. */}
           <ModeButton
             icon={currentMode.icon}
             label={currentMode.label}
             color={currentMode.color}
             tint={currentMode.tint}
             onPress={onOpenModeMenu}
-          />
-        </div>
-
-        {/* Row 2 — near-full-width compact search bar with its built-in
-            filter button on the right (1a.3, decision 4.6's correction). */}
-        <div style={{
-          padding:      '6px var(--page-gutter, var(--space-6)) 8px',
-          boxSizing:    'border-box',
-        }}>
-          <SearchBar
-            value={query}
-            onChange={onQueryChange}
-            onInputFocus={onSearchFocus}
-            placeholder={placeholder}
-            onFilter={onFilter}
-            filterDisabled={filterDisabled}
-            hasActiveFilters={hasActiveFilters}
-            compact
+            width={96}
           />
         </div>
       </div>

@@ -40,6 +40,14 @@
   --color-border:        #E9ECF1;
   --color-border-subtle: #EEF1F4;
 
+  /* Header block of the home screens (UI refresh plan, step 8.1): the soft tint behind the
+     title and search, the track of the mode switch, and its raised thumb. The blue text on
+     the tint is 4.5:1 or better. */
+  --color-header-tint:      #EEF4FF;
+  --color-seg-track:        #DCE7FB;
+  --color-seg-thumb:        #FFFFFF;
+  --color-seg-thumb-text:   #2563EB;
+
   /* Semantic */
   --color-danger:        #DC2626;
   --color-danger-light:  #FEE2E2;
@@ -231,6 +239,13 @@
   --color-surface-muted:    #111827;
   --color-border:           #374151;
   --color-border-subtle:    #1F2937;
+
+  /* Header block of the home screens (UI refresh plan, step 8.1), dark. The thumb uses the
+     deeper blue so white text on it is 5.2:1 (rulebook 12.4, option B). */
+  --color-header-tint:      #17233B;
+  --color-seg-track:        #0F1A2E;
+  --color-seg-thumb:        #2563EB;
+  --color-seg-thumb-text:   #FFFFFF;
 
   /* Hero panel — see light-mode definition above for rationale. A step up
      from --color-surface for more separation from --color-bg than the
