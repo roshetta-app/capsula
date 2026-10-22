@@ -63,7 +63,7 @@ export default function CategoryRow({ label, iconType, iconValue, color, textCol
       </div>
 
       {/* Name */}
-      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', lineHeight: 1.3 }}>
+      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', lineHeight: 1.3, minWidth: 0, overflowWrap: 'break-word' }}>
         {label}
       </div>
     </div>

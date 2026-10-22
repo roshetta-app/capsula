@@ -1,5 +1,10 @@
 /**
  * src/components/drugs/home/DrugsBrowseSection.jsx
+ * 2026-10-22 (UI refresh plan, step 8.3): the strip is now a 2 by 2 grid of four category tiles
+ * (the same CategoryRow tile as the categories screen, so a name is never split inside a word)
+ * and the link reads 'View all categories'. The dashed '+N more' tile is gone. Loading shows
+ * four placeholder tiles in the same shape. The notes below describe the older strip.
+ *
  * 2026-10-18 (Drugs groups plan, step 1.4): the 'Browse' area of the Drugs
  * home was two big buttons, Category (blue) and Class (violet).
  *
@@ -38,15 +43,16 @@ import { Layers, ChevronRight } from 'lucide-react'
 import { buildClassIndex } from '../../../utils/classSearch'
 import DrugsSectionCard, { SECTION_TITLE_STYLE } from './DrugsSectionCard'
 import { shimmer } from './shimmer'
-import { SpecialtyIcon, useIsDark } from '../../../utils/specialtyIcon'
+import CategoryRow from './CategoryRow'
+import { useIsDark } from '../../../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN } from '../../../utils/specialtyTokens'
 import { useDrugContext } from '../../../context/DrugContext'
 import { useCategories } from '../../../hooks/useCategories'
 import { ROUTES } from '../../../router'
 import { prepareCategoryOpen } from '../../../pages/DrugsScreen'
 
-// How many category tiles show before the dashed '+N more' tile.
-const STRIP_COUNT = 3
+// How many category tiles show on the home (2 by 2); the rest are behind View all categories.
+const STRIP_COUNT = 4
 
 function ClassRow({ subtitle, onTap }) {
   const [pressed, setPressed] = useState(false)
@@ -84,67 +90,11 @@ function ClassRow({ subtitle, onTap }) {
   )
 }
 
-// One cell of the strip: a rounded square (the icon, or the '+N' of the dashed
-// tile) with the name under it. The square keeps its shape and a 64 px top size,
-// so four fit a small phone. The name is limited to two lines.
-function StripTile({ label, ariaLabel, onTap, children, dashed = false, bg, accent = false }) {
-  const [pressed, setPressed] = useState(false)
-  return (
-    <button
-      type="button"
-      onClick={onTap}
-      aria-label={ariaLabel || label}
-      onPointerDown={() => setPressed(true)}
-      onPointerUp={() => setPressed(false)}
-      onPointerLeave={() => setPressed(false)}
-      onPointerCancel={() => setPressed(false)}
-      style={{
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
-        minWidth: 0, padding: 0, margin: 0,
-        background: 'none', border: 'none', cursor: 'pointer',
-        fontFamily: 'var(--font-body)',
-        WebkitTapHighlightColor: 'transparent',
-        opacity: pressed ? 0.75 : 1,
-        transform: pressed ? 'scale(0.97)' : 'scale(1)',
-        transition: 'opacity var(--motion-fast) var(--ease-settle), transform var(--motion-fast) var(--ease-settle)',
-      }}
-    >
-      <span style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        width: '100%', maxWidth: 64, aspectRatio: '1 / 1',
-        borderRadius: 18, boxSizing: 'border-box',
-        background: dashed ? 'transparent' : bg,
-        border: dashed ? '1.5px dashed var(--color-border)' : 'none',
-        color: accent ? 'var(--color-accent)' : 'inherit',
-        fontSize: 17, fontWeight: 700,
-      }}>
-        {children}
-      </span>
-      <span
-        dir="auto"
-        style={{
-          width: '100%', textAlign: 'center',
-          fontSize: 12, fontWeight: 600, lineHeight: 1.25,
-          color: dashed ? 'var(--color-text-secondary)' : 'var(--color-text-primary)',
-          overflow: 'hidden', display: '-webkit-box',
-          WebkitBoxOrient: 'vertical', WebkitLineClamp: 2,
-          overflowWrap: 'anywhere', hyphens: 'auto',
-        }}
-      >
-        {label}
-      </span>
-    </button>
-  )
-}
-
 function StripSkeleton() {
   return (
     <div style={STRIP_GRID} aria-hidden="true">
-      {Array.from({ length: STRIP_COUNT + 1 }, (_, i) => (
-        <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-          <div style={shimmer({ width: '100%', maxWidth: 64, aspectRatio: '1 / 1', borderRadius: 18 })} />
-          <div style={shimmer({ width: '70%', height: 12 })} />
-        </div>
+      {Array.from({ length: STRIP_COUNT }, (_, i) => (
+        <div key={i} style={shimmer({ height: 80, borderRadius: 16 })} />
       ))}
     </div>
   )
@@ -152,9 +102,8 @@ function StripSkeleton() {
 
 const STRIP_GRID = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
-  gap: 8,
-  alignItems: 'start',
+  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+  gap: 'var(--space-2)',
 }
 
 export default function DrugsBrowseSection() {
@@ -180,8 +129,6 @@ export default function DrugsBrowseSection() {
     : 'Search by class or drug family'
 
   const shown = withDrugs.slice(0, STRIP_COUNT)
-  const restCount = Math.max(0, withDrugs.length - STRIP_COUNT)
-  const total = withDrugs.length
 
   function openAll() { navigate(ROUTES.DRUGS_BROWSE_CATEGORY) }
   function openClasses() { navigate(ROUTES.DRUGS_BROWSE_CLASS) }
@@ -208,7 +155,7 @@ export default function DrugsBrowseSection() {
         WebkitTapHighlightColor: 'transparent',
       }}
     >
-      {total > 0 ? `View all ${total}` : 'View all'}
+      View all categories
       <ChevronRight size={16} strokeWidth={2.2} aria-hidden="true" />
     </button>
   )
@@ -241,16 +188,17 @@ export default function DrugsBrowseSection() {
           const iconValue = iconType === 'custom' ? (cat.icon_url || '') : (cat.icon_name || 'Pill')
           const colors    = resolveToken(cat.color_token || FALLBACK_TOKEN, isDark)
           return (
-            <StripTile key={cat.id} label={cat.name_en} bg={colors.bg} onTap={() => openCategory(cat.slug)}>
-              <SpecialtyIcon iconType={iconType} iconValue={iconValue} size={26} color={colors.fg} />
-            </StripTile>
+            <CategoryRow
+              key={cat.id}
+              label={cat.name_en}
+              iconType={iconType}
+              iconValue={iconValue}
+              color={colors.bg}
+              textColor={colors.fg}
+              onTap={() => openCategory(cat.slug)}
+            />
           )
         })}
-        {restCount > 0 && (
-          <StripTile dashed accent label="more" ariaLabel={`${restCount} more categories`} onTap={openAll}>
-            +{restCount}
-          </StripTile>
-        )}
       </div>
     )
   }
