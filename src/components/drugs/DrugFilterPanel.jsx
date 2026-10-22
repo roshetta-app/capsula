@@ -428,7 +428,7 @@ function ToggleChip({ label, active, onToggle, showCheckbox = true, fitContent =
         fontSize: 13, fontWeight: 500,
         cursor: 'pointer',
         border: active ? '1.5px solid var(--color-accent)' : '1.5px solid var(--color-border)',
-        backgroundColor: active ? 'var(--color-accent)' : 'transparent',
+        backgroundColor: active ? 'var(--color-accent-solid)' : 'transparent',
         color: active ? '#fff' : 'var(--color-text-secondary)',
         fontFamily: 'var(--font-body)',
         transform: pressed ? 'scale(0.96)' : 'scale(1)',

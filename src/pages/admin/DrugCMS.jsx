@@ -729,7 +729,7 @@ const primaryBtnStyle = {
   padding: 'var(--space-2) var(--space-3)',
   borderRadius: 'var(--radius-sm)',
   border: 'none',
-  backgroundColor: 'var(--color-accent)',
+  backgroundColor: 'var(--color-accent-solid)',
   color: '#fff',
   fontSize: 13, fontWeight: 600,
   fontFamily: 'var(--font-body)',
@@ -772,7 +772,7 @@ const sortToggleBtnStyle = {
 const sortToggleBtnActiveStyle = {
   fontWeight: 600,
   border: '1.5px solid var(--color-accent)',
-  backgroundColor: 'var(--color-accent)',
+  backgroundColor: 'var(--color-accent-solid)',
   color: '#fff',
 }
 

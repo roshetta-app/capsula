@@ -119,7 +119,7 @@ export default function ConditionsCMS() {
             display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
             padding: '7px 14px', borderRadius: 'var(--radius-md)',
             fontSize: 13, fontWeight: 600, cursor: 'pointer',
-            border: 'none', backgroundColor: 'var(--color-accent)', color: '#fff',
+            border: 'none', backgroundColor: 'var(--color-accent-solid)', color: '#fff',
             fontFamily: 'var(--font-body)',
           }}
         >

@@ -116,6 +116,7 @@
   --color-accent-light:     #EFF4FF;
   --color-accent-hover:     #1D4ED8;
   --color-accent-text:      #2563EB;   /* accent used as words: 4.5:1 on white and page colour */
+  --color-accent-solid:     #2563EB;   /* blue behind white text (buttons, selected tabs): 5.2:1 (UI refresh 8.7) */
 
   --color-danger:           #DC2626;
   --color-danger-light:     #FEE2E2;
@@ -262,6 +263,7 @@
   --color-accent-light:     #1E3A5F;
   --color-accent-hover:     #60A5FA;
   --color-accent-text:      #60A5FA;   /* accent used as words: the plain dark accent is only 4.0:1 on cards */
+  --color-accent-solid:     #2563EB;   /* blue behind white text: the deeper blue, 5.2:1 (UI refresh 8.7, rulebook 12.4 B); --color-accent stays the lighter blue for icons, lines and words */
 
   --color-danger:           #F87171;
   --color-danger-light:     #450A0A;

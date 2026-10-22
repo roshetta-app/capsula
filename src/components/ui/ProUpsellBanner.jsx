@@ -38,7 +38,7 @@ export default function ProUpsellBanner({
         justifyContent:          'space-between',
         gap:                     'var(--space-3)',
         padding:                 'var(--space-3)',
-        backgroundColor:         'var(--color-accent)',
+        backgroundColor:         'var(--color-accent-solid)',
         borderRadius:            'var(--radius-lg)',
         cursor:                  interactive ? 'pointer' : 'default',
         WebkitTapHighlightColor: 'transparent',

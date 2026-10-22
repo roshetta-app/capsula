@@ -101,7 +101,7 @@ function RoundMark({ inGroup }) {
     }}>
       <span style={{
         width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        backgroundColor: inGroup ? 'var(--color-accent-light)' : 'var(--color-accent)',
+        backgroundColor: inGroup ? 'var(--color-accent-light)' : 'var(--color-accent-solid)',
         color: inGroup ? 'var(--color-accent)' : '#fff',
         transition: 'background-color var(--motion-fast) var(--ease-settle)',
       }}>
@@ -341,7 +341,7 @@ export default function AddToGroupSheet({ isOpen, onClose, drug }) {
               onClick={handleNewGroup}
               style={{
                 width: '100%', minHeight: 48, borderRadius: 'var(--radius-md)', border: 'none', cursor: 'pointer',
-                backgroundColor: 'var(--color-accent)', color: '#fff',
+                backgroundColor: 'var(--color-accent-solid)', color: '#fff',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)',
                 fontSize: 15, fontWeight: 700, fontFamily: 'var(--font-body)',
                 WebkitTapHighlightColor: 'transparent', outline: 'none',

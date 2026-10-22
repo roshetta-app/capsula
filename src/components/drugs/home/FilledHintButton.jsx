@@ -28,7 +28,7 @@ export default function FilledHintButton({ onClick, children, style }) {
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4,
         cursor: 'pointer',
         border: '1.5px solid var(--color-accent)',
-        backgroundColor: 'var(--color-accent)',
+        backgroundColor: 'var(--color-accent-solid)',
         color: '#fff',
         fontSize: 13, fontWeight: 600,
         fontFamily: 'var(--font-body)',

@@ -216,7 +216,7 @@ function NewSpecialtyModal({ isOpen, onClose, onCreated }) {
             disabled={!name.trim() || busy}
             style={{
               padding: '8px 16px', borderRadius: 'var(--radius-md)',
-              border: 'none', backgroundColor: 'var(--color-accent)', color: '#fff',
+              border: 'none', backgroundColor: 'var(--color-accent-solid)', color: '#fff',
               fontSize: 13, fontWeight: 600,
               cursor: !name.trim() || busy ? 'default' : 'pointer',
               opacity: !name.trim() || busy ? 0.6 : 1,
@@ -461,7 +461,7 @@ export default function ConditionEditor() {
             padding: '7px 18px', borderRadius: 'var(--radius-md)',
             fontSize: 13, fontWeight: 600, cursor: !isValid() || saving ? 'default' : 'pointer',
             border: 'none',
-            backgroundColor: 'var(--color-accent)',
+            backgroundColor: 'var(--color-accent-solid)',
             color: '#fff', fontFamily: 'var(--font-body)',
             opacity: !isValid() || saving ? 0.6 : 1,
             display: 'flex', alignItems: 'center', gap: 'var(--space-1)',

@@ -94,7 +94,7 @@ export default function GroupStateMessage({
             marginTop: 'var(--space-1)',
             padding: '0 20px', minHeight: 44, borderRadius: 'var(--radius-md)',
             border: 'none', cursor: 'pointer',
-            backgroundColor: 'var(--color-accent)', color: '#fff',
+            backgroundColor: 'var(--color-accent-solid)', color: '#fff',
             fontSize: 13, fontWeight: 600, fontFamily: font,
             WebkitTapHighlightColor: 'transparent',
           }}

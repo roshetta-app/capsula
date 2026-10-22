@@ -276,7 +276,7 @@ export default function ConfirmSheet({
               padding: 'var(--space-2) var(--space-4)',
               borderRadius: 'var(--radius-sm)',
               border: 'none',
-              backgroundColor: destructive ? 'var(--color-danger)' : 'var(--color-accent)',
+              backgroundColor: destructive ? 'var(--color-danger)' : 'var(--color-accent-solid)',
               color: '#fff',
               fontSize: 14,
               fontWeight: 600,

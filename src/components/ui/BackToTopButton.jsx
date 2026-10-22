@@ -23,7 +23,7 @@ export default function BackToTopButton({ visible, onClick }) {
         height:                  50,
         borderRadius:            'var(--radius-full)',
         border:                  'none',
-        backgroundColor:         'var(--color-accent)',
+        backgroundColor:         'var(--color-accent-solid)',
         color:                   '#ffffff',
         boxShadow:               'var(--shadow-elevated)',
         display:                 'flex',

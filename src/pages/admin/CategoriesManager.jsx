@@ -842,7 +842,7 @@ const btnPrimary = {
   padding:         '8px 14px',
   borderRadius:    'var(--radius-sm)',
   border:          'none',
-  backgroundColor: 'var(--color-accent)',
+  backgroundColor: 'var(--color-accent-solid)',
   color:           '#fff',
   fontSize:        13,
   fontWeight:      600,

@@ -78,7 +78,7 @@ export default function FavouritesStickyHeader({ visible, activeTab, onSelectTab
                 aria-label="Close search"
                 style={{
                   width: 40, height: 40, borderRadius: '50%', border: 'none', flexShrink: 0,
-                  backgroundColor: 'var(--color-accent)', display: 'flex', alignItems: 'center',
+                  backgroundColor: 'var(--color-accent-solid)', display: 'flex', alignItems: 'center',
                   justifyContent: 'center', cursor: 'pointer', WebkitTapHighlightColor: 'transparent', outline: 'none',
                 }}
               >

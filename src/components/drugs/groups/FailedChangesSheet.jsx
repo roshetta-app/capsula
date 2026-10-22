@@ -117,7 +117,7 @@ export default function FailedChangesSheet({ isOpen, onClose }) {
             >
               Discard
             </button>
-            <button onClick={handleRetry} style={{ ...BUTTON, backgroundColor: 'var(--color-accent)', color: '#fff' }}>
+            <button onClick={handleRetry} style={{ ...BUTTON, backgroundColor: 'var(--color-accent-solid)', color: '#fff' }}>
               Try again
             </button>
           </div>

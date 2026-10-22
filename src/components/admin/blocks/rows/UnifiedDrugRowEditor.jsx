@@ -599,7 +599,7 @@ function EditableDoseLine({
               type="button"
               onClick={onConfirmSave}
               style={{
-                background: 'var(--color-accent)', color: '#fff',
+                background: 'var(--color-accent-solid)', color: '#fff',
                 border: 'none', borderRadius: 'var(--radius-md)',
                 padding: '3px 10px', fontSize: 11, fontWeight: 600,
                 cursor: 'pointer', fontFamily: 'var(--font-body)',
@@ -812,7 +812,7 @@ function EditableMaxDose({
               type="button"
               onClick={onConfirmSave}
               style={{
-                background: 'var(--color-accent)', color: '#fff',
+                background: 'var(--color-accent-solid)', color: '#fff',
                 border: 'none', borderRadius: 'var(--radius-md)',
                 padding: '3px 10px', fontSize: 11, fontWeight: 600,
                 cursor: 'pointer', fontFamily: 'var(--font-body)',
@@ -3350,7 +3350,7 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                           type="button"
                           onClick={() => { setConfirmSaveGroup(null); saveDoseToLibrary(groupIdx) }}
                           style={{
-                            background: 'var(--color-accent)', color: '#fff',
+                            background: 'var(--color-accent-solid)', color: '#fff',
                             border: 'none', borderRadius: 'var(--radius-md)',
                             padding: '3px 10px', fontSize: 11, fontWeight: 600,
                             cursor: 'pointer', fontFamily: 'var(--font-body)',

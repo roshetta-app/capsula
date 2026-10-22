@@ -484,7 +484,7 @@ export default function DrugGroupScreen() {
                 <button
                   onClick={() => setRemoveMode(false)}
                   aria-label="Done removing drugs"
-                  style={{ ...pillButtonStyle, backgroundColor: 'var(--color-accent)', color: '#fff' }}
+                  style={{ ...pillButtonStyle, backgroundColor: 'var(--color-accent-solid)', color: '#fff' }}
                 >
                   <Check size={18} strokeWidth={2.5} aria-hidden="true" />
                   Done

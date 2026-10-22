@@ -157,7 +157,7 @@ export default function ProComingSoonSheet({ isOpen, onClose }) {
               padding:         'var(--space-3) var(--space-4)',
               borderRadius:    'var(--radius-full)',
               border:          'none',
-              backgroundColor: 'var(--color-accent)',
+              backgroundColor: 'var(--color-accent-solid)',
               color:           '#fff',
               fontSize:        15,
               fontWeight:      600,

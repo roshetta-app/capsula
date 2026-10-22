@@ -21,7 +21,7 @@ const VARIANT_STYLES = {
     border: 'none',
   },
   primary: {
-    backgroundColor: 'var(--color-accent)',
+    backgroundColor: 'var(--color-accent-solid)',
     color: '#fff',
     border: 'none',
   },

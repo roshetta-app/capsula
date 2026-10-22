@@ -124,7 +124,7 @@ function LinkProblem({ Icon, title, body, actionLabel, onAction }) {
         onClick={onAction}
         style={{
           width: '100%', maxWidth: 320, minHeight: 48, border: 'none', padding: '0 16px',
-          borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-accent)', color: '#fff',
+          borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-accent-solid)', color: '#fff',
           fontSize: 15, fontWeight: 600, fontFamily: 'var(--font-body)', cursor: 'pointer',
           WebkitTapHighlightColor: 'transparent', outline: 'none',
         }}
@@ -469,7 +469,7 @@ function SharedGroupBody({ code }) {
                 onClick={() => navigate(ROUTES.DRUGS_GROUP(saveState.groupId))}
                 style={{
                   flexShrink: 0, minHeight: 44, border: 'none', cursor: 'pointer', padding: '0 20px',
-                  borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-accent)', color: '#fff',
+                  borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-accent-solid)', color: '#fff',
                   fontSize: 14, fontWeight: 600, fontFamily: 'var(--font-body)',
                   WebkitTapHighlightColor: 'transparent', outline: 'none',
                 }}
@@ -489,7 +489,7 @@ function SharedGroupBody({ code }) {
                 disabled={saveBusy}
                 style={{
                   display: 'block', width: '100%', minHeight: 48, border: 'none', padding: '0 16px',
-                  borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-accent)', color: '#fff',
+                  borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-accent-solid)', color: '#fff',
                   fontSize: 15, fontWeight: 600, fontFamily: 'var(--font-body)',
                   cursor: saveBusy ? 'default' : 'pointer', opacity: saveBusy ? 0.6 : 1,
                   WebkitTapHighlightColor: 'transparent', outline: 'none',

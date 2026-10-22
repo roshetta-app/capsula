@@ -125,7 +125,7 @@ export default function InfoSheet({ isOpen, onClose, title, children }) {
             padding:         'var(--space-2) var(--space-4)',
             borderRadius:    'var(--radius-sm)',
             border:          'none',
-            backgroundColor: 'var(--color-accent)',
+            backgroundColor: 'var(--color-accent-solid)',
             color:           '#fff',
             fontSize:        14,
             fontWeight:      600,

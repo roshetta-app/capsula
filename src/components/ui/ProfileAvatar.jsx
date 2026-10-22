@@ -114,7 +114,7 @@ export default function ProfileAvatar({ user, fullName, style }) {
       width:           72,
       height:          72,
       borderRadius:    'var(--radius-full)',
-      backgroundColor: 'var(--color-accent)',
+      backgroundColor: 'var(--color-accent-solid)',
       display:         'flex',
       alignItems:      'center',
       justifyContent:  'center',

@@ -52,7 +52,7 @@ const OFFLINE_SHARE_MESSAGE = "You're offline. Reconnect to share."
 
 const PRIMARY_BUTTON = {
   width: '100%', minHeight: 48, borderRadius: 'var(--radius-md)', border: 'none', cursor: 'pointer',
-  backgroundColor: 'var(--color-accent)', color: '#fff', fontSize: 15, fontWeight: 600,
+  backgroundColor: 'var(--color-accent-solid)', color: '#fff', fontSize: 15, fontWeight: 600,
   fontFamily: 'var(--font-body)', WebkitTapHighlightColor: 'transparent', outline: 'none',
   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
 }

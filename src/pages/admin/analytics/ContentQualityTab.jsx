@@ -481,7 +481,7 @@ function DrugGroupsChart({ rows }) {
               }}>
                 <div style={{
                   width: `${pct}%`, height: '100%',
-                  backgroundColor: 'var(--color-accent)',
+                  backgroundColor: 'var(--color-accent-solid)',
                   borderRadius: 'var(--radius-sm)',
                   transition: 'width 0.5s ease',
                   display: 'flex', alignItems: 'center',

@@ -126,7 +126,7 @@ export default function FavouritesHero({ activeTab, onSelectTab, counts, heroRef
               height:                  44,
               borderRadius:            '50%',
               border:                  'none',
-              backgroundColor:         isSearching ? 'var(--color-accent)' : 'transparent',
+              backgroundColor:         isSearching ? 'var(--color-accent-solid)' : 'transparent',
               display:                 'flex',
               alignItems:              'center',
               justifyContent:          'center',

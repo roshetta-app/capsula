@@ -992,7 +992,7 @@ export default function NotificationsPanel() {
                         style={{
                           display: 'flex', alignItems: 'center', gap: 4,
                           padding: '6px 14px', borderRadius: 'var(--radius-sm)', border: 'none',
-                          backgroundColor: 'var(--color-accent)', color: '#fff',
+                          backgroundColor: 'var(--color-accent-solid)', color: '#fff',
                           fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-body)',
                           cursor: savingEdit ? 'not-allowed' : 'pointer', opacity: savingEdit ? 0.7 : 1,
                         }}

@@ -52,7 +52,7 @@ function AddMark({ inGroup, onAdd, name }) {
       onClick={e => { e.stopPropagation(); onAdd() }}
       onPointerDown={e => e.stopPropagation()}
       aria-label={`Add ${name} to this group`}
-      style={{ ...base, cursor: 'pointer', backgroundColor: 'var(--color-accent)', color: '#fff' }}
+      style={{ ...base, cursor: 'pointer', backgroundColor: 'var(--color-accent-solid)', color: '#fff' }}
     >
       <Plus size={22} strokeWidth={2.5} aria-hidden="true" />
     </button>

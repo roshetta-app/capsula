@@ -152,7 +152,7 @@ export default function CrashLogs() {
             display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
             padding: 'var(--space-2) var(--space-3)',
             borderRadius: 'var(--radius-sm)', border: 'none',
-            backgroundColor: 'var(--color-accent)', color: '#fff',
+            backgroundColor: 'var(--color-accent-solid)', color: '#fff',
             fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-body)',
             cursor: refreshing ? 'not-allowed' : 'pointer',
             opacity: refreshing ? 0.7 : 1,
