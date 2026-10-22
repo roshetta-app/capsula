@@ -823,7 +823,7 @@ export default function DrugsScreen() {
       <div
         aria-hidden="true"
         style={{
-          width: 44, height: 44, borderRadius: '50%', flexShrink: 0,
+          width: 48, height: 48, borderRadius: '50%', flexShrink: 0,
           backgroundColor: `color-mix(in srgb, ${ink} 16%, var(--color-surface))`,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}
@@ -970,7 +970,7 @@ export default function DrugsScreen() {
               {hasQuery && activeCategory && activeCategory !== '__all' && ` in ${categoryLabel}`}
               {/* 2026-10-18 (Omar): the old separate 'Keep typing to narrow these
                   results' line is folded into the count line, only past 100. */}
-              {displayed.length > 100 && ' · type more to narrow'}
+              {hasQuery && displayed.length > 100 && ' · type more to narrow'}
             </div>
             )}
 
@@ -1158,8 +1158,9 @@ export default function DrugsScreen() {
                   <BrowseTopRow
                     backLabel={location.state?.from === 'categories' ? 'Categories' : 'Drugs'}
                     onBack={goBackFromCategory}
-                    title={categoryLabel}
+                    title={activeCategory === '__all' || /drugs$/i.test(categoryLabel) ? categoryLabel : `${categoryLabel} Drugs`}
                     icon={categoryBadge}
+                    spaceBelow={18}
                   />
                 ) : (
                   <DrugsHero onInfoTap={() => setShowModeInfo(true)} />

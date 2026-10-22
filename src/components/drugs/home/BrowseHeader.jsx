@@ -18,7 +18,7 @@
 
 import { ChevronLeft } from 'lucide-react'
 
-export function BrowseTopRow({ backLabel, onBack, title, subtitle = null, icon = null }) {
+export function BrowseTopRow({ backLabel, onBack, title, subtitle = null, icon = null, spaceBelow = 0 }) {
   return (
     <div>
       <button
@@ -36,7 +36,7 @@ export function BrowseTopRow({ backLabel, onBack, title, subtitle = null, icon =
         <ChevronLeft size={20} strokeWidth={2.2} aria-hidden="true" />
         {backLabel}
       </button>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 2 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: icon ? 8 : 2, marginBottom: spaceBelow }}>
         {icon}
         <h1 style={{
           margin: 0, minWidth: 0, overflowWrap: 'break-word', fontSize: 26, fontWeight: 700, lineHeight: 1.2,
