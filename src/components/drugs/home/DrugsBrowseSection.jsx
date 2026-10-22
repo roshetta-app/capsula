@@ -82,7 +82,7 @@ function ClassRow({ subtitle, onTap }) {
         <Layers size={21} strokeWidth={1.9} aria-hidden="true" />
       </span>
       <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, flex: 1 }}>
-        <span style={{ fontSize: 16, fontWeight: 600, lineHeight: 1.25, color: 'var(--color-text-primary)' }}>Browse by class</span>
+        <span style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.25, color: 'var(--color-text-primary)' }}>Browse by class</span>
         <span style={{ fontSize: 13, lineHeight: 1.3, color: 'var(--color-text-secondary)' }}>{subtitle}</span>
       </span>
       <ChevronRight size={18} strokeWidth={2} color="var(--color-text-tertiary)" aria-hidden="true" style={{ flexShrink: 0 }} />

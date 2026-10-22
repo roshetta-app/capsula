@@ -18,7 +18,8 @@
  * and no line between sections (2026-10-22: dividers removed, whitespace does the separating:
  * 12px above and below each section, 12px between a title and its content). The `divider`
  * prop is kept so old call sites still work, but it no longer draws anything.
- * Type scale on the Drugs home: section title 18/700, row title 16/600, link 14/600, helper 13.
+ * Type scale on the Drugs home: section title 18/700, row title 15/600, card and tile name 14/600,
+ * link 14/600, helper 12 to 13.
  * Cards stay as they were when `flat` is off (the search focus mode, until step 11.6).
  *
  * The title text style is exported (SECTION_TITLE_STYLE) so the pieces of both

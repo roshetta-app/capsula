@@ -116,7 +116,7 @@ export default function DrugsSearchSection({
         style={{
           display:       'flex',
           flexDirection: 'column',
-          padding:       searchOpen ? 0 : '0 0 var(--space-4)',
+          padding:       searchOpen ? 0 : '0 0 var(--space-2)',
         }}
       >
         {/* The header block. Home: tinted, full width to the screen edges, rounded bottom
@@ -171,7 +171,7 @@ export default function DrugsSearchSection({
         {/* Recently viewed: a shortcut to drugs, so it belongs with search. It sits under the
             tinted block, outside it. */}
         {showRecent && recentDrugs.length > 0 && (
-          <div style={{ order: 2, marginTop: 'var(--space-4)', marginBottom: 'var(--space-1)' }}>
+          <div style={{ order: 2, marginTop: 'var(--space-4)' }}>
             <RecentlyViewedButton
               onTap={onOpenRecent}
               drugs={recentDrugs}

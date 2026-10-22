@@ -43,7 +43,7 @@ export default function CategoryRow({ label, iconType, iconValue, color, textCol
         backgroundColor: 'var(--color-surface-muted)',
         border: 'none',
         borderRadius: 16,
-        padding: 'var(--space-3)',
+        padding: 12,
         cursor: 'pointer',
         outline: 'none',
         WebkitTapHighlightColor: 'transparent',
@@ -54,16 +54,16 @@ export default function CategoryRow({ label, iconType, iconValue, color, textCol
     >
       {/* Icon in tinted circle */}
       <div style={{
-        width: 32, height: 32, borderRadius: '50%',
+        width: 36, height: 36, borderRadius: '50%',
         backgroundColor: color,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         flexShrink: 0,
       }}>
-        <SpecialtyIcon iconType={iconType} iconValue={iconValue} size={15} color={textColor} />
+        <SpecialtyIcon iconType={iconType} iconValue={iconValue} size={17} color={textColor} />
       </div>
 
       {/* Name */}
-      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', lineHeight: 1.3, minWidth: 0, overflowWrap: 'break-word' }}>
+      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)', lineHeight: 1.3, minWidth: 0, overflowWrap: 'break-word' }}>
         {label}
       </div>
     </div>

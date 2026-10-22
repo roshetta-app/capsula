@@ -75,15 +75,15 @@ export default function RecentlyViewedButton({ onTap, drugs, categories, isDark,
             <div
               key={drug.id}
               style={{
-                width:           34,
-                height:          34,
+                width:           32,
+                height:          32,
                 borderRadius:    '50%',
                 backgroundColor: colors.bg,
                 color:           colors.fg,
                 display:         'flex',
                 alignItems:      'center',
                 justifyContent:  'center',
-                fontSize:        14,
+                fontSize:        13,
                 fontWeight:      600,
                 border:          `2px solid ${onPage ? 'var(--color-bg)' : 'var(--color-surface)'}`,
                 marginLeft:      i === 0 ? 0 : -9,
@@ -98,7 +98,7 @@ export default function RecentlyViewedButton({ onTap, drugs, categories, isDark,
       </div>
 
       <span style={{
-        fontSize:   16,
+        fontSize:   15,
         fontWeight: 600,
         color:      'var(--color-text-primary)',
       }}>
