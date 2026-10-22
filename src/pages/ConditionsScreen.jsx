@@ -1,5 +1,11 @@
 /**
  * src/pages/ConditionsScreen.jsx
+ * 2026-10-22 (UI refresh plan, step 8.6a): the Conditions home gets the same header as the Drugs
+ * home. One tinted block with a rounded bottom edge holds the logo row (bell and sun stay), the
+ * tall search pill and the Specialty control as one slim pill; the list sits under it on the page
+ * colour (the two-layer hero and the rounded panel are gone). The rotating tagline is no longer
+ * shown here. The slide-in bar on scroll is now one slim row: a search pill and the Specialty
+ * chip, built on the shared ScrollRevealHeader like the Drugs one.
  * Phase 5 — Conditions Screen Redesign
  * Phase 6 — Sticky header polish: visual hierarchy, spacing, toolbar balance,
  *            search icon in logo row (scroll-to-search)
@@ -154,6 +160,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, ListFilter, Heart, Bell, WifiOff } from 'lucide-react'
 import BackToTopButton         from '../components/ui/BackToTopButton'
+import ScrollRevealHeader      from '../components/ui/ScrollRevealHeader'
 import SearchBar               from '../components/ui/SearchBar'
 import ConditionCard           from '../components/ConditionCard'
 import RecentlyViewedChips     from '../components/conditions/RecentlyViewedChips'
@@ -368,128 +375,14 @@ function DarkModeToggle({ theme, onCycleTheme }) {
   )
 }
 
-// ─── Rotating tagline ──────────────────────────────────────────────────────────
-// Sits in the exact spot the static "What are you looking for?" headline
-// used to occupy, beneath the logo. Cycles through TAGLINES with a gentle
-// crossfade, pauses on any home-screen interaction, and resumes after a
-// short idle period. Uses refs (not state) for pause/idle bookkeeping so
-// frequent events like scroll/keydown don't trigger extra re-renders.
+// ─── Brand row ────────────────────────────────────────────────────────────────
+// 2026-10-22 (step 8.6a): the logo row of the tinted header: wordmark left, bell and sun right.
+// The tagline under it is gone (the Drugs header has none).
 
-const TAGLINES = [
-  'Treat With Confidence',
-  'Medicine At Your Fingertips',
-  'The Clinic In Your Pocket',
-]
-
-const TAGLINE_VISIBLE_MS     = 6500 // time each tagline stays on screen (5–8s range)
-const TAGLINE_FADE_MS        = 400  // crossfade duration (300–500ms range)
-const TAGLINE_IDLE_RESUME_MS = 4000 // idle time before rotation resumes (3–5s range)
-
-function RotatingTagline({
-  fontSize   = 16,
-  fontWeight = 500,
-  color      = 'var(--color-text-primary)',
-}) {
-  const [textA, setTextA]         = useState(TAGLINES[0])
-  const [textB, setTextB]         = useState(TAGLINES[1])
-  const [activeIsA, setActiveIsA] = useState(true)
-
-  const indexRef     = useRef(0)
-  const pausedRef    = useRef(false)
-  const idleTimerRef = useRef(null)
-
-  useEffect(() => {
-    function advance() {
-      if (pausedRef.current) return
-      const nextIndex = (indexRef.current + 1) % TAGLINES.length
-      indexRef.current = nextIndex
-      setActiveIsA(prevActiveIsA => {
-        if (prevActiveIsA) {
-          setTextB(TAGLINES[nextIndex])
-        } else {
-          setTextA(TAGLINES[nextIndex])
-        }
-        return !prevActiveIsA
-      })
-    }
-
-    const intervalId = setInterval(advance, TAGLINE_VISIBLE_MS)
-
-    // Any interaction on the home screen (typing, scrolling, tapping
-    // filters, etc.) pauses rotation; resumes once idle again.
-    function handleInteraction() {
-      pausedRef.current = true
-      if (idleTimerRef.current) clearTimeout(idleTimerRef.current)
-      idleTimerRef.current = setTimeout(() => {
-        pausedRef.current = false
-      }, TAGLINE_IDLE_RESUME_MS)
-    }
-
-    window.addEventListener('scroll', handleInteraction, { passive: true })
-    window.addEventListener('pointerdown', handleInteraction, { passive: true })
-    window.addEventListener('keydown', handleInteraction)
-    window.addEventListener('input', handleInteraction)
-
-    return () => {
-      clearInterval(intervalId)
-      if (idleTimerRef.current) clearTimeout(idleTimerRef.current)
-      window.removeEventListener('scroll', handleInteraction)
-      window.removeEventListener('pointerdown', handleInteraction)
-      window.removeEventListener('keydown', handleInteraction)
-      window.removeEventListener('input', handleInteraction)
-    }
-  }, [])
-
-  // Identical typography to the headline this replaces — only the text
-  // content changes between the two stacked layers. fontSize/fontWeight/
-  // color are overridable per call site (e.g. StickyLogoHeader uses a
-  // smaller, lighter, lower-contrast variant); defaults match BrandRow's
-  // original values exactly, so BrandRow's rendering is unaffected.
-  const taglineStyle = {
-    position:      'absolute',
-    top:            0,
-    left:           0,
-    margin:         0,
-    fontSize,
-    fontWeight,
-    letterSpacing:  '-0.1px',
-    lineHeight:     1.4,
-    color,
-    whiteSpace:     'nowrap',
-    transition:     `opacity ${TAGLINE_FADE_MS}ms ease`,
-  }
-
+function BrandRow({ theme, onCycleTheme, onOpenNotifications }) {
   return (
-    <div style={{ position: 'relative', height: 23, overflow: 'hidden' }}>
-      <p style={{ ...taglineStyle, opacity: activeIsA ? 1 : 0 }}>{textA}</p>
-      <p style={{ ...taglineStyle, opacity: activeIsA ? 0 : 1 }}>{textB}</p>
-    </div>
-  )
-}
-
-// ─── Brand row + headline ─────────────────────────────────────────────────────
-
-function BrandRow({ isSearching, theme, onCycleTheme, onOpenNotifications, brandRowRef }) {
-  return (
-    <div ref={brandRowRef} style={{
-      paddingTop:    'var(--space-5)',
-      // Tagline → search gap. Was 20px (--space-5, premium polish pass);
-      // brought down to 12px (--space-3) per hierarchy pass — the search
-      // bar should feel anchored to the brand block, not floating below it.
-      paddingBottom: 'var(--space-3)',
-    }}>
-      <div style={{
-        display:      'flex',
-        alignItems:   'center',
-        gap:          'var(--space-2)',
-        // Logo → tagline gap. Was 12px (--space-3, premium polish pass);
-        // brought back down to 8px (--space-2) per hierarchy pass — the
-        // extra gap plus the tagline→search gap left the search bar
-        // feeling too far from the brand block above it.
-        marginBottom: isSearching ? 0 : 8,
-        transition:   'margin-bottom 0.15s ease',
-      }}>
-        {/* Logo wordmark */}
+    <div style={{ paddingTop: 'var(--space-2)', paddingBottom: 'var(--space-3)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', minHeight: 44 }}>
         <img
           src={`${import.meta.env.BASE_URL}logo.svg`}
           alt="Capsula"
@@ -498,7 +391,7 @@ function BrandRow({ isSearching, theme, onCycleTheme, onOpenNotifications, brand
         />
         <span style={{ flex: 1 }} />
 
-        {/* Notification bell — opens the persistent status sheet */}
+        {/* Notification bell: opens the persistent status sheet */}
         <button
           onClick={onOpenNotifications}
           aria-label="Notifications"
@@ -514,7 +407,6 @@ function BrandRow({ isSearching, theme, onCycleTheme, onOpenNotifications, brand
             cursor:                  'pointer',
             flexShrink:              0,
             color:                   'var(--color-text-secondary)',
-            transition:              'background-color 0.15s ease, border-color 0.15s ease',
             outline:                 'none',
             WebkitTapHighlightColor: 'transparent',
             marginRight:             'var(--space-2)',
@@ -523,38 +415,25 @@ function BrandRow({ isSearching, theme, onCycleTheme, onOpenNotifications, brand
           <Bell size={16} />
         </button>
 
-        {/* Dark mode toggle — top right */}
+        {/* Dark mode toggle */}
         <DarkModeToggle theme={theme} onCycleTheme={onCycleTheme} />
       </div>
-
-      {!isSearching && (
-        <RotatingTagline
-          fontSize={13}
-          fontWeight={500}
-          color="var(--color-text-secondary)"
-        />
-      )}
     </div>
   )
 }
 
-// ─── Sliding sticky logo header ───────────────────────────────────────────────
-// Appears once the in-page BrandRow logo scrolls out of view (above the
-// viewport). Slides in from the top with a CSS transition; slides back out
-// when the user scrolls back up and the logo re-enters the viewport.
+// ─── Sliding sticky header ───────────────────────────────────────────────────
+// Slides in from the top (shared ScrollRevealHeader) once the tinted header block has scrolled
+// out of view, and slides back out when it returns. One slim row (step 8.6a):
+//   search pill (left, taps scroll to the real search field) + Specialty chip (right).
 //
-// Layout (top to bottom):
-//   1. Logo row    — wordmark left, search icon right.
-//   2. Toolbar     — merged specialty pill (left), sort toggle (right).
-//
-// Specialty pill (merged, mirrors SpecialtySelector pattern):
+// Specialty chip (mirrors the SpecialtySelector pattern):
 //   Idle:   ListFilter icon + "All Specialties" + chevron
 //   Active: specialty icon + name + chevron + inline ✕ (clears without opening sheet)
-//   Tapping anywhere on the pill (except ✕) opens the specialty sheet.
+//   Tapping anywhere on the chip (except ✕) opens the specialty sheet.
 
 function StickyLogoHeader({
-  visible,
-  isSearching,
+  watchRef,
   activeSpecialtyObj,
   onClearSpecialty,
   onOpenSpecialties,
@@ -564,11 +443,6 @@ function StickyLogoHeader({
   const hasFilter = !!activeSpecialtyObj
   const tokenKey  = activeSpecialtyObj?.colorToken ?? FALLBACK_TOKEN
   const colors    = resolveToken(tokenKey, isDark)
-
-  // Search icon press feedback — conditions-screen-polish-master-plan Phase 5.
-  // Tracks pointer down/up so the icon can shrink slightly and tint toward
-  // accent while pressed, releasing right as onSearchTap's scroll begins.
-  const [searchPressed, setSearchPressed] = useState(false)
 
   // Specialty pill press feedback — matches SpecialtySelector's own pressed
   // state exactly (same pressedBg swap + scale(0.985) + --motion-fast/
@@ -606,50 +480,45 @@ function StickyLogoHeader({
   const controlTint  = hasFilter ? `rgba(${r}, ${g}, ${b}, 0.65)` : 'var(--color-text-secondary)'
 
   return (
-    <div
-      aria-hidden="true"
-      style={{
-        position:               'fixed',
-        top:                    0,
-        left:                   0,
-        right:                  0,
-        zIndex:                 50,
-        backgroundColor:        'var(--color-surface)',
-        borderBottomLeftRadius:  18,
-        borderBottomRightRadius: 18,
-        boxShadow:               '0 4px 12px rgba(0, 0, 0, 0.06)',
-        transform:               visible ? 'translateY(0)' : 'translateY(-100%)',
-        transition:              'transform 0.25s ease',
-        pointerEvents:           visible ? 'auto' : 'none',
-      }}
-    >
+    <ScrollRevealHeader watchRef={watchRef}>
       <div style={{ width: '100%', maxWidth: 680, margin: '0 auto' }}>
 
-        {/* 1. Logo row — wordmark only; search icon lives in the toolbar row below */}
-        <div style={{
-          display:    'flex',
-          alignItems: 'center',
-          padding:    '16px var(--page-gutter, var(--space-4)) 0',
-        }}>
-          <img
-            src={`${import.meta.env.BASE_URL}logo.svg`}
-            alt="Capsula"
-            className="capsula-logo"
-            style={{ display: 'block', height: 27, width: 'auto', flexShrink: 0 }}
-          />
-        </div>
-
-        {/* 2. Toolbar — specialty pill (fills available space), search icon (right).
-            Horizontal padding matches the shared --page-gutter page margins so the
-            pill's left edge and the search pill's right edge align with the
-            condition list content and the logo above. */}
+        {/* One slim row (step 8.6a, rule 13): a search pill that scrolls up to the real search
+            field, and the Specialty chip. The logo row is gone. */}
         <div style={{
           display:        'flex',
           alignItems:     'center',
-          gap:            10,
-          marginTop:      10,
-          padding:        '0 var(--page-gutter, var(--space-4)) 14px',
+          gap:            8,
+          padding:        '8px var(--page-gutter, var(--space-4))',
         }}>
+
+          {/* Search pill */}
+          <button
+            onClick={onSearchTap}
+            aria-label="Go to search"
+            style={{
+              flex:                    1,
+              minWidth:                0,
+              height:                  44,
+              display:                 'flex',
+              alignItems:              'center',
+              gap:                     8,
+              padding:                 '0 14px',
+              background:              'var(--color-header-tint)',
+              border:                  'none',
+              borderRadius:            'var(--radius-full)',
+              cursor:                  'pointer',
+              color:                   'var(--color-text-secondary)',
+              fontSize:                14,
+              fontFamily:              'var(--font-body)',
+              textAlign:               'left',
+              outline:                 'none',
+              WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            <Search size={17} strokeWidth={2.1} color="var(--color-accent)" aria-hidden="true" style={{ flexShrink: 0 }} />
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Search conditions…</span>
+          </button>
 
           {/* Specialty pill — flex:1 so it fills all space left of the search icon */}
           <div
@@ -673,8 +542,10 @@ function StickyLogoHeader({
               border:          hasFilter ? `1px solid rgba(${r}, ${g}, ${b}, 0.3)` : idlePillBorder,
               borderRadius:    'var(--radius-full)',
               overflow:        'hidden',
-              flex:            1,
+              flex:            '0 1 auto',
+              maxWidth:        '48%',
               minWidth:        0,
+              minHeight:       44,
               transform:       specialtyPressed ? 'scale(0.985)' : 'scale(1)',
               transition:      'background 0.2s ease, border-color 0.2s ease, transform var(--motion-fast) var(--ease-settle)',
             }}>
@@ -690,6 +561,7 @@ function StickyLogoHeader({
                 flex:                    1,
                 minWidth:                0,
                 padding:                 '9px 0 9px 14px',
+                minHeight:               44,
                 background:              'none',
                 border:                  'none',
                 cursor:                  'pointer',
@@ -773,42 +645,10 @@ function StickyLogoHeader({
             )}
           </div>
 
-          {/* Right: search icon — same neutral idle surface as the specialty
-              pill (Option A), blue accent glyph. Was a blue-tint fill; now
-              matches the pill's chrome so the two controls read as one
-              consistent idle system, with blue reserved for the icon glyphs. */}
-          <button
-            onClick={onSearchTap}
-            onPointerDown={() => setSearchPressed(true)}
-            onPointerUp={() => setSearchPressed(false)}
-            onPointerLeave={() => setSearchPressed(false)}
-            onPointerCancel={() => setSearchPressed(false)}
-            aria-label="Go to search"
-            style={{
-              display:                 'flex',
-              alignItems:              'center',
-              justifyContent:          'center',
-              width:                   38,
-              height:                  38,
-              background:              searchPressed ? 'var(--color-accent-light)' : idlePillBg,
-              border:                  idlePillBorder,
-              borderRadius:            'var(--radius-full)',
-              cursor:                  'pointer',
-              color:                   'var(--color-accent)',
-              padding:                 0,
-              outline:                 'none',
-              WebkitTapHighlightColor: 'transparent',
-              flexShrink:              0,
-              transform:               searchPressed ? 'scale(0.99)' : 'scale(1)',
-              transition:              'background var(--motion-fast) var(--ease-settle), transform var(--motion-fast) var(--ease-settle)',
-            }}
-          >
-            <Search size={17} strokeWidth={2.1} aria-hidden="true" />
-          </button>
         </div>
 
       </div>
-    </div>
+    </ScrollRevealHeader>
   )
 }
 
@@ -825,18 +665,13 @@ export default function ConditionsScreen() {
     results, resultCount,
   } = useConditionContext()
   const { isConditionFavourited }             = useFavouritesContext()
-  const { isDark, theme, setTheme }          = useDarkMode()
+  const { theme, setTheme }                  = useDarkMode()
 
   const [bottomSheetOpen, setBottomSheetOpen]     = useState(false)
   const [notifSheetOpen, setNotifSheetOpen]       = useState(false)
-  // showStickyHeader: plain boolean, flips once the BrandRow (logo) leaves
-  // the viewport. Same approach as FavouritesScreen's showStickyHeader —
-  // no continuous signal, no derived opacity/lift/shadow values. The base
-  // layer and panel are a static two-tone look now, not a scroll-driven
-  // animation, so a single fire-once boolean is all the header needs.
-  const [showStickyHeader, setShowStickyHeader]   = useState(false)
+  // The slim bar is shown and hidden by ScrollRevealHeader, watching heroRef (the tinted header block).
   const { visible: showBackToTop, scrollToTop: handleBackToTop } = useBackToTop()
-  const brandRowRef    = useRef(null)
+  const heroRef        = useRef(null)
   const searchInputRef = useRef(null)
   const listHeaderRef  = useRef(null)
 
@@ -904,20 +739,11 @@ export default function ConditionsScreen() {
     }, 100)
   }
 
-  useEffect(() => {
-    const el = brandRowRef.current
-    if (!el) return
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        setShowStickyHeader(!entry.isIntersecting)
-      },
-      { threshold: 0, rootMargin: '-1px 0px 0px 0px' }
-    )
-
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [])
+  // True while the tinted header block is scrolled out of view (the slim bar is showing).
+  function isStickyShown() {
+    const el = heroRef.current
+    return !!el && el.getBoundingClientRect().bottom <= 1
+  }
 
   // Waits for the cold-start skeleton to clear before triggering the fade —
   // flipping entranceIn as soon as this effect first ran (ignoring loading)
@@ -1004,8 +830,8 @@ export default function ConditionsScreen() {
   function snapToListHeader() {
     if (!listHeaderRef.current) return
     const el            = listHeaderRef.current
-    const STICKY_HEIGHT = 90
-    const GAP           = 28
+    const STICKY_HEIGHT = 60
+    const GAP           = 16
     const targetScroll  = el.offsetTop - STICKY_HEIGHT - GAP
     const maxScroll     = document.documentElement.scrollHeight - window.innerHeight
     // Temporarily disable CSS scroll-behavior: smooth so the jump is truly instant
@@ -1020,7 +846,7 @@ export default function ConditionsScreen() {
 
   function handleClearFilter() {
     setActiveSpecialty('all')
-    if (showStickyHeader) snapToListHeader()
+    if (isStickyShown()) snapToListHeader()
   }
 
   // When a specialty is chosen via the sticky header (user is scrolled down),
@@ -1029,7 +855,7 @@ export default function ConditionsScreen() {
   // (filtered list is short), snap to top instead so the sticky header hides.
   function handleSelectSpecialty(id) {
     setActiveSpecialty(id)
-    if (showStickyHeader) setTimeout(snapToListHeader, 50)
+    if (isStickyShown()) setTimeout(snapToListHeader, 50)
   }
 
   // Static (non-interactive) favourite indicator for the trailing slot —
@@ -1120,14 +946,18 @@ export default function ConditionsScreen() {
     return (
       <>
         <div ref={skeletonHeaderRef}>
-          <div style={{ paddingTop: 'var(--space-4)', paddingBottom: 'var(--space-3)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
+          <div style={{
+            margin: '0 calc(-1 * var(--page-gutter, var(--space-4))) var(--space-4)',
+            padding: 'var(--space-2) var(--page-gutter, var(--space-4)) 16px',
+            backgroundColor: 'var(--color-header-tint)',
+            borderRadius: '0 0 24px 24px',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', minHeight: 44, marginBottom: 'var(--space-3)' }}>
               <div style={shimmer({ width: 154, height: 27, borderRadius: 'var(--radius-sm)' })} />
             </div>
-            <div style={shimmer({ width: '55%', height: 16, borderRadius: 'var(--radius-sm)' })} />
+            <div style={shimmer({ width: '100%', height: 52, marginBottom: 'var(--space-3)', borderRadius: 'var(--radius-full)' })} />
+            <div style={shimmer({ width: '100%', height: 44, borderRadius: 'var(--radius-full)' })} />
           </div>
-          <div style={shimmer({ width: '100%', height: 46, marginBottom: 'var(--space-4)', borderRadius: 'var(--radius-full)' })} />
-          <div style={shimmer({ width: '100%', height: 40, marginBottom: 'var(--space-3)', borderRadius: 'var(--radius-md)' })} />
         </div>
         {Array.from({ length: skeletonRowCount }, (_, i) => <SkeletonCard key={i} />)}
       </>
@@ -1139,73 +969,59 @@ export default function ConditionsScreen() {
   return (
     <>
 
-      {/* Sliding sticky logo header — appears once BrandRow scrolls out of view */}
+      {/* Slim bar: slides in once the tinted header block scrolls out of view */}
       <StickyLogoHeader
-        visible={showStickyHeader}
-        isSearching={isSearching}
+        watchRef={heroRef}
         activeSpecialtyObj={activeSpecialtyObj}
         onClearSpecialty={handleClearFilter}
         onOpenSpecialties={() => setBottomSheetOpen(true)}
-        sortMode={sortMode}
-        onSortToggle={handleSortToggle}
-        SORT_LABELS={SORT_LABELS}
         onSearchTap={handleSearchTap}
       />
 
-      {/* ─── Base layer ───────────────────────────────────────────────────────
-          Static flat background, var(--color-hero-bg) — now a distinct,
-          non-animated color (#FAFAFA light) from the panel's var(--color-bg)
-          (#F7F8FA light), see globals.css. Bled edge-to-edge past Layout's
-          <main> side padding (negative margin equal to that padding,
-          restored as this panel's own padding for its children). Contains
-          everything above the sort row: brand row, search, recently-viewed,
-          specialty selector.
-          paddingBottom is a calc() of two named tokens — visible gap
-          (var(--space-5), 20px) plus the panel's curve radius
-          (var(--radius-xl)) below it — so the gap and the curve can't drift
-          out of sync. (Previously documented here as var(--space-3)/12px —
-          that was stale; the actual token has been --space-5 since Phase 21
-          and the current 20px gap is the intended look, kept as-is.) */}
-      <div style={{
-        backgroundColor: 'var(--color-hero-bg)',
-        marginLeft:      'calc(var(--page-gutter, var(--space-4)) * -1)',
-        marginRight:     'calc(var(--page-gutter, var(--space-4)) * -1)',
-        paddingLeft:     'var(--page-gutter, var(--space-4))',
-        paddingRight:    'var(--page-gutter, var(--space-4))',
-        paddingBottom:   'calc(var(--space-5) + var(--radius-xl))',
-      }}>
+      {/* ─── Tinted header block (step 8.6a) ──────────────────────────────────
+          Same look as the Drugs home header: tint, full width to the screen edges (the layout's
+          side gap as a negative margin), rounded bottom edge. Logo row with the bell and sun,
+          the tall search pill, and the Specialty control as one slim pill. The list sits under
+          it on the page colour. The title stays for screen readers only, like the Drugs home. */}
+      <div
+        ref={heroRef}
+        style={{
+          margin:          '0 calc(-1 * var(--page-gutter, var(--space-4)))',
+          padding:         '0 var(--page-gutter, var(--space-4)) 16px',
+          backgroundColor: 'var(--color-header-tint)',
+          borderRadius:    '0 0 24px 24px',
+        }}
+      >
+        <h1 style={{
+          position: 'absolute', width: 1, height: 1, margin: -1, padding: 0,
+          overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap', border: 0,
+        }}>
+          Conditions
+        </h1>
 
-        {/* 1. Brand row + tagline + dark mode toggle — entrance stage 0
-            (Phase 11): fades/rises in first, on first load this session
-            only; otherwise renders at full opacity as before, no animation. */}
         <div style={entranceStyle(0)}>
           <BrandRow
-            isSearching={isSearching}
             theme={theme}
             onCycleTheme={() => setTheme(nextInThemeCycle(theme))}
             onOpenNotifications={() => setNotifSheetOpen(true)}
-            brandRowRef={brandRowRef}
           />
         </div>
 
-        {/* 2. Search bar — entrance stage 1 (Phase 11), grouped with the
-            specialty selector below as one "search/specialty" stage. */}
         <div style={{ marginBottom: 'var(--space-3)', ...entranceStyle(1) }}>
           <SearchBar
             ref={searchInputRef}
             value={query}
             onChange={val => setQuery(val)}
+            tall
           />
         </div>
 
-        {/* 3. Recently viewed — temporarily hidden (set hidden={isSearching} to re-enable) */}
+        {/* Recently viewed: temporarily hidden (set hidden={isSearching} to re-enable) */}
         <RecentlyViewedChips
           recentlyViewed={recentlyViewed}
           hidden={true}
         />
 
-        {/* 4. Full-width specialty selector — same width as search bar.
-            Same entrance stage as the search bar above (Phase 11). */}
         <div style={entranceStyle(1)}>
           <SpecialtySelector
             activeSpecialtyObj={activeSpecialtyObj}
@@ -1216,38 +1032,8 @@ export default function ConditionsScreen() {
         </div>
       </div>
 
-      {/* ─── Panel ─────────────────────────────────────────────────────────────
-          var(--color-bg) — pulled up over the base layer's bottom edge by
-          exactly its own corner radius (var(--radius-xl)), so the rounded
-          top corners cut a static curve into the base layer above instead
-          of sitting flush against it. Same edge-to-edge bleed as the base
-          layer, for the same reason. Extends from here to the bottom of
-          the page — no separate wrapper below it.
-          No scroll-driven animation: border and shadow are both fixed
-          values. borderTop (not a full border) traces the rounded top
-          corners so the curve itself has a visible hairline edge. boxShadow
-          uses a negative y-offset with a tight blur/low opacity so the
-          shadow only reads just above the curve, not around the whole
-          panel — dark-mode-aware since a black shadow on the darker,
-          bleaker dark-mode base layer would be nearly invisible.
-          Entrance stage 2 (Phase 11) fades/rises this whole panel in last,
-          on first load this session only — see entranceStyle() above. */}
-      <div style={{
-        backgroundColor: 'var(--color-bg)',
-        borderTopLeftRadius:  'var(--radius-xl)',
-        borderTopRightRadius: 'var(--radius-xl)',
-        borderTop:       isDark
-          ? '1px solid rgba(255, 255, 255, 0.11)'
-          : '1px solid rgba(15, 23, 42, 0.09)',
-        marginTop:       'calc(var(--radius-xl) * -1)',
-        marginLeft:      'calc(var(--page-gutter, var(--space-4)) * -1)',
-        marginRight:     'calc(var(--page-gutter, var(--space-4)) * -1)',
-        paddingLeft:     'var(--page-gutter, var(--space-4))',
-        paddingRight:    'var(--page-gutter, var(--space-4))',
-        paddingTop:      'var(--space-4)',
-        boxShadow:       '0 -6px 14px rgba(15, 23, 42, 0.035)',
-        ...entranceStyle(2),
-      }}>
+      {/* The list: flat on the page colour, under the header block. */}
+      <div style={{ paddingTop: 'var(--space-4)', ...entranceStyle(2) }}>
 
         {/* 5. Count + sort row — in A-Z mode, the first letter is shown inline on the left */}
         <div ref={listHeaderRef}>

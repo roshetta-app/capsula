@@ -1,5 +1,10 @@
 /**
  * src/components/conditions/SpecialtySelector.jsx
+ * 2026-10-22 (UI refresh plan, step 8.6a): now one slim pill for the Conditions header (rule 12:
+ * a long list is a single pill with a down arrow). No 'Specialty' label line and no white card:
+ * a 44 px pill in the header's mode-track colour (--color-seg-track) that sits inside the tinted
+ * block; the active specialty keeps its own soft wash and border. Icon, name, chevron and the
+ * clear button work as before. The history below describes the older card.
  * Extracted from src/pages/ConditionsScreen.jsx — previously defined inline.
  * Phase 8  — SpecialtySelector toolbar redesign: filled muted surface, no border,
  *            radius-md, chevron rotation, animated clear button.
@@ -134,56 +139,40 @@ export default function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear,
   // per-specialty wash (tintedBg, same helper/alpha StickyLogoHeader's
   // active pill already uses) instead of one fixed premium tint shared by
   // every specialty.
-  const idleSurfaceBg = isDark ? 'var(--color-surface)' : '#FFFFFF'
+  const idleSurfaceBg = 'var(--color-seg-track)'
   const surfaceBg = isActive ? tintedBg(colors.bg, isDark) : idleSurfaceBg
   const pressedBg = isDark ? '#262D3A' : '#F5F4F2'
-
-  // Ambient elevation — Premium polish pass. Single diffused shadow shared
-  // by idle/active/pressed states, matching the search field's ambient
-  // treatment so both controls read as the same elevation system.
-  const containerShadow = 'var(--shadow-ambient-selector)'
 
   return (
     <div
       style={{
         display:         'flex',
-        alignItems:      'stretch',
+        alignItems:      'center',
         width:           '100%',
+        minHeight:       44,
         backgroundColor: pressed ? pressedBg : surfaceBg,
-        // Idle state gets a hairline border in the shared border color;
-        // active state now gets a low-alpha border of the specialty's own
-        // fg color instead of one fixed selected-border token, so the
-        // border tints per specialty along with everything else.
         border:          isActive
           ? `1px solid rgba(${r}, ${g}, ${b}, 0.3)`
-          : '1px solid var(--color-border)',
-        borderRadius:    '16px',
+          : '1px solid transparent',
+        borderRadius:    'var(--radius-full)',
         overflow:        'hidden',
-        boxShadow:       containerShadow,
-        // Phase 9 (conditions-screen-polish-master-plan): subtle press-scale
-        // added alongside the existing background swap, so tapping to open
-        // the specialty sheet gives a tactile response, not just a color
-        // change. Reuses the same `pressed` state and motion tokens as the
-        // icon crossfade below.
         transform:       pressed ? 'scale(0.985)' : 'scale(1)',
-        transition:      'background-color 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease, transform var(--motion-fast) var(--ease-settle)',
+        transition:      'background-color 0.12s ease, border-color 0.12s ease, transform var(--motion-fast) var(--ease-settle)',
       }}
       onPointerDown={() => setPressed(true)}
       onPointerUp={() => setPressed(false)}
       onPointerLeave={() => setPressed(false)}
     >
-
-      {/* Main tap area — label on top, value row below, both left-aligned.
-          One cohesive field rather than a single tappable line. */}
       <button
         onClick={onOpen}
         aria-label={isActive ? `Specialty: ${activeSpecialtyObj.name}. Tap to change.` : 'Browse specialties'}
         style={{
           flex:                    1,
           display:                 'flex',
-          flexDirection:           'column',
-          alignItems:              'stretch',
-          padding:                 '12px 8px 12px 14px',
+          alignItems:              'center',
+          gap:                     8,
+          minHeight:               44,
+          padding:                 '0 8px 0 14px',
           background:              'none',
           border:                  'none',
           cursor:                  'pointer',
@@ -193,129 +182,73 @@ export default function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear,
           WebkitTapHighlightColor: 'transparent',
         }}
       >
-        {/* Label — helper text, smallest element in the hierarchy */}
+        {/* Icon: ListFilter when idle, the specialty icon when active (cross-fade) */}
         <span style={{
-          fontSize:     11,
-          fontWeight:   500,
-          fontFamily:   'var(--font-body)',
-          color:        'var(--color-text-tertiary)',
-          marginBottom: 2,
+          position:       'relative',
+          display:        'flex',
+          alignItems:     'center',
+          justifyContent: 'center',
+          flexShrink:     0,
+          width:          20,
+          height:         20,
+          color:          iconColor,
+          transition:     'color 0.2s ease',
         }}>
-          Specialty
+          <span style={{
+            position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            opacity: isActive ? 0 : 1, transition: 'opacity var(--motion-fast) var(--ease-settle)',
+          }}>
+            <ListFilter size={16} strokeWidth={1.75} aria-hidden="true" />
+          </span>
+          <span style={{
+            position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            opacity: isActive ? 1 : 0, transition: 'opacity var(--motion-fast) var(--ease-settle)',
+          }}>
+            {isActive && (
+              <SpecialtyIcon
+                iconType={activeSpecialtyObj.iconType   ?? 'lucide'}
+                iconValue={activeSpecialtyObj.iconValue ?? 'Stethoscope'}
+                size={16}
+                color={iconColor}
+              />
+            )}
+          </span>
         </span>
 
-        {/* Value row — icon, name, chevron. Vertically centered, left aligned. */}
+        {/* Name */}
         <span style={{
-          display:    'flex',
-          alignItems: 'center',
-          gap:        8,
-          minWidth:   0,
+          flex:          1,
+          minWidth:      0,
+          overflow:      'hidden',
+          textOverflow:  'ellipsis',
+          whiteSpace:    'nowrap',
+          fontSize:      14,
+          fontWeight:    isActive ? 600 : 500,
+          fontFamily:    'var(--font-body)',
+          color:         isActive ? iconColor : 'var(--color-text-primary)',
+          letterSpacing: '-0.2px',
+          transition:    'color 0.2s ease',
         }}>
-          {/* Icon — ListFilter when idle (consistent with sticky header pill),
-              specialty icon when active. Both icons are stacked in a
-              fixed-size wrapper and cross-fade via opacity instead of
-              hard-swapping on isActive change — conditions-screen-polish-
-              master-plan Phase 8. Color stays on this outer wrapper
-              (inherited via currentColor) so the existing per-specialty
-              color transition keeps working unchanged.
-              Phase 9 (conditions-screen-polish-master-plan): wrapper grew
-              16x16 → 26x26 and gained a soft circular badge behind the
-              icon, idle only — backgroundColor is 'transparent' when
-              active, so the active specialty icon still sits bare exactly
-              as Phase 12 set it. The icons themselves stay 16px, still
-              centered, so neither state's rendered icon size changes. */}
-          <span style={{
-            position:        'relative',
-            display:         'flex',
-            alignItems:      'center',
-            justifyContent:  'center',
-            flexShrink:      0,
-            width:           26,
-            height:          26,
-            borderRadius:    'var(--radius-full)',
-            backgroundColor: isActive ? 'transparent' : 'var(--color-bg)',
-            color:           iconColor,
-            transition:      'color 0.2s ease, background-color 0.2s ease',
-          }}>
-            <span style={{
-              position:   'absolute',
-              inset:      0,
-              display:    'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              opacity:    isActive ? 0 : 1,
-              transition: 'opacity var(--motion-fast) var(--ease-settle)',
-            }}>
-              <ListFilter size={16} strokeWidth={1.75} aria-hidden="true" />
-            </span>
-            <span style={{
-              position:   'absolute',
-              inset:      0,
-              display:    'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              opacity:    isActive ? 1 : 0,
-              transition: 'opacity var(--motion-fast) var(--ease-settle)',
-            }}>
-              {isActive && (
-                <SpecialtyIcon
-                  iconType={activeSpecialtyObj.iconType   ?? 'lucide'}
-                  iconValue={activeSpecialtyObj.iconValue ?? 'Stethoscope'}
-                  size={16}
-                  color={iconColor}
-                />
-              )}
-            </span>
-          </span>
-
-          {/* Specialty name — the dominant element on this control when
-              active (semibold, tinted with the specialty's accent color,
-              unchanged since Phase 12/17). Idle state weight lightened in
-              Phase 9 (conditions-screen-polish-master-plan) from 500 to
-              400, kept here — but idle color reverted from text-tertiary
-              back to text-primary (Phase 10) so the name itself reads as
-              near-black. Distinction from the search placeholder above is
-              now carried by the placeholder's own lighter weight
-              (globals.css, same phase) rather than by dimming this text. */}
-          <span style={{
-            flex:         1,
-            minWidth:     0,
-            overflow:     'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace:   'nowrap',
-            fontSize:     14,
-            fontWeight:   isActive ? 600 : 400,
-            fontFamily:   'var(--font-body)',
-            color:        isActive ? iconColor : 'var(--color-text-primary)',
-            letterSpacing: '-0.2px',
-            transition:   'color 0.2s ease',
-          }}>
-            {isActive ? activeSpecialtyObj.name : 'All Specialties'}
-          </span>
-
-          {/* Chevron — soft specialty tint when active, neutral when idle */}
-          <svg width="13" height="13" viewBox="0 0 12 12" fill="none"
-            aria-hidden="true"
-            style={{
-              flexShrink:  0,
-              marginRight: isActive ? 0 : 6,
-              color:       controlTint,
-              transform:   isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-              transition:  'transform 0.2s ease, color 0.2s ease',
-            }}>
-            <path d="M2 4.5L6 8.5L10 4.5"
-              stroke="currentColor" strokeWidth="1.6"
-              strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+          {isActive ? activeSpecialtyObj.name : 'All Specialties'}
         </span>
+
+        {/* Down arrow */}
+        <svg width="13" height="13" viewBox="0 0 12 12" fill="none"
+          aria-hidden="true"
+          style={{
+            flexShrink:  0,
+            marginRight: isActive ? 0 : 6,
+            color:       controlTint,
+            transform:   isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+            transition:  'transform 0.2s ease, color 0.2s ease',
+          }}>
+          <path d="M2 4.5L6 8.5L10 4.5"
+            stroke="currentColor" strokeWidth="1.6"
+            strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
       </button>
 
-      {/* Clear (x) — slides in/out; soft specialty tint when active; no
-          divider. The outer container centers this button against the
-          full card height, but the value row it needs to align with sits
-          lower than that center (the label row above pushes it down) —
-          so a top margin equal to the label row's reserved height nudges
-          this button down onto the same line as the icon/name/chevron. */}
+      {/* Clear (x): slides in only while a specialty is chosen */}
       <button
         onClick={e => { e.stopPropagation(); onClear() }}
         aria-label={isActive ? `Clear ${activeSpecialtyObj.name} filter` : undefined}
@@ -325,7 +258,7 @@ export default function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear,
           alignItems:              'center',
           justifyContent:          'center',
           width:                   isActive ? 44 : 0,
-          marginTop:               18,
+          height:                  44,
           opacity:                 isActive ? 1 : 0,
           flexShrink:              0,
           overflow:                'hidden',
@@ -343,13 +276,9 @@ export default function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear,
         <svg width="22" height="22" viewBox="0 0 22 22" fill="none"
           aria-hidden="true" style={{ display: 'block', flexShrink: 0 }}>
           <path d="M7.5 7.5L14.5 14.5M14.5 7.5L7.5 14.5"
-            stroke="currentColor"
-            strokeWidth="2" strokeLinecap="round" />
+            stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
         </svg>
       </button>
-
-      {/* Right padding spacer when clear is hidden */}
-      {!isActive && <span style={{ width: 14, flexShrink: 0 }} />}
     </div>
   )
 }
