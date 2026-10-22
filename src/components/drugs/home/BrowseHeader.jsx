@@ -11,11 +11,14 @@
  *                 layout's side gap as a negative margin, like the home header.
  *
  * Back is the caller's job (onBack), so each screen keeps its own one-step-back rule.
+ *
+ * 2026-10-22 (step 8.13): BrowseTopRow takes an optional 'icon' (a round badge drawn by the
+ * caller) that sits to the left of the title. An opened category uses it for its own icon.
  */
 
 import { ChevronLeft } from 'lucide-react'
 
-export function BrowseTopRow({ backLabel, onBack, title, subtitle = null }) {
+export function BrowseTopRow({ backLabel, onBack, title, subtitle = null, icon = null }) {
   return (
     <div>
       <button
@@ -33,12 +36,15 @@ export function BrowseTopRow({ backLabel, onBack, title, subtitle = null }) {
         <ChevronLeft size={20} strokeWidth={2.2} aria-hidden="true" />
         {backLabel}
       </button>
-      <h1 style={{
-        margin: '2px 0 0', fontSize: 26, fontWeight: 700, lineHeight: 1.2,
-        color: 'var(--color-text-primary)', fontFamily: 'var(--font-body)',
-      }}>
-        {title}
-      </h1>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 2 }}>
+        {icon}
+        <h1 style={{
+          margin: 0, minWidth: 0, overflowWrap: 'break-word', fontSize: 26, fontWeight: 700, lineHeight: 1.2,
+          color: 'var(--color-text-primary)', fontFamily: 'var(--font-body)',
+        }}>
+          {title}
+        </h1>
+      </div>
       {subtitle ? (
         <div style={{ marginTop: 2, fontSize: 14, lineHeight: 1.3, color: 'var(--color-text-secondary)', fontFamily: 'var(--font-body)' }}>
           {subtitle}

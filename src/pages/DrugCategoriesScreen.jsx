@@ -23,9 +23,11 @@ import { useIsDark } from '../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN } from '../utils/specialtyTokens'
 import { ROUTES } from '../router'
 import { useDeepLinkParent } from '../hooks/useDeepLinkParent'
+import useScrollToTopOnOpen from '../hooks/useScrollToTopOnOpen'
 import { prepareCategoryOpen } from './DrugsScreen'
 
 export default function DrugCategoriesScreen() {
+  useScrollToTopOnOpen()
   const navigate = useNavigate()
   // Back (arrow and phone button) goes to the real previous screen; if this page
   // is opened straight from a link, the Drugs home is put behind it first.

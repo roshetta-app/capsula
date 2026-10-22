@@ -22,6 +22,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowUpDown } from 'lucide-react'
+import useScrollToTopOnOpen from '../hooks/useScrollToTopOnOpen'
 import SearchBar from '../components/ui/SearchBar'
 import BrowseHeader from '../components/drugs/home/BrowseHeader'
 import ClassSearchResults from '../components/drugs/classes/ClassSearchResults'
@@ -59,6 +60,7 @@ function ClassSortButton({ sortMode, onToggle }) {
 }
 
 export default function DrugClassesScreen() {
+  useScrollToTopOnOpen()
   const navigate = useNavigate()
   // Back (arrow and phone button) goes to the real previous screen; if this page
   // is opened straight from a link, the Drugs home is put behind it first.

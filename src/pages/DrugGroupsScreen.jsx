@@ -14,10 +14,12 @@ import BrowseHeader from '../components/drugs/home/BrowseHeader'
 import { useFavouritesContext } from '../context/FavouritesContext'
 import { useAuth } from '../hooks/useAuth'
 import { useDeepLinkParent } from '../hooks/useDeepLinkParent'
+import useScrollToTopOnOpen from '../hooks/useScrollToTopOnOpen'
 import { isDrugGroupsOn } from '../constants/features'
 import { ROUTES } from '../router'
 
 export default function DrugGroupsScreen() {
+  useScrollToTopOnOpen()
   const navigate = useNavigate()
   const { user } = useAuth()
   const { groups, groupsStatus } = useFavouritesContext()

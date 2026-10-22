@@ -328,7 +328,8 @@ import { titleCaseWords } from '../utils/classSearch'
 import { useCategories } from '../hooks/useCategories'
 import { useBackToTop } from '../hooks/useBackToTop'
 import { useRecentlyViewed } from '../hooks/useRecentlyViewed'
-import { useIsDark } from '../utils/specialtyIcon'
+import { useIsDark, SpecialtyIcon } from '../utils/specialtyIcon'
+import { resolveToken, FALLBACK_TOKEN } from '../utils/specialtyTokens'
 import { ROUTES } from '../router'
 import { useBackClose } from '../hooks/useBackClose'
 import { useSearchHistory } from '../hooks/useSearchHistory'
@@ -479,14 +480,20 @@ export default function DrugsScreen() {
   // screen being rebuilt when the address changes) and this runs as soon as
   // the category is on screen, before it is drawn. Coming back from a drug
   // page or leaving a category sets no note, so those keep their place.
+  // 2026-10-22 (step 8.13): a category now also starts at the top when it is reached any other
+  // way (switching from one category to another, 'Search all drugs instead'), not only from a
+  // tapped card. The one exception is coming back from a drug page: the list then still has its
+  // remembered place (drugListMemory) and keeps it.
   useLayoutEffect(() => {
-    if (scrollTopOnCategoryOpen && activeCategory !== null) {
-      scrollTopOnCategoryOpen = false
-      window.scrollTo(0, 0)
-      // Once more on the next frame, in case the list's first measuring
-      // nudged the page.
-      requestAnimationFrame(() => window.scrollTo(0, 0))
-    }
+    if (activeCategory === null) return undefined
+    const flagged = scrollTopOnCategoryOpen
+    scrollTopOnCategoryOpen = false
+    if (!flagged && drugListMemory.has(`cat:${activeCategory}`)) return undefined
+    window.scrollTo(0, 0)
+    // Once more on the next frame, in case the list's first measuring
+    // nudged the page.
+    const frame = requestAnimationFrame(() => window.scrollTo(0, 0))
+    return () => cancelAnimationFrame(frame)
   }, [activeCategory])
 
   const { history: recentDrugs, addRecentlyViewed: addRecentDrug } = useRecentlyViewed('drug')
@@ -799,14 +806,31 @@ export default function DrugsScreen() {
 
   // The opened category's own header (step 8.5): one step back to where it was opened from (the
   // home or the Categories screen); opened straight from a link there is nothing behind it, so
-  // it goes to the Drugs home. The count is the whole category (the filter count stays in the list).
+  // it goes to the Drugs home. 2026-10-22 (step 8.13): the count moved out of the header to a line
+  // of its own above the list, and the header gets the category's own icon in a round badge (the
+  // same icon and colour as its tile; 'All Drugs' uses the pill icon in the fallback colour).
   function goBackFromCategory() {
     if (window.history.state && window.history.state.idx > 0) navigate(-1)
     else navigate(ROUTES.DRUGS, { replace: true })
   }
-  const categoryCountText = activeCategory === null ? null : (() => {
-    const n = drugs.filter(d => activeCategory === '__all' || d.category === activeCategory).length
-    return n > 0 ? `${n} drug${n !== 1 ? 's' : ''}` : null
+  const categoryBadge = (() => {
+    if (activeCategory === null) return null
+    const cat = activeCategory === '__all' ? null : categories.find(c => c.slug === activeCategory)
+    const iconType  = cat?.icon_type || 'lucide'
+    const iconValue = !cat ? 'Pill' : iconType === 'custom' ? (cat.icon_url || '') : (cat.icon_name || 'Pill')
+    const ink = resolveToken(cat?.color_token || FALLBACK_TOKEN, isDark).fg
+    return (
+      <div
+        aria-hidden="true"
+        style={{
+          width: 44, height: 44, borderRadius: '50%', flexShrink: 0,
+          backgroundColor: `color-mix(in srgb, ${ink} 16%, var(--color-surface))`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}
+      >
+        <SpecialtyIcon iconType={iconType} iconValue={iconValue} size={22} color={ink} />
+      </div>
+    )
   })()
   let body
   let cardsShowing
@@ -870,7 +894,8 @@ export default function DrugsScreen() {
     // Count text: 'N drugs', or 'shown/all drugs' (5/20 drugs) while a Form or
     // Route filter is on, so the size of the list before filtering stays visible.
     const countTotal = hasFilters ? base.length : displayed.length
-    const countText = `${hasFilters ? `${displayed.length}/${base.length}` : displayed.length} drug${countTotal !== 1 ? 's' : ''}`
+    const fmt = n => n.toLocaleString('en-US')
+    const countText = `${hasFilters ? `${fmt(displayed.length)}/${fmt(base.length)}` : fmt(displayed.length)} drug${countTotal !== 1 ? 's' : ''}`
 
     body = (
       <>
@@ -916,10 +941,9 @@ export default function DrugsScreen() {
           )
         ) : (
           <>
-            {/* Results count line, shown while searching only. When browsing a
-                category with no query, the count sits in the back-button row
-                above. The Clear filter button is not here any more: it lives
-                in the Search area. */}
+            {/* Count line, above the list: while searching, and (step 8.13) inside an opened
+                category with nothing typed, where it used to sit in the header. The Clear
+                filter button is not here any more: it lives in the Search area. */}
             {/* Class hint (2026-10-05): the same text is also a class, drug
                 family or class keyword. Slim strip while drugs are listed or
                 a filter hides them; with no drugs at all the full card in
@@ -928,9 +952,9 @@ export default function DrugsScreen() {
               <ClassHintStrip hint={classHint} onSwitch={() => handleModeChange('class')} />
             )}
 
-            {hasQuery && displayed.length > 0 && (
+            {(hasQuery || activeCategory !== null) && displayed.length > 0 && (
             <div style={{
-              fontSize: 12, color: 'var(--color-text-tertiary)',
+              fontSize: 13, color: 'var(--color-text-secondary)',
               marginBottom: 'var(--space-2)',
             }}>
               {countText}
@@ -1135,7 +1159,7 @@ export default function DrugsScreen() {
                     backLabel={location.state?.from === 'categories' ? 'Categories' : 'Drugs'}
                     onBack={goBackFromCategory}
                     title={categoryLabel}
-                    subtitle={categoryCountText}
+                    icon={categoryBadge}
                   />
                 ) : (
                   <DrugsHero onInfoTap={() => setShowModeInfo(true)} />
