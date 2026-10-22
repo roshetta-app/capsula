@@ -1,5 +1,8 @@
 /**
  * src/components/conditions/FavouritesStickyHeader.jsx
+ * 2026-10-22 (UI refresh plan, step 8.6b, rule 13): the slim bar is now one row: the compact
+ * Conditions / Drugs control with the search and filter buttons beside it. While searching, the
+ * row is the back button and the search field. The title row and the underline tabs are gone.
  *
  * Extracted verbatim from src/pages/FavouritesScreen.jsx (Favourites Screen
  * Refactor plan, Phase 1) — the component itself is unchanged. Like
@@ -34,12 +37,11 @@
 
 import { Heart, Search, ArrowLeft, SlidersHorizontal } from 'lucide-react'
 import SearchBar from '../ui/SearchBar'
-import { renderTabs } from './FavouritesTabBar'
+import { FavouritesSegmented } from './FavouritesTabBar'
 
 // Favourites' own identity color — same one-line alias / same convention
 // already followed in FavouritesHero.jsx, FavouritesEmptyStates.jsx, and
 // RowStarButton.jsx.
-const FAV_ACCENT = 'var(--color-favourite)'
 
 export default function FavouritesStickyHeader({ visible, activeTab, onSelectTab, showManagerButton, hasActiveFilters, onOpenManager, counts, isSearching, onToggleSearch, searchValue, onSearchChange, searchPlaceholder }) {
   return (
@@ -62,148 +64,78 @@ export default function FavouritesStickyHeader({ visible, activeTab, onSelectTab
       }}
     >
       <div style={{ width: '100%', maxWidth: 680, margin: '0 auto' }}>
-
-        {/* Title row — badge icon + text on the left, manage toggle on the
-            right, same lockup as the expanded hero at a smaller scale.
-            boxSizing: 'border-box' + height: 44 (not minHeight) hard-locks
-            this row to a fixed, padding-inclusive size. */}
         <div style={{
-          display:        'flex',
-          alignItems:     'center',
-          justifyContent: 'space-between',
-          gap:            8,
-          padding:        '8px var(--page-gutter, var(--space-6)) 0',
-          height:         44,
-          boxSizing:      'border-box',
-          marginTop:      5,
+          display:    'flex',
+          alignItems: 'center',
+          gap:        6,
+          padding:    '8px var(--page-gutter, var(--space-4))',
+          boxSizing:  'border-box',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 }}>
-            {!isSearching && (
-              <div style={{
-                width:           28,
-                height:          28,
-                borderRadius:    '50%',
-                backgroundColor: FAV_ACCENT,
-                display:         'flex',
-                alignItems:      'center',
-                justifyContent:  'center',
-                flexShrink:      0,
-              }}>
-                <Heart size={15} fill="#fff" color="#fff" strokeWidth={0} />
-              </div>
-            )}
-            {isSearching
-              ? (
-                  <div
-                    key="search"
-                    className="fav-search-micro fav-sticky-search-height"
-                    style={{
-                      flex:            1,
-                      minWidth:        0,
-                      animation:       'favSearchExpand 0.2s ease',
-                      transformOrigin: 'left center',
-                    }}
-                  >
-                    <SearchBar
-                      value={searchValue}
-                      onChange={onSearchChange}
-                      placeholder={searchPlaceholder}
-                      icon={Heart}
-                      compact
-                    />
-                  </div>
-                )
-              : (
-                  <div
-                    key="title"
-                    style={{
-                      fontSize:      18,
-                      fontWeight:    700,
-                      color:         'var(--color-text-primary)',
-                      letterSpacing: '-0.2px',
-                      minWidth:      0,
-                      animation:     'favHeaderCrossfade 0.2s ease',
-                    }}
-                  >
-                    Favourites
-                  </div>
-                )}
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-            <button
-              onClick={onToggleSearch}
-              aria-label={isSearching ? 'Close search' : 'Search favourites'}
-              style={{
-                width:                   isSearching ? 36 : 32,
-                height:                  isSearching ? 36 : 32,
-                borderRadius:            '50%',
-                border:                  'none',
-                backgroundColor:         isSearching ? 'var(--color-accent)' : 'var(--color-surface)',
-                display:                 'flex',
-                alignItems:              'center',
-                justifyContent:          'center',
-                flexShrink:              0,
-                cursor:                  'pointer',
-                WebkitTapHighlightColor: 'transparent',
-                outline:                 'none',
-                transition:              'width 0.2s ease, height 0.2s ease',
-              }}
-            >
-              {isSearching
-                ? <ArrowLeft size={17} color="#fff" strokeWidth={2.2} />
-                : <Search size={17} color="var(--color-text-primary)" strokeWidth={2.2} />}
-            </button>
-
-            {showManagerButton && !isSearching && (
+          {isSearching ? (
+            <>
               <button
-                onClick={onOpenManager}
-                aria-label="Sort, filter, and manage favourites"
+                onClick={onToggleSearch}
+                aria-label="Close search"
                 style={{
-                  position:                'relative',
-                  width:                   32,
-                  height:                  32,
-                  borderRadius:            '50%',
-                  border:                  'none',
-                  backgroundColor:         'var(--color-surface)',
-                  display:                 'flex',
-                  alignItems:              'center',
-                  justifyContent:          'center',
-                  flexShrink:              0,
-                  cursor:                  'pointer',
-                  WebkitTapHighlightColor: 'transparent',
-                  outline:                 'none',
+                  width: 40, height: 40, borderRadius: '50%', border: 'none', flexShrink: 0,
+                  backgroundColor: 'var(--color-accent)', display: 'flex', alignItems: 'center',
+                  justifyContent: 'center', cursor: 'pointer', WebkitTapHighlightColor: 'transparent', outline: 'none',
                 }}
               >
-                <SlidersHorizontal size={17} color="var(--color-text-primary)" strokeWidth={2.2} />
-                {hasActiveFilters && (
-                  <span aria-hidden="true" style={{
-                    position:        'absolute',
-                    top:             5,
-                    right:           5,
-                    width:           7,
-                    height:          7,
-                    borderRadius:    '50%',
-                    backgroundColor: 'var(--color-accent)',
-                  }} />
-                )}
+                <ArrowLeft size={17} color="#fff" strokeWidth={2.2} />
               </button>
-            )}
-          </div>
+              <div
+                key="search"
+                className="fav-search-micro fav-sticky-search-height"
+                style={{ flex: 1, minWidth: 0, animation: 'favSearchExpand 0.2s ease', transformOrigin: 'left center' }}
+              >
+                <SearchBar
+                  value={searchValue}
+                  onChange={onSearchChange}
+                  placeholder={searchPlaceholder}
+                  icon={Heart}
+                  compact
+                />
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <FavouritesSegmented activeTab={activeTab} onSelect={onSelectTab} counts={counts} compact />
+              </div>
+              <button
+                onClick={onToggleSearch}
+                aria-label="Search favourites"
+                style={{
+                  width: 40, height: 40, borderRadius: '50%', border: 'none', flexShrink: 0,
+                  backgroundColor: 'transparent', display: 'flex', alignItems: 'center',
+                  justifyContent: 'center', cursor: 'pointer', WebkitTapHighlightColor: 'transparent', outline: 'none',
+                }}
+              >
+                <Search size={18} color="var(--color-text-primary)" strokeWidth={2.2} />
+              </button>
+              {showManagerButton && (
+                <button
+                  onClick={onOpenManager}
+                  aria-label="Sort, filter, and manage favourites"
+                  style={{
+                    position: 'relative', width: 40, height: 40, borderRadius: '50%', border: 'none', flexShrink: 0,
+                    backgroundColor: 'transparent', display: 'flex', alignItems: 'center',
+                    justifyContent: 'center', cursor: 'pointer', WebkitTapHighlightColor: 'transparent', outline: 'none',
+                  }}
+                >
+                  <SlidersHorizontal size={18} color="var(--color-text-primary)" strokeWidth={2.2} />
+                  {hasActiveFilters && (
+                    <span aria-hidden="true" style={{
+                      position: 'absolute', top: 7, right: 7, width: 7, height: 7,
+                      borderRadius: '50%', backgroundColor: 'var(--color-accent)',
+                    }} />
+                  )}
+                </button>
+              )}
+            </>
+          )}
         </div>
-
-        {/* Tabs — same content as the in-page row, kept in sync via renderTabs.
-            Spacing redistributed (not just trimmed): marginTop 0 and bottom
-            padding 3px here exactly offset the +5px marginTop on the title
-            row above, so total sticky-header height is unchanged. The 50px
-            tab button height itself (inside renderTabs) is untouched. */}
-        <div style={{
-          marginTop: 0,
-          padding:   '0 var(--page-gutter, var(--space-6)) 3px',
-        }}>
-          {renderTabs(activeTab, onSelectTab, counts)}
-        </div>
-
       </div>
     </div>
   )

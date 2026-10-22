@@ -1,5 +1,10 @@
 /**
  * src/components/conditions/FavouritesTabBar.jsx
+ * 2026-10-22 (UI refresh plan, step 8.6b): the tab row is now one segmented control (rule 12) in
+ * the same track and raised-thumb colours as the Drugs Brand / Generic / Class switch
+ * (--color-seg-track, --color-seg-thumb, --color-seg-thumb-text). 'FavouritesSegmented' replaces
+ * 'renderTabs'; the count stays next to each name ('10/10' on a free account). 'compact' is the
+ * shorter version for the slim bar on scroll (no icons).
  *
  * Extracted verbatim from src/pages/FavouritesScreen.jsx (Favourites Screen
  * Refactor plan, Phase 1) — no behavior change.
@@ -25,8 +30,9 @@
  */
 
 import { BookOpen, Pill } from 'lucide-react'
-import CountTag from '../ui/CountTag.jsx'
 
+// The screen's swipe logic needs this order too, so it stays exported from here.
+// eslint-disable-next-line react-refresh/only-export-components
 export const FAVOURITES_TABS = [
   {
     key: 'conditions',
@@ -40,65 +46,65 @@ export const FAVOURITES_TABS = [
   },
 ]
 
-export function renderTabs(activeTab, onSelect, counts) {
+export function FavouritesSegmented({ activeTab, onSelect, counts, compact = false }) {
   return (
-    <div style={{ display: 'flex' }}>
+    <div
+      role="radiogroup"
+      aria-label="Favourites"
+      style={{
+        display:         'flex',
+        gap:             2,
+        padding:         3,
+        borderRadius:    'var(--radius-full)',
+        backgroundColor: 'var(--color-seg-track)',
+      }}
+    >
       {FAVOURITES_TABS.map(tab => {
-        const isActive = activeTab === tab.key
-        const fg = isActive ? 'var(--color-accent)' : 'var(--color-text-secondary)'
-        const count = counts ? counts[tab.key] : undefined
-
+        const chosen = activeTab === tab.key
+        const count  = counts ? counts[tab.key] : undefined
         return (
-          <div
+          <button
             key={tab.key}
-            style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}
+            type="button"
+            role="radio"
+            aria-checked={chosen}
+            onClick={() => { if (!chosen) onSelect(tab.key) }}
+            style={{
+              flex:                    1,
+              minWidth:                0,
+              height:                  compact ? 34 : 44,
+              display:                 'flex',
+              alignItems:              'center',
+              justifyContent:          'center',
+              gap:                     6,
+              padding:                 '0 8px',
+              border:                  'none',
+              borderRadius:            'var(--radius-full)',
+              backgroundColor:         chosen ? 'var(--color-seg-thumb)' : 'transparent',
+              color:                   chosen ? 'var(--color-seg-thumb-text)' : 'var(--color-text-primary)',
+              boxShadow:               chosen ? '0 1px 3px rgba(0, 0, 0, 0.14)' : 'none',
+              fontFamily:              'var(--font-body)',
+              fontSize:                14,
+              fontWeight:              chosen ? 700 : 500,
+              cursor:                  'pointer',
+              transition:              'background-color var(--motion-fast) var(--ease-settle), color var(--motion-fast) var(--ease-settle)',
+              WebkitTapHighlightColor: 'transparent',
+              outline:                 'none',
+            }}
           >
-            <button
-              onClick={() => onSelect(tab.key)}
-              style={{
-                display:        'flex',
-                flexDirection:  'row',
-                alignItems:     'center',
-                justifyContent: 'center',
-                gap:            10,
-                height:         50,
-                paddingLeft:    'var(--space-2)',
-                paddingRight:   'var(--space-2)',
-                width:          '100%',
-                border:         'none',
-                background:     'none',
-                cursor:         'pointer',
-                fontFamily:     'var(--font-body)',
-                WebkitTapHighlightColor: 'transparent',
-                outline:        'none',
-                transition:     'color 0.15s ease',
-              }}
-            >
-              {tab.renderIcon(fg)}
-              <span style={{ fontSize: 14, fontWeight: isActive ? 700 : 500, color: fg }}>
-                {tab.label}
+            {!compact && tab.renderIcon('currentColor')}
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tab.label}</span>
+            {count !== undefined && count !== null && count !== '' && (
+              <span style={{
+                fontSize:   12,
+                fontWeight: 600,
+                color:      chosen ? 'inherit' : 'var(--color-text-secondary)',
+                flexShrink: 0,
+              }}>
+                {count}
               </span>
-              {count !== undefined && count !== null && count !== '' && (
-                <CountTag tone={isActive ? 'accent' : 'neutral'}>{count}</CountTag>
-              )}
-            </button>
-            {/* Underline — full width of this 50% cell, exactly matching the
-                active tab's rendered width; rounded ends; visible only
-                beneath the active tab. NOTE: this spec was previously kept
-                pixel-identical to ConditionDetailScreen's DetailHeader
-                underline by explicit prior decision — that file wasn't part
-                of this task's context, so it's now out of sync with this
-                2px value until/unless it's updated to match. */}
-            <span style={{
-              display:         'block',
-              height:          2,
-              width:           '100%',
-              marginTop:       2,
-              borderRadius:    'var(--radius-full)',
-              backgroundColor: isActive ? 'var(--color-accent)' : 'transparent',
-              transition:      'background-color 0.15s ease',
-            }} />
-          </div>
+            )}
+          </button>
         )
       })}
     </div>

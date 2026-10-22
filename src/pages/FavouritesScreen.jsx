@@ -530,7 +530,7 @@ import FavouritesManagerSheet from '../components/conditions/FavouritesManagerSh
 import ManageActionBar from '../components/conditions/ManageActionBar'
 import SpecialtyFilterBanner from '../components/conditions/SpecialtyFilterBanner'
 import { NothingSavedEmptyState, NoSearchResultsState, SpecialtyEmptyState } from '../components/conditions/FavouritesEmptyStates'
-import { FAVOURITES_TABS, renderTabs } from '../components/conditions/FavouritesTabBar'
+import { FAVOURITES_TABS } from '../components/conditions/FavouritesTabBar'
 import FavouritesHero from '../components/conditions/FavouritesHero'
 import FavouritesStickyHeader from '../components/conditions/FavouritesStickyHeader'
 import { useIsDark } from '../utils/specialtyIcon'
@@ -1354,6 +1354,9 @@ export default function FavouritesScreen() {
       <div>
 
         <FavouritesHero
+          activeTab={activeTab}
+          onSelectTab={switchTab}
+          counts={tabCounts}
           heroRef={heroRef}
           showManagerButton={true}
           hasActiveFilters={hasActiveFilters}
@@ -1365,13 +1368,9 @@ export default function FavouritesScreen() {
           searchPlaceholder={heroSearchPlaceholder}
         />
 
-        {/* Tab bar — chooses which collection (Conditions/Drugs) is being
-            browsed. Search is icon-triggered from the header (see
-            FavouritesHero/FavouritesStickyHeader) and now swaps in-place
-            with the header title itself — no overlay panel here anymore. */}
-        <div style={{ marginBottom: 8 }}>
-          {renderTabs(activeTab, switchTab, tabCounts)}
-        </div>
+        {/* The Conditions / Drugs control now lives inside the tinted hero (step 8.6b).
+            Search is icon-triggered from the header and swaps in place with the title. */}
+        <div style={{ height: 'var(--space-4)' }} />
 
         {/* Tab content area — swipeable again (see handleTabTouch* above),
             plus tap via the tab bar. minHeight (Phase 7) keeps this

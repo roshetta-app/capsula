@@ -1,5 +1,10 @@
 /**
  * src/components/conditions/FavouritesHero.jsx
+ * 2026-10-22 (UI refresh plan, step 8.6b): the same tinted header block as the Drugs and
+ * Conditions homes (16 px top and bottom, rounded bottom edge, full width). Row 1 (44 px): heart
+ * tile, 'Favourites' and 'Your saved references' on the left, search and filter buttons on the
+ * right (search still swaps the title for the search field in place). Under it the Conditions /
+ * Drugs segmented control with the counts. New props: activeTab, onSelectTab, counts.
  *
  * Extracted verbatim from src/pages/FavouritesScreen.jsx (Favourites Screen
  * Refactor plan, Phase 1) — the component itself is unchanged. Decision 10
@@ -34,21 +39,19 @@
 
 import { Heart, Search, ArrowLeft, SlidersHorizontal } from 'lucide-react'
 import SearchBar from '../ui/SearchBar'
+import { FavouritesSegmented } from './FavouritesTabBar'
 
 // Favourites' own identity color — same one-line alias / same convention
 // already followed in FavouritesEmptyStates.jsx and RowStarButton.jsx.
 const FAV_ACCENT = 'var(--color-favourite)'
 
-export default function FavouritesHero({ heroRef, showManagerButton, hasActiveFilters, onOpenManager, isSearching, onToggleSearch, searchValue, onSearchChange, searchPlaceholder }) {
+export default function FavouritesHero({ activeTab, onSelectTab, counts, heroRef, showManagerButton, hasActiveFilters, onOpenManager, isSearching, onToggleSearch, searchValue, onSearchChange, searchPlaceholder }) {
   return (
     <div ref={heroRef} style={{
-      backgroundColor: 'var(--color-surface)',
-      borderRadius:    16,
-      padding:         '14px 14px 14px',
-      marginTop:       'var(--space-4)',
-      // Diffused, soft-blur shadow — larger blur radius + low spread keeps
-      // it soft rather than a hard drop shadow.
-      boxShadow:       '0 4px 16px rgba(0, 0, 0, 0.045)',
+      margin:          '0 calc(-1 * var(--page-gutter, 16px))',
+      padding:         '16px var(--page-gutter, 16px) 16px',
+      backgroundColor: 'var(--color-header-tint)',
+      borderRadius:    '0 0 24px 24px',
     }}>
       {/* height: 44 (not minHeight) is a hard lock matching SearchBar's own
           compact height exactly, so toggling between the title/subtitle
@@ -93,7 +96,7 @@ export default function FavouritesHero({ heroRef, showManagerButton, hasActiveFi
             : (
                 <div key="title" style={{ minWidth: 0, animation: 'favHeaderCrossfade 0.2s ease' }}>
                   <h1 style={{
-                    fontSize:      19,
+                    fontSize:      22,
                     lineHeight:    1.15,
                     fontWeight:    700,
                     color:         'var(--color-text-primary)',
@@ -103,9 +106,9 @@ export default function FavouritesHero({ heroRef, showManagerButton, hasActiveFi
                     Favourites
                   </h1>
                   <div style={{
-                    fontSize:   12,
+                    fontSize:   13,
                     lineHeight: 1.2,
-                    color:      'var(--color-text-tertiary)',
+                    color:      'var(--color-text-secondary)',
                     marginTop:  1,
                   }}>
                     Your saved references
@@ -114,13 +117,13 @@ export default function FavouritesHero({ heroRef, showManagerButton, hasActiveFi
               )}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 0, flexShrink: 0, marginRight: -8 }}>
           <button
             onClick={onToggleSearch}
             aria-label={isSearching ? 'Close search' : 'Search favourites'}
             style={{
-              width:                   isSearching ? 40 : 36,
-              height:                  isSearching ? 40 : 36,
+              width:                   44,
+              height:                  44,
               borderRadius:            '50%',
               border:                  'none',
               backgroundColor:         isSearching ? 'var(--color-accent)' : 'transparent',
@@ -145,8 +148,8 @@ export default function FavouritesHero({ heroRef, showManagerButton, hasActiveFi
               aria-label="Sort, filter, and manage favourites"
               style={{
                 position:                'relative',
-                width:                   36,
-                height:                  36,
+                width:                   44,
+                height:                  44,
                 borderRadius:            '50%',
                 border:                  'none',
                 backgroundColor:         'transparent',
@@ -163,8 +166,8 @@ export default function FavouritesHero({ heroRef, showManagerButton, hasActiveFi
               {hasActiveFilters && (
                 <span aria-hidden="true" style={{
                   position:        'absolute',
-                  top:             6,
-                  right:           6,
+                  top:             9,
+                  right:           9,
                   width:           7,
                   height:          7,
                   borderRadius:    '50%',
@@ -174,6 +177,10 @@ export default function FavouritesHero({ heroRef, showManagerButton, hasActiveFi
             </button>
           )}
         </div>
+      </div>
+
+      <div style={{ marginTop: 'var(--space-3)' }}>
+        <FavouritesSegmented activeTab={activeTab} onSelect={onSelectTab} counts={counts} />
       </div>
     </div>
   )
