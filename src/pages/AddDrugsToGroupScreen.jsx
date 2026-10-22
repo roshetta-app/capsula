@@ -7,7 +7,11 @@
  * Class in the mode pop-up or the info sheet, no Class strip or results, no Class entry in
  * "found in other modes", no Class searches in recent searches (the 'allowClass' setting).
  *
- * Under the bar sits a slim strip with the group's name and "12 of 20". Each result is the
+ * 2026-10-22 (UI refresh plan, step 8.4b): the group strip moved into the tinted header, above
+ * the search bar: a folder tile in the group's colour, the group name with "12 of 20 drugs"
+ * (and "Full" at the limit), and a Done button that returns to the group page. A drug that is
+ * already in the group shows a tick with the word Added.
+ * Before that, under the bar sat a slim strip with the group's name and "12 of 20". Each result is the
  * normal drug card with a round + to add the drug, or a tick when it is already in the group.
  * A tap adds at once and the search stays open, so several drugs can be added; tapping the
  * card itself opens the drug page, and coming back brings the search back. At the limit the
@@ -355,39 +359,38 @@ export default function AddDrugsToGroupScreen() {
           categories={categories}
           isDark={isDark}
           allowClass={false}
-        />
-
-        {/* The group strip: whose list this is and how full it is. */}
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
-          marginTop: 'var(--space-2)', minHeight: 36,
-          fontFamily: 'var(--font-body)',
-        }}>
-          <div style={{
-            width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
-            backgroundColor: tone.bg, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <Folder size={14} color={tone.fg} aria-hidden="true" />
-          </div>
-          <span dir="ltr" style={{
-            flex: 1, minWidth: 0, fontSize: 14, fontWeight: 600, textAlign: 'start',
-            color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          }}>
-            {group.name}
-          </span>
-          <span style={{ fontSize: 13, color: 'var(--color-text-secondary)', flexShrink: 0 }}>
-            {count} of {drugsCap}
-          </span>
-          {full && (
-            <span style={{
-              fontSize: 11, fontWeight: 700, letterSpacing: '0.04em', flexShrink: 0,
-              color: 'var(--color-text-secondary)', backgroundColor: 'var(--color-surface)',
-              borderRadius: 8, padding: '2px 8px',
-            }}>
-              Full
-            </span>
+          top={(
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-3)', fontFamily: 'var(--font-body)' }}>
+              <div style={{
+                width: 36, height: 36, borderRadius: 11, flexShrink: 0,
+                backgroundColor: tone.bg, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <Folder size={18} color={tone.fg} aria-hidden="true" />
+              </div>
+              <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <span dir="ltr" style={{
+                  fontSize: 16, fontWeight: 700, lineHeight: 1.2, textAlign: 'start',
+                  color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>
+                  {group.name}
+                </span>
+                <span style={{ fontSize: 13, lineHeight: 1.3, color: 'var(--color-text-secondary)' }}>
+                  {count} of {drugsCap} drugs{full ? ' · Full' : ''}
+                </span>
+              </div>
+              <button
+                onClick={goBack}
+                style={{
+                  flexShrink: 0, minHeight: 44, padding: '0 4px 0 12px', background: 'none', border: 'none',
+                  cursor: 'pointer', fontSize: 16, fontWeight: 600, color: 'var(--color-accent)',
+                  fontFamily: 'var(--font-body)', WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                Done
+              </button>
+            </div>
           )}
-        </div>
+        />
       </div>
 
       <div style={{ paddingTop: 'var(--space-3)', paddingBottom: 'var(--space-4)' }}>

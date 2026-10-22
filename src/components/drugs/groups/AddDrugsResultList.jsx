@@ -1,4 +1,7 @@
 /**
+ * 2026-10-22 (UI refresh plan, step 8.4b): a drug already in the group shows a tick with the word
+ * Added instead of a bare tick.
+ *
  * src/components/drugs/groups/AddDrugsResultList.jsx
  * 2026-10-21 (Drug groups plan, step 12.5): the result list of the Add drugs screen. The same
  * windowed list as the Drugs screen's (only the rows on screen are drawn, measured as they
@@ -30,8 +33,16 @@ function AddMark({ inGroup, onAdd, name }) {
   }
   if (inGroup) {
     return (
-      <span role="img" aria-label={`${name} is in this group`} style={{ ...base, color: 'var(--color-accent)' }}>
-        <Check size={22} strokeWidth={2.5} aria-hidden="true" />
+      <span
+        role="img"
+        aria-label={`${name} is in this group`}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, minHeight: 44, padding: '0 4px',
+          fontSize: 13, fontWeight: 600, color: 'var(--color-accent)', fontFamily: 'var(--font-body)',
+        }}
+      >
+        <Check size={16} strokeWidth={2.5} aria-hidden="true" />
+        Added
       </span>
     )
   }
