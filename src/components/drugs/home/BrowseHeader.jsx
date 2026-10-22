@@ -13,7 +13,7 @@
  * Back is the caller's job (onBack), so each screen keeps its own one-step-back rule.
  *
  * 2026-10-22 (step 8.13): BrowseTopRow also takes 'accent' (colour of the back link), 'titleSize' and
- * 'action' (a button at the right end of the back row, used for New group). It takes an optional 'icon' (a round badge drawn by the
+ * 'action' (a button at the right end of the title row, used for New group). It takes an optional 'icon' (a round badge drawn by the
  * caller) that sits to the left of the title. An opened category uses it for its own icon.
  */
 
@@ -22,7 +22,6 @@ import { ChevronLeft } from 'lucide-react'
 export function BrowseTopRow({ backLabel, onBack, title, subtitle = null, icon = null, spaceBelow = 0, titleSize = 26, accent = 'var(--color-accent)', action = null }) {
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
       <button
         type="button"
         onClick={onBack}
@@ -38,16 +37,15 @@ export function BrowseTopRow({ backLabel, onBack, title, subtitle = null, icon =
         <ChevronLeft size={20} strokeWidth={2.2} aria-hidden="true" />
         {backLabel}
       </button>
-      {action}
-      </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: icon ? 8 : 2, marginBottom: spaceBelow }}>
         {icon}
         <h1 style={{
-          margin: 0, minWidth: 0, overflowWrap: 'break-word', fontSize: titleSize, fontWeight: 700, lineHeight: 1.2,
+          margin: 0, minWidth: 0, flex: 1, overflowWrap: 'break-word', fontSize: titleSize, fontWeight: 700, lineHeight: 1.2,
           color: 'var(--color-text-primary)', fontFamily: 'var(--font-body)',
         }}>
           {title}
         </h1>
+        {action ? <div style={{ marginLeft: 'auto', flexShrink: 0 }}>{action}</div> : null}
       </div>
       {subtitle ? (
         <div style={{ marginTop: 2, fontSize: 14, lineHeight: 1.3, color: 'var(--color-text-secondary)', fontFamily: 'var(--font-body)' }}>

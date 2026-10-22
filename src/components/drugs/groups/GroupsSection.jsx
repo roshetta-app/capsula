@@ -36,14 +36,13 @@
 
 import { memo, useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronRight, Plus } from 'lucide-react'
+import { ArrowUpDown, ChevronRight, Plus } from 'lucide-react'
 import BrowseHeader from '../home/BrowseHeader'
 import DrugsSectionCard, { SECTION_TITLE_STYLE } from '../home/DrugsSectionCard'
 import { shimmer } from '../home/shimmer'
 import GroupTile, { CARD_WIDTH, ProPill } from './GroupTile'
 import GroupRow from './GroupRow'
 import GroupViewToggle from './GroupViewToggle'
-import SoftSwitch from './SoftSwitch'
 import { firstNames } from './groupDrugText'
 
 const NAME_ORDER = new Intl.Collator(undefined, { sensitivity: 'base' })
@@ -67,10 +66,6 @@ const READ_ONLY_MESSAGE = 'Your groups are read only. Delete a group or upgrade 
 // Same look as the sort button on the Class page: no box, arrow icon, 13px
 // medium text in the secondary colour. Shows the order a tap switches to.
 // Step 8.12: the sort is a two-option switch that shows the mode you are on.
-const SORT_OPTIONS = [
-  { key: 'newest', label: SORT_LABELS.newest },
-  { key: 'az', label: SORT_LABELS.az },
-]
 
 // Step 8.9: the folder card is about 128 tall (14 tab + 114 body).
 function SkeletonTile({ fill = false }) {
@@ -200,9 +195,25 @@ function GroupsSection({ all = false, headerProps = null }) {
 
   const title = <span style={SECTION_TITLE_STYLE}>My drug groups</span>
   const showControls = !!user && groupsStatus === 'ready' && groups.length > 0
+  // Step 8.13 (third try): two plain controls, no boxes. Left: the sort as a text button that
+  // switches between Newest first and A to Z (same look as the sort button on the Class page).
+  // Right: one icon that switches between grid and list, showing the view a tap changes to.
   const controls = showControls && all ? (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
-      <SoftSwitch options={SORT_OPTIONS} value={groupsSortMode} onChange={setGroupsSortMode} label="Sort groups" />
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-2)' }}>
+      <button
+        type="button"
+        onClick={() => setGroupsSortMode(groupsSortMode === 'az' ? 'newest' : 'az')}
+        aria-label={`Sorted ${groupsSortMode === 'az' ? 'A to Z' : 'newest first'}. Tap to change`}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 6, minHeight: 44, padding: 0,
+          background: 'none', border: 'none', cursor: 'pointer', outline: 'none',
+          fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 500,
+          color: 'var(--color-text-secondary)', WebkitTapHighlightColor: 'transparent',
+        }}
+      >
+        <ArrowUpDown size={16} aria-hidden="true" />
+        {SORT_LABELS[groupsSortMode] ?? SORT_LABELS.newest}
+      </button>
       <GroupViewToggle value={groupsView} onChange={setGroupsView} />
     </div>
   ) : null
@@ -305,7 +316,7 @@ function GroupsSection({ all = false, headerProps = null }) {
     )
   }
 
-  // Step 8.13: New group sits at the right end of the See all header (a pill, with the PRO tag at the
+  // Step 8.13: New group is a round plus at the right end of the title row in the See all header (PRO tag at the
   // limit). Shown once there is at least one group; the empty state has its own Create group button.
   const newGroupButton = all && showControls && !isReadOnly ? (
     <button
@@ -313,15 +324,17 @@ function GroupsSection({ all = false, headerProps = null }) {
       onClick={handleNewGroup}
       aria-label="New group"
       style={{
-        display: 'flex', alignItems: 'center', gap: 6, minHeight: 44, padding: '0 16px 0 12px',
-        borderRadius: 'var(--radius-full)', border: 'none', cursor: 'pointer', outline: 'none',
-        backgroundColor: 'var(--color-accent-solid)', color: '#fff',
-        fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600, WebkitTapHighlightColor: 'transparent',
+        position: 'relative', width: 44, height: 44, borderRadius: '50%',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        border: 'none', cursor: 'pointer', outline: 'none',
+        backgroundColor: 'var(--color-surface)', color: 'var(--color-accent-text)',
+        WebkitTapHighlightColor: 'transparent',
       }}
     >
-      <Plus size={18} strokeWidth={2.2} aria-hidden="true" />
-      New group
-      {!isPro && groups.length >= DRUG_GROUPS_CAP_FREE ? <ProPill /> : null}
+      <Plus size={22} strokeWidth={2.4} aria-hidden="true" />
+      {!isPro && groups.length >= DRUG_GROUPS_CAP_FREE ? (
+        <span style={{ position: 'absolute', top: -6, right: -6 }}><ProPill /></span>
+      ) : null}
     </button>
   ) : null
 
