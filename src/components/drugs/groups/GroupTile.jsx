@@ -21,10 +21,15 @@
  * New group tile is the same size with a dashed line and a plus. 'animate' gives a tile
  * that was just added or renamed a short soft fade-in (the class is defined in
  * GroupsSection.jsx).
+ *
+ * 2026-10-22 (UI refresh plan, step 8.2a): the tile is now a card in the sideways row on the
+ * Drugs home. Surface fill with a thin border, a small tile in the group's colour with a
+ * folder, then the name, the drug count and the first drug names, each on one line. The New
+ * group card is the same size with a dashed line. 'drugNames' is the preview line.
  */
 
 import { useState } from 'react'
-import { Plus, CloudUpload } from 'lucide-react'
+import { Plus, Folder, CloudUpload } from 'lucide-react'
 import { resolveToken } from '../../../utils/specialtyTokens'
 import { useIsDark } from '../../../utils/specialtyIcon'
 
@@ -54,13 +59,15 @@ export function WaitingMark({ size = 14, color = 'var(--color-text-secondary)' }
   )
 }
 
-export default function GroupTile({ group, isNew = false, showProBadge = false, waiting = false, animate = false, onOpen }) {
+export const CARD_WIDTH = 156
+
+export default function GroupTile({ group, isNew = false, showProBadge = false, waiting = false, animate = false, drugNames = '', onOpen }) {
   const [pressed, setPressed] = useState(false)
   const isDark = useIsDark()
   const colors = resolveToken(isNew ? 'slate' : group?.color, isDark)
   const name = isNew ? 'New group' : (group?.name ?? '')
-  const dir = 'ltr'
   const count = group?.brandIds?.length ?? 0
+  const line = { fontSize: 12, lineHeight: 1.3, fontFamily: 'var(--font-body)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }
 
   return (
     <div
@@ -75,12 +82,13 @@ export default function GroupTile({ group, isNew = false, showProBadge = false, 
       onPointerLeave={() => setPressed(false)}
       onPointerCancel={() => setPressed(false)}
       style={{
-        display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 'var(--space-3)',
-        backgroundColor: isNew ? 'transparent' : colors.bg,
-        border: isNew ? '1.5px dashed var(--color-border)' : 'none',
-        borderRadius: 18,
-        padding: 14,
-        minHeight: 96,
+        flex: `0 0 ${CARD_WIDTH}px`, width: CARD_WIDTH, scrollSnapAlign: 'start',
+        display: 'flex', flexDirection: 'column', gap: 10,
+        backgroundColor: isNew ? 'transparent' : 'var(--color-surface)',
+        border: isNew ? '1.5px dashed var(--color-border)' : '1px solid var(--color-border)',
+        borderRadius: 16,
+        padding: 12,
+        minHeight: 128,
         cursor: 'pointer',
         outline: 'none',
         WebkitTapHighlightColor: 'transparent',
@@ -91,34 +99,31 @@ export default function GroupTile({ group, isNew = false, showProBadge = false, 
       }}
     >
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
-        {isNew ? (
-          <Plus size={24} strokeWidth={2} color="var(--color-text-secondary)" aria-hidden="true" />
-        ) : (
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, minWidth: 0 }}>
-            <span style={{ fontSize: 28, fontWeight: 800, lineHeight: 1, color: colors.fg, fontFamily: 'var(--font-body)' }}>
-              {count}
-            </span>
-            <span style={{ fontSize: 11, fontWeight: 600, color: colors.fg, opacity: 0.8, fontFamily: 'var(--font-body)' }}>
-              {count === 1 ? 'drug' : 'drugs'}
-            </span>
-          </div>
-        )}
+        <div style={{
+          width: 36, height: 36, borderRadius: 11, flexShrink: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          backgroundColor: isNew ? 'var(--color-surface-muted)' : colors.bg,
+        }}>
+          {isNew
+            ? <Plus size={18} strokeWidth={2} color="var(--color-text-secondary)" aria-hidden="true" />
+            : <Folder size={18} strokeWidth={1.8} color={colors.fg} aria-hidden="true" />}
+        </div>
         {isNew && showProBadge && <ProPill />}
-        {!isNew && waiting && <WaitingMark color={colors.fg} />}
+        {!isNew && waiting && <WaitingMark />}
       </div>
 
-      <div
-        dir={dir}
-        style={{
-          width: '100%', textAlign: 'start',
-          fontSize: 14, fontWeight: 600, lineHeight: 1.3,
-          color: isNew ? 'var(--color-text-secondary)' : colors.fg,
-          fontFamily: 'var(--font-body)',
-          display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
-          overflow: 'hidden', overflowWrap: 'anywhere',
-        }}
-      >
-        {name}
+      <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <div dir="ltr" style={{ ...line, fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)' }}>
+          {name}
+        </div>
+        {isNew ? (
+          <div style={{ ...line, color: 'var(--color-text-secondary)' }}>Start a list</div>
+        ) : (
+          <>
+            <div style={{ ...line, fontWeight: 500, color: 'var(--color-text-secondary)' }}>{count === 0 ? 'No drugs yet' : drugCountLabel(count)}</div>
+            {drugNames ? <div style={{ ...line, color: 'var(--color-text-muted)' }}>{drugNames}</div> : null}
+          </>
+        )}
       </div>
     </div>
   )

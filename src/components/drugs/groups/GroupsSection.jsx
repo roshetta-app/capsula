@@ -18,6 +18,10 @@
  * The Undo message for a group deleted from its page is shown here, handed
  * over by pendingUndo.js.
  *
+ * 2026-10-22 (UI refresh plan, step 8.2a): tiles view is one sideways row of cards (name, count,
+ * first drug names, New group card at the end); the "N of 3 groups · Full" line shows under it
+ * for a free account at its limit. List view and every message state are unchanged.
+ *
  * 2026-10-20 (step 11.5): flat look. Colour tiles with a big drug count, flat list rows
  * with thin lines, a dashed New group tile or row at the end, centred messages with no
  * box, and placeholders in the same shapes while loading. A group that is added or
@@ -31,7 +35,7 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowUpDown } from 'lucide-react'
 import DrugsSectionCard, { SECTION_TITLE_STYLE } from '../home/DrugsSectionCard'
 import { shimmer } from '../home/shimmer'
-import GroupTile from './GroupTile'
+import GroupTile, { CARD_WIDTH } from './GroupTile'
 import GroupRow from './GroupRow'
 import GroupViewToggle from './GroupViewToggle'
 import { firstNames } from './groupDrugText'
@@ -77,7 +81,7 @@ function GroupSortButton({ sortMode, onToggle }) {
 }
 
 function SkeletonTile() {
-  return <div style={shimmer({ minHeight: 96, borderRadius: 18 })} />
+  return <div style={shimmer({ flex: `0 0 ${CARD_WIDTH}px`, width: CARD_WIDTH, height: 128, borderRadius: 16 })} />
 }
 
 function SkeletonRow({ last = false }) {
@@ -99,9 +103,13 @@ function SkeletonRow({ last = false }) {
 // Soft fade-in for a group that was just added or renamed. Written once here for the
 // tiles and rows; the speed comes from the motion token, which is near zero when the
 // phone asks for reduced motion.
-const SOFT_IN_CSS = '@keyframes groupSoftIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } } .group-soft-in { animation: groupSoftIn var(--motion-base) var(--ease-settle) both; }'
+const SOFT_IN_CSS = '@keyframes groupSoftIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } } .group-soft-in { animation: groupSoftIn var(--motion-base) var(--ease-settle) both; } .groups-row::-webkit-scrollbar { display: none; }'
 
-const GRID_STYLE = { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 'var(--space-2)' }
+// Step 8.2a: the groups sit in one sideways row of cards (no grid).
+const ROW_STYLE = {
+  display: 'flex', gap: 10, overflowX: 'auto', scrollSnapType: 'x proximity',
+  scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch', paddingBottom: 2,
+}
 const LIST_STYLE = { display: 'flex', flexDirection: 'column' }
 
 function GroupsSection() {
@@ -220,7 +228,7 @@ function GroupsSection() {
   if (authLoading || (user && groupsStatus === 'loading')) {
     content = groupsView === 'list'
       ? <div style={LIST_STYLE}><SkeletonRow /><SkeletonRow /><SkeletonRow last /></div>
-      : <div style={GRID_STYLE}><SkeletonTile /><SkeletonTile /><SkeletonTile /><SkeletonTile /></div>
+      : <div className="groups-row" style={ROW_STYLE}><SkeletonTile /><SkeletonTile /><SkeletonTile /></div>
   } else if (!user) {
     content = (
       <GroupStateMessage
@@ -276,15 +284,20 @@ function GroupsSection() {
             {showNew && <GroupRow isNew last showProBadge={showPro} onOpen={handleNewGroup} />}
           </div>
         ) : (
-          <div style={GRID_STYLE}>
+          <div className="groups-row" style={ROW_STYLE}>
             {sorted.map(g => (
               <GroupTile
-                key={`${g.id}:${g.name}`} group={g}
+                key={`${g.id}:${g.name}`} group={g} drugNames={previewNames(g)}
                 waiting={waitingGroupIds.includes(g.id)} animate={isFresh(g)}
                 onOpen={() => handleOpenGroup(g)}
               />
             ))}
             {showNew && <GroupTile isNew showProBadge={showPro} onOpen={handleNewGroup} />}
+          </div>
+        )}
+        {showPro && groupsView !== 'list' && (
+          <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', fontFamily: 'var(--font-body)' }}>
+            {groups.length} of {DRUG_GROUPS_CAP_FREE} groups · Full
           </div>
         )}
       </div>

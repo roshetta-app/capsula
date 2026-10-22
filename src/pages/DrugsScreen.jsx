@@ -1065,10 +1065,12 @@ export default function DrugsScreen() {
     // 2026-10-18 (Drug groups plan, step 3.6): under Browse sits the My drug
     // groups area, drawn only when the groups switch (or the test preview on
     // this phone) is on.
+    // 2026-10-22 (UI refresh plan, step 8.2a): My drug groups moved above Browse, right
+    // under Recently viewed.
     body = (
       <>
-        <DrugsBrowseSection />
         {isDrugGroupsOn() && <GroupsSection />}
+        <DrugsBrowseSection />
       </>
     )
   }
