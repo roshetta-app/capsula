@@ -23,6 +23,9 @@ import { resolveToken, FALLBACK_TOKEN } from '../../../utils/specialtyTokens'
 // however many are actually in `drugs` (already capped at MAX_RECENT
 // upstream, but this row itself only ever shows the first 3).
 
+// 2026-10-22 (UI refresh, Recently viewed refinement): flat row kept, no card and no count.
+// Circles 34 px with one letter so none is cut off, most recent on top; label 15 px; muted chevron.
+
 // onPage (step 11.2): true when there is no card behind the button (the flat Drugs home), so the
 // avatar rings and the pressed fill use the page colour instead of the card colour.
 export default function RecentlyViewedButton({ onTap, drugs, categories, isDark, onPage = false }) {
@@ -32,7 +35,7 @@ export default function RecentlyViewedButton({ onTap, drugs, categories, isDark,
   function getInitials(drug) {
     const name = drug.tradenameClean || drug.genericName || ''
     if (!name) return '?'
-    return name.slice(0, 1).toUpperCase() + name.slice(1, 2).toLowerCase()
+    return name.slice(0, 1).toUpperCase()
   }
 
   function getColors(drug) {
@@ -50,12 +53,13 @@ export default function RecentlyViewedButton({ onTap, drugs, categories, isDark,
       style={{
         display:                 'flex',
         alignItems:              'center',
-        gap:                     'var(--space-2)',
+        gap:                     'var(--space-3)',
         width:                   '100%',
+        minHeight:               48,
         backgroundColor:         pressed ? (onPage ? 'var(--color-surface)' : 'var(--color-surface-muted)') : 'transparent',
         border:                  'none',
         borderRadius:            'var(--radius-lg)',
-        padding:                 'var(--space-1) 0',
+        padding:                 'var(--space-2) 0',
         cursor:                  'pointer',
         fontFamily:              'var(--font-body)',
         outline:                 'none',
@@ -71,18 +75,20 @@ export default function RecentlyViewedButton({ onTap, drugs, categories, isDark,
             <div
               key={drug.id}
               style={{
-                width:           28,
-                height:          28,
+                width:           34,
+                height:          34,
                 borderRadius:    '50%',
                 backgroundColor: colors.bg,
                 color:           colors.fg,
                 display:         'flex',
                 alignItems:      'center',
                 justifyContent:  'center',
-                fontSize:        11,
+                fontSize:        14,
                 fontWeight:      600,
                 border:          `2px solid ${onPage ? 'var(--color-bg)' : 'var(--color-surface)'}`,
-                marginLeft:      i === 0 ? 0 : -10,
+                marginLeft:      i === 0 ? 0 : -9,
+                position:        'relative',
+                zIndex:          preview.length - i,
               }}
             >
               {getInitials(drug)}
@@ -92,7 +98,7 @@ export default function RecentlyViewedButton({ onTap, drugs, categories, isDark,
       </div>
 
       <span style={{
-        fontSize:   13,
+        fontSize:   15,
         fontWeight: 500,
         color:      'var(--color-text-primary)',
       }}>
@@ -100,8 +106,8 @@ export default function RecentlyViewedButton({ onTap, drugs, categories, isDark,
       </span>
 
       <svg
-        width="16" height="16" viewBox="0 0 24 24" fill="none"
-        stroke="var(--color-text-primary)" strokeWidth="2"
+        width="18" height="18" viewBox="0 0 24 24" fill="none"
+        stroke="var(--color-text-secondary)" strokeWidth="2"
         strokeLinecap="round" strokeLinejoin="round"
         style={{ marginLeft: 'auto' }}
       >
