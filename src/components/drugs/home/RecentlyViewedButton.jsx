@@ -98,8 +98,8 @@ export default function RecentlyViewedButton({ onTap, drugs, categories, isDark,
       </div>
 
       <span style={{
-        fontSize:   15,
-        fontWeight: 500,
+        fontSize:   16,
+        fontWeight: 600,
         color:      'var(--color-text-primary)',
       }}>
         Recently viewed

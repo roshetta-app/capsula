@@ -15,7 +15,10 @@
  *
  * 2026-10-20 (Drug groups plan, step 11.1): new `flat` option. Flat sections have no card:
  * no fill, corners or shadow, and no side padding (the layout owns the 16px side gap),
- * with a thin line above the section unless `divider` is false (the first section).
+ * and no line between sections (2026-10-22: dividers removed, whitespace does the separating:
+ * 12px above and below each section, 12px between a title and its content). The `divider`
+ * prop is kept so old call sites still work, but it no longer draws anything.
+ * Type scale on the Drugs home: section title 18/700, row title 16/600, link 14/600, helper 13.
  * Cards stay as they were when `flat` is off (the search focus mode, until step 11.6).
  *
  * The title text style is exported (SECTION_TITLE_STYLE) so the pieces of both
@@ -24,19 +27,18 @@
  */
 
 export const SECTION_TITLE_STYLE = {
-  fontSize:   16,
+  fontSize:   18,
   fontWeight: 700,
-  lineHeight: 1.2,
+  lineHeight: 1.25,
   color:      'var(--color-text-primary)',
   fontFamily: 'var(--font-body)',
 }
 
-export default function DrugsSectionCard({ label, title, trailing = null, flat = false, divider = true, children }) {
+export default function DrugsSectionCard({ label, title, trailing = null, flat = false, children }) {
   const frame = flat
     ? {
-        padding:   '16px 0',
+        padding:   '12px 0',
         marginBottom: 0,
-        borderTop: divider ? '1px solid var(--color-border)' : 'none',
       }
     : {
         backgroundColor: 'var(--color-surface)',
@@ -55,7 +57,7 @@ export default function DrugsSectionCard({ label, title, trailing = null, flat =
         alignItems:     'center',
         justifyContent: 'space-between',
         gap:            'var(--space-2)',
-        minHeight:      34,
+        minHeight:      32,
         marginBottom:   'var(--space-3)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}>

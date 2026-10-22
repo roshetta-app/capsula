@@ -171,7 +171,7 @@ export default function DrugsSearchSection({
         {/* Recently viewed: a shortcut to drugs, so it belongs with search. It sits under the
             tinted block, outside it. */}
         {showRecent && recentDrugs.length > 0 && (
-          <div style={{ order: 2, marginTop: 'var(--space-4)' }}>
+          <div style={{ order: 2, marginTop: 'var(--space-4)', marginBottom: 'var(--space-1)' }}>
             <RecentlyViewedButton
               onTap={onOpenRecent}
               drugs={recentDrugs}
