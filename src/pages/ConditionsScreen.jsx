@@ -381,7 +381,7 @@ function DarkModeToggle({ theme, onCycleTheme }) {
 
 function BrandRow({ theme, onCycleTheme, onOpenNotifications }) {
   return (
-    <div style={{ paddingTop: 'var(--space-2)', paddingBottom: 'var(--space-3)' }}>
+    <div style={{ paddingBottom: 'var(--space-3)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', minHeight: 44 }}>
         <img
           src={`${import.meta.env.BASE_URL}logo.svg`}
@@ -987,7 +987,7 @@ export default function ConditionsScreen() {
         ref={heroRef}
         style={{
           margin:          '0 calc(-1 * var(--page-gutter, var(--space-4)))',
-          padding:         '0 var(--page-gutter, var(--space-4)) 16px',
+          padding:         '16px var(--page-gutter, var(--space-4)) 16px',
           backgroundColor: 'var(--color-header-tint)',
           borderRadius:    '0 0 24px 24px',
         }}

@@ -2,7 +2,7 @@
  * src/components/conditions/SpecialtySelector.jsx
  * 2026-10-22 (UI refresh plan, step 8.6a): now one slim pill for the Conditions header (rule 12:
  * a long list is a single pill with a down arrow). No 'Specialty' label line and no white card:
- * a 44 px pill in the header's mode-track colour (--color-seg-track) that sits inside the tinted
+ * a 50 px pill (same height as the Brand / Generic / Class switch on Drugs) in the header's mode-track colour (--color-seg-track) that sits inside the tinted
  * block; the active specialty keeps its own soft wash and border. Icon, name, chevron and the
  * clear button work as before. The history below describes the older card.
  * Extracted from src/pages/ConditionsScreen.jsx — previously defined inline.
@@ -149,7 +149,7 @@ export default function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear,
         display:         'flex',
         alignItems:      'center',
         width:           '100%',
-        minHeight:       44,
+        minHeight:       50,
         backgroundColor: pressed ? pressedBg : surfaceBg,
         border:          isActive
           ? `1px solid rgba(${r}, ${g}, ${b}, 0.3)`
@@ -171,7 +171,7 @@ export default function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear,
           display:                 'flex',
           alignItems:              'center',
           gap:                     8,
-          minHeight:               44,
+          minHeight:               50,
           padding:                 '0 8px 0 14px',
           background:              'none',
           border:                  'none',
@@ -258,7 +258,7 @@ export default function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear,
           alignItems:              'center',
           justifyContent:          'center',
           width:                   isActive ? 44 : 0,
-          height:                  44,
+          height:                  50,
           opacity:                 isActive ? 1 : 0,
           flexShrink:              0,
           overflow:                'hidden',
