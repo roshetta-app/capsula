@@ -15,6 +15,7 @@
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import CategoryRow from '../components/drugs/home/CategoryRow'
+import BrowseHeader from '../components/drugs/home/BrowseHeader'
 import { DrugsSkeleton, LibraryErrorState } from '../components/drugs/home/BrowseStates'
 import { useDrugContext } from '../context/DrugContext'
 import { useCategories } from '../hooks/useCategories'
@@ -46,7 +47,7 @@ export default function DrugCategoriesScreen() {
 
   function openCategory(slug) {
     prepareCategoryOpen(slug)
-    navigate(ROUTES.DRUGS_CATEGORY(slug))
+    navigate(ROUTES.DRUGS_CATEGORY(slug), { state: { from: 'categories' } })
   }
 
   let body = null
@@ -89,28 +90,8 @@ export default function DrugCategoriesScreen() {
 
   // Side gap and max width come from Layout (Drug groups plan, step 12.0 / F1); this page adds top and bottom space only.
   return (
-    <div style={{ padding: 'var(--space-3) 0 var(--space-4)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-3)' }}>
-        <button
-          onClick={() => navigate(-1)}
-          aria-label="Back to Drugs"
-          style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            background: 'none', border: 'none', cursor: 'pointer',
-            color: 'var(--color-accent)', fontSize: 14, fontWeight: 500,
-            fontFamily: 'var(--font-body)', padding: '4px 0',
-            WebkitTapHighlightColor: 'transparent',
-          }}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <polyline points="15 18 9 12 15 6" />
-          </svg>
-          Drugs
-        </button>
-      </div>
-      <h1 style={{ margin: '0 0 var(--space-3)', fontSize: 22, fontWeight: 700, lineHeight: 1.2, color: 'var(--color-text-primary)', fontFamily: 'var(--font-body)' }}>
-        Category
-      </h1>
+    <div style={{ padding: '0 0 var(--space-4)' }}>
+      <BrowseHeader backLabel="Drugs" onBack={() => navigate(-1)} title="Categories" />
       {body}
     </div>
   )

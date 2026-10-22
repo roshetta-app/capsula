@@ -296,7 +296,7 @@
 
 import { Search, Target, ArrowDown01, ArrowUpDown, ChevronDown } from 'lucide-react'
 import { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useWindowVirtualizer, observeWindowOffset } from '@tanstack/react-virtual'
 import SharedDrugCard from '../components/SharedDrugCard'
 import RowStarButton from '../components/ui/RowStarButton'
@@ -333,6 +333,7 @@ import { ROUTES } from '../router'
 import { useBackClose } from '../hooks/useBackClose'
 import { useSearchHistory } from '../hooks/useSearchHistory'
 import SearchHistoryList from '../components/drugs/home/SearchHistoryList'
+import { BrowseTopRow } from '../components/drugs/home/BrowseHeader'
 
 // ─── applyFilters ─────────────────────────────────────────────────────────────
 
@@ -427,6 +428,7 @@ export function prepareCategoryOpen(slug) {
 
 export default function DrugsScreen() {
   const navigate           = useNavigate()
+  const location           = useLocation()
   const { categorySlug }   = useParams()
   const {
     drugs, loading, error, retry,
@@ -794,6 +796,18 @@ export default function DrugsScreen() {
   // and the home view (the Browse area). 'body' holds whichever applies, drawn
   // under the Search area.
   const inResultsView = hasQuery || (activeCategory !== null)
+
+  // The opened category's own header (step 8.5): one step back to where it was opened from (the
+  // home or the Categories screen); opened straight from a link there is nothing behind it, so
+  // it goes to the Drugs home. The count is the whole category (the filter count stays in the list).
+  function goBackFromCategory() {
+    if (window.history.state && window.history.state.idx > 0) navigate(-1)
+    else navigate(ROUTES.DRUGS, { replace: true })
+  }
+  const categoryCountText = activeCategory === null ? null : (() => {
+    const n = drugs.filter(d => activeCategory === '__all' || d.category === activeCategory).length
+    return n > 0 ? `${n} drug${n !== 1 ? 's' : ''}` : null
+  })()
   let body
   let cardsShowing
   // Phase 5 (§4.3) — true when the search itself found real results but the
@@ -860,40 +874,6 @@ export default function DrugsScreen() {
 
     body = (
       <>
-        {/* Back to categories button (only when in a category, not searching) */}
-        {!hasQuery && activeCategory !== null && (
-          <div style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            gap: 'var(--space-3)',
-            marginBottom: 'var(--space-3)',
-          }}>
-            <button
-              onClick={() => navigate(ROUTES.DRUGS, { replace: true })}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                background: 'none', border: 'none', cursor: 'pointer',
-                color: 'var(--color-accent)', fontSize: 14, fontWeight: 500,
-                fontFamily: 'var(--font-body)', padding: '4px 0',
-                WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="15 18 9 12 15 6"/>
-              </svg>
-              {/* categoryLabel computed above, shared with the sticky
-                  search bar's placeholder (1a.3). */}
-              {categoryLabel}
-            </button>
-            {/* The drug count for the open category, at the right end of the
-                back-button row (it used to be its own line below). */}
-            {!resultsNotReady && (
-              <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)', flexShrink: 0 }}>
-                {countText}
-              </span>
-            )}
-          </div>
-        )}
-
         <div style={{
           opacity:    dimmed && cardsShowing && !queryTooShort && !resultsNotReady && !modeSwitching && !slowPending ? 0.7 : 1,
           transition: 'opacity 150ms ease',
@@ -1150,7 +1130,16 @@ export default function DrugsScreen() {
               }}
             >
               <div style={{ minHeight: 0, overflow: searchOpen || !headerReady ? 'hidden' : 'visible' }}>
-                <DrugsHero onInfoTap={() => setShowModeInfo(true)} />
+                {activeCategory !== null ? (
+                  <BrowseTopRow
+                    backLabel={location.state?.from === 'categories' ? 'Categories' : 'Drugs'}
+                    onBack={goBackFromCategory}
+                    title={categoryLabel}
+                    subtitle={categoryCountText}
+                  />
+                ) : (
+                  <DrugsHero onInfoTap={() => setShowModeInfo(true)} />
+                )}
               </div>
             </div>
           )}
