@@ -25,7 +25,7 @@
  */
 
 import { useState } from 'react'
-import { Plus } from 'lucide-react'
+import { Folder, FolderPlus, Plus } from 'lucide-react'
 import { resolveToken } from '../../../utils/specialtyTokens'
 import { useIsDark } from '../../../utils/specialtyIcon'
 import { drugCountLabel, ProPill, WaitingMark } from './GroupTile'
@@ -56,7 +56,7 @@ export default function GroupRow({ group, drugNames = [], isNew = false, showPro
       onPointerLeave={() => setPressed(false)}
       onPointerCancel={() => setPressed(false)}
       style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
         padding: '12px 14px', minHeight: 64, borderRadius: 16,
         backgroundColor: isNew ? FOLDER_GREY_WASH : folderWash(colors.fg),
         cursor: 'pointer',
@@ -67,6 +67,20 @@ export default function GroupRow({ group, drugNames = [], isNew = false, showPro
         boxSizing: 'border-box',
       }}
     >
+      {/* Step 8.13: a folder icon in a round wash of the group's colour, at the left. */}
+      <div
+        aria-hidden="true"
+        style={{
+          width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
+          backgroundColor: isNew ? 'color-mix(in srgb, var(--color-text-primary) 8%, var(--color-bg))' : `color-mix(in srgb, ${colors.fg} 20%, var(--color-surface))`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}
+      >
+        {isNew
+          ? <FolderPlus size={20} color={soft} />
+          : <Folder size={20} color={folderCountColor(colors.fg)} />}
+      </div>
+
       <div style={{ flex: 1, minWidth: 0 }}>
         <div
           dir="ltr"
@@ -93,8 +107,13 @@ export default function GroupRow({ group, drugNames = [], isNew = false, showPro
         {isNew
           ? (showProBadge ? <ProPill /> : <Plus size={18} strokeWidth={2} color={soft} aria-hidden="true" />)
           : (
-            <span style={{ fontSize: 12, fontWeight: 600, fontFamily: 'var(--font-body)', color: folderCountColor(colors.fg), whiteSpace: 'nowrap' }}>
-              {count === 0 ? 'No drugs yet' : drugCountLabel(count)}
+            <span style={{
+              minWidth: 28, height: 26, padding: '0 9px', boxSizing: 'border-box', borderRadius: 13,
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              backgroundColor: `color-mix(in srgb, ${colors.fg} 20%, var(--color-surface))`,
+              fontSize: 13, fontWeight: 700, fontFamily: 'var(--font-body)', color: folderCountColor(colors.fg),
+            }}>
+              {count}
             </span>
           )}
       </div>
