@@ -1,7 +1,7 @@
 /**
- * 2026-10-22 (UI refresh plan, step 8.4a): the list is one white bordered card (16px corners) under
- * the heading and Clear all. Each row has a clock tile, the search text, a small mode tag in the
- * mode's own tint, and the remove button. Same props and behaviour as before.
+ * 2026-10-22 (UI refresh plan, step 8.4a): no card; the list sits plain on the page, right under
+ * the header. Heading and Clear all, then rows with thin lines between: clock icon, the search
+ * text, a small mode tag in the mode's own tint, and the remove button. Same props and behaviour.
  *
  * src/components/drugs/home/SearchHistoryList.jsx
  * 2026-10-21 (step 11.7): new 'allowClass' setting (default true); false hides the Class entries.
@@ -38,7 +38,7 @@ export default function SearchHistoryList({
   if (history.length === 0) return null
 
   return (
-    <div style={{ marginTop: 8 }}>
+    <div style={{ marginTop: 16 }}>
       <div style={{
         display:        'flex',
         alignItems:     'center',
@@ -62,11 +62,7 @@ export default function SearchHistoryList({
         )}
       </div>
 
-      <div style={{
-        display: 'flex', flexDirection: 'column',
-        backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)',
-        borderRadius: 16, overflow: 'hidden',
-      }}>
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
         {history.map((entry, i) => {
           const meta = MODE_META[entry.mode] ?? MODE_META.brand
           return (
@@ -82,22 +78,16 @@ export default function SearchHistoryList({
                 onClick={() => onPick(entry)}
                 style={{
                   flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 12,
-                  padding: '10px 4px 10px 12px', background: 'none', border: 'none', cursor: 'pointer',
+                  padding: '12px 2px', background: 'none', border: 'none', cursor: 'pointer',
                   textAlign: 'left', fontFamily: 'var(--font-body)',
                   WebkitTapHighlightColor: 'transparent',
                 }}
               >
-                <span style={{
-                  width: 32, height: 32, borderRadius: 10, flexShrink: 0,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  backgroundColor: 'var(--color-surface-muted)',
-                }}>
-                  <Clock size={15} style={{ color: 'var(--color-text-tertiary)' }} />
-                </span>
+                <Clock size={18} strokeWidth={1.8} style={{ color: 'var(--color-text-tertiary)', flexShrink: 0 }} />
                 <span
                   dir="auto"
                   style={{
-                    flex: 1, minWidth: 0, fontSize: 15, color: 'var(--color-text-primary)',
+                    flex: 1, minWidth: 0, fontSize: 16, color: 'var(--color-text-primary)',
                     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                   }}
                 >

@@ -3,7 +3,8 @@
  * 2026-10-22 (UI refresh plan, step 8.4a): the focus mode now keeps the tinted block: the back
  * arrow sits inside the search pill (SearchBar onBack), the Brand / Generic / Class switch is under
  * it as on the home, and the small mode button and the info button are gone. 'How search modes
- * work' stays reachable as a quiet link under the block while nothing is typed.
+ * work' sheet now opens from the info icon in the home header (the screen owns it and passes
+ * modeInfoOpen / onModeInfoClose); the focus mode has no info link at all.
  * 2026-10-22 (UI refresh plan, step 8.1): the home header block. On the home view the title
  * area (passed in as 'top'), the search field and the Brand / Generic / Class switch sit
  * together in one tinted block with a rounded bottom edge; Recently viewed and Clear filter
@@ -65,8 +66,7 @@
  *   categories, isDark           colours for Recently viewed and the info sheet
  */
 
-import { useState } from 'react'
-import { Search, Tag, FlaskConical, Layers, Info } from 'lucide-react'
+import { Search, Tag, FlaskConical, Layers } from 'lucide-react'
 import ClearFiltersButton from './ClearFiltersButton'
 import RecentlyViewedButton from './RecentlyViewedButton'
 import ModeSegmentedControl from './ModeSegmentedControl'
@@ -96,8 +96,8 @@ export default function DrugsSearchSection({
   searchOpen = false, onSearchFocus, onSearchCancel, onSearchSubmit, searchInputRef,
   allowClass = true,
   top = null, blockRef,
+  modeInfoOpen = false, onModeInfoClose,
 }) {
-  const [showModeInfo, setShowModeInfo] = useState(false)
 
   function handlePickMode(value) {
     onModeChange(value)
@@ -167,23 +167,6 @@ export default function DrugsSearchSection({
         </div>
         </div>
 
-        {/* Focus mode, nothing typed: a quiet link to the search modes sheet. The info button
-            left the focus header (step 8.4a), so this keeps the sheet reachable. */}
-        {searchOpen && !query && (
-          <button
-            type="button"
-            onClick={() => setShowModeInfo(true)}
-            style={{
-              alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: 6,
-              margin: '10px 0 0', padding: '6px 2px', background: 'none', border: 'none', cursor: 'pointer',
-              fontSize: 13, fontWeight: 500, color: 'var(--color-text-secondary)',
-              fontFamily: 'var(--font-body)', WebkitTapHighlightColor: 'transparent',
-            }}
-          >
-            <Info size={14} aria-hidden="true" />
-            How search modes work
-          </button>
-        )}
 
         {/* Recently viewed: a shortcut to drugs, so it belongs with search. It sits under the
             tinted block, outside it. */}
@@ -226,8 +209,8 @@ export default function DrugsSearchSection({
       )}
 
       <SearchModeInfoSheet
-        isOpen={showModeInfo}
-        onClose={() => setShowModeInfo(false)}
+        isOpen={modeInfoOpen}
+        onClose={() => onModeInfoClose?.()}
         categories={categories}
         isDark={isDark}
         allowClass={allowClass}

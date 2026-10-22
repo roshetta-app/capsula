@@ -306,7 +306,6 @@ import ClassSearchResults from '../components/drugs/classes/ClassSearchResults'
 import ClassSheet from '../components/drugs/classes/ClassSheet'
 import { ALL_KEY as ALL_CLASS_DRUGS_KEY } from '../components/drugs/classes/classKeys'
 import RecentlyViewedSheet from '../components/drugs/RecentlyViewedSheet'
-import DrugsInfoSheet from '../components/drugs/DrugsInfoSheet'
 import DrugsSearchSection, { MODE_OPTIONS } from '../components/drugs/home/DrugsSearchSection'
 import ModeButton from '../components/drugs/home/ModeButton'
 import DrugsBrowseSection from '../components/drugs/home/DrugsBrowseSection'
@@ -516,7 +515,7 @@ export default function DrugsScreen() {
     })
   }
   const [showRecentSheet,  setShowRecentSheet]  = useState(false)
-  const [showInfoSheet,    setShowInfoSheet]    = useState(false)
+  const [showModeInfo,     setShowModeInfo]     = useState(false)
   // Class search mode: the class sheet opened from a class or subclass card.
   // 'classTarget' stays after the sheet closes so it can slide out showing the
   // same content; 'classSheetKey' changes on every open so each opening starts
@@ -1151,7 +1150,7 @@ export default function DrugsScreen() {
               }}
             >
               <div style={{ minHeight: 0, overflow: searchOpen || !headerReady ? 'hidden' : 'visible' }}>
-                <DrugsHero onInfoTap={() => setShowInfoSheet(true)} />
+                <DrugsHero onInfoTap={() => setShowModeInfo(true)} />
               </div>
             </div>
           )}
@@ -1172,7 +1171,9 @@ export default function DrugsScreen() {
           hasActiveFilters={hasFilters && filtersApply}
           showClear={hasFilters && filtersApply && !isFilterMasked}
           onClearFilters={requestClearFilters}
-          showRecent={!hasQuery}
+          showRecent={!hasQuery && !searchOpen}
+          modeInfoOpen={showModeInfo}
+          onModeInfoClose={() => setShowModeInfo(false)}
           recentDrugs={recentDrugObjects}
           onOpenRecent={() => setShowRecentSheet(true)}
           categories={categories}
@@ -1230,11 +1231,6 @@ export default function DrugsScreen() {
         categories={categories}
         isDark={isDark}
         onSelectDrug={handleDrugTap}
-      />
-
-      <DrugsInfoSheet
-        isOpen={showInfoSheet}
-        onClose={() => setShowInfoSheet(false)}
       />
 
       {/* Class search mode: the class sheet opened from a class or subclass
@@ -1317,10 +1313,10 @@ function DrugsHero({ onInfoTap }) {
           style={{ display: 'block', height: 30, width: 'auto' }}
         />
 
-        {/* The info button opens DrugsInfoSheet (sources and disclaimer). */}
+        {/* The info button opens the 'How search modes work' sheet (2026-10-22; it replaced the About sheet). */}
         <button
           onClick={onInfoTap}
-          aria-label="About this drug library"
+          aria-label="How search modes work"
           style={{
             display:                 'flex',
             alignItems:              'center',
