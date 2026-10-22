@@ -33,6 +33,9 @@
  * (15) and the first two different drug names with '+ more' at the bottom. 'drugNames' is the
  * list of names; the card joins them itself (they used to run together with no separator).
  *
+ * 2026-10-23 (UI refresh): the drug-name preview is gone from the card; it shows the name and the
+ * drug count only. 'drugNames' is no longer used (the list rows still show names).
+ *
  * 2026-10-22 (UI refresh, step 8.9, approved drawing): folder-shaped card. A small tab at the top
  * left (rounded top-left corner, slanted right edge) and a body with a square top-left corner and
  * 20 corners elsewhere, in the same wash colour so they read as one piece. Inside the body, top to
@@ -87,18 +90,12 @@ function clampLines(n) {
   return { display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: n, overflow: 'hidden', overflowWrap: 'anywhere' }
 }
 
-export default function GroupTile({ group, isNew = false, showProBadge = false, waiting = false, animate = false, drugNames = '', fill = false, onOpen }) {
+export default function GroupTile({ group, isNew = false, showProBadge = false, waiting = false, animate = false, fill = false, onOpen }) {
   const [pressed, setPressed] = useState(false)
   const isDark = useIsDark()
   const colors = resolveToken(isNew ? 'slate' : group?.color, isDark)
   const name = isNew ? 'New group' : (group?.name ?? '')
   const count = group?.brandIds?.length ?? 0
-
-  // Preview line: the first three different names, joined with commas. The count is on the card.
-  const names = Array.isArray(drugNames) ? drugNames : (drugNames ? [drugNames] : [])
-  const shownNames = [...new Set(names)].slice(0, 3)
-  const moreCount = Math.max(0, count - shownNames.length)   // step 8.13: '+N' for the drugs not named
-  const preview = shownNames.join(', ') + (shownNames.length > 0 && moreCount > 0 ? ` +${moreCount}` : '')
 
   // Tab and body share one opaque colour, so the folder has no seam and no border.
   const wash = isNew
@@ -154,8 +151,6 @@ export default function GroupTile({ group, isNew = false, showProBadge = false, 
           </div>
           {isNew ? (
             <div style={{ ...clampLines(2), marginTop: 4, fontSize: 13, lineHeight: 1.3, fontFamily: 'var(--font-body)', color: SOFT_TEXT }}>Start a list</div>
-          ) : preview ? (
-            <div style={{ ...clampLines(2), marginTop: 4, fontSize: 12, lineHeight: 1.35, fontFamily: 'var(--font-body)', color: SOFT_TEXT }}>{preview}</div>
           ) : null}
         </div>
 

@@ -7,6 +7,10 @@
  * Class in the mode pop-up or the info sheet, no Class strip or results, no Class entry in
  * "found in other modes", no Class searches in recent searches (the 'allowClass' setting).
  *
+ * 2026-10-23 (second pass): the group name and icon above the bar are gone; they live in the Done
+ * button now (folder icon, 'Done · name', count). The button floats above the bottom bar, not under it.
+ * The keyboard no longer opens by itself, on arriving or on coming back from a drug; it opens only
+ * when the bar is tapped.
  * 2026-10-23 (UI refresh): the header above the bar is bigger (a 48px folder tile, the name at 20,
  * the count at 14). Done is a wide button floating at the bottom of the screen instead of a word
  * in the header. The bar has the same Form / Route filter button as the Drugs screen; the filter
@@ -56,7 +60,6 @@ import { useDrugSearch } from '../hooks/useDrugSearch'
 import { useSearchHistory } from '../hooks/useSearchHistory'
 import { useDeepLinkParent } from '../hooks/useDeepLinkParent'
 import { useIsDark } from '../utils/specialtyIcon'
-import { resolveToken } from '../utils/specialtyTokens'
 import { DRUG_GROUP_DRUGS_CAP_FREE, DRUG_GROUP_DRUGS_CAP_PRO } from '../constants/features'
 import { ROUTES } from '../router'
 
@@ -212,17 +215,6 @@ export default function AddDrugsToGroupScreen() {
     }
   }, [])
 
-  // The cursor goes into the bar once the search is on screen.
-  const ready = Boolean(user && group && !isReadOnly)
-  useEffect(() => {
-    if (!ready) return undefined
-    const frame = requestAnimationFrame(() => {
-      const input = searchInputRef.current
-      if (input && document.activeElement !== input && !keptSearch) input.focus()
-    })
-    return () => cancelAnimationFrame(frame)
-  }, [ready])
-
   const reduceMotion = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
@@ -283,7 +275,6 @@ export default function AddDrugsToGroupScreen() {
     return <div style={{ padding: 'var(--space-3) 0 var(--space-4)' }}>{message}</div>
   }
 
-  const tone = resolveToken(group.color, isDark)
   const otherMode = mode === 'brand' ? 'generic' : 'brand'
   const waitingForDrugs = drugsLoading && (drugs ?? []).length === 0
   const shownResults = applyFilters(results, activeFilters)
@@ -380,50 +371,38 @@ export default function AddDrugsToGroupScreen() {
           categories={categories}
           isDark={isDark}
           allowClass={false}
-          top={(
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-3)', fontFamily: 'var(--font-body)' }}>
-              <div style={{
-                width: 48, height: 48, borderRadius: 15, flexShrink: 0,
-                backgroundColor: tone.bg, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>
-                <Folder size={24} color={tone.fg} aria-hidden="true" />
-              </div>
-              <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <span dir="ltr" style={{
-                  fontSize: 20, fontWeight: 700, lineHeight: 1.2, textAlign: 'start',
-                  color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                }}>
-                  {group.name}
-                </span>
-                <span style={{ fontSize: 14, lineHeight: 1.3, color: 'var(--color-text-secondary)' }}>
-                  {count} of {drugsCap} drugs{full ? ' · Full' : ''}
-                </span>
-              </div>
-            </div>
-          )}
         />
       </div>
 
-      <div style={{ paddingTop: 'var(--space-3)', paddingBottom: 'calc(var(--space-4) + 76px)' }}>
+      <div style={{ paddingTop: 'var(--space-3)', paddingBottom: 'calc(var(--space-4) + 84px)' }}>
         {body}
       </div>
 
       <div style={{
-        position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 45,
-        padding: '12px var(--page-gutter, 16px) calc(env(safe-area-inset-bottom, 0px) + 12px)',
-        background: 'linear-gradient(to top, var(--color-bg) 70%, transparent)',
+        position: 'fixed', left: 0, right: 0, zIndex: 95,
+        bottom: 'calc(61px + env(safe-area-inset-bottom, 0px))',
+        padding: '8px var(--page-gutter, 16px) 10px',
+        background: 'linear-gradient(to top, var(--color-bg) 65%, transparent)',
         pointerEvents: 'none',
       }}>
         <button
           onClick={goBack}
+          aria-label={`Done adding to ${group.name}, ${count} of ${drugsCap} drugs`}
           style={{
-            pointerEvents: 'auto', display: 'block', width: '100%', minHeight: 52, borderRadius: 16,
+            pointerEvents: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+            width: '100%', minHeight: 54, borderRadius: 16, padding: '0 18px',
             border: 'none', cursor: 'pointer', backgroundColor: 'var(--color-accent-solid)', color: '#fff',
             fontSize: 16, fontWeight: 600, fontFamily: 'var(--font-body)',
             boxShadow: '0 4px 14px rgba(0,0,0,0.18)', WebkitTapHighlightColor: 'transparent',
           }}
         >
-          Done
+          <Folder size={20} aria-hidden="true" style={{ flexShrink: 0 }} />
+          <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            Done · <bdi>{group.name}</bdi>
+          </span>
+          <span style={{ flexShrink: 0, fontSize: 14, fontWeight: 500, opacity: 0.85 }}>
+            {count}/{drugsCap}{full ? ' · Full' : ''}
+          </span>
         </button>
       </div>
 

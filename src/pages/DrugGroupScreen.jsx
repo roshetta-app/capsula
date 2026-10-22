@@ -36,6 +36,10 @@
  * removed today; step 12.4 (remove mode) and step 12.5 (Add drugs search) replace them.
  * The drug cards are not changed.
  *
+ * 2026-10-23 (UI refresh): the 'N of M drugs' line is gone (the bar says it; 'Full' stays). In remove mode
+ * the minus is on the right, in the heart's place, the same size as the + on the Add drugs screen. The heart
+ * on a drug row only shows that the drug is a favourite; it no longer un-favourites it.
+ *
  * 2026-10-21 (steps 12.4 to 12.6): Add opens the Add drugs screen (/drugs/group/:id/add,
  * AddDrugsToGroupScreen.jsx, built from the Drugs search). Remove turns into Done and every
  * card gets a round minus beside it (the card keeps its layout and is not tappable then);
@@ -113,7 +117,7 @@ export default function DrugGroupScreen() {
   const { drugs, loading: drugsLoading } = useDrugContext()
   const {
     groups, groupsStatus, isReadOnly, reloadGroups, deleteGroup,
-    isDrugFavourited, toggleDrug, promptSignIn, getShareCode,
+    isDrugFavourited, promptSignIn, getShareCode,
   } = useFavouritesContext()
   const { user, loading: authLoading } = useAuth()
   const isPro = useIsPro()
@@ -323,40 +327,42 @@ export default function DrugGroupScreen() {
           {known.map((drug, i) => {
             const card = (
               <SharedDrugCard
-                key={removing ? undefined : drug.id}
+                key={drug.id}
                 drug={drug}
                 categories={categories}
                 isDark={isDark}
                 isLast={i === known.length - 1 && missing.length === 0}
                 onTap={() => navigate(ROUTES.DRUG_DETAIL(drug.slug || drug.id))}
                 disableTap={removing}
-                trailing={
+                trailing={removing ? (
+                  <button
+                    onClick={e => { e.stopPropagation(); handleMinus(drug.id) }}
+                    onPointerDown={e => e.stopPropagation()}
+                    aria-label={`Remove ${drugRowTitle(drug)} from this group`}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      width: 44, height: 44, borderRadius: '50%', flexShrink: 0, padding: 0,
+                      border: 'none', background: 'none', cursor: 'pointer',
+                      WebkitTapHighlightColor: 'transparent', outline: 'none',
+                    }}
+                  >
+                    <span style={{
+                      width: 32, height: 32, borderRadius: '50%',
+                      backgroundColor: 'var(--color-danger-light)', color: 'var(--color-danger)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      <Minus size={18} strokeWidth={2.5} aria-hidden="true" />
+                    </span>
+                  </button>
+                ) : (
                   <RowStarButton
                     isFavourited={isDrugFavourited(drug.id)}
-                    onPress={() => toggleDrug(drug.id)}
+                    readOnly
                   />
-                }
+                )}
               />
             )
-            if (!removing) return card
-            return (
-              <div key={drug.id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
-                <button
-                  onClick={() => handleMinus(drug.id)}
-                  aria-label={`Remove ${drugRowTitle(drug)} from this group`}
-                  style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    width: 44, height: 44, borderRadius: '50%', flexShrink: 0, padding: 0,
-                    border: 'none', cursor: 'pointer',
-                    backgroundColor: 'var(--color-danger-light)', color: 'var(--color-danger)',
-                    WebkitTapHighlightColor: 'transparent', outline: 'none',
-                  }}
-                >
-                  <Minus size={20} strokeWidth={2.5} aria-hidden="true" />
-                </button>
-                <div style={{ flex: 1, minWidth: 0 }}>{card}</div>
-              </div>
-            )
+            return card
           })}
           {missing.map(id => (
             <div key={id} style={REMOVE_ROW_STYLE}>
@@ -404,7 +410,6 @@ export default function DrugGroupScreen() {
               display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
               fontSize: 13, color: 'color-mix(in srgb, var(--color-text-primary) 72%, transparent)', fontFamily: 'var(--font-body)',
             }}>
-              <span>{count} of {drugsCap} drugs</span>
               {full && (
                 <span style={{
                   fontSize: 11, fontWeight: 700, letterSpacing: '0.04em',
