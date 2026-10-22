@@ -20,15 +20,18 @@
 
 import { useState } from 'react'
 
-const FILL = {
-  brand:   'var(--color-accent-solid)',
-  generic: 'var(--color-generic-solid)',
-  class:   'var(--color-class-solid)',
+// 2026-10-22 (step 8.13): the chosen chip is a soft wash of its mode colour with the mode colour
+// as words and outline (the same look as the category tiles), not the full solid fill behind
+// white text. Brand blue, Generic green, Class violet; the text variables keep 4.5 to 1.
+const INK = {
+  brand:   'var(--color-accent-text)',
+  generic: 'var(--color-generic-text)',
+  class:   'var(--color-class)',
 }
 
 function Chip({ value, label, icon: Icon, chosen, onPick }) {
   const [pressed, setPressed] = useState(false)
-  const fill = FILL[value] ?? FILL.brand
+  const ink = INK[value] ?? INK.brand
   return (
     <button
       type="button"
@@ -49,9 +52,9 @@ function Chip({ value, label, icon: Icon, chosen, onPick }) {
         gap:                     6,
         padding:                 '0 8px',
         borderRadius:            'var(--radius-full)',
-        border:                  `1px solid ${chosen ? fill : 'var(--color-chip-line)'}`,
-        backgroundColor:         chosen ? fill : 'transparent',
-        color:                   chosen ? '#fff' : 'color-mix(in srgb, var(--color-text-primary) 72%, transparent)',
+        border:                  `1px solid ${chosen ? `color-mix(in srgb, ${ink} 55%, transparent)` : 'var(--color-chip-line)'}`,
+        backgroundColor:         chosen ? `color-mix(in srgb, ${ink} 16%, var(--color-surface))` : 'transparent',
+        color:                   chosen ? ink : 'color-mix(in srgb, var(--color-text-primary) 72%, transparent)',
         fontFamily:              'var(--font-body)',
         fontSize:                14,
         fontWeight:              chosen ? 600 : 500,

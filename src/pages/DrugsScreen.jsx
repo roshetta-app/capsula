@@ -1158,9 +1158,12 @@ export default function DrugsScreen() {
                   <BrowseTopRow
                     backLabel={location.state?.from === 'categories' ? 'Categories' : 'Drugs'}
                     onBack={goBackFromCategory}
-                    title={activeCategory === '__all' || /drugs$/i.test(categoryLabel) ? categoryLabel : `${categoryLabel} Drugs`}
+                    title={activeCategory === '__all' || /drugs$/i.test(categoryLabel)
+                      ? categoryLabel
+                      : <>{categoryLabel}<span style={{ fontWeight: 400 }}> Drugs</span></>}
                     icon={categoryBadge}
                     spaceBelow={18}
+                    titleSize={22}
                   />
                 ) : (
                   <DrugsHero onInfoTap={() => setShowModeInfo(true)} />
@@ -1185,7 +1188,7 @@ export default function DrugsScreen() {
           hasActiveFilters={hasFilters && filtersApply}
           showClear={hasFilters && filtersApply && !isFilterMasked}
           onClearFilters={requestClearFilters}
-          showRecent={!hasQuery && !searchOpen}
+          showRecent={!hasQuery && !searchOpen && activeCategory === null}
           modeInfoOpen={showModeInfo}
           onModeInfoClose={() => setShowModeInfo(false)}
           recentDrugs={recentDrugObjects}
