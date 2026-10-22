@@ -84,8 +84,9 @@ function GroupSortButton({ sortMode, onToggle }) {
   )
 }
 
+// Step 8.9: the folder card is about 128 tall (14 tab + 114 body).
 function SkeletonTile({ fill = false }) {
-  return <div style={shimmer(fill ? { height: 116, borderRadius: 20 } : { flex: `0 0 ${CARD_WIDTH}px`, width: CARD_WIDTH, height: 116, borderRadius: 20 })} />
+  return <div style={shimmer(fill ? { height: 128, borderRadius: 20 } : { flex: `0 0 ${CARD_WIDTH}px`, width: CARD_WIDTH, height: 128, borderRadius: 20 })} />
 }
 
 function SkeletonRow({ last = false }) {
