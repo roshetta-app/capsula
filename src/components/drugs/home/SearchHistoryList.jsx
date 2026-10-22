@@ -1,4 +1,8 @@
 /**
+ * 2026-10-22 (UI refresh plan, step 8.4a): the list is one white bordered card (16px corners) under
+ * the heading and Clear all. Each row has a clock tile, the search text, a small mode tag in the
+ * mode's own tint, and the remove button. Same props and behaviour as before.
+ *
  * src/components/drugs/home/SearchHistoryList.jsx
  * 2026-10-21 (step 11.7): new 'allowClass' setting (default true); false hides the Class entries.
  * The rows were already flat with thin lines, so the look is unchanged.
@@ -19,9 +23,9 @@
 import { Clock, X, Tag, FlaskConical, Layers } from 'lucide-react'
 
 const MODE_META = {
-  brand:   { label: 'Brand',   icon: Tag,          color: 'var(--color-accent)' },
-  generic: { label: 'Generic', icon: FlaskConical, color: 'var(--color-generic)' },
-  class:   { label: 'Class',   icon: Layers,       color: 'var(--color-class)' },
+  brand:   { label: 'Brand',   icon: Tag,          color: 'var(--color-accent)',  tint: 'var(--color-accent-light)' },
+  generic: { label: 'Generic', icon: FlaskConical, color: 'var(--color-generic)', tint: 'var(--color-generic-light)' },
+  class:   { label: 'Class',   icon: Layers,       color: 'var(--color-class)',   tint: 'var(--color-class-light)' },
 }
 
 export default function SearchHistoryList({
@@ -34,7 +38,7 @@ export default function SearchHistoryList({
   if (history.length === 0) return null
 
   return (
-    <div>
+    <div style={{ marginTop: 8 }}>
       <div style={{
         display:        'flex',
         alignItems:     'center',
@@ -58,8 +62,12 @@ export default function SearchHistoryList({
         )}
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column' }}>
-        {history.map(entry => {
+      <div style={{
+        display: 'flex', flexDirection: 'column',
+        backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)',
+        borderRadius: 16, overflow: 'hidden',
+      }}>
+        {history.map((entry, i) => {
           const meta = MODE_META[entry.mode] ?? MODE_META.brand
           return (
             <div
@@ -67,19 +75,25 @@ export default function SearchHistoryList({
               style={{
                 display:      'flex',
                 alignItems:   'center',
-                borderBottom: '1px solid var(--color-border)',
+                borderBottom: i === history.length - 1 ? 'none' : '1px solid var(--color-border)',
               }}
             >
               <button
                 onClick={() => onPick(entry)}
                 style={{
                   flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 12,
-                  padding: '12px 2px', background: 'none', border: 'none', cursor: 'pointer',
+                  padding: '10px 4px 10px 12px', background: 'none', border: 'none', cursor: 'pointer',
                   textAlign: 'left', fontFamily: 'var(--font-body)',
                   WebkitTapHighlightColor: 'transparent',
                 }}
               >
-                <Clock size={16} style={{ color: 'var(--color-text-tertiary)', flexShrink: 0 }} />
+                <span style={{
+                  width: 32, height: 32, borderRadius: 10, flexShrink: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  backgroundColor: 'var(--color-surface-muted)',
+                }}>
+                  <Clock size={15} style={{ color: 'var(--color-text-tertiary)' }} />
+                </span>
                 <span
                   dir="auto"
                   style={{
@@ -91,7 +105,8 @@ export default function SearchHistoryList({
                 </span>
                 <span style={{
                   flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 4,
-                  fontSize: 11, fontWeight: 500, color: meta.color,
+                  fontSize: 11, fontWeight: 600, color: meta.color,
+                  backgroundColor: meta.tint, padding: '3px 8px', borderRadius: 'var(--radius-pill)',
                 }}>
                   <meta.icon size={12} strokeWidth={2} />
                   {meta.label}

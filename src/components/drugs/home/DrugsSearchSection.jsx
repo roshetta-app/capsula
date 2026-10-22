@@ -1,5 +1,9 @@
 /**
  * src/components/drugs/home/DrugsSearchSection.jsx
+ * 2026-10-22 (UI refresh plan, step 8.4a): the focus mode now keeps the tinted block: the back
+ * arrow sits inside the search pill (SearchBar onBack), the Brand / Generic / Class switch is under
+ * it as on the home, and the small mode button and the info button are gone. 'How search modes
+ * work' stays reachable as a quiet link under the block while nothing is typed.
  * 2026-10-22 (UI refresh plan, step 8.1): the home header block. On the home view the title
  * area (passed in as 'top'), the search field and the Brand / Generic / Class switch sit
  * together in one tinted block with a rounded bottom edge; Recently viewed and Clear filter
@@ -62,8 +66,7 @@
  */
 
 import { useState } from 'react'
-import { Search, Tag, FlaskConical, Layers, Info, ArrowLeft } from 'lucide-react'
-import ModeButton from './ModeButton'
+import { Search, Tag, FlaskConical, Layers, Info } from 'lucide-react'
 import ClearFiltersButton from './ClearFiltersButton'
 import RecentlyViewedButton from './RecentlyViewedButton'
 import ModeSegmentedControl from './ModeSegmentedControl'
@@ -95,7 +98,6 @@ export default function DrugsSearchSection({
   top = null, blockRef,
 }) {
   const [showModeInfo, setShowModeInfo] = useState(false)
-  const currentMode = MODE_OPTIONS.find(o => o.value === mode) ?? MODE_OPTIONS[0]
 
   function handlePickMode(value) {
     onModeChange(value)
@@ -105,7 +107,6 @@ export default function DrugsSearchSection({
   // One layout switch: 'order' puts the bar first in focus mode, 'row-reverse' puts the
   // mode button before the info button under it. The elements and their positions in
   // the tree are the same in both views.
-  const infoSize = 36
   const switchOptions = allowClass ? MODE_OPTIONS : MODE_OPTIONS.filter(o => o.value !== 'class')
 
   return (
@@ -126,94 +127,23 @@ export default function DrugsSearchSection({
             order:           0,
             display:         'flex',
             flexDirection:   'column',
-            margin:          searchOpen ? 0 : '0 calc(-1 * var(--page-gutter, 16px))',
-            padding:         searchOpen ? 0 : '16px var(--page-gutter, 16px) 16px',
-            backgroundColor: searchOpen ? 'transparent' : 'var(--color-header-tint)',
-            borderRadius:    searchOpen ? 0 : '0 0 24px 24px',
+            margin:          '0 calc(-1 * var(--page-gutter, 16px))',
+            padding:         searchOpen
+              ? 'calc(env(safe-area-inset-top, 0px) + 12px) var(--page-gutter, 16px) 14px'
+              : '16px var(--page-gutter, 16px) 16px',
+            backgroundColor: 'var(--color-header-tint)',
+            borderRadius:    '0 0 24px 24px',
             transition:      'padding var(--motion-base) ease, margin var(--motion-base) ease, background-color var(--motion-fast) ease',
           }}
         >
         {/* Title area (home only; the screen folds it away in focus mode). */}
         <div style={{ order: 0 }}>{top}</div>
 
-        {/* Heading row: 'Find a drug' + info on the left and the mode button on the right (home);
-            in focus mode the heading is hidden and this row sits under the bar with the mode
-            button first, then the info button. */}
-        {searchOpen && (
-        <div style={{
-          order:          2,
-          display:        'flex',
-          flexDirection:  'row-reverse',
-          alignItems:     'center',
-          justifyContent: 'flex-end',
-          gap:            4,
-          minHeight:      36,
-          marginTop:      8,
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}>
-            <button
-              onClick={() => setShowModeInfo(true)}
-              aria-label="How search modes work"
-              style={{
-                display:                 'flex',
-                alignItems:              'center',
-                justifyContent:          'center',
-                width:                   infoSize,
-                height:                  infoSize,
-                margin:                  0,
-                borderRadius:            '50%',
-                background:              'none',
-                border:                  'none',
-                padding:                 0,
-                cursor:                  'pointer',
-                color:                   'var(--color-text-tertiary)',
-                WebkitTapHighlightColor: 'transparent',
-                outline:                 'none',
-              }}
-            >
-              <Info size={16} />
-            </button>
-          </div>
-          <ModeButton
-            icon={currentMode.icon}
-            label={currentMode.label}
-            color={currentMode.color}
-            tint={currentMode.tint}
-            onPress={() => onModeMenuChange(true)}
-          />
-        </div>
-        )}
-
         {/* The one search bar of the screen. Nothing is added or removed above it
             except the back arrow, which sits in this same row ('false' holds its place
             when closed), so React keeps the same input (and the keyboard) while the
             view below changes. */}
         <div style={{ order: 1, display: 'flex', alignItems: 'center', gap: 4 }}>
-          {searchOpen && (
-            <button
-              onClick={onSearchCancel}
-              aria-label="Close search"
-              style={{
-                display:                 'flex',
-                alignItems:              'center',
-                justifyContent:          'center',
-                width:                   40,
-                height:                  40,
-                marginLeft:              -8,
-                flexShrink:              0,
-                borderRadius:            '50%',
-                background:              'none',
-                border:                  'none',
-                padding:                 0,
-                cursor:                  'pointer',
-                color:                   'var(--color-text-primary)',
-                WebkitTapHighlightColor: 'transparent',
-                outline:                 'none',
-              }}
-            >
-              <ArrowLeft size={22} />
-            </button>
-          )}
           <div style={{ flex: 1, minWidth: 0 }}>
             <SearchBar
               ref={searchInputRef}
@@ -225,18 +155,35 @@ export default function DrugsSearchSection({
               onFilter={onFilter}
               filterDisabled={filterDisabled}
               hasActiveFilters={hasActiveFilters}
-              tall={!searchOpen}
+              tall
+              onBack={searchOpen ? onSearchCancel : undefined}
             />
           </div>
         </div>
 
-        {/* The mode switch (home only), full width under the search field. */}
-        {!searchOpen && (
-          <div style={{ order: 2, marginTop: 'var(--space-3)' }}>
-            <ModeSegmentedControl options={switchOptions} mode={mode} onChange={onModeChange} />
-          </div>
-        )}
+        {/* The mode switch, full width under the search field (home and focus mode). */}
+        <div style={{ order: 2, marginTop: 'var(--space-3)' }}>
+          <ModeSegmentedControl options={switchOptions} mode={mode} onChange={onModeChange} />
         </div>
+        </div>
+
+        {/* Focus mode, nothing typed: a quiet link to the search modes sheet. The info button
+            left the focus header (step 8.4a), so this keeps the sheet reachable. */}
+        {searchOpen && !query && (
+          <button
+            type="button"
+            onClick={() => setShowModeInfo(true)}
+            style={{
+              alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: 6,
+              margin: '10px 0 0', padding: '6px 2px', background: 'none', border: 'none', cursor: 'pointer',
+              fontSize: 13, fontWeight: 500, color: 'var(--color-text-secondary)',
+              fontFamily: 'var(--font-body)', WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            <Info size={14} aria-hidden="true" />
+            How search modes work
+          </button>
+        )}
 
         {/* Recently viewed: a shortcut to drugs, so it belongs with search. It sits under the
             tinted block, outside it. */}

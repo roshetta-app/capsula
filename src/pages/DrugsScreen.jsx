@@ -1127,13 +1127,13 @@ export default function DrugsScreen() {
           top:             0,
           zIndex:          searchOpen ? 40 : 'auto',
           backgroundColor: searchOpen ? 'var(--color-bg)' : 'transparent',
-          paddingTop:      searchOpen ? 'calc(env(safe-area-inset-top, 0px) + 8px)' : 0,
+          paddingTop:      0,
           // Flat bar (step 11.6): a little space under it, then a thin line that shows only
           // once the list has scrolled. The page colour behind stays solid, and being real
           // space it never covers the first line of results.
           paddingBottom:   searchOpen ? 8 : 0,
-          borderBottom:    searchOpen ? `1px solid ${searchScrolled ? 'var(--color-border)' : 'transparent'}` : '1px solid transparent',
-          transition:      reduceMotion ? 'none' : 'padding-top 220ms ease, padding-bottom 220ms ease, border-color 160ms ease',
+          borderBottom:    `1px solid ${searchOpen && searchScrolled ? 'var(--color-border)' : 'transparent'}`,
+          transition:      reduceMotion ? 'none' : 'padding-bottom 220ms ease, border-color 160ms ease',
         }}>
         <DrugsSearchSection
           blockRef={heroRef}

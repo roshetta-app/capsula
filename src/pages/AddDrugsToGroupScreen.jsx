@@ -332,7 +332,7 @@ export default function AddDrugsToGroupScreen() {
     <>
       <div style={{
         position: 'sticky', top: 0, zIndex: 40, backgroundColor: 'var(--color-bg)',
-        paddingTop: 'calc(env(safe-area-inset-top, 0px) + 8px)', paddingBottom: 8,
+        paddingTop: 0, paddingBottom: 8,
         borderBottom: `1px solid ${scrolled ? 'var(--color-border)' : 'transparent'}`,
         transition: 'border-color var(--motion-base) var(--ease-reveal)',
       }}>

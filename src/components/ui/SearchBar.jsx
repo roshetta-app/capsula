@@ -1,4 +1,7 @@
 /**
+ * 2026-10-22 (UI refresh plan, step 8.4a): new 'onBack' prop. When given, a back arrow button sits
+ * inside the pill at the left in place of the search icon (the Drugs search focus mode).
+ *
  * src/components/ui/SearchBar.jsx
  *
  * 2026-10-15: optional 'onSubmit': the keyboard's Search key calls it with the typed text
@@ -83,7 +86,7 @@
  */
 
 import { forwardRef }                    from 'react'
-import { Search, X, SlidersHorizontal } from 'lucide-react'
+import { Search, X, SlidersHorizontal, ArrowLeft } from 'lucide-react'
 
 const SearchBar = forwardRef(function SearchBar({
   value,
@@ -97,6 +100,7 @@ const SearchBar = forwardRef(function SearchBar({
   icon: Icon = Search,
   onInputFocus,
   onSubmit,
+  onBack,
 }, ref) {
   const height = tall ? 52 : compact ? 44 : 46
 
@@ -113,17 +117,33 @@ const SearchBar = forwardRef(function SearchBar({
 
   return (
     <div style={{ position: 'relative', width: '100%' }}>
-      <Icon
-        size={16}
-        style={{
-          position:      'absolute',
-          left:          'var(--space-4)',
-          top:           '50%',
-          transform:     'translateY(-50%)',
-          color:         'var(--color-accent)',
-          pointerEvents: 'none',
-        }}
-      />
+      {onBack ? (
+        <button
+          type="button"
+          onClick={onBack}
+          aria-label="Close search"
+          style={{
+            position: 'absolute', left: 4, top: '50%', transform: 'translateY(-50%)',
+            width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'none', border: 'none', borderRadius: '50%', padding: 0, cursor: 'pointer',
+            color: 'var(--color-text-primary)', WebkitTapHighlightColor: 'transparent', outline: 'none',
+          }}
+        >
+          <ArrowLeft size={20} />
+        </button>
+      ) : (
+        <Icon
+          size={16}
+          style={{
+            position:      'absolute',
+            left:          'var(--space-4)',
+            top:           '50%',
+            transform:     'translateY(-50%)',
+            color:         'var(--color-accent)',
+            pointerEvents: 'none',
+          }}
+        />
+      )}
       <input
         ref={ref}
         type="text"
@@ -141,7 +161,7 @@ const SearchBar = forwardRef(function SearchBar({
         style={{
           width:           '100%',
           boxSizing:       'border-box',
-          paddingLeft:     40,
+          paddingLeft:     onBack ? 48 : 40,
           paddingRight,
           height:          height,
           borderRadius:    'var(--radius-full)',
