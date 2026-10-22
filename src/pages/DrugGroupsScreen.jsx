@@ -10,7 +10,6 @@
 
 import { Navigate, useNavigate } from 'react-router-dom'
 import GroupsSection from '../components/drugs/groups/GroupsSection'
-import BrowseHeader from '../components/drugs/home/BrowseHeader'
 import { useFavouritesContext } from '../context/FavouritesContext'
 import { useAuth } from '../hooks/useAuth'
 import { useDeepLinkParent } from '../hooks/useDeepLinkParent'
@@ -33,8 +32,7 @@ export default function DrugGroupsScreen() {
   // Side gap and max width come from Layout; this page adds bottom space only.
   return (
     <div style={{ padding: '0 0 var(--space-4)' }}>
-      <BrowseHeader backLabel="Drugs" onBack={() => navigate(-1)} title="My drug groups" subtitle={subtitle} />
-      <GroupsSection all />
+      <GroupsSection all headerProps={{ backLabel: 'Drugs', onBack: () => navigate(-1), title: 'My drug groups', subtitle }} />
     </div>
   )
 }

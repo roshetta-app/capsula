@@ -36,10 +36,11 @@
 
 import { memo, useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, Plus } from 'lucide-react'
+import BrowseHeader from '../home/BrowseHeader'
 import DrugsSectionCard, { SECTION_TITLE_STYLE } from '../home/DrugsSectionCard'
 import { shimmer } from '../home/shimmer'
-import GroupTile, { CARD_WIDTH } from './GroupTile'
+import GroupTile, { CARD_WIDTH, ProPill } from './GroupTile'
 import GroupRow from './GroupRow'
 import GroupViewToggle from './GroupViewToggle'
 import SoftSwitch from './SoftSwitch'
@@ -96,7 +97,7 @@ const LIST_STYLE = { display: 'flex', flexDirection: 'column', gap: 8 }
 // 'all' (step 8.2b): the See all screen. It shows every group with the sort button and the
 // Tiles / List switch, in a 2-column grid or a list. Without it (the home) the section is
 // the sideways row with a See all link.
-function GroupsSection({ all = false }) {
+function GroupsSection({ all = false, headerProps = null }) {
   const { drugs, groupsView, setGroupsView, groupsSortMode, setGroupsSortMode } = useDrugContext()
   const {
     groups, groupsStatus, groupsLoadError, isReadOnly,
@@ -260,7 +261,7 @@ function GroupsSection({ all = false }) {
       />
     )
   } else {
-    const showNew = !isReadOnly
+    const showNew = !isReadOnly && !all   // step 8.13: on See all, New group is in the header
     const showPro = !isPro && groups.length >= DRUG_GROUPS_CAP_FREE
     content = (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
@@ -304,11 +305,32 @@ function GroupsSection({ all = false }) {
     )
   }
 
+  // Step 8.13: New group sits at the right end of the See all header (a pill, with the PRO tag at the
+  // limit). Shown once there is at least one group; the empty state has its own Create group button.
+  const newGroupButton = all && showControls && !isReadOnly ? (
+    <button
+      type="button"
+      onClick={handleNewGroup}
+      aria-label="New group"
+      style={{
+        display: 'flex', alignItems: 'center', gap: 6, minHeight: 44, padding: '0 16px 0 12px',
+        borderRadius: 'var(--radius-full)', border: 'none', cursor: 'pointer', outline: 'none',
+        backgroundColor: 'var(--color-accent-solid)', color: '#fff',
+        fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600, WebkitTapHighlightColor: 'transparent',
+      }}
+    >
+      <Plus size={18} strokeWidth={2.2} aria-hidden="true" />
+      New group
+      {!isPro && groups.length >= DRUG_GROUPS_CAP_FREE ? <ProPill /> : null}
+    </button>
+  ) : null
+
   return (
     <>
       <style>{SOFT_IN_CSS}</style>
       {all ? (
         <div>
+          {headerProps ? <BrowseHeader {...headerProps} action={newGroupButton} /> : null}
           {controls}
           {content}
         </div>

@@ -12,15 +12,17 @@
  *
  * Back is the caller's job (onBack), so each screen keeps its own one-step-back rule.
  *
- * 2026-10-22 (step 8.13): BrowseTopRow takes an optional 'icon' (a round badge drawn by the
+ * 2026-10-22 (step 8.13): BrowseTopRow also takes 'accent' (colour of the back link), 'titleSize' and
+ * 'action' (a button at the right end of the back row, used for New group). It takes an optional 'icon' (a round badge drawn by the
  * caller) that sits to the left of the title. An opened category uses it for its own icon.
  */
 
 import { ChevronLeft } from 'lucide-react'
 
-export function BrowseTopRow({ backLabel, onBack, title, subtitle = null, icon = null, spaceBelow = 0, titleSize = 26 }) {
+export function BrowseTopRow({ backLabel, onBack, title, subtitle = null, icon = null, spaceBelow = 0, titleSize = 26, accent = 'var(--color-accent)', action = null }) {
   return (
     <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
       <button
         type="button"
         onClick={onBack}
@@ -29,13 +31,15 @@ export function BrowseTopRow({ backLabel, onBack, title, subtitle = null, icon =
           display: 'flex', alignItems: 'center', gap: 2,
           minHeight: 44, margin: '0 0 0 -8px', padding: '0 8px 0 4px',
           background: 'none', border: 'none', cursor: 'pointer',
-          color: 'var(--color-accent)', fontSize: 15, fontWeight: 600,
+          color: accent, fontSize: 15, fontWeight: 600,
           fontFamily: 'var(--font-body)', WebkitTapHighlightColor: 'transparent',
         }}
       >
         <ChevronLeft size={20} strokeWidth={2.2} aria-hidden="true" />
         {backLabel}
       </button>
+      {action}
+      </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: icon ? 8 : 2, marginBottom: spaceBelow }}>
         {icon}
         <h1 style={{
@@ -54,7 +58,7 @@ export function BrowseTopRow({ backLabel, onBack, title, subtitle = null, icon =
   )
 }
 
-export default function BrowseHeader({ backLabel, onBack, title, subtitle = null, children = null }) {
+export default function BrowseHeader({ backLabel, onBack, title, subtitle = null, children = null, action = null }) {
   return (
     <div style={{
       margin: '0 calc(-1 * var(--page-gutter, 16px)) var(--space-4)',
@@ -62,7 +66,7 @@ export default function BrowseHeader({ backLabel, onBack, title, subtitle = null
       backgroundColor: 'var(--color-header-tint)',
       borderRadius: '0 0 24px 24px',
     }}>
-      <BrowseTopRow backLabel={backLabel} onBack={onBack} title={title} subtitle={subtitle} />
+      <BrowseTopRow backLabel={backLabel} onBack={onBack} title={title} subtitle={subtitle} action={action} />
       {children ? <div style={{ marginTop: 'var(--space-3)' }}>{children}</div> : null}
     </div>
   )

@@ -96,7 +96,9 @@ export default function GroupTile({ group, isNew = false, showProBadge = false, 
 
   // Preview line: the first three different names, joined with commas. The count is on the card.
   const names = Array.isArray(drugNames) ? drugNames : (drugNames ? [drugNames] : [])
-  const preview = [...new Set(names)].slice(0, 3).join(', ')
+  const shownNames = [...new Set(names)].slice(0, 3)
+  const moreCount = Math.max(0, count - shownNames.length)   // step 8.13: '+N' for the drugs not named
+  const preview = shownNames.join(', ') + (shownNames.length > 0 && moreCount > 0 ? ` +${moreCount}` : '')
 
   // Tab and body share one opaque colour, so the folder has no seam and no border.
   const wash = isNew
@@ -153,7 +155,7 @@ export default function GroupTile({ group, isNew = false, showProBadge = false, 
           {isNew ? (
             <div style={{ ...clampLines(2), marginTop: 4, fontSize: 13, lineHeight: 1.3, fontFamily: 'var(--font-body)', color: SOFT_TEXT }}>Start a list</div>
           ) : preview ? (
-            <div style={{ ...clampLines(2), marginTop: 4, fontSize: 13, lineHeight: 1.3, fontFamily: 'var(--font-body)', color: SOFT_TEXT }}>{preview}</div>
+            <div style={{ ...clampLines(2), marginTop: 4, fontSize: 12, lineHeight: 1.35, fontFamily: 'var(--font-body)', color: SOFT_TEXT }}>{preview}</div>
           ) : null}
         </div>
 

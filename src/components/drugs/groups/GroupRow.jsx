@@ -37,7 +37,9 @@ export default function GroupRow({ group, drugNames = [], isNew = false, showPro
   const colors = resolveToken(isNew ? 'slate' : group?.color, isDark)
   const name = isNew ? 'New group' : (group?.name ?? '')
   const count = group?.brandIds?.length ?? 0
-  const preview = [...new Set(drugNames.filter(Boolean))].slice(0, 3).join(', ')
+  const shownNames = [...new Set(drugNames.filter(Boolean))].slice(0, 3)
+  const preview = shownNames.join(', ')
+  const moreCount = Math.max(0, count - shownNames.length)   // step 8.13: '+N' for the drugs not named
   const second = isNew ? 'Start a list' : preview   // the count is on the right, so an empty group has no second line
   const soft = 'color-mix(in srgb, var(--color-text-primary) 72%, transparent)'
 
@@ -79,12 +81,9 @@ export default function GroupRow({ group, drugNames = [], isNew = false, showPro
           {name}
         </div>
         {second ? (
-          <div style={{
-            marginTop: 2, fontSize: 13, color: soft,
-            fontFamily: 'var(--font-body)',
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          }}>
-            {second}
+          <div style={{ marginTop: 2, display: 'flex', gap: 4, fontSize: 12, color: soft, fontFamily: 'var(--font-body)' }}>
+            <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{second}</span>
+            {!isNew && moreCount > 0 && preview ? <span style={{ flexShrink: 0 }}>+{moreCount}</span> : null}
           </div>
         ) : null}
       </div>

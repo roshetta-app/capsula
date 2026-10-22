@@ -95,7 +95,7 @@ export default function DrugsSearchSection({
   categories, isDark,
   searchOpen = false, onSearchFocus, onSearchCancel, onSearchSubmit, searchInputRef,
   allowClass = true,
-  top = null, blockRef,
+  top = null, blockRef, tint = null, tintLine = null,
   modeInfoOpen = false, onModeInfoClose,
 }) {
 
@@ -131,7 +131,10 @@ export default function DrugsSearchSection({
             padding:         searchOpen
               ? 'calc(env(safe-area-inset-top, 0px) + 12px) var(--page-gutter, 16px) 14px'
               : '16px var(--page-gutter, 16px) 16px',
-            backgroundColor: 'var(--color-header-tint)',
+            backgroundColor: tint || 'var(--color-header-tint)',
+            // 2026-10-22 (step 8.13): an opened category colours its header; the outline of the
+            // unchosen mode chips follows it through this variable.
+            ...(tintLine ? { '--color-chip-line': tintLine } : null),
             borderRadius:    '0 0 24px 24px',
             transition:      'padding var(--motion-base) ease, margin var(--motion-base) ease, background-color var(--motion-fast) ease',
           }}

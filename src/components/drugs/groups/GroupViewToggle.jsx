@@ -18,5 +18,5 @@ const OPTIONS = [
 ]
 
 export default function GroupViewToggle({ value = 'tiles', onChange }) {
-  return <SoftSwitch options={OPTIONS} value={value} onChange={onChange} label="Groups view" />
+  return <SoftSwitch options={OPTIONS} value={value} onChange={onChange} label="Groups view" iconOnly />
 }

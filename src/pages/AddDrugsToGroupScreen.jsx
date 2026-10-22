@@ -352,7 +352,7 @@ export default function AddDrugsToGroupScreen() {
           onModeMenuChange={setModeMenuOpen}
           query={query}
           onQueryChange={setQuery}
-          placeholder="Search drugs…"
+          placeholder={mode === 'generic' ? 'Search generic names…' : 'Search brand names…'}
           showClear={false}
           showRecent={false}
           recentDrugs={[]}

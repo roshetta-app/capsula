@@ -782,7 +782,10 @@ export default function DrugsScreen() {
   // a wrong empty state.
   const isClassSearch = mode === 'class' && hasQuery
   const resultsNotReady = hasQuery && !queryTooShort && ((mode === 'class') !== (classResults != null))
-  const searchPlaceholder = mode === 'class' ? 'Search classes or families…' : 'Search drugs…'
+  // 2026-10-22 (step 8.13): the hint names what the chosen mode searches.
+  const searchPlaceholder = mode === 'class'
+    ? 'Search classes or families…'
+    : mode === 'generic' ? 'Search generic names…' : 'Search brand names…'
   // The Form/Route filter does not apply to class cards, so the filter button
   // in the search bar is greyed out and not tappable then (the sheet would be
   // empty).
@@ -813,18 +816,24 @@ export default function DrugsScreen() {
     if (window.history.state && window.history.state.idx > 0) navigate(-1)
     else navigate(ROUTES.DRUGS, { replace: true })
   }
+  // The category's own colour (the same token as its tile); null on the home.
+  const openCat = activeCategory === null || activeCategory === '__all' ? null : categories.find(c => c.slug === activeCategory)
+  const categoryInk = activeCategory === null ? null : resolveToken(openCat?.color_token || FALLBACK_TOKEN, isDark).fg
+  // The header block takes the category colour (2026-10-22, step 8.13): the same wash as its tile.
+  const categoryTint = categoryInk ? `color-mix(in srgb, ${categoryInk} 14%, var(--color-surface))` : null
+  const categoryTintLine = categoryInk ? `color-mix(in srgb, ${categoryInk} 32%, transparent)` : null
   const categoryBadge = (() => {
     if (activeCategory === null) return null
-    const cat = activeCategory === '__all' ? null : categories.find(c => c.slug === activeCategory)
+    const cat = openCat
     const iconType  = cat?.icon_type || 'lucide'
     const iconValue = !cat ? 'Pill' : iconType === 'custom' ? (cat.icon_url || '') : (cat.icon_name || 'Pill')
-    const ink = resolveToken(cat?.color_token || FALLBACK_TOKEN, isDark).fg
+    const ink = categoryInk
     return (
       <div
         aria-hidden="true"
         style={{
           width: 48, height: 48, borderRadius: '50%', flexShrink: 0,
-          backgroundColor: `color-mix(in srgb, ${ink} 16%, var(--color-surface))`,
+          backgroundColor: 'var(--color-surface)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}
       >
@@ -1097,7 +1106,7 @@ export default function DrugsScreen() {
   // Sticky search bar hint: in a category with nothing typed it names the
   // category (1a.3); otherwise it is the same text as the main search bar.
   const stickyPlaceholder = (inResultsView && mode !== 'class')
-    ? (hasQuery ? 'Search drugs…' : `Search in ${categoryLabel}…`)
+    ? (hasQuery ? searchPlaceholder : `Search ${mode === 'generic' ? 'generics' : 'brands'} in ${categoryLabel}…`)
     : searchPlaceholder
 
   return (
@@ -1140,6 +1149,8 @@ export default function DrugsScreen() {
         }}>
         <DrugsSearchSection
           blockRef={heroRef}
+          tint={categoryTint}
+          tintLine={categoryTintLine}
           top={(
             // The title area sits inside the tinted header block (step 8.1). It folds away and
             // fades when the search opens, and unfolds when it closes.
@@ -1164,6 +1175,7 @@ export default function DrugsScreen() {
                     icon={categoryBadge}
                     spaceBelow={18}
                     titleSize={22}
+                    accent={categoryInk}
                   />
                 ) : (
                   <DrugsHero onInfoTap={() => setShowModeInfo(true)} />
