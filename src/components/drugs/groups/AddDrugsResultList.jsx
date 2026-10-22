@@ -1,6 +1,7 @@
 /**
  * 2026-10-22 (UI refresh plan, step 8.4b): a drug already in the group shows a tick with the word
- * Added instead of a bare tick.
+ * Added instead of a bare tick. The plus stops its tap from reaching the card, so adding a drug
+ * no longer also opens the drug page.
  *
  * src/components/drugs/groups/AddDrugsResultList.jsx
  * 2026-10-21 (Drug groups plan, step 12.5): the result list of the Add drugs screen. The same
@@ -48,7 +49,8 @@ function AddMark({ inGroup, onAdd, name }) {
   }
   return (
     <button
-      onClick={onAdd}
+      onClick={e => { e.stopPropagation(); onAdd() }}
+      onPointerDown={e => e.stopPropagation()}
       aria-label={`Add ${name} to this group`}
       style={{ ...base, cursor: 'pointer', backgroundColor: 'var(--color-accent)', color: '#fff' }}
     >
