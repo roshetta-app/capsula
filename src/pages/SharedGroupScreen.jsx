@@ -65,9 +65,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
-import { Folder, FolderX, Check, WifiOff, CircleAlert } from 'lucide-react'
+import { FolderX, Check, WifiOff, CircleAlert } from 'lucide-react'
 import SharedDrugCard from '../components/SharedDrugCard'
 import GroupStateMessage from '../components/drugs/groups/GroupStateMessage'
+import FolderShell from '../components/drugs/groups/FolderShell'
+import GroupDescription from '../components/drugs/groups/GroupDescription'
+import { folderWash } from '../components/drugs/groups/folderStyles'
 import { sortDrugsByTitle } from '../components/drugs/groups/groupDrugText'
 import { shimmer } from '../components/drugs/home/shimmer'
 import { useCategories } from '../hooks/useCategories'
@@ -360,17 +363,8 @@ function SharedGroupBody({ code }) {
 
     content = (
       <>
-        <div style={{
-          backgroundColor: tone.bg, borderRadius: 20, padding: 'var(--space-4)',
-          display: 'flex', flexDirection: 'column', gap: 'var(--space-3)',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)' }}>
-            <div style={{
-              width: 44, height: 44, borderRadius: '50%', flexShrink: 0,
-              backgroundColor: 'var(--color-surface)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <Folder size={22} color={tone.fg} aria-hidden="true" />
-            </div>
+        <FolderShell wash={folderWash(tone.fg)} padding={16} gap={12}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
             <span style={{
               fontSize: 11, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase',
               color: 'var(--color-text-secondary)', backgroundColor: 'var(--color-surface)',
@@ -388,27 +382,19 @@ function SharedGroupBody({ code }) {
             {group.name}
           </h1>
 
-          <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', fontFamily: 'var(--font-body)' }}>
+          <div style={{ fontSize: 13, color: 'color-mix(in srgb, var(--color-text-primary) 72%, transparent)', fontFamily: 'var(--font-body)' }}>
             {count} {count === 1 ? 'drug' : 'drugs'}
           </div>
 
-          {group.description && (
-            <p dir="ltr" style={{
-              margin: 0, fontSize: 14, lineHeight: 1.5, textAlign: 'start',
-              color: 'var(--color-text-secondary)', fontFamily: 'var(--font-body)',
-              whiteSpace: 'pre-wrap', overflowWrap: 'anywhere',
-            }}>
-              {group.description}
-            </p>
-          )}
+          <GroupDescription text={group.description} />
 
           <p style={{
-            margin: 0, paddingTop: 'var(--space-3)', borderTop: '1px solid var(--color-surface)',
-            fontSize: 12, lineHeight: 1.45, color: 'var(--color-text-secondary)', fontFamily: 'var(--font-body)',
+            margin: 0,
+            fontSize: 12, lineHeight: 1.45, color: 'color-mix(in srgb, var(--color-text-primary) 72%, transparent)', fontFamily: 'var(--font-body)',
           }}>
             Shared by a Capsula user. The name and description were written by them, not by Capsula.
           </p>
-        </div>
+        </FolderShell>
 
         <div style={{ marginTop: 'var(--space-4)' }}>
           {count === 0 ? (

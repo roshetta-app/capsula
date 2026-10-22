@@ -36,12 +36,13 @@
 
 import { memo, useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowUpDown, ChevronRight } from 'lucide-react'
+import { ChevronRight } from 'lucide-react'
 import DrugsSectionCard, { SECTION_TITLE_STYLE } from '../home/DrugsSectionCard'
 import { shimmer } from '../home/shimmer'
 import GroupTile, { CARD_WIDTH } from './GroupTile'
 import GroupRow from './GroupRow'
 import GroupViewToggle from './GroupViewToggle'
+import SoftSwitch from './SoftSwitch'
 import { firstNames } from './groupDrugText'
 
 const NAME_ORDER = new Intl.Collator(undefined, { sensitivity: 'base' })
@@ -64,45 +65,19 @@ const READ_ONLY_MESSAGE = 'Your groups are read only. Delete a group or upgrade 
 
 // Same look as the sort button on the Class page: no box, arrow icon, 13px
 // medium text in the secondary colour. Shows the order a tap switches to.
-function GroupSortButton({ sortMode, onToggle }) {
-  const nextMode = sortMode === 'newest' ? 'az' : 'newest'
-  return (
-    <button
-      onClick={onToggle}
-      aria-label={`Sort: currently ${SORT_LABELS[sortMode]}. Tap to switch to ${SORT_LABELS[nextMode]}.`}
-      style={{
-        display: 'flex', alignItems: 'center', gap: 4,
-        background: 'none', border: 'none', cursor: 'pointer',
-        padding: '4px 0 4px 8px', fontSize: 13, fontWeight: 500,
-        color: 'var(--color-text-secondary)', fontFamily: 'var(--font-body)',
-        WebkitTapHighlightColor: 'transparent', outline: 'none',
-      }}
-    >
-      <ArrowUpDown size={13} strokeWidth={1.8} aria-hidden="true" />
-      {SORT_LABELS[nextMode]}
-    </button>
-  )
-}
+// Step 8.12: the sort is a two-option switch that shows the mode you are on.
+const SORT_OPTIONS = [
+  { key: 'newest', label: SORT_LABELS.newest },
+  { key: 'az', label: SORT_LABELS.az },
+]
 
 // Step 8.9: the folder card is about 128 tall (14 tab + 114 body).
 function SkeletonTile({ fill = false }) {
   return <div style={shimmer(fill ? { height: 128, borderRadius: 20 } : { flex: `0 0 ${CARD_WIDTH}px`, width: CARD_WIDTH, height: 128, borderRadius: 20 })} />
 }
 
-function SkeletonRow({ last = false }) {
-  return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
-      padding: '12px 0', minHeight: 68, boxSizing: 'border-box',
-      borderBottom: last ? 'none' : '1px solid var(--color-border)',
-    }}>
-      <div style={shimmer({ width: 44, height: 44, borderRadius: 14, flexShrink: 0 })} />
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <div style={shimmer({ width: '55%', height: 13 })} />
-        <div style={shimmer({ width: '35%', height: 11 })} />
-      </div>
-    </div>
-  )
+function SkeletonRow() {
+  return <div style={shimmer({ height: 64, borderRadius: 16 })} />
 }
 
 // Soft fade-in for a group that was just added or renamed. Written once here for the
@@ -116,7 +91,7 @@ const ROW_STYLE = {
   display: 'flex', gap: 10, overflowX: 'auto', scrollSnapType: 'x proximity',
   scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch', paddingBottom: 2,
 }
-const LIST_STYLE = { display: 'flex', flexDirection: 'column' }
+const LIST_STYLE = { display: 'flex', flexDirection: 'column', gap: 8 }
 
 // 'all' (step 8.2b): the See all screen. It shows every group with the sort button and the
 // Tiles / List switch, in a 2-column grid or a list. Without it (the home) the section is
@@ -225,11 +200,8 @@ function GroupsSection({ all = false }) {
   const title = <span style={SECTION_TITLE_STYLE}>My drug groups</span>
   const showControls = !!user && groupsStatus === 'ready' && groups.length > 0
   const controls = showControls && all ? (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
-      <GroupSortButton
-        sortMode={groupsSortMode}
-        onToggle={() => setGroupsSortMode(groupsSortMode === 'newest' ? 'az' : 'newest')}
-      />
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
+      <SoftSwitch options={SORT_OPTIONS} value={groupsSortMode} onChange={setGroupsSortMode} label="Sort groups" />
       <GroupViewToggle value={groupsView} onChange={setGroupsView} />
     </div>
   ) : null
@@ -252,7 +224,7 @@ function GroupsSection({ all = false }) {
   let content
   if (authLoading || (user && groupsStatus === 'loading')) {
     content = asList
-      ? <div style={LIST_STYLE}><SkeletonRow /><SkeletonRow /><SkeletonRow last /></div>
+      ? <div style={LIST_STYLE}><SkeletonRow /><SkeletonRow /><SkeletonRow /></div>
       : all
         ? <div style={GRID_STYLE}><SkeletonTile fill /><SkeletonTile fill /><SkeletonTile fill /><SkeletonTile fill /></div>
         : <div className="groups-row" style={ROW_STYLE}><SkeletonTile /><SkeletonTile /><SkeletonTile /></div>
@@ -274,6 +246,7 @@ function GroupsSection({ all = false }) {
         actionLabel="Try again"
         onAction={reloadGroups}
         flat
+        secondary
       />
     )
   } else if (groups.length === 0) {
@@ -300,15 +273,14 @@ function GroupsSection({ all = false }) {
         ) : null}
         {asList ? (
           <div style={LIST_STYLE}>
-            {sorted.map((g, i) => (
+            {sorted.map(g => (
               <GroupRow
                 key={`${g.id}:${g.name}`} group={g} drugNames={previewNames(g)}
                 waiting={waitingGroupIds.includes(g.id)} animate={isFresh(g)}
-                last={!showNew && i === sorted.length - 1}
                 onOpen={() => handleOpenGroup(g)}
               />
             ))}
-            {showNew && <GroupRow isNew last showProBadge={showPro} onOpen={handleNewGroup} />}
+            {showNew && <GroupRow isNew showProBadge={showPro} onOpen={handleNewGroup} />}
           </div>
         ) : (
           <div className={all ? undefined : 'groups-row'} style={all ? GRID_STYLE : ROW_STYLE}>

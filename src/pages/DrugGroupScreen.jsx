@@ -59,7 +59,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Check, Folder, Minus, Pencil, Search, Share2, Trash2 } from 'lucide-react'
+import { Check, Minus, Pencil, Search, Share2, Trash2 } from 'lucide-react'
 import SharedDrugCard from '../components/SharedDrugCard'
 import RowStarButton from '../components/ui/RowStarButton'
 import ConfirmSheet from '../components/ui/ConfirmSheet'
@@ -68,6 +68,9 @@ import GroupEditorSheet from '../components/drugs/groups/GroupEditorSheet'
 import ShareGroupSheet from '../components/drugs/groups/ShareGroupSheet'
 import GroupStateMessage from '../components/drugs/groups/GroupStateMessage'
 import GroupSyncStatus from '../components/drugs/groups/GroupSyncStatus'
+import FolderShell from '../components/drugs/groups/FolderShell'
+import GroupDescription from '../components/drugs/groups/GroupDescription'
+import { folderWash } from '../components/drugs/groups/folderStyles'
 import { drugRowTitle, sortDrugsByTitle } from '../components/drugs/groups/groupDrugText'
 import { drugsLimitMessage } from '../components/drugs/groups/groupMessages'
 import { useGroupDrugEdits } from '../components/drugs/groups/useGroupDrugEdits'
@@ -379,19 +382,10 @@ export default function DrugGroupScreen() {
 
     content = (
       <>
-        <div style={{
-          backgroundColor: tone.bg, borderRadius: 20, padding: 'var(--space-4)',
-          display: 'flex', flexDirection: 'column', gap: 'var(--space-3)',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)' }}>
-            <div style={{
-              width: 44, height: 44, borderRadius: '50%', flexShrink: 0,
-              backgroundColor: 'var(--color-surface)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <Folder size={22} color={tone.fg} aria-hidden="true" />
-            </div>
-            {actionButtons}
-          </div>
+        <FolderShell wash={folderWash(tone.fg)} padding={16} gap={12}>
+          {actionButtons ? (
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>{actionButtons}</div>
+          ) : null}
 
           <h1 dir="ltr" style={{
             margin: 0, fontSize: 22, fontWeight: 700, lineHeight: 1.25, textAlign: 'start',
@@ -404,7 +398,7 @@ export default function DrugGroupScreen() {
           <div>
             <div style={{
               display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
-              fontSize: 13, color: 'var(--color-text-secondary)', fontFamily: 'var(--font-body)',
+              fontSize: 13, color: 'color-mix(in srgb, var(--color-text-primary) 72%, transparent)', fontFamily: 'var(--font-body)',
             }}>
               <span>{count} of {drugsCap} drugs</span>
               {full && (
@@ -435,16 +429,8 @@ export default function DrugGroupScreen() {
             </div>
           </div>
 
-          {group.description && (
-            <p dir="ltr" style={{
-              margin: 0, fontSize: 14, lineHeight: 1.5, textAlign: 'start',
-              color: 'var(--color-text-secondary)', fontFamily: 'var(--font-body)',
-              whiteSpace: 'pre-wrap', overflowWrap: 'anywhere',
-            }}>
-              {group.description}
-            </p>
-          )}
-        </div>
+          <GroupDescription text={group.description} />
+        </FolderShell>
 
         <GroupSyncStatus marginTop="var(--space-3)" />
 
