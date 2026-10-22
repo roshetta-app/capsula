@@ -164,6 +164,9 @@
   --color-generic:          #2F9E5B;
   --color-generic-light:    #E8F6EE;
   --color-generic-text:     #1F7A45;   /* Generic as words or icon on its light tint: 4.5:1 */
+  --color-generic-solid:    #1F7A45;   /* Generic fill behind white text: 5.3:1 */
+  --color-class-solid:      #7C3AED;   /* Class fill behind white text: 5.7:1 */
+  --color-chip-line:        #AFC2EC;   /* outline of an unchosen mode chip on the header tint */
 
   --font-display:           "IBM Plex Sans", "IBM Plex Sans Arabic", sans-serif;
   --font-body:              "IBM Plex Sans", "IBM Plex Sans Arabic", sans-serif;
@@ -303,6 +306,9 @@
   --color-generic:          #5CC98A;
   --color-generic-light:    #12301F;
   --color-generic-text:     #5CC98A;
+  --color-generic-solid:    #23804A;   /* 4.9:1 with white text */
+  --color-class-solid:      #7C3AED;
+  --color-chip-line:        #35496B;
 
   --shadow-card:            0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
   --shadow-elevated:        0 4px 12px rgba(0,0,0,0.4);
