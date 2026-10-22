@@ -51,7 +51,7 @@ function Chip({ value, label, icon: Icon, chosen, onPick }) {
         borderRadius:            'var(--radius-full)',
         border:                  `1px solid ${chosen ? fill : 'var(--color-chip-line)'}`,
         backgroundColor:         chosen ? fill : 'transparent',
-        color:                   chosen ? '#fff' : 'var(--color-text-secondary)',
+        color:                   chosen ? '#fff' : 'color-mix(in srgb, var(--color-text-primary) 72%, transparent)',
         fontFamily:              'var(--font-body)',
         fontSize:                14,
         fontWeight:              chosen ? 600 : 500,

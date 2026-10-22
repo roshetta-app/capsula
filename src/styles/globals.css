@@ -86,6 +86,7 @@
   --color-seg-track:        #CBDAF8;
   --color-seg-thumb:        #FFFFFF;
   --color-seg-thumb-text:   #2563EB;
+  --color-tint-chip:        rgba(255, 255, 255, 0.75);  /* round icon and count pill on a soft-tinted card */
   --color-bg:               #F7F8FA;
   --color-surface:          #FFFFFF;
   --color-surface-muted:    #F9FAFB;
@@ -252,6 +253,7 @@
   --color-seg-track:        #0F1A2E;
   --color-seg-thumb:        #2563EB;
   --color-seg-thumb-text:   #FFFFFF;
+  --color-tint-chip:        rgba(255, 255, 255, 0.08);
 
   /* Hero panel — see light-mode definition above for rationale. A step up
      from --color-surface for more separation from --color-bg than the

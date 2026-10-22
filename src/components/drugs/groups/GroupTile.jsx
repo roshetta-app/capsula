@@ -27,6 +27,11 @@
  * folder, then the name, the drug count and the first drug names, each on one line. The New
  * group card is the same size with a dashed line. 'drugNames' is the preview line. 'fill' (step
  * 8.2b, the See all screen) makes the card fill its grid column instead of the fixed width.
+ *
+ * 2026-10-22 (UI refresh, card refinement, approved by Lmar): softer card. No border; a soft wash
+ * of the group's own colour; round icon at the top left, drug-count pill at the top right, name
+ * (15) and the first two different drug names with '+ more' at the bottom. 'drugNames' is the
+ * list of names; the card joins them itself (they used to run together with no separator).
  */
 
 import { useState } from 'react'
@@ -62,13 +67,21 @@ export function WaitingMark({ size = 14, color = 'var(--color-text-secondary)' }
 
 export const CARD_WIDTH = 156
 
+const SOFT_TEXT = 'color-mix(in srgb, var(--color-text-primary) 72%, transparent)'
+
 export default function GroupTile({ group, isNew = false, showProBadge = false, waiting = false, animate = false, drugNames = '', fill = false, onOpen }) {
   const [pressed, setPressed] = useState(false)
   const isDark = useIsDark()
   const colors = resolveToken(isNew ? 'slate' : group?.color, isDark)
   const name = isNew ? 'New group' : (group?.name ?? '')
   const count = group?.brandIds?.length ?? 0
-  const line = { fontSize: 12, lineHeight: 1.3, fontFamily: 'var(--font-body)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }
+  const line = { fontSize: 13, lineHeight: 1.3, fontFamily: 'var(--font-body)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }
+
+  // Preview line: the first two different names, then how many drugs are left.
+  const names = Array.isArray(drugNames) ? drugNames : (drugNames ? [drugNames] : [])
+  const shown = [...new Set(names)].slice(0, 2)
+  const covered = names.filter(n => shown.includes(n)).length
+  const preview = shown.length ? shown.join(', ') + (count > covered ? ` +${count - covered}` : '') : ''
 
   return (
     <div
@@ -84,12 +97,14 @@ export default function GroupTile({ group, isNew = false, showProBadge = false, 
       onPointerCancel={() => setPressed(false)}
       style={{
         flex: fill ? '1 1 auto' : `0 0 ${CARD_WIDTH}px`, width: fill ? '100%' : CARD_WIDTH, minWidth: 0, scrollSnapAlign: 'start',
-        display: 'flex', flexDirection: 'column', gap: 10,
-        backgroundColor: isNew ? 'transparent' : 'var(--color-surface)',
-        border: isNew ? '1.5px dashed var(--color-border)' : '1px solid var(--color-border)',
-        borderRadius: 16,
-        padding: 12,
-        minHeight: 128,
+        display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 10,
+        backgroundColor: isNew
+          ? 'color-mix(in srgb, var(--color-text-primary) 5%, var(--color-bg))'
+          : `color-mix(in srgb, ${colors.fg} 12%, var(--color-surface))`,
+        border: 'none',
+        borderRadius: 20,
+        padding: 14,
+        minHeight: 116,
         cursor: 'pointer',
         outline: 'none',
         WebkitTapHighlightColor: 'transparent',
@@ -99,32 +114,40 @@ export default function GroupTile({ group, isNew = false, showProBadge = false, 
         boxSizing: 'border-box',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
         <div style={{
-          width: 36, height: 36, borderRadius: 11, flexShrink: 0,
+          width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          backgroundColor: isNew ? 'var(--color-surface-muted)' : colors.bg,
+          backgroundColor: 'var(--color-tint-chip)',
         }}>
           {isNew
-            ? <Plus size={18} strokeWidth={2} color="var(--color-text-secondary)" aria-hidden="true" />
+            ? <Plus size={18} strokeWidth={2} color={SOFT_TEXT} aria-hidden="true" />
             : <Folder size={18} strokeWidth={1.8} color={colors.fg} aria-hidden="true" />}
         </div>
-        {isNew && showProBadge && <ProPill />}
-        {!isNew && waiting && <WaitingMark />}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+          {!isNew && waiting && <WaitingMark />}
+          {isNew && showProBadge && <ProPill />}
+          {!isNew && (
+            <span style={{
+              fontSize: 12, fontWeight: 600, lineHeight: 1.2, whiteSpace: 'nowrap',
+              fontFamily: 'var(--font-body)', color: SOFT_TEXT,
+              backgroundColor: 'var(--color-tint-chip)', borderRadius: 12, padding: '4px 10px',
+            }}>
+              {count === 0 ? 'Empty' : drugCountLabel(count)}
+            </span>
+          )}
+        </div>
       </div>
 
-      <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
-        <div dir="ltr" style={{ ...line, fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)' }}>
+      <div style={{ minWidth: 0 }}>
+        <div dir="ltr" style={{ ...line, fontSize: 15, fontWeight: 600, lineHeight: 1.25, color: 'var(--color-text-primary)' }}>
           {name}
         </div>
         {isNew ? (
-          <div style={{ ...line, color: 'var(--color-text-secondary)' }}>Start a list</div>
-        ) : (
-          <>
-            <div style={{ ...line, fontWeight: 500, color: 'var(--color-text-secondary)' }}>{count === 0 ? 'No drugs yet' : drugCountLabel(count)}</div>
-            {drugNames ? <div style={{ ...line, color: 'var(--color-text-muted)' }}>{drugNames}</div> : null}
-          </>
-        )}
+          <div style={{ ...line, marginTop: 2, color: SOFT_TEXT }}>Start a list</div>
+        ) : preview ? (
+          <div style={{ ...line, marginTop: 2, color: SOFT_TEXT }}>{preview}</div>
+        ) : null}
       </div>
     </div>
   )

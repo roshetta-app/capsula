@@ -25,7 +25,11 @@ import { SpecialtyIcon } from '../../../utils/specialtyIcon'
 // same press feedback (fade to 0.8 and shrink to 0.985). The theme variables
 // carry it into dark mode.
 
-export default function CategoryRow({ label, iconType, iconValue, color, textColor, onTap }) {
+// 2026-10-22 (UI refresh, card refinement, approved by Lmar): same soft card as the group cards. No
+// border, a soft wash of the category's own colour, a round icon at the top and the name (15) at the
+// bottom. The old 'color' prop (the icon square fill) is no longer used; callers may still pass it.
+export default function CategoryRow({ label, iconType, iconValue, textColor, onTap }) {
+  const ink = textColor || 'var(--color-accent)'
   const [pressed, setPressed] = useState(false)
 
   return (
@@ -39,11 +43,12 @@ export default function CategoryRow({ label, iconType, iconValue, color, textCol
       onPointerLeave={() => setPressed(false)}
       onPointerCancel={() => setPressed(false)}
       style={{
-        display: 'flex', flexDirection: 'column', gap: 'var(--space-2)',
-        backgroundColor: 'var(--color-surface-muted)',
+        display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 10,
+        minHeight: 92, boxSizing: 'border-box',
+        backgroundColor: `color-mix(in srgb, ${ink} 12%, var(--color-surface))`,
         border: 'none',
-        borderRadius: 16,
-        padding: 12,
+        borderRadius: 20,
+        padding: 14,
         cursor: 'pointer',
         outline: 'none',
         WebkitTapHighlightColor: 'transparent',
@@ -55,15 +60,15 @@ export default function CategoryRow({ label, iconType, iconValue, color, textCol
       {/* Icon in tinted circle */}
       <div style={{
         width: 36, height: 36, borderRadius: '50%',
-        backgroundColor: color,
+        backgroundColor: 'var(--color-tint-chip)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         flexShrink: 0,
       }}>
-        <SpecialtyIcon iconType={iconType} iconValue={iconValue} size={17} color={textColor} />
+        <SpecialtyIcon iconType={iconType} iconValue={iconValue} size={18} color={ink} />
       </div>
 
       {/* Name */}
-      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)', lineHeight: 1.3, minWidth: 0, overflowWrap: 'break-word' }}>
+      <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text-primary)', lineHeight: 1.25, minWidth: 0, overflowWrap: 'break-word' }}>
         {label}
       </div>
     </div>

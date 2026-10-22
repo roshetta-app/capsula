@@ -1317,7 +1317,7 @@ function DrugsHero({ onInfoTap }) {
             background:              'none',
             border:                  'none',
             cursor:                  'pointer',
-            color:                   'var(--color-text-secondary)',
+            color:                   'color-mix(in srgb, var(--color-text-primary) 72%, transparent)',
             flexShrink:              0,
             WebkitTapHighlightColor: 'transparent',
           }}

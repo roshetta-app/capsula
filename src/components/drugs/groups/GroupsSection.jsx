@@ -85,7 +85,7 @@ function GroupSortButton({ sortMode, onToggle }) {
 }
 
 function SkeletonTile({ fill = false }) {
-  return <div style={shimmer(fill ? { height: 128, borderRadius: 16 } : { flex: `0 0 ${CARD_WIDTH}px`, width: CARD_WIDTH, height: 128, borderRadius: 16 })} />
+  return <div style={shimmer(fill ? { height: 116, borderRadius: 20 } : { flex: `0 0 ${CARD_WIDTH}px`, width: CARD_WIDTH, height: 116, borderRadius: 20 })} />
 }
 
 function SkeletonRow({ last = false }) {
@@ -109,7 +109,7 @@ function SkeletonRow({ last = false }) {
 // phone asks for reduced motion.
 const SOFT_IN_CSS = '@keyframes groupSoftIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } } .group-soft-in { animation: groupSoftIn var(--motion-base) var(--ease-settle) both; } .groups-row::-webkit-scrollbar { display: none; }'
 
-const GRID_STYLE = { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 'var(--space-2)' }
+const GRID_STYLE = { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }
 // Step 8.2a: on the home the groups sit in one sideways row of cards.
 const ROW_STYLE = {
   display: 'flex', gap: 10, overflowX: 'auto', scrollSnapType: 'x proximity',

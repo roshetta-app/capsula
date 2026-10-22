@@ -59,7 +59,7 @@ export default function DrugCategoriesScreen() {
     body = (
       // One column while no category has drugs yet, so 'All Drugs' fills the
       // row; two columns as soon as there are real categories.
-      <div style={{ display: 'grid', gridTemplateColumns: categoriesWithCounts.length === 0 ? '1fr' : 'repeat(2, minmax(0, 1fr))', gap: 'var(--space-2)' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: categoriesWithCounts.length === 0 ? '1fr' : 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
         <CategoryRow
           label="All Drugs"
           iconType="lucide"

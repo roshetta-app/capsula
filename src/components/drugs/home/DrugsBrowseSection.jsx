@@ -76,10 +76,10 @@ function ClassRow({ subtitle, onTap }) {
     >
       <span style={{
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        width: 44, height: 44, borderRadius: 14, flexShrink: 0,
+        width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
         background: 'var(--color-class-light)', color: 'var(--color-class)',
       }}>
-        <Layers size={21} strokeWidth={1.9} aria-hidden="true" />
+        <Layers size={20} strokeWidth={1.9} aria-hidden="true" />
       </span>
       <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, flex: 1 }}>
         <span style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.25, color: 'var(--color-text-primary)' }}>Browse by class</span>
@@ -94,7 +94,7 @@ function StripSkeleton() {
   return (
     <div style={STRIP_GRID} aria-hidden="true">
       {Array.from({ length: STRIP_COUNT }, (_, i) => (
-        <div key={i} style={shimmer({ height: 80, borderRadius: 16 })} />
+        <div key={i} style={shimmer({ height: 92, borderRadius: 20 })} />
       ))}
     </div>
   )
@@ -103,7 +103,7 @@ function StripSkeleton() {
 const STRIP_GRID = {
   display: 'grid',
   gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-  gap: 'var(--space-2)',
+  gap: 10,
 }
 
 export default function DrugsBrowseSection() {
