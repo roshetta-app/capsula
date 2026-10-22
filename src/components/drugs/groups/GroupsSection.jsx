@@ -22,6 +22,10 @@
  * first drug names, New group card at the end); the "N of 3 groups · Full" line shows under it
  * for a free account at its limit. List view and every message state are unchanged.
  *
+ * 2026-10-22 (step 8.2b): the sort button and the Tiles / List switch moved to the See all
+ * screen (DrugGroupsScreen, which draws this section with all). The home keeps the sideways
+ * row and gets a See all link beside the heading.
+ *
  * 2026-10-20 (step 11.5): flat look. Colour tiles with a big drug count, flat list rows
  * with thin lines, a dashed New group tile or row at the end, centred messages with no
  * box, and placeholders in the same shapes while loading. A group that is added or
@@ -32,7 +36,7 @@
 
 import { memo, useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowUpDown } from 'lucide-react'
+import { ArrowUpDown, ChevronRight } from 'lucide-react'
 import DrugsSectionCard, { SECTION_TITLE_STYLE } from '../home/DrugsSectionCard'
 import { shimmer } from '../home/shimmer'
 import GroupTile, { CARD_WIDTH } from './GroupTile'
@@ -80,8 +84,8 @@ function GroupSortButton({ sortMode, onToggle }) {
   )
 }
 
-function SkeletonTile() {
-  return <div style={shimmer({ flex: `0 0 ${CARD_WIDTH}px`, width: CARD_WIDTH, height: 128, borderRadius: 16 })} />
+function SkeletonTile({ fill = false }) {
+  return <div style={shimmer(fill ? { height: 128, borderRadius: 16 } : { flex: `0 0 ${CARD_WIDTH}px`, width: CARD_WIDTH, height: 128, borderRadius: 16 })} />
 }
 
 function SkeletonRow({ last = false }) {
@@ -105,14 +109,18 @@ function SkeletonRow({ last = false }) {
 // phone asks for reduced motion.
 const SOFT_IN_CSS = '@keyframes groupSoftIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } } .group-soft-in { animation: groupSoftIn var(--motion-base) var(--ease-settle) both; } .groups-row::-webkit-scrollbar { display: none; }'
 
-// Step 8.2a: the groups sit in one sideways row of cards (no grid).
+const GRID_STYLE = { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 'var(--space-2)' }
+// Step 8.2a: on the home the groups sit in one sideways row of cards.
 const ROW_STYLE = {
   display: 'flex', gap: 10, overflowX: 'auto', scrollSnapType: 'x proximity',
   scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch', paddingBottom: 2,
 }
 const LIST_STYLE = { display: 'flex', flexDirection: 'column' }
 
-function GroupsSection() {
+// 'all' (step 8.2b): the See all screen. It shows every group with the sort button and the
+// Tiles / List switch, in a 2-column grid or a list. Without it (the home) the section is
+// the sideways row with a See all link.
+function GroupsSection({ all = false }) {
   const { drugs, groupsView, setGroupsView, groupsSortMode, setGroupsSortMode } = useDrugContext()
   const {
     groups, groupsStatus, groupsLoadError, isReadOnly,
@@ -120,6 +128,7 @@ function GroupsSection() {
     waitingGroupIds = [],
   } = useFavouritesContext()
   const { user, loading: authLoading } = useAuth()
+  const asList = all && groupsView === 'list'
   const isPro = useIsPro()
   const [editor, setEditor] = useState({ open: false, group: null })
 
@@ -214,8 +223,8 @@ function GroupsSection() {
 
   const title = <span style={SECTION_TITLE_STYLE}>My drug groups</span>
   const showControls = !!user && groupsStatus === 'ready' && groups.length > 0
-  const trailing = showControls ? (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+  const controls = showControls && all ? (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
       <GroupSortButton
         sortMode={groupsSortMode}
         onToggle={() => setGroupsSortMode(groupsSortMode === 'newest' ? 'az' : 'newest')}
@@ -223,12 +232,29 @@ function GroupsSection() {
       <GroupViewToggle value={groupsView} onChange={setGroupsView} />
     </div>
   ) : null
+  const trailing = showControls && !all ? (
+    <button
+      onClick={() => navigate(ROUTES.DRUGS_GROUPS)}
+      aria-label="See all my drug groups"
+      style={{
+        display: 'flex', alignItems: 'center', gap: 2, background: 'none', border: 'none',
+        cursor: 'pointer', padding: '4px 0 4px 8px', fontSize: 14, fontWeight: 600,
+        color: 'var(--color-accent)', fontFamily: 'var(--font-body)',
+        WebkitTapHighlightColor: 'transparent', outline: 'none',
+      }}
+    >
+      See all
+      <ChevronRight size={16} strokeWidth={2} aria-hidden="true" />
+    </button>
+  ) : null
 
   let content
   if (authLoading || (user && groupsStatus === 'loading')) {
-    content = groupsView === 'list'
+    content = asList
       ? <div style={LIST_STYLE}><SkeletonRow /><SkeletonRow /><SkeletonRow last /></div>
-      : <div className="groups-row" style={ROW_STYLE}><SkeletonTile /><SkeletonTile /><SkeletonTile /></div>
+      : all
+        ? <div style={GRID_STYLE}><SkeletonTile fill /><SkeletonTile fill /><SkeletonTile fill /><SkeletonTile fill /></div>
+        : <div className="groups-row" style={ROW_STYLE}><SkeletonTile /><SkeletonTile /><SkeletonTile /></div>
   } else if (!user) {
     content = (
       <GroupStateMessage
@@ -271,7 +297,7 @@ function GroupsSection() {
         {groupsLoadError && online && appOnline ? (
           <GroupStateMessage variant="banner" title="Couldn't refresh your groups" actionLabel="Try again" onAction={reloadGroups} />
         ) : null}
-        {groupsView === 'list' ? (
+        {asList ? (
           <div style={LIST_STYLE}>
             {sorted.map((g, i) => (
               <GroupRow
@@ -284,18 +310,19 @@ function GroupsSection() {
             {showNew && <GroupRow isNew last showProBadge={showPro} onOpen={handleNewGroup} />}
           </div>
         ) : (
-          <div className="groups-row" style={ROW_STYLE}>
+          <div className={all ? undefined : 'groups-row'} style={all ? GRID_STYLE : ROW_STYLE}>
             {sorted.map(g => (
               <GroupTile
+                fill={all}
                 key={`${g.id}:${g.name}`} group={g} drugNames={previewNames(g)}
                 waiting={waitingGroupIds.includes(g.id)} animate={isFresh(g)}
                 onOpen={() => handleOpenGroup(g)}
               />
             ))}
-            {showNew && <GroupTile isNew showProBadge={showPro} onOpen={handleNewGroup} />}
+            {showNew && <GroupTile fill={all} isNew showProBadge={showPro} onOpen={handleNewGroup} />}
           </div>
         )}
-        {showPro && groupsView !== 'list' && (
+        {showPro && !asList && (
           <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', fontFamily: 'var(--font-body)' }}>
             {groups.length} of {DRUG_GROUPS_CAP_FREE} groups · Full
           </div>
@@ -307,9 +334,16 @@ function GroupsSection() {
   return (
     <>
       <style>{SOFT_IN_CSS}</style>
-      <DrugsSectionCard label="My drug groups" flat title={title} trailing={trailing}>
-        {content}
-      </DrugsSectionCard>
+      {all ? (
+        <div>
+          {controls}
+          {content}
+        </div>
+      ) : (
+        <DrugsSectionCard label="My drug groups" flat title={title} trailing={trailing}>
+          {content}
+        </DrugsSectionCard>
+      )}
       <GroupEditorSheet isOpen={editor.open} onClose={closeEditor} group={editor.group} />
       <Snackbar visible={undo.visible} message="Group deleted" actionLabel="Undo" onAction={handleUndo} />
     </>

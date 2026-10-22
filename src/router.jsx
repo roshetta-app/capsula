@@ -60,6 +60,7 @@ import DrugsScreen           from './pages/DrugsScreen'
 import DrugCategoriesScreen  from './pages/DrugCategoriesScreen'
 import DrugClassesScreen     from './pages/DrugClassesScreen'
 import DrugGroupScreen       from './pages/DrugGroupScreen'
+import DrugGroupsScreen      from './pages/DrugGroupsScreen'
 import AddDrugsToGroupScreen from './pages/AddDrugsToGroupScreen'
 import SharedGroupScreen     from './pages/SharedGroupScreen'
 import DrugDetailScreen      from './pages/DrugDetailScreen'
@@ -104,6 +105,9 @@ export const ROUTES = {
   DRUGS_BROWSE_CLASS:    '/drugs/browse/class',
   // 2026-10-19 (Drugs groups plan, step 6.2): a group's own page. Two segments
   // after /drugs, so it can never clash with /drugs/:slug.
+  // 2026-10-22 (UI refresh plan, step 8.2b): the See all screen for My drug groups. Three
+  // segments, like the browse pages, so it can never clash with /drugs/:slug.
+  DRUGS_GROUPS:          '/drugs/browse/groups',
   DRUGS_GROUP:           (id) => `/drugs/group/${id}`,
   // 2026-10-21 (Drugs groups plan, step 12.5): the Add drugs search for one group.
   DRUGS_GROUP_ADD:       (id) => `/drugs/group/${id}/add`,
@@ -156,6 +160,7 @@ export function PublicRoutes() {
         <Route path="/drugs/category/:categorySlug"  element={<DrugsScreen />} />
         <Route path="/drugs/browse/category"          element={<DrugCategoriesScreen />} />
         <Route path="/drugs/browse/class"             element={<DrugClassesScreen />} />
+        <Route path="/drugs/browse/groups"            element={<DrugGroupsScreen />} />
         <Route path="/drugs/group/:groupId"           element={<DrugGroupScreen />} />
         <Route path="/drugs/group/:groupId/add"       element={<AddDrugsToGroupScreen />} />
         <Route path="/favourites"          element={<FavouritesScreen />} />

@@ -25,7 +25,8 @@
  * 2026-10-22 (UI refresh plan, step 8.2a): the tile is now a card in the sideways row on the
  * Drugs home. Surface fill with a thin border, a small tile in the group's colour with a
  * folder, then the name, the drug count and the first drug names, each on one line. The New
- * group card is the same size with a dashed line. 'drugNames' is the preview line.
+ * group card is the same size with a dashed line. 'drugNames' is the preview line. 'fill' (step
+ * 8.2b, the See all screen) makes the card fill its grid column instead of the fixed width.
  */
 
 import { useState } from 'react'
@@ -61,7 +62,7 @@ export function WaitingMark({ size = 14, color = 'var(--color-text-secondary)' }
 
 export const CARD_WIDTH = 156
 
-export default function GroupTile({ group, isNew = false, showProBadge = false, waiting = false, animate = false, drugNames = '', onOpen }) {
+export default function GroupTile({ group, isNew = false, showProBadge = false, waiting = false, animate = false, drugNames = '', fill = false, onOpen }) {
   const [pressed, setPressed] = useState(false)
   const isDark = useIsDark()
   const colors = resolveToken(isNew ? 'slate' : group?.color, isDark)
@@ -82,7 +83,7 @@ export default function GroupTile({ group, isNew = false, showProBadge = false, 
       onPointerLeave={() => setPressed(false)}
       onPointerCancel={() => setPressed(false)}
       style={{
-        flex: `0 0 ${CARD_WIDTH}px`, width: CARD_WIDTH, scrollSnapAlign: 'start',
+        flex: fill ? '1 1 auto' : `0 0 ${CARD_WIDTH}px`, width: fill ? '100%' : CARD_WIDTH, minWidth: 0, scrollSnapAlign: 'start',
         display: 'flex', flexDirection: 'column', gap: 10,
         backgroundColor: isNew ? 'transparent' : 'var(--color-surface)',
         border: isNew ? '1.5px dashed var(--color-border)' : '1px solid var(--color-border)',
