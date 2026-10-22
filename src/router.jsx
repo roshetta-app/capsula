@@ -51,6 +51,7 @@
 
 import { Routes, Route, Outlet } from 'react-router-dom'
 import Layout from './components/layout'
+import { BackLabelTracker } from './hooks/useBackLabel'
 
 // ─── Public screens ───────────────────────────────────────────────────────────
 
@@ -145,6 +146,8 @@ export const ROUTES = {
 
 export function PublicRoutes() {
   return (
+    <>
+    <BackLabelTracker />
     <Routes>
 
       {/* Conditions, Drugs, Favourites, and Account share one Layout instance
@@ -178,6 +181,7 @@ export function PublicRoutes() {
       <Route path="/account/faq"         element={<AccountFaqScreen />} />
 
     </Routes>
+    </>
   )
 }
 

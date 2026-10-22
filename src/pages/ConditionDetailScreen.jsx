@@ -5,6 +5,7 @@ import { useConditionContext } from '../context/ConditionContext'
 import { useFavouritesContext } from '../context/FavouritesContext'
 import { useKeyboardOpen } from '../hooks/useKeyboardOpen'
 import { useDeepLinkParent } from '../hooks/useDeepLinkParent'
+import { useBackLabel } from '../hooks/useBackLabel'
 import PrescriptionsTab from '../components/conditions/PrescriptionsTab'
 import ClinicalDataTab from '../components/conditions/ClinicalDataTab'
 import BottomNav from '../components/BottomNav'
@@ -549,6 +550,7 @@ function ConditionDetailSkeleton() {
 
 function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTab, setActiveTab }) {
   const isDark = useIsDark()
+  const backLabel = useBackLabel()
 
   const tokenKey  = condition?.specialtyColorToken ?? FALLBACK_TOKEN
   const iconType  = condition?.specialtyIconType   ?? 'lucide'
@@ -585,7 +587,7 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTa
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', minWidth: 0 }}>
             <button
               onClick={onBack}
-              aria-label="Back"
+              aria-label={backLabel ? `Back to ${backLabel}` : 'Back'}
               style={{
                 display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
                 background: 'none', border: 'none', cursor: 'pointer',
@@ -596,7 +598,7 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTa
               }}
             >
               <ArrowLeft size={16} strokeWidth={2} />
-              Back
+              {backLabel || 'Back'}
             </button>
 
             {condition && condition.specialtyName && (

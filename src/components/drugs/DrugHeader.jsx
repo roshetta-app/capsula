@@ -195,6 +195,7 @@ import { ArrowLeft, Share2, Heart, FolderPlus } from 'lucide-react'
 import { useToast } from '../../context/ToastContext'
 import { shareDrug } from '../../utils/shareDrugLink'
 import { usePressed } from '../../hooks/usePressed'
+import { useBackLabel } from '../../hooks/useBackLabel'
 import { SpecialtyIcon } from '../../utils/specialtyIcon'
 import { toTitleCase, getDrugTitleSuffix, TITLE_HIDDEN_MODIFIER_TAGS } from '../../utils/drugTitleFormat'
 
@@ -256,6 +257,7 @@ function edgeFadeStyle(fade) {
 
 
 export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, onAddToGroup, category, colors }) {
+  const backLabel = useBackLabel()
   const brandFade  = useEdgeFade(drug.id)
   const suffixFade = useEdgeFade(drug.id)
 
@@ -373,7 +375,7 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, on
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', minWidth: 0 }}>
             <button
               onClick={onBack}
-              aria-label="Back"
+              aria-label={backLabel ? `Back to ${backLabel}` : 'Back'}
               style={{
                 display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
                 background: 'none', border: 'none', cursor: 'pointer',
@@ -384,7 +386,7 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, on
               }}
             >
               <ArrowLeft size={16} strokeWidth={2} />
-              Back
+              {backLabel || 'Back'}
             </button>
 
             {category && (
