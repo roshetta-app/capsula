@@ -300,7 +300,8 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useWindowVirtualizer, observeWindowOffset } from '@tanstack/react-virtual'
 import SharedDrugCard from '../components/SharedDrugCard'
 import RowStarButton from '../components/ui/RowStarButton'
-import DrugFilterPanel, { FORM_OPTIONS } from '../components/drugs/DrugFilterPanel'
+import DrugFilterPanel from '../components/drugs/DrugFilterPanel'
+import { applyFilters } from '../utils/applyDrugFilters'
 import { FilterModal } from '../components/ui/FilterModal'
 import ClassSearchResults from '../components/drugs/classes/ClassSearchResults'
 import ClassSheet from '../components/drugs/classes/ClassSheet'
@@ -335,32 +336,6 @@ import { useBackClose } from '../hooks/useBackClose'
 import { useSearchHistory } from '../hooks/useSearchHistory'
 import SearchHistoryList from '../components/drugs/home/SearchHistoryList'
 import { BrowseTopRow } from '../components/drugs/home/BrowseHeader'
-
-// ─── applyFilters ─────────────────────────────────────────────────────────────
-
-function applyFilters(drugs, filters) {
-  if (!filters) return drugs
-  let result = drugs
-
-  // Form — each selected chip covers a set of real raw form values (see
-  // DrugFilterPanel's FORM_OPTIONS), not a single value, so match against
-  // the combined set of raw values for every chip that's currently active.
-  // A chip can also define `routes` (currently only Inhaled) for real
-  // items whose `form` is a generic label (piece/powder/solution) but
-  // whose `route` is the actual signal — a drug matches if its form is in
-  // the active matches set OR its route is in the active routes set.
-  if (!filters.forms.includes('all')) {
-    const activeOptions = FORM_OPTIONS.filter(opt => filters.forms.includes(opt.value))
-    const activeFormMatches  = new Set(activeOptions.flatMap(opt => opt.matches))
-    const activeRouteMatches = new Set(activeOptions.flatMap(opt => opt.routes ?? []))
-    result = result.filter(d =>
-      activeFormMatches.has(d.form?.toLowerCase()) ||
-      (d.route && activeRouteMatches.has(d.route.toLowerCase()))
-    )
-  }
-
-  return result
-}
 
 // drug-search-sort-cheapest — ascending by price; drugs with no price (5 of
 // ~19,774 brands, per DB check) sort to the end rather than the front, since
@@ -641,7 +616,7 @@ export default function DrugsScreen() {
   const [searchOpen, setSearchOpen] = useState(() => query.trim().length > 0)
   const restoredOpenRef = useRef(searchOpen)
   const searchInputRef = useRef(null)
-  const { history, addSearch, removeSearch, clearHistory } = useSearchHistory()
+  const { history, addSearch, clearHistory } = useSearchHistory()
   const [showClearHistoryConfirm, setShowClearHistoryConfirm] = useState(false)
   const [commitTick, setCommitTick] = useState(0)
 
@@ -1218,7 +1193,6 @@ export default function DrugsScreen() {
               <SearchHistoryList
                 history={history}
                 onPick={handlePickHistory}
-                onRemove={removeSearch}
                 onClear={() => setShowClearHistoryConfirm(true)}
               />
             )}

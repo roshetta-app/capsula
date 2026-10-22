@@ -1,4 +1,6 @@
 /**
+ * 2026-10-23 (UI refresh): the round + is smaller (a 32px circle inside the same 44px tap area).
+ *
  * 2026-10-22 (UI refresh plan, step 8.4b): a drug already in the group shows a tick with the word
  * Added instead of a bare tick. The plus stops its tap from reaching the card, so adding a drug
  * no longer also opens the drug page.
@@ -30,6 +32,7 @@ function AddMark({ inGroup, onAdd, name }) {
   const base = {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     width: 44, height: 44, borderRadius: '50%', flexShrink: 0, border: 'none', padding: 0,
+    background: 'none',
     WebkitTapHighlightColor: 'transparent', outline: 'none',
   }
   if (inGroup) {
@@ -52,9 +55,14 @@ function AddMark({ inGroup, onAdd, name }) {
       onClick={e => { e.stopPropagation(); onAdd() }}
       onPointerDown={e => e.stopPropagation()}
       aria-label={`Add ${name} to this group`}
-      style={{ ...base, cursor: 'pointer', backgroundColor: 'var(--color-accent-solid)', color: '#fff' }}
+      style={{ ...base, cursor: 'pointer' }}
     >
-      <Plus size={22} strokeWidth={2.5} aria-hidden="true" />
+      <span style={{
+        width: 32, height: 32, borderRadius: '50%', backgroundColor: 'var(--color-accent-solid)', color: '#fff',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <Plus size={18} strokeWidth={2.5} aria-hidden="true" />
+      </span>
     </button>
   )
 }

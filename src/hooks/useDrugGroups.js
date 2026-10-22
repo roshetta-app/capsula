@@ -121,7 +121,7 @@ import {
 
 export const GROUP_NAME_MAX = 40
 export const GROUP_DESCRIPTION_MAX = 200
-export const GROUP_COLORS = ['blue', 'teal', 'violet', 'amber', 'rose']
+export const GROUP_COLORS = ['blue', 'teal', 'violet', 'amber', 'rose', 'green', 'orange', 'pink', 'indigo', 'cyan']
 
 const OFFLINE_MESSAGE = "You're offline. Reconnect to change your groups."
 

@@ -75,7 +75,10 @@ import { resolveToken } from '../../../utils/specialtyTokens'
 import { useIsDark } from '../../../utils/specialtyIcon'
 import { groupsLimitMessage, drugsLimitMessage } from './groupMessages'
 
-const COLOR_LABELS = { blue: 'Blue', teal: 'Teal', violet: 'Violet', amber: 'Amber', rose: 'Rose' }
+const COLOR_LABELS = {
+  blue: 'Blue', teal: 'Teal', violet: 'Violet', amber: 'Amber', rose: 'Rose',
+  green: 'Green', orange: 'Orange', pink: 'Pink', indigo: 'Indigo', cyan: 'Cyan',
+}
 const BLANK = { name: '', description: '', color: GROUP_COLORS[0], brandIds: [] }
 
 function sameIds(a, b) {
@@ -293,7 +296,7 @@ export default function GroupEditorSheet({ isOpen, onClose, group = null, onSave
               value={name}
               onChange={e => { setName(e.target.value.slice(0, GROUP_NAME_MAX)); if (nameError) setNameError(false); if (nameTakenByServer) setNameTakenByServer(false) }}
               maxLength={GROUP_NAME_MAX}
-              placeholder="For example ICU drips"
+              placeholder="e.g. Nausea and vomiting"
               dir="ltr"
               aria-invalid={nameError || showNameTaken}
               aria-describedby={nameError || showNameTaken ? 'group-name-error' : undefined}
@@ -319,7 +322,7 @@ export default function GroupEditorSheet({ isOpen, onClose, group = null, onSave
               onChange={e => setDescription(e.target.value.slice(0, GROUP_DESCRIPTION_MAX))}
               maxLength={GROUP_DESCRIPTION_MAX}
               rows={3}
-              placeholder="What is this group for?"
+              placeholder="e.g. Antiemetics for ED and ward use"
               dir="ltr"
               style={{ ...FIELD_STYLE, border: '1.5px solid transparent', resize: 'none' }}
             />
@@ -333,7 +336,7 @@ export default function GroupEditorSheet({ isOpen, onClose, group = null, onSave
 
           <div>
             <span id="group-colour-label" style={LABEL_STYLE}>Colour</span>
-            <div role="radiogroup" aria-labelledby="group-colour-label" style={{ display: 'flex', gap: 'var(--space-1)', marginInlineStart: -6 }}>
+            <div role="radiogroup" aria-labelledby="group-colour-label" style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-1)', marginInlineStart: -6 }}>
               {GROUP_COLORS.map(c => {
                 const tone = resolveToken(c, isDark)
                 const selected = c === color

@@ -243,8 +243,8 @@ function GroupsSection({ all = false, headerProps = null }) {
   } else if (!user) {
     content = (
       <GroupStateMessage
-        title="Sign in to keep your groups"
-        body="Collect drugs into your own lists and reach them in one tap."
+        title="Build your own drug lists"
+        body="Sign in to create groups and open them on any device."
         actionLabel="Sign in"
         onAction={() => promptSignIn('groups', 'new')}
         flat
@@ -264,9 +264,10 @@ function GroupsSection({ all = false, headerProps = null }) {
   } else if (groups.length === 0) {
     content = (
       <GroupStateMessage
-        title="Group your drugs for quick access"
-        body="Make a group for a ward, a shift or a patient type."
+        title="Create your first group"
+        body="Organise drugs by ward, shift or condition for quick access."
         actionLabel="Create group"
+        actionIcon={Plus}
         onAction={handleNewGroup}
         flat
       />

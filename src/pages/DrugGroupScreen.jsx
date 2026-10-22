@@ -59,7 +59,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Check, Minus, Pencil, Search, Share2, Trash2 } from 'lucide-react'
+import { Check, Minus, Pencil, Pill, Plus, Search, Share2, Trash2 } from 'lucide-react'
 import SharedDrugCard from '../components/SharedDrugCard'
 import RowStarButton from '../components/ui/RowStarButton'
 import ConfirmSheet from '../components/ui/ConfirmSheet'
@@ -305,9 +305,13 @@ export default function DrugGroupScreen() {
     if (count === 0) {
       list = (
         <GroupStateMessage
-          title="No drugs in this group yet"
-          body={isReadOnly ? undefined : 'Search for a drug and tap + to add it.'}
+          open
+          icon={Pill}
+          accent={{ bg: tone.bg, fg: tone.fg }}
+          title="Nothing here yet"
+          body={isReadOnly ? undefined : 'Search for drugs and add them to this group.'}
           actionLabel={isReadOnly ? undefined : 'Add drugs'}
+          actionIcon={Plus}
           onAction={isReadOnly ? undefined : openAddDrugs}
         />
       )

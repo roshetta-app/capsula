@@ -12,8 +12,8 @@
  *   animate      true -> soft fade-in (a group just added or renamed)
  *   onOpen       tap handler
  *
- * The group's colour is one of five fixed names (blue, teal, violet, amber,
- * rose), read through the app's colour tokens so light and dark both work.
+ * The group's colour is one of ten fixed names (blue, teal, violet, amber,
+ * rose, green, orange, pink, indigo, cyan), read through the app's colour tokens so light and dark both work.
  * An Arabic name is left-aligned like an English one (decision 2026-10-19).
  *
  * 2026-10-20 (Drug groups plan, step 11.5): flat look. A group is a tile filled with its

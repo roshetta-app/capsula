@@ -13,6 +13,13 @@
  *   flat         card variant only: the grey folder card with left-aligned text and button (step 8.10; the Drugs home,
  *                step 11.5). Default false, so every other screen keeps the boxed look.
  *   secondary    soft button (white fill, blue words) instead of the main blue one; for 'Try again'
+ *   actionIcon   optional icon component drawn before the button text (for example Plus)
+ *   open         card variant only: no box. A big tinted icon, a larger title and body, and a wide button,
+ *                straight on the page (the empty group, 2026-10-23). 'icon' is the icon component and
+ *                'accent' is { bg, fg } for its circle; both optional.
+ *
+ * 2026-10-23 (UI refresh): the Drugs home cards get more space above and below (20px instead of
+ * 14px); 'actionIcon' and 'open' are new.
  */
 
 import { Folder } from 'lucide-react'
@@ -23,6 +30,7 @@ const font = 'var(--font-body)'
 
 export default function GroupStateMessage({
   variant = 'card', tone = 'neutral', title, body, actionLabel, onAction, flat = false, secondary = false,
+  actionIcon: ActionIcon = null, open = false, icon: HeroIcon = Folder, accent = null,
 }) {
   if (variant === 'banner') {
     const warn = tone === 'warning'
@@ -64,7 +72,7 @@ export default function GroupStateMessage({
   if (flat) {
     return (
       <div role="status">
-        <FolderShell wash={FOLDER_GREY_WASH} minHeight={114}>
+        <FolderShell wash={FOLDER_GREY_WASH} minHeight={114} padding="20px 14px">
           <div style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.25, color: 'var(--color-text-primary)', fontFamily: font }}>
             {title}
           </div>
@@ -79,6 +87,7 @@ export default function GroupStateMessage({
               onClick={onAction}
               style={{
                 alignSelf: 'flex-start', minHeight: 44, padding: '0 20px', borderRadius: 12,
+                display: 'inline-flex', alignItems: 'center', gap: 8,
                 border: 'none', cursor: 'pointer',
                 backgroundColor: secondary ? 'var(--color-surface)' : 'var(--color-accent-solid)',
                 color: secondary ? 'var(--color-accent-text)' : '#fff',
@@ -86,10 +95,57 @@ export default function GroupStateMessage({
                 WebkitTapHighlightColor: 'transparent',
               }}
             >
+              {ActionIcon && <ActionIcon size={18} strokeWidth={2.4} aria-hidden="true" />}
               {actionLabel}
             </button>
           )}
         </FolderShell>
+      </div>
+    )
+  }
+
+  // 2026-10-23: the open look, no box.
+  if (open) {
+    return (
+      <div
+        role="status"
+        style={{
+          display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center',
+          gap: 'var(--space-2)', padding: 'var(--space-8, 40px) var(--space-4) var(--space-4)',
+        }}
+      >
+        <div style={{
+          width: 88, height: 88, borderRadius: '50%', marginBottom: 'var(--space-3)',
+          backgroundColor: accent?.bg ?? 'var(--color-accent-light)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <HeroIcon size={40} strokeWidth={1.8} color={accent?.fg ?? 'var(--color-accent)'} aria-hidden="true" />
+        </div>
+        <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.2, color: 'var(--color-text-primary)', fontFamily: font }}>
+          {title}
+        </div>
+        {body && (
+          <div style={{ fontSize: 15, lineHeight: 1.45, maxWidth: 300, color: 'var(--color-text-secondary)', fontFamily: font }}>
+            {body}
+          </div>
+        )}
+        {actionLabel && (
+          <button
+            type="button"
+            onClick={onAction}
+            style={{
+              marginTop: 'var(--space-4)', minHeight: 52, padding: '0 28px', borderRadius: 16,
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              border: 'none', cursor: 'pointer',
+              backgroundColor: 'var(--color-accent-solid)', color: '#fff',
+              fontSize: 16, fontWeight: 600, fontFamily: font,
+              WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            {ActionIcon && <ActionIcon size={20} strokeWidth={2.4} aria-hidden="true" />}
+            {actionLabel}
+          </button>
+        )}
       </div>
     )
   }

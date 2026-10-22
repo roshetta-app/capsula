@@ -306,7 +306,7 @@ export default function AccountSheet({
                 : display.groupContext === 'save'
                   ? 'Save this group'
                   : display.groupContext
-                    ? 'Keep your drug groups'
+                    ? 'Sign in to create groups'
                     : display.noteContext
                       ? 'Add your notes'
                       : 'Sign in or create account'}
@@ -322,7 +322,7 @@ export default function AccountSheet({
                 : display.groupContext === 'save'
                   ? 'Sign in to save a copy to your groups and open it on any device.'
                   : display.groupContext
-                    ? 'Sign in to save your groups and open them on any device.'
+                    ? 'Your groups are saved to your account and available on any device.'
                     : display.noteContext
                       ? 'Sign in to add notes and access them everywhere.'
                       : 'Sync your favourites across devices with your Google account.'}

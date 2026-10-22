@@ -7,6 +7,12 @@
  * Class in the mode pop-up or the info sheet, no Class strip or results, no Class entry in
  * "found in other modes", no Class searches in recent searches (the 'allowClass' setting).
  *
+ * 2026-10-23 (UI refresh): the header above the bar is bigger (a 48px folder tile, the name at 20,
+ * the count at 14). Done is a wide button floating at the bottom of the screen instead of a word
+ * in the header. The bar has the same Form / Route filter button as the Drugs screen; the filter
+ * here belongs to this screen only and is cleared when it closes. The recent searches have an
+ * arrow in place of the X (see SearchHistoryList.jsx).
+ *
  * 2026-10-22 (UI refresh plan, step 8.4b): the group strip moved into the tinted header, above
  * the search bar: a folder tile in the group's colour, the group name with "12 of 20 drugs"
  * (and "Full" at the limit), and a Done button that returns to the group page. A drug that is
@@ -26,11 +32,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Folder } from 'lucide-react'
+import DrugFilterPanel from '../components/drugs/DrugFilterPanel'
+import { applyFilters } from '../utils/applyDrugFilters'
 import DrugsSearchSection, { MODE_OPTIONS } from '../components/drugs/home/DrugsSearchSection'
 import SearchHistoryList from '../components/drugs/home/SearchHistoryList'
 import {
   FadeIn, SearchSwitchingState, TooShortState, RecentEmptyState,
-  EmptyState, ModeSwitchState, DidYouMeanState,
+  EmptyState, ModeSwitchState, DidYouMeanState, FilterMaskedState,
 } from '../components/drugs/search/SearchStates'
 import AddDrugsResultList from '../components/drugs/groups/AddDrugsResultList'
 import GroupStateMessage from '../components/drugs/groups/GroupStateMessage'
@@ -102,10 +110,18 @@ export default function AddDrugsToGroupScreen() {
   const {
     query, setQuery, results, queryTooShort, suggestions, crossModeMatch, searchPending,
   } = useDrugSearch(drugs, mode, NO_KEYWORDS, SEARCH_OPTIONS)
-  const { history, addSearch, removeSearch, clearHistory } = useSearchHistory()
+  const { history, addSearch, clearHistory } = useSearchHistory()
   const [showClearHistoryConfirm, setShowClearHistoryConfirm] = useState(false)
   const hasQuery = query.trim().length > 0
   const searchInputRef = useRef(null)
+
+  // The Form / Route filter (this screen's own).
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [activeFilters, setActiveFilters] = useState(null)
+  const hasFilters = !!activeFilters
+  function handleApplyFilters(filters) {
+    setActiveFilters(filters.forms.includes('all') ? null : filters)
+  }
 
   // Back from an opened drug: the typed text comes back, once.
   useEffect(() => {
@@ -270,6 +286,7 @@ export default function AddDrugsToGroupScreen() {
   const tone = resolveToken(group.color, isDark)
   const otherMode = mode === 'brand' ? 'generic' : 'brand'
   const waitingForDrugs = drugsLoading && (drugs ?? []).length === 0
+  const shownResults = applyFilters(results, activeFilters)
 
   let body
   if (waitingForDrugs) {
@@ -284,7 +301,6 @@ export default function AddDrugsToGroupScreen() {
             history={history}
             allowClass={false}
             onPick={handlePickHistory}
-            onRemove={removeSearch}
             onClear={() => setShowClearHistoryConfirm(true)}
           />
         )}
@@ -294,6 +310,8 @@ export default function AddDrugsToGroupScreen() {
     body = <TooShortState />
   } else if (slowPending) {
     body = <SearchSwitchingState />
+  } else if (results.length > 0 && shownResults.length === 0) {
+    body = <FilterMaskedState count={results.length} query={query} onClearFilter={() => setActiveFilters(null)} />
   } else if (results.length === 0) {
     body = crossModeMatch ? (
       <ModeSwitchState
@@ -313,12 +331,12 @@ export default function AddDrugsToGroupScreen() {
     body = (
       <div style={{ opacity: searchPending ? 0.7 : 1, transition: 'opacity var(--motion-fast) var(--ease-reveal)' }}>
         <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 'var(--space-2)' }}>
-          {results.length} drug{results.length !== 1 ? 's' : ''} for &quot;{query}&quot;
+          {hasFilters ? `${shownResults.length}/${results.length}` : shownResults.length} drug{results.length !== 1 ? 's' : ''} for &quot;{query}&quot;
           {results.length > 100 && ' · type more to narrow'}
         </div>
         <AddDrugsResultList
           key="results"
-          drugs={results}
+          drugs={shownResults}
           inGroup={inGroup}
           onAdd={handleAdd}
           onOpen={handleOpen}
@@ -353,7 +371,10 @@ export default function AddDrugsToGroupScreen() {
           query={query}
           onQueryChange={setQuery}
           placeholder={mode === 'generic' ? 'Search generic names…' : 'Search brand names…'}
-          showClear={false}
+          onFilter={() => setFilterOpen(true)}
+          hasActiveFilters={hasFilters}
+          showClear={hasFilters}
+          onClearFilters={() => setActiveFilters(null)}
           showRecent={false}
           recentDrugs={[]}
           categories={categories}
@@ -362,40 +383,56 @@ export default function AddDrugsToGroupScreen() {
           top={(
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-3)', fontFamily: 'var(--font-body)' }}>
               <div style={{
-                width: 36, height: 36, borderRadius: 11, flexShrink: 0,
+                width: 48, height: 48, borderRadius: 15, flexShrink: 0,
                 backgroundColor: tone.bg, display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
-                <Folder size={18} color={tone.fg} aria-hidden="true" />
+                <Folder size={24} color={tone.fg} aria-hidden="true" />
               </div>
-              <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
+              <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
                 <span dir="ltr" style={{
-                  fontSize: 16, fontWeight: 700, lineHeight: 1.2, textAlign: 'start',
+                  fontSize: 20, fontWeight: 700, lineHeight: 1.2, textAlign: 'start',
                   color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 }}>
                   {group.name}
                 </span>
-                <span style={{ fontSize: 13, lineHeight: 1.3, color: 'var(--color-text-secondary)' }}>
+                <span style={{ fontSize: 14, lineHeight: 1.3, color: 'var(--color-text-secondary)' }}>
                   {count} of {drugsCap} drugs{full ? ' · Full' : ''}
                 </span>
               </div>
-              <button
-                onClick={goBack}
-                style={{
-                  flexShrink: 0, minHeight: 44, padding: '0 4px 0 12px', background: 'none', border: 'none',
-                  cursor: 'pointer', fontSize: 16, fontWeight: 600, color: 'var(--color-accent)',
-                  fontFamily: 'var(--font-body)', WebkitTapHighlightColor: 'transparent',
-                }}
-              >
-                Done
-              </button>
             </div>
           )}
         />
       </div>
 
-      <div style={{ paddingTop: 'var(--space-3)', paddingBottom: 'var(--space-4)' }}>
+      <div style={{ paddingTop: 'var(--space-3)', paddingBottom: 'calc(var(--space-4) + 76px)' }}>
         {body}
       </div>
+
+      <div style={{
+        position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 45,
+        padding: '12px var(--page-gutter, 16px) calc(env(safe-area-inset-bottom, 0px) + 12px)',
+        background: 'linear-gradient(to top, var(--color-bg) 70%, transparent)',
+        pointerEvents: 'none',
+      }}>
+        <button
+          onClick={goBack}
+          style={{
+            pointerEvents: 'auto', display: 'block', width: '100%', minHeight: 52, borderRadius: 16,
+            border: 'none', cursor: 'pointer', backgroundColor: 'var(--color-accent-solid)', color: '#fff',
+            fontSize: 16, fontWeight: 600, fontFamily: 'var(--font-body)',
+            boxShadow: '0 4px 14px rgba(0,0,0,0.18)', WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          Done
+        </button>
+      </div>
+
+      <DrugFilterPanel
+        isOpen={filterOpen}
+        onClose={() => setFilterOpen(false)}
+        onApply={handleApplyFilters}
+        activeFilters={activeFilters}
+      />
 
       <ConfirmSheet
         isOpen={showClearHistoryConfirm}

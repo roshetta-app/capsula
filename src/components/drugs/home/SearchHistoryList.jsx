@@ -1,4 +1,8 @@
 /**
+ * 2026-10-23 (UI refresh): the X on each row is now an arrow pointing up and right that opens the
+ * search, the same as tapping the row (so a single search can no longer be removed; Clear all stays).
+ * The mode tag is quieter: no fill behind it, a softer colour, lighter text. 'onRemove' is no longer used.
+ *
  * 2026-10-22 (UI refresh plan, step 8.4a): no card; the list sits plain on the page, right under
  * the header. Heading and Clear all, then rows with thin lines between: clock icon, the search
  * text, a small mode tag in the mode's own tint, and the remove button. Same props and behaviour.
@@ -20,7 +24,7 @@
  * again at once, in that mode. The small X removes one row, 'Clear all' empties the list.
  */
 
-import { Clock, X, Tag, FlaskConical, Layers } from 'lucide-react'
+import { Clock, ArrowUpRight, Tag, FlaskConical, Layers } from 'lucide-react'
 
 const MODE_META = {
   brand:   { label: 'Brand',   icon: Tag,          color: 'var(--color-accent)',  tint: 'var(--color-accent-light)' },
@@ -29,7 +33,7 @@ const MODE_META = {
 }
 
 export default function SearchHistoryList({
-  history: fullHistory, onPick, onRemove, onClear,
+  history: fullHistory, onPick, onClear,
   heading = 'Recent searches', showClear = true, showRemove = true,
   allowClass = true,
 }) {
@@ -95,24 +99,24 @@ export default function SearchHistoryList({
                 </span>
                 <span style={{
                   flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 4,
-                  fontSize: 11, fontWeight: 600, color: meta.color,
-                  backgroundColor: meta.tint, padding: '3px 8px', borderRadius: 'var(--radius-pill)',
+                  fontSize: 11, fontWeight: 500,
+                  color: `color-mix(in srgb, ${meta.color} 70%, var(--color-text-tertiary))`,
                 }}>
-                  <meta.icon size={12} strokeWidth={2} />
+                  <meta.icon size={11} strokeWidth={1.8} />
                   {meta.label}
                 </span>
               </button>
               {showRemove && (
               <button
-                onClick={() => onRemove(entry)}
-                aria-label={`Remove ${entry.text} from recent searches`}
+                onClick={() => onPick(entry)}
+                aria-label={`Search ${entry.text} again`}
                 style={{
                   flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer',
                   padding: 10, color: 'var(--color-text-tertiary)', display: 'flex',
                   WebkitTapHighlightColor: 'transparent',
                 }}
               >
-                <X size={15} />
+                <ArrowUpRight size={18} strokeWidth={1.8} />
               </button>
               )}
             </div>
