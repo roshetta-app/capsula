@@ -46,10 +46,15 @@
  *     "Create a group". A group made from here receives this drug (initialBrandIds).
  *   - Close button is 44 px. Saving, limits, offline and analytics are untouched
  *     (setGroupDrugs still does every write; a second tap on a row that is saving is ignored).
+ *
+ * 2026-10-23 (UI refresh): the close X is gone; a round plus at the top right makes a new group (it
+ * carries a small PRO tag when it would need PRO). The bottom button is a full-width Done that closes
+ * the sheet. The drug being added sits in its own framed card under an 'Adding this drug' caption.
+ * A group made from here now receives the drug in the same save (the hook's list is updated at once).
  */
 
 import { useMemo, useState } from 'react'
-import { Check, Folder, Plus, X } from 'lucide-react'
+import { Check, Folder, Plus } from 'lucide-react'
 import SheetShell from '../../ui/SheetShell'
 import SharedDrugCard from '../../SharedDrugCard'
 import GroupStateMessage from './GroupStateMessage'
@@ -167,8 +172,8 @@ export default function AddToGroupSheet({ isOpen, onClose, drug }) {
   const loadFailed = !!user && !loading && groupsStatus === 'error' && groups.length === 0
   const noGroups = !!user && !loading && !loadFailed && groups.length === 0
   const hasList = !!user && !loading && !loadFailed && groups.length > 0
-  // The fixed New group button: in view whenever groups can be made from here.
-  const showFooter = !!user && !isReadOnly && !loading && !loadFailed
+  // The plus button at the top right (it replaced the close X): in view whenever groups can be made from here.
+  const showPlus = !!user && !isReadOnly && !loading && !loadFailed
 
   let body
   if (!user) {
@@ -204,6 +209,9 @@ export default function AddToGroupSheet({ isOpen, onClose, drug }) {
           flat
           title="No groups yet"
           body="Make a group and this drug is added to it."
+          actionLabel={isReadOnly ? undefined : 'Create a group'}
+          actionIcon={Plus}
+          onAction={handleNewGroup}
         />
       </div>
     )
@@ -293,26 +301,46 @@ export default function AddToGroupSheet({ isOpen, onClose, drug }) {
               </div>
             )}
           </div>
-          <button
-            onClick={onClose}
-            aria-label="Close"
-            style={{
-              width: 44, height: 44, borderRadius: '50%', border: 'none', flexShrink: 0,
-              backgroundColor: 'var(--color-surface-muted)', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              WebkitTapHighlightColor: 'transparent', outline: 'none',
-            }}
-          >
-            <X size={20} color="var(--color-text-secondary)" aria-hidden="true" />
-          </button>
+          {showPlus && (
+            <button
+              onClick={handleNewGroup}
+              aria-label={showProTag ? 'Create new group (PRO)' : 'Create new group'}
+              style={{
+                position: 'relative', width: 44, height: 44, borderRadius: '50%', border: 'none', flexShrink: 0,
+                backgroundColor: 'var(--color-accent-solid)', color: '#fff', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                WebkitTapHighlightColor: 'transparent', outline: 'none',
+              }}
+            >
+              <Plus size={22} strokeWidth={2.75} aria-hidden="true" />
+              {showProTag && (
+                <span aria-hidden="true" style={{
+                  position: 'absolute', top: -4, insetInlineEnd: -6,
+                  fontSize: 9, fontWeight: 800, letterSpacing: '0.05em', lineHeight: 1,
+                  backgroundColor: 'var(--color-text-primary)', color: 'var(--color-surface)',
+                  borderRadius: 6, padding: '3px 5px',
+                }}>
+                  PRO
+                </span>
+              )}
+            </button>
+          )}
         </div>
 
         {/* The drug being added: its normal card, display only (no tap, no chevron). */}
         {drug && (
-          <div style={{
-            flexShrink: 0, padding: '0 var(--space-4)',
-            borderTop: '1px solid var(--color-border)', borderBottom: '1px solid var(--color-border)',
-          }}>
+          <div style={{ flexShrink: 0, padding: 'var(--space-2) var(--space-4) var(--space-3)' }}>
+            <div style={{
+              marginBottom: 6, fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
+              color: 'var(--color-text-secondary)', fontFamily: 'var(--font-body)',
+            }}>
+              Adding this drug
+            </div>
+            <div style={{
+              padding: '2px var(--space-3)', borderRadius: 'var(--radius-lg, 16px)',
+              backgroundColor: 'var(--color-surface-muted)', border: '1px solid var(--color-border)',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+            }}>
             <SharedDrugCard
               drug={drug}
               categories={categories}
@@ -322,6 +350,7 @@ export default function AddToGroupSheet({ isOpen, onClose, drug }) {
               showChevron={false}
               isLast
             />
+            </div>
           </div>
         )}
 
@@ -332,35 +361,23 @@ export default function AddToGroupSheet({ isOpen, onClose, drug }) {
           {body}
         </div>
 
-        {showFooter && (
-          <div style={{
-            flexShrink: 0, padding: 'var(--space-3) var(--space-4)',
-            borderTop: '1px solid var(--color-border)', backgroundColor: 'var(--color-surface)',
-          }}>
-            <button
-              onClick={handleNewGroup}
-              style={{
-                width: '100%', minHeight: 48, borderRadius: 'var(--radius-md)', border: 'none', cursor: 'pointer',
-                backgroundColor: 'var(--color-accent-solid)', color: '#fff',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)',
-                fontSize: 15, fontWeight: 700, fontFamily: 'var(--font-body)',
-                WebkitTapHighlightColor: 'transparent', outline: 'none',
-              }}
-            >
-              <Plus size={18} strokeWidth={2.5} aria-hidden="true" />
-              {noGroups ? 'Create a group' : 'New group'}
-              {showProTag && (
-                <span style={{
-                  fontSize: 11, fontWeight: 800, letterSpacing: '0.06em',
-                  backgroundColor: 'rgba(255,255,255,0.22)', color: '#fff',
-                  borderRadius: 6, padding: '2px 6px',
-                }}>
-                  PRO
-                </span>
-              )}
-            </button>
-          </div>
-        )}
+        <div style={{
+          flexShrink: 0, padding: 'var(--space-3) var(--space-4)',
+          borderTop: '1px solid var(--color-border)', backgroundColor: 'var(--color-surface)',
+        }}>
+          <button
+            onClick={onClose}
+            style={{
+              width: '100%', minHeight: 48, borderRadius: 'var(--radius-md)', border: 'none', cursor: 'pointer',
+              backgroundColor: 'var(--color-accent-solid)', color: '#fff',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 15, fontWeight: 700, fontFamily: 'var(--font-body)',
+              WebkitTapHighlightColor: 'transparent', outline: 'none',
+            }}
+          >
+            Done
+          </button>
+        </div>
       </SheetShell>
 
       <GroupEditorSheet

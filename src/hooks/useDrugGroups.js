@@ -635,7 +635,11 @@ export function useDrugGroups(fav) {
       return { ok: false, reason: 'error' }
     }
     const group = mapGroupRow({ ...data, drug_group_items: [] })
-    setGroups(prev => newestFirst([group, ...prev]))
+    // 2026-10-23: the list the other calls read is updated now, not after the next draw, so a
+    // drug added straight after (Add to group sheet, New group) finds the group. Before this,
+    // setGroupDrugs answered 'missing' and the new group was made without its drug.
+    groupsRef.current = newestFirst([group, ...groupsRef.current.filter(g => g.id !== group.id)])
+    setGroups(prev => newestFirst([group, ...prev.filter(g => g.id !== group.id)]))
     // Analytics (step 9.5): the group id only, never its name or description.
     logUsageEvent('group_create', group.id)
     return { ok: true, group }

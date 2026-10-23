@@ -261,9 +261,10 @@ export default function DrugGroupScreen() {
   // Add and Remove: 44 px tall pill buttons in the list header (step 12.3).
   const pillButtonStyle = {
     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-    minHeight: 44, minWidth: 44, padding: '0 var(--space-4)', borderRadius: 22, flexShrink: 0,
+    minHeight: 44, minWidth: 96, padding: '0 var(--space-4)', borderRadius: 22, flexShrink: 0,
     background: 'var(--color-surface)', border: 'none', cursor: 'pointer',
     fontSize: 14, fontWeight: 600, fontFamily: 'var(--font-body)',
+    transition: 'background-color var(--motion-base) var(--ease-reveal), color var(--motion-base) var(--ease-reveal)',
     WebkitTapHighlightColor: 'transparent', outline: 'none',
   }
 

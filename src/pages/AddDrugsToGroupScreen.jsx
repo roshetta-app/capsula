@@ -389,19 +389,34 @@ export default function AddDrugsToGroupScreen() {
           onClick={goBack}
           aria-label={`Done adding to ${group.name}, ${count} of ${drugsCap} drugs`}
           style={{
-            pointerEvents: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-            width: '100%', minHeight: 54, borderRadius: 16, padding: '0 18px',
+            pointerEvents: 'auto', display: 'flex', alignItems: 'center', gap: 12, textAlign: 'start',
+            width: '100%', minHeight: 60, borderRadius: 18, padding: '8px 12px',
             border: 'none', cursor: 'pointer', backgroundColor: 'var(--color-accent-solid)', color: '#fff',
-            fontSize: 16, fontWeight: 600, fontFamily: 'var(--font-body)',
+            fontFamily: 'var(--font-body)',
             boxShadow: '0 4px 14px rgba(0,0,0,0.18)', WebkitTapHighlightColor: 'transparent',
           }}
         >
-          <Folder size={20} aria-hidden="true" style={{ flexShrink: 0 }} />
-          <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            Done · <bdi>{group.name}</bdi>
+          <span aria-hidden="true" style={{
+            width: 40, height: 40, borderRadius: 12, flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            backgroundColor: 'rgba(255,255,255,0.2)',
+          }}>
+            <Folder size={20} />
           </span>
-          <span style={{ flexShrink: 0, fontSize: 14, fontWeight: 500, opacity: 0.85 }}>
-            {count}/{drugsCap}{full ? ' · Full' : ''}
+          <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
+            <span style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.25 }}>Done</span>
+            <bdi style={{
+              fontSize: 13, fontWeight: 500, lineHeight: 1.3, opacity: 0.88,
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>
+              {group.name}
+            </bdi>
+          </span>
+          <span style={{
+            flexShrink: 0, padding: '5px 12px', borderRadius: 999,
+            backgroundColor: 'rgba(255,255,255,0.22)', fontSize: 13, fontWeight: 700,
+          }}>
+            {full ? `${count} of ${drugsCap} · Full` : `${count} of ${drugsCap}`}
           </span>
         </button>
       </div>
