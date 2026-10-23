@@ -37,7 +37,7 @@
  *     not tappable, no chevron), in place of the plain name line.
  *   - Each row: the group's colour tile at the left, name and "4 of 50" in the middle,
  *     one round control at the right (plus when the drug is not in the group, tick when
- *     it is). "Changes save as you tap" sits under the title; there is no Save step.
+ *     it is). There is no Save step: each tap saves.
  *   - A full group (drug not in it) is dimmed, shows "Full" instead of the plus and says
  *     "Full. Remove a drug from it to add another." under the count. Tapping it still
  *     opens the limit sheet (13.3 redraws that sheet).
@@ -49,7 +49,7 @@
  *
  * 2026-10-23 (UI refresh): the close X is gone; a round plus at the top right makes a new group (it
  * carries a small PRO tag when it would need PRO). The bottom button is a full-width Done that closes
- * the sheet. The drug being added sits in its own framed card under an 'Adding this drug' caption.
+ * the sheet. The drug being added sits in its own framed card with its category name (in the category colour) on top; the 'Changes save as you tap' and 'Adding this drug' lines are gone. The plus became a 'Create group' button.
  * A group made from here now receives the drug in the same save (the hook's list is updated at once).
  */
 
@@ -66,7 +66,7 @@ import { useToast } from '../../../context/ToastContext'
 import { useAuth } from '../../../hooks/useAuth'
 import { useCategories } from '../../../hooks/useCategories'
 import { useIsPro } from '../../../hooks/useIsPro'
-import { resolveToken } from '../../../utils/specialtyTokens'
+import { resolveToken, FALLBACK_TOKEN } from '../../../utils/specialtyTokens'
 import { useIsDark } from '../../../utils/specialtyIcon'
 import {
   DRUG_GROUPS_CAP_FREE, DRUG_GROUP_DRUGS_CAP_FREE, DRUG_GROUP_DRUGS_CAP_PRO,
@@ -132,6 +132,8 @@ export default function AddToGroupSheet({ isOpen, onClose, drug }) {
   const [editorOpen, setEditorOpen] = useState(false)
 
   const drugId = drug?.id
+  const drugCategory = categories.find(c => c.slug === drug?.category) ?? null
+  const categoryTone = resolveToken(drugCategory?.color_token || FALLBACK_TOKEN, isDark)
   const drugsCap = isPro ? DRUG_GROUP_DRUGS_CAP_PRO : DRUG_GROUP_DRUGS_CAP_FREE
 
   const sorted = useMemo(() => {
@@ -171,7 +173,6 @@ export default function AddToGroupSheet({ isOpen, onClose, drug }) {
   const loading = !!user && groupsStatus === 'loading'
   const loadFailed = !!user && !loading && groupsStatus === 'error' && groups.length === 0
   const noGroups = !!user && !loading && !loadFailed && groups.length === 0
-  const hasList = !!user && !loading && !loadFailed && groups.length > 0
   // The plus button at the top right (it replaced the close X): in view whenever groups can be made from here.
   const showPlus = !!user && !isReadOnly && !loading && !loadFailed
 
@@ -295,25 +296,23 @@ export default function AddToGroupSheet({ isOpen, onClose, drug }) {
             <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-text-primary)', fontFamily: 'var(--font-body)' }}>
               Add to group
             </div>
-            {hasList && !isReadOnly && (
-              <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', fontFamily: 'var(--font-body)' }}>
-                Changes save as you tap
-              </div>
-            )}
+
           </div>
           {showPlus && (
             <button
               onClick={handleNewGroup}
               aria-label={showProTag ? 'Create new group (PRO)' : 'Create new group'}
               style={{
-                position: 'relative', width: 44, height: 44, borderRadius: 14, flexShrink: 0, boxSizing: 'border-box',
+                position: 'relative', height: 44, padding: '0 14px', borderRadius: 14, flexShrink: 0, boxSizing: 'border-box',
                 border: '1.5px solid var(--color-accent)', backgroundColor: 'var(--color-accent-light)',
                 color: 'var(--color-accent)', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                fontSize: 14, fontWeight: 700, fontFamily: 'var(--font-body)', whiteSpace: 'nowrap',
                 WebkitTapHighlightColor: 'transparent', outline: 'none',
               }}
             >
-              <FolderPlus size={22} strokeWidth={2.25} aria-hidden="true" />
+              <FolderPlus size={20} strokeWidth={2.25} aria-hidden="true" />
+              Create group
               {showProTag && (
                 <span aria-hidden="true" style={{
                   position: 'absolute', top: -4, insetInlineEnd: -6,
@@ -332,25 +331,30 @@ export default function AddToGroupSheet({ isOpen, onClose, drug }) {
         {drug && (
           <div style={{ flexShrink: 0, padding: 'var(--space-2) var(--space-4) var(--space-3)' }}>
             <div style={{
-              marginBottom: 6, fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
-              color: 'var(--color-text-secondary)', fontFamily: 'var(--font-body)',
-            }}>
-              Adding this drug
-            </div>
-            <div style={{
-              padding: '2px var(--space-3)', borderRadius: 'var(--radius-lg, 16px)',
+              padding: '10px var(--space-3) 2px', borderRadius: 'var(--radius-lg, 16px)',
               backgroundColor: 'var(--color-surface-muted)', border: '1px solid var(--color-border)',
               boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
             }}>
-            <SharedDrugCard
-              drug={drug}
-              categories={categories}
-              isDark={isDark}
-              onTap={NO_TAP}
-              disableTap
-              showChevron={false}
-              isLast
-            />
+              {drugCategory?.name_en && (
+                <span style={{
+                  display: 'inline-block', maxWidth: '100%', boxSizing: 'border-box',
+                  padding: '3px 10px', borderRadius: 999,
+                  backgroundColor: categoryTone.bg, color: categoryTone.fg,
+                  fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-body)',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>
+                  {drugCategory.name_en}
+                </span>
+              )}
+              <SharedDrugCard
+                drug={drug}
+                categories={categories}
+                isDark={isDark}
+                onTap={NO_TAP}
+                disableTap
+                showChevron={false}
+                isLast
+              />
             </div>
           </div>
         )}

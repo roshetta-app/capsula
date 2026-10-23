@@ -110,6 +110,8 @@ export default function AddDrugsToGroupScreen() {
   const inGroup = new Set(edits.ids)
   const count = edits.ids.length
   const full = count >= drugsCap
+  // The bottom button stays grey until the group holds its first drug.
+  const noDrugsYet = count === 0
 
   // ── Search (its own, Brand and Generic only) ───────────────────────────────
   const [mode, setMode] = useState(() => (keptSearch?.groupId === groupId ? keptSearch.mode : 'brand'))
@@ -395,24 +397,28 @@ export default function AddDrugsToGroupScreen() {
         }}>
           <button
             onClick={goBack}
-            aria-label={`Done adding to ${group.name}, ${count} of ${drugsCap} drugs`}
+            disabled={noDrugsYet}
+            aria-label={noDrugsYet ? `Add to ${group.name} group (add a drug first)` : `Add to ${group.name} group, ${count} of ${drugsCap} drugs`}
             style={{
               pointerEvents: 'auto', display: 'flex', alignItems: 'center', gap: 12, textAlign: 'start',
               width: '100%', minHeight: 52, borderRadius: 16, padding: '8px 16px 8px 10px',
-              border: 'none', cursor: 'pointer', backgroundColor: 'var(--color-accent-solid)', color: '#fff',
+              border: 'none', cursor: noDrugsYet ? 'default' : 'pointer',
+              backgroundColor: noDrugsYet ? 'var(--color-surface-muted)' : 'var(--color-accent-solid)',
+              color: noDrugsYet ? 'var(--color-text-tertiary)' : '#fff',
               fontFamily: 'var(--font-body)', fontSize: 16, fontWeight: 700,
-              boxShadow: '0 4px 14px rgba(0,0,0,0.18)', WebkitTapHighlightColor: 'transparent',
+              boxShadow: noDrugsYet ? 'none' : '0 4px 14px rgba(0,0,0,0.18)', WebkitTapHighlightColor: 'transparent',
+              transition: 'background-color var(--motion-base) var(--ease-reveal), color var(--motion-base) var(--ease-reveal)',
             }}
           >
             <span aria-hidden="true" style={{
               width: 36, height: 36, borderRadius: 11, flexShrink: 0,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              backgroundColor: 'rgba(255,255,255,0.2)',
+              backgroundColor: noDrugsYet ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.2)',
             }}>
               <Folder size={19} />
             </span>
             <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              Done adding to <bdi>{group.name}</bdi>
+              Add to <bdi>{group.name}</bdi> group
             </span>
           </button>
         </div>

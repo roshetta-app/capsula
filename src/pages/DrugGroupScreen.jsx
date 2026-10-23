@@ -132,12 +132,15 @@ export default function DrugGroupScreen() {
   const [shareCode, setShareCode] = useState(null)
   // Remove mode (step 12.4) and its Undo message (5 seconds, the last drug removed).
   const [removeMode, setRemoveMode] = useState(false)
-  const [undo, setUndo] = useState({ visible: false, id: null })
+  // 2026-10-23: Undo works for every drug removed, newest first, not only the last one. 'stack'
+  // holds the removed ids (newest at the end). The message stays up while remove mode is on and
+  // for 5 seconds after the last tap once it is off; when it goes, the stack is cleared.
+  const [undo, setUndo] = useState({ visible: false, stack: [] })
   useEffect(() => {
-    if (!undo.visible) return undefined
-    const timer = setTimeout(() => setUndo(u => ({ ...u, visible: false })), 5000)
+    if (!undo.visible || removeMode) return undefined
+    const timer = setTimeout(() => setUndo({ visible: false, stack: [] }), 5000)
     return () => clearTimeout(timer)
-  }, [undo.visible, undo.id])
+  }, [undo.visible, undo.stack.length, removeMode])
 
   // Keep the last copy of the group while the editor or delete question is
   // open, so a delete in progress does not flash "not found".
@@ -207,15 +210,22 @@ export default function DrugGroupScreen() {
   // A minus in remove mode: the drug goes at once, with an Undo for 5 seconds. If the save is
   // refused (the hook says why), the message is taken back.
   function handleMinus(id) {
-    setUndo({ visible: true, id })
+    setUndo(u => ({ visible: true, stack: [...u.stack.filter(x => x !== id), id] }))
     edits.remove(id).then(res => {
-      if (!res?.ok && res?.reason !== 'missing') setUndo(u => ({ ...u, visible: false }))
+      if (!res?.ok && res?.reason !== 'missing') {
+        setUndo(u => {
+          const stack = u.stack.filter(x => x !== id)
+          return { visible: stack.length > 0, stack }
+        })
+      }
     })
   }
   function handleUndo() {
-    const id = undo.id
-    setUndo(u => ({ ...u, visible: false }))
-    if (id) edits.add(id)
+    const id = undo.stack[undo.stack.length - 1]
+    if (!id) return
+    const stack = undo.stack.slice(0, -1)
+    setUndo({ visible: stack.length > 0, stack })
+    edits.add(id)
   }
 
   const backButton = (
@@ -261,9 +271,9 @@ export default function DrugGroupScreen() {
   // Add and Remove: 44 px tall pill buttons in the list header (step 12.3).
   const pillButtonStyle = {
     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-    height: 44, width: 112, padding: 0, boxSizing: 'border-box', borderRadius: 22, flexShrink: 0,
+    height: 38, width: 96, padding: 0, boxSizing: 'border-box', borderRadius: 19, flexShrink: 0,
     background: 'var(--color-surface)', border: 'none', cursor: 'pointer',
-    fontSize: 14, fontWeight: 600, fontFamily: 'var(--font-body)',
+    fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-body)',
     transition: 'background-color var(--motion-base) var(--ease-reveal), color var(--motion-base) var(--ease-reveal)',
     WebkitTapHighlightColor: 'transparent', outline: 'none',
   }
@@ -547,7 +557,12 @@ export default function DrugGroupScreen() {
           onShareChange={setShareCode}
         />
       )}
-      <Snackbar visible={undo.visible} message="Drug removed" actionLabel="Undo" onAction={handleUndo} />
+      <Snackbar
+        visible={undo.visible}
+        message={undo.stack.length > 1 ? `${undo.stack.length} drugs removed` : 'Drug removed'}
+        actionLabel="Undo"
+        onAction={handleUndo}
+      />
       <ConfirmSheet
         isOpen={deleteOpen}
         onClose={() => setDeleteOpen(false)}
