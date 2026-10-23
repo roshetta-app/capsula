@@ -25,7 +25,7 @@ import { SpecialtyIcon } from '../../../utils/specialtyIcon'
 // same press feedback (fade to 0.8 and shrink to 0.985). The theme variables
 // carry it into dark mode.
 
-// 2026-10-23: new look (white bordered tile, icon square at the left, name beside it), see inside.
+// 2026-10-23: new look (white bordered tile, icon square on top, name under it), see inside.
 // 2026-10-22 (UI refresh, card refinement, approved by Lmar): same soft card as the group cards. No
 // border, a soft wash of the category's own colour, a round icon at the top and the name (15) at the
 // bottom. The old 'color' prop (the icon square fill) is no longer used; callers may still pass it.
@@ -44,14 +44,14 @@ export default function CategoryRow({ label, iconType, iconValue, textColor, onT
       onPointerLeave={() => setPressed(false)}
       onPointerCancel={() => setPressed(false)}
       style={{
-        display: 'flex', alignItems: 'center', gap: 10,
-        minHeight: 64, boxSizing: 'border-box',
-        // 2026-10-23: a quiet white tile with a thin border, icon and name side by side. Only the
+        display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 10,
+        minHeight: 92, boxSizing: 'border-box',
+        // 2026-10-23: a quiet white tile with a thin border, icon square at the top and the name under it (the name always fits). Only the
         // small icon square carries the category colour, so it no longer looks like a group card.
         backgroundColor: pressed ? 'var(--color-surface-muted)' : 'var(--color-surface)',
         border: '1px solid var(--color-border)',
         borderRadius: 16,
-        padding: '10px 12px',
+        padding: 14,
         cursor: 'pointer',
         outline: 'none',
         WebkitTapHighlightColor: 'transparent',
@@ -66,7 +66,7 @@ export default function CategoryRow({ label, iconType, iconValue, textColor, onT
       }}>
         <SpecialtyIcon iconType={iconType} iconValue={iconValue} size={18} color={ink} />
       </div>
-      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)', lineHeight: 1.25, minWidth: 0, flex: 1 }}>
+      <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text-primary)', lineHeight: 1.25, minWidth: 0 }}>
         {label}
       </div>
     </div>

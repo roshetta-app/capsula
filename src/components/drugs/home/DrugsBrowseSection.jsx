@@ -92,7 +92,7 @@ function StripSkeleton() {
   return (
     <div style={STRIP_GRID} aria-hidden="true">
       {Array.from({ length: STRIP_COUNT }, (_, i) => (
-        <div key={i} style={shimmer({ height: 64, borderRadius: 16 })} />
+        <div key={i} style={shimmer({ height: 92, borderRadius: 16 })} />
       ))}
     </div>
   )
