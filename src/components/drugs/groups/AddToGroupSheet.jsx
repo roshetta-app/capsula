@@ -54,7 +54,7 @@
  */
 
 import { useMemo, useState } from 'react'
-import { Check, Folder, Plus } from 'lucide-react'
+import { Check, Folder, FolderPlus, Plus } from 'lucide-react'
 import SheetShell from '../../ui/SheetShell'
 import SharedDrugCard from '../../SharedDrugCard'
 import GroupStateMessage from './GroupStateMessage'
@@ -306,13 +306,14 @@ export default function AddToGroupSheet({ isOpen, onClose, drug }) {
               onClick={handleNewGroup}
               aria-label={showProTag ? 'Create new group (PRO)' : 'Create new group'}
               style={{
-                position: 'relative', width: 44, height: 44, borderRadius: '50%', border: 'none', flexShrink: 0,
-                backgroundColor: 'var(--color-accent-solid)', color: '#fff', cursor: 'pointer',
+                position: 'relative', width: 44, height: 44, borderRadius: 14, flexShrink: 0, boxSizing: 'border-box',
+                border: '1.5px solid var(--color-accent)', backgroundColor: 'var(--color-accent-light)',
+                color: 'var(--color-accent)', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 WebkitTapHighlightColor: 'transparent', outline: 'none',
               }}
             >
-              <Plus size={22} strokeWidth={2.75} aria-hidden="true" />
+              <FolderPlus size={22} strokeWidth={2.25} aria-hidden="true" />
               {showProTag && (
                 <span aria-hidden="true" style={{
                   position: 'absolute', top: -4, insetInlineEnd: -6,

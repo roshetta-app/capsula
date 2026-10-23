@@ -7,6 +7,9 @@
  * Class in the mode pop-up or the info sheet, no Class strip or results, no Class entry in
  * "found in other modes", no Class searches in recent searches (the 'allowClass' setting).
  *
+ * 2026-10-23 (third pass): the Done button is one line ('Done adding to <name>', folder badge, no count)
+ * and is hidden while the keyboard is open (above the keyboard it looked wrong, and the first tap
+ * was lost because closing the keyboard moved the button).
  * 2026-10-23 (second pass): the group name and icon above the bar are gone; they live in the Done
  * button now (folder icon, 'Done · name', count). The button floats above the bottom bar, not under it.
  * The keyboard no longer opens by itself, on arriving or on coming back from a drug; it opens only
@@ -55,6 +58,7 @@ import { useFavouritesContext } from '../context/FavouritesContext'
 import { useToast } from '../context/ToastContext'
 import { useAuth } from '../hooks/useAuth'
 import { useIsPro } from '../hooks/useIsPro'
+import { useKeyboardOpen } from '../hooks/useKeyboardOpen'
 import { useCategories } from '../hooks/useCategories'
 import { useDrugSearch } from '../hooks/useDrugSearch'
 import { useSearchHistory } from '../hooks/useSearchHistory'
@@ -117,6 +121,7 @@ export default function AddDrugsToGroupScreen() {
   const [showClearHistoryConfirm, setShowClearHistoryConfirm] = useState(false)
   const hasQuery = query.trim().length > 0
   const searchInputRef = useRef(null)
+  const keyboardOpen = useKeyboardOpen()
 
   // The Form / Route filter (this screen's own).
   const [filterOpen, setFilterOpen] = useState(false)
@@ -378,48 +383,40 @@ export default function AddDrugsToGroupScreen() {
         {body}
       </div>
 
-      <div style={{
-        position: 'fixed', left: 0, right: 0, zIndex: 95,
-        bottom: 'calc(61px + env(safe-area-inset-bottom, 0px))',
-        padding: '8px var(--page-gutter, 16px) 10px',
-        background: 'linear-gradient(to top, var(--color-bg) 65%, transparent)',
-        pointerEvents: 'none',
-      }}>
-        <button
-          onClick={goBack}
-          aria-label={`Done adding to ${group.name}, ${count} of ${drugsCap} drugs`}
-          style={{
-            pointerEvents: 'auto', display: 'flex', alignItems: 'center', gap: 12, textAlign: 'start',
-            width: '100%', minHeight: 60, borderRadius: 18, padding: '8px 12px',
-            border: 'none', cursor: 'pointer', backgroundColor: 'var(--color-accent-solid)', color: '#fff',
-            fontFamily: 'var(--font-body)',
-            boxShadow: '0 4px 14px rgba(0,0,0,0.18)', WebkitTapHighlightColor: 'transparent',
-          }}
-        >
-          <span aria-hidden="true" style={{
-            width: 40, height: 40, borderRadius: 12, flexShrink: 0,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            backgroundColor: 'rgba(255,255,255,0.2)',
-          }}>
-            <Folder size={20} />
-          </span>
-          <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
-            <span style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.25 }}>Done</span>
-            <bdi style={{
-              fontSize: 13, fontWeight: 500, lineHeight: 1.3, opacity: 0.88,
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      {/* Hidden while the keyboard is open: it used to sit above the keyboard, and the first tap
+          only closed the keyboard, moved the button, and missed. Back arrow and drag still work. */}
+      {!keyboardOpen && (
+        <div style={{
+          position: 'fixed', left: 0, right: 0, zIndex: 95,
+          bottom: 'calc(61px + env(safe-area-inset-bottom, 0px))',
+          padding: '8px var(--page-gutter, 16px) 10px',
+          background: 'linear-gradient(to top, var(--color-bg) 65%, transparent)',
+          pointerEvents: 'none',
+        }}>
+          <button
+            onClick={goBack}
+            aria-label={`Done adding to ${group.name}, ${count} of ${drugsCap} drugs`}
+            style={{
+              pointerEvents: 'auto', display: 'flex', alignItems: 'center', gap: 12, textAlign: 'start',
+              width: '100%', minHeight: 52, borderRadius: 16, padding: '8px 16px 8px 10px',
+              border: 'none', cursor: 'pointer', backgroundColor: 'var(--color-accent-solid)', color: '#fff',
+              fontFamily: 'var(--font-body)', fontSize: 16, fontWeight: 700,
+              boxShadow: '0 4px 14px rgba(0,0,0,0.18)', WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            <span aria-hidden="true" style={{
+              width: 36, height: 36, borderRadius: 11, flexShrink: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              backgroundColor: 'rgba(255,255,255,0.2)',
             }}>
-              {group.name}
-            </bdi>
-          </span>
-          <span style={{
-            flexShrink: 0, padding: '5px 12px', borderRadius: 999,
-            backgroundColor: 'rgba(255,255,255,0.22)', fontSize: 13, fontWeight: 700,
-          }}>
-            {full ? `${count} of ${drugsCap} · Full` : `${count} of ${drugsCap}`}
-          </span>
-        </button>
-      </div>
+              <Folder size={19} />
+            </span>
+            <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              Done adding to <bdi>{group.name}</bdi>
+            </span>
+          </button>
+        </div>
+      )}
 
       <DrugFilterPanel
         isOpen={filterOpen}
