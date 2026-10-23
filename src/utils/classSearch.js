@@ -33,6 +33,10 @@
  *   - Order inside a group: an exact name first, then more brands, then A to Z.
  *   - No strength or form parsing (those belong to drugs, not groups).
  *
+ * 2026-10-23: 'Did you mean' ties (same number of changes) are now broken first by how close the
+ * matched word's length is to the typed text, so 'nsail' offers 'NSAID' before 'Nail'; then the old
+ * order (keywords last, classes first, more brands, A to Z).
+ *
  * 'Did you mean' uses the same letter-difference rule as the other modes
  * (editDistance and maxAllowedEdits from searchUtils.js): same first letter,
  * tolerance grows with the length of the typed text.
@@ -444,12 +448,15 @@ export function getClassSearchSuggestions(index, query, keywordIndex = null) {
   const consider = (entry, isClass) => {
     const candidates = [entry.norm, ...entry.tokens.filter(t => t.length >= 3)]
     let best = null
+    let bestGap = 0
     for (const cand of candidates) {
       if (!cand || !sameFirstLetter(cand[0], q[0])) continue
       const d = editDistance(q, cand)
-      if (d <= allowed && (best === null || d < best)) best = d
+      // On the same number of changes, the word whose length is closest to the typed text wins.
+      const gap = Math.abs(cand.length - q.length)
+      if (d <= allowed && (best === null || d < best || (d === best && gap < bestGap))) { best = d; bestGap = gap }
     }
-    if (best !== null) scored.push({ entry, d: best, isClass })
+    if (best !== null) scored.push({ entry, d: best, gap: bestGap, isClass })
   }
   index.classes.forEach(c => consider(c, true))
   index.subclasses.forEach(s => consider(s, false))
@@ -462,13 +469,15 @@ export function getClassSearchSuggestions(index, query, keywordIndex = null) {
       for (const kw of keywordIndex) {
         const candidates = [kw.norm, ...kw.tokens.filter(t => t.length >= 3)]
         let best = null
+        let bestGap = 0
         for (const cand of candidates) {
           if (!cand || !sameFirstLetter(cand[0], qk[0])) continue
           const d = editDistance(qk, cand)
-          if (d <= allowedK && (best === null || d < best)) best = d
+          const gap = Math.abs(cand.length - qk.length)
+          if (d <= allowedK && (best === null || d < best || (d === best && gap < bestGap))) { best = d; bestGap = gap }
         }
         if (best !== null) {
-          scored.push({ entry: { norm: kw.norm, name: kw.keyword, brandCount: 0 }, d: best, isClass: false, isKeyword: true })
+          scored.push({ entry: { norm: kw.norm, name: kw.keyword, brandCount: 0 }, d: best, gap: bestGap, isClass: false, isKeyword: true })
         }
       }
     }
@@ -476,6 +485,7 @@ export function getClassSearchSuggestions(index, query, keywordIndex = null) {
 
   scored.sort((a, b) => {
     if (a.d !== b.d) return a.d - b.d
+    if (a.gap !== b.gap) return a.gap - b.gap
     if (Boolean(a.isKeyword) !== Boolean(b.isKeyword)) return a.isKeyword ? 1 : -1
     if (a.isClass !== b.isClass) return a.isClass ? -1 : 1
     if (a.entry.brandCount !== b.entry.brandCount) return b.entry.brandCount - a.entry.brandCount
