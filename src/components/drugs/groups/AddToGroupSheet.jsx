@@ -47,6 +47,8 @@
  *   - Close button is 44 px. Saving, limits, offline and analytics are untouched
  *     (setGroupDrugs still does every write; a second tap on a row that is saving is ignored).
  *
+ * 2026-10-23: with no groups yet the sheet is plain text and the one bottom button reads 'Create group'
+ * (the top button and the folder card with its own button are gone).
  * 2026-10-23 (UI refresh): the close X is gone; a round plus at the top right makes a new group (it
  * carries a small PRO tag when it would need PRO). The bottom button is a full-width Done that closes
  * the sheet. The drug being added sits in its own framed card tinted with its category colour; the 'Changes save as you tap' and 'Adding this drug' lines are gone. The plus became a 'Create group' button.
@@ -174,7 +176,9 @@ export default function AddToGroupSheet({ isOpen, onClose, drug }) {
   const loadFailed = !!user && !loading && groupsStatus === 'error' && groups.length === 0
   const noGroups = !!user && !loading && !loadFailed && groups.length === 0
   // The plus button at the top right (it replaced the close X): in view whenever groups can be made from here.
-  const showPlus = !!user && !isReadOnly && !loading && !loadFailed
+  const showPlus = !!user && !isReadOnly && !loading && !loadFailed && !noGroups
+  // With no groups the bottom button is the one Create group button (it replaces Done).
+  const bottomCreates = noGroups && !isReadOnly
 
   let body
   if (!user) {
@@ -206,14 +210,14 @@ export default function AddToGroupSheet({ isOpen, onClose, drug }) {
             <GroupStateMessage variant="banner" tone="warning" title={READ_ONLY_MESSAGE} />
           </div>
         )}
-        <GroupStateMessage
-          flat
-          title="No groups yet"
-          body="Make a group and this drug is added to it."
-          actionLabel={isReadOnly ? undefined : 'Create a group'}
-          actionIcon={Plus}
-          onAction={handleNewGroup}
-        />
+        <div style={{ padding: 'var(--space-6, 24px) var(--space-2) var(--space-4)', textAlign: 'center' }}>
+          <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--color-text-primary)', fontFamily: 'var(--font-body)' }}>
+            No groups yet
+          </div>
+          <div style={{ marginTop: 6, fontSize: 14, lineHeight: 1.45, color: 'var(--color-text-secondary)', fontFamily: 'var(--font-body)' }}>
+            Make a group and this drug is added to it.
+          </div>
+        </div>
       </div>
     )
   } else {
@@ -361,16 +365,17 @@ export default function AddToGroupSheet({ isOpen, onClose, drug }) {
           borderTop: '1px solid var(--color-border)', backgroundColor: 'var(--color-surface)',
         }}>
           <button
-            onClick={onClose}
+            onClick={bottomCreates ? handleNewGroup : onClose}
             style={{
               width: '100%', minHeight: 48, borderRadius: 'var(--radius-md)', border: 'none', cursor: 'pointer',
               backgroundColor: 'var(--color-accent-solid)', color: '#fff',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
               fontSize: 15, fontWeight: 700, fontFamily: 'var(--font-body)',
               WebkitTapHighlightColor: 'transparent', outline: 'none',
             }}
           >
-            Done
+            {bottomCreates && <FolderPlus size={20} strokeWidth={2.25} aria-hidden="true" />}
+            {bottomCreates ? 'Create group' : 'Done'}
           </button>
         </div>
       </SheetShell>
