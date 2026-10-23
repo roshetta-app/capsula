@@ -474,8 +474,8 @@ export default function DrugGroupScreen() {
               fontSize: 18, fontWeight: 700, color: 'var(--color-text-primary)',
               fontFamily: 'var(--font-body)',
             }}>
-              Drugs
               <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-text-secondary)' }}>{count}</span>
+              Drugs
             </h2>
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
               <button
