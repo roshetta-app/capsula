@@ -1,7 +1,8 @@
 /**
  * src/components/drugs/home/DrugsBrowseSection.jsx
- * 2026-10-23: the 'Browse by class' row is now a full-width card in the same style as the category
- * tiles (soft wash of the class colour, rounded corners, icon in a round chip, chevron at the right).
+ * 2026-10-23: the 'Browse by class' row is now a slim violet pill (icon, title, chevron) with no second
+ * line, and the category tiles are white bordered tiles (see CategoryRow.jsx), so the group card, the
+ * category tile and this button each look different.
  * 2026-10-22 (UI refresh plan, step 8.3): the strip is now a 2 by 2 grid of four category tiles
  * (the same CategoryRow tile as the categories screen, so a name is never split inside a word)
  * and the link reads 'View all categories'. The dashed '+N more' tile is gone. Loading shows
@@ -42,7 +43,6 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Layers, ChevronRight } from 'lucide-react'
-import { buildClassIndex } from '../../../utils/classSearch'
 import DrugsSectionCard, { SECTION_TITLE_STYLE } from './DrugsSectionCard'
 import { shimmer } from './shimmer'
 import CategoryRow from './CategoryRow'
@@ -56,7 +56,7 @@ import { prepareCategoryOpen } from '../../../pages/DrugsScreen'
 // How many category tiles show on the home (2 by 2); the rest are behind View all categories.
 const STRIP_COUNT = 4
 
-function ClassRow({ subtitle, onTap }) {
+function ClassRow({ onTap }) {
   const [pressed, setPressed] = useState(false)
   return (
     <button
@@ -67,30 +67,23 @@ function ClassRow({ subtitle, onTap }) {
       onPointerLeave={() => setPressed(false)}
       onPointerCancel={() => setPressed(false)}
       style={{
-        display: 'flex', alignItems: 'center', gap: 12,
-        width: '100%', minHeight: 72, boxSizing: 'border-box', textAlign: 'left',
-        // Same card as a category tile: one soft wash of the class colour, 20px corners, no border.
-        backgroundColor: 'color-mix(in srgb, var(--color-class) 8%, var(--color-surface))',
-        border: 'none', borderRadius: 20, padding: 14, cursor: 'pointer', outline: 'none',
-        fontFamily: 'var(--font-body)',
+        display: 'flex', alignItems: 'center', gap: 10,
+        width: '100%', minHeight: 52, boxSizing: 'border-box', textAlign: 'left',
+        // A slim pill in the class violet: the one pill-shaped control on the page, so it reads as a
+        // button and not as another card.
+        backgroundColor: 'color-mix(in srgb, var(--color-class) 10%, var(--color-surface))',
+        color: 'var(--color-class)',
+        border: 'none', borderRadius: 999, padding: '0 16px', cursor: 'pointer', outline: 'none',
+        fontFamily: 'var(--font-body)', fontSize: 15, fontWeight: 600,
         WebkitTapHighlightColor: 'transparent',
         opacity: pressed ? 0.8 : 1,
         transform: pressed ? 'scale(0.985)' : 'scale(1)',
         transition: 'opacity var(--motion-fast) var(--ease-settle), transform var(--motion-fast) var(--ease-settle)',
       }}
     >
-      <span style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
-        backgroundColor: 'var(--color-tint-chip)', color: 'var(--color-class)',
-      }}>
-        <Layers size={18} strokeWidth={1.9} aria-hidden="true" />
-      </span>
-      <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, flex: 1 }}>
-        <span style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.25, color: 'var(--color-text-primary)' }}>Browse by class</span>
-        <span style={{ fontSize: 13, lineHeight: 1.3, color: 'var(--color-text-secondary)' }}>{subtitle}</span>
-      </span>
-      <ChevronRight size={18} strokeWidth={2} color="var(--color-text-tertiary)" aria-hidden="true" style={{ flexShrink: 0 }} />
+      <Layers size={20} strokeWidth={1.9} aria-hidden="true" style={{ flexShrink: 0 }} />
+      <span style={{ flex: 1, minWidth: 0 }}>Browse by class</span>
+      <ChevronRight size={18} strokeWidth={2} aria-hidden="true" style={{ flexShrink: 0 }} />
     </button>
   )
 }
@@ -99,7 +92,7 @@ function StripSkeleton() {
   return (
     <div style={STRIP_GRID} aria-hidden="true">
       {Array.from({ length: STRIP_COUNT }, (_, i) => (
-        <div key={i} style={shimmer({ height: 92, borderRadius: 20 })} />
+        <div key={i} style={shimmer({ height: 64, borderRadius: 16 })} />
       ))}
     </div>
   )
@@ -123,15 +116,6 @@ export default function DrugsBrowseSection() {
     for (const d of drugs) counts.set(d.category, (counts.get(d.category) || 0) + 1)
     return categories.filter(c => (counts.get(c.slug) || 0) > 0)
   }, [categories, drugs])
-
-  // Live count for the Class row: classes plus drug families, as the Classes screen lists them.
-  const classTotal = useMemo(() => {
-    const idx = buildClassIndex(drugs)
-    return idx.classes.length + idx.subclasses.length
-  }, [drugs])
-  const classSubtitle = classTotal > 0
-    ? `${classTotal} classes and families, searchable`
-    : 'Search by class or drug family'
 
   const shown = withDrugs.slice(0, STRIP_COUNT)
 
@@ -217,7 +201,7 @@ export default function DrugsBrowseSection() {
         aria-label="Browse by class"
         style={{ padding: '12px 0 0' }}
       >
-        <ClassRow subtitle={classSubtitle} onTap={openClasses} />
+        <ClassRow onTap={openClasses} />
       </section>
     </>
   )

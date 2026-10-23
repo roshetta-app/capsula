@@ -25,6 +25,7 @@ import { SpecialtyIcon } from '../../../utils/specialtyIcon'
 // same press feedback (fade to 0.8 and shrink to 0.985). The theme variables
 // carry it into dark mode.
 
+// 2026-10-23: new look (white bordered tile, icon square at the left, name beside it), see inside.
 // 2026-10-22 (UI refresh, card refinement, approved by Lmar): same soft card as the group cards. No
 // border, a soft wash of the category's own colour, a round icon at the top and the name (15) at the
 // bottom. The old 'color' prop (the icon square fill) is no longer used; callers may still pass it.
@@ -43,32 +44,29 @@ export default function CategoryRow({ label, iconType, iconValue, textColor, onT
       onPointerLeave={() => setPressed(false)}
       onPointerCancel={() => setPressed(false)}
       style={{
-        display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 10,
-        minHeight: 92, boxSizing: 'border-box',
-        backgroundColor: `color-mix(in srgb, ${ink} 8%, var(--color-surface))`,
-        border: 'none',
-        borderRadius: 20,
-        padding: 14,
+        display: 'flex', alignItems: 'center', gap: 10,
+        minHeight: 64, boxSizing: 'border-box',
+        // 2026-10-23: a quiet white tile with a thin border, icon and name side by side. Only the
+        // small icon square carries the category colour, so it no longer looks like a group card.
+        backgroundColor: pressed ? 'var(--color-surface-muted)' : 'var(--color-surface)',
+        border: '1px solid var(--color-border)',
+        borderRadius: 16,
+        padding: '10px 12px',
         cursor: 'pointer',
         outline: 'none',
         WebkitTapHighlightColor: 'transparent',
-        opacity: pressed ? 0.8 : 1,
         transform: pressed ? 'scale(0.985)' : 'scale(1)',
-        transition: 'opacity var(--motion-fast) var(--ease-settle), transform var(--motion-fast) var(--ease-settle)',
+        transition: 'background-color var(--motion-fast) var(--ease-settle), transform var(--motion-fast) var(--ease-settle)',
       }}
     >
-      {/* Icon in tinted circle */}
       <div style={{
-        width: 36, height: 36, borderRadius: '50%',
-        backgroundColor: 'var(--color-tint-chip)',
+        width: 36, height: 36, borderRadius: 11, flexShrink: 0,
+        backgroundColor: `color-mix(in srgb, ${ink} 12%, var(--color-surface))`,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        flexShrink: 0,
       }}>
         <SpecialtyIcon iconType={iconType} iconValue={iconValue} size={18} color={ink} />
       </div>
-
-      {/* Name */}
-      <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text-primary)', lineHeight: 1.25, minWidth: 0, overflowWrap: 'break-word' }}>
+      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)', lineHeight: 1.25, minWidth: 0, flex: 1 }}>
         {label}
       </div>
     </div>
