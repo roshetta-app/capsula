@@ -12,7 +12,7 @@
  *   actionLabel  string  (optional)
  *   onAction     () => void  (optional)
  *
- * 2026-10-23: made bigger everywhere it is used (16 px text, 56 px tall, a 44 px Undo tap area).
+ * 2026-10-23: made bigger everywhere it is used (15 px text, 48 px tall, a 40 px Undo tap area).
  */
 
 import { Undo2 } from 'lucide-react'
@@ -30,10 +30,10 @@ export default function Snackbar({ visible, message, actionLabel, onAction }) {
         transition:      'opacity 0.2s ease, transform 0.2s ease',
         backgroundColor: 'var(--color-text-primary)',
         color:           'var(--color-bg)',
-        fontSize:        16,
+        fontSize:        15,
         fontWeight:      500,
-        minHeight:       56,
-        padding:         '6px 8px 6px 22px',
+        minHeight:       48,
+        padding:         '4px 6px 4px 20px',
         maxWidth:        'calc(100vw - 32px)',
         boxSizing:       'border-box',
         borderRadius:    'var(--radius-full)',
@@ -41,7 +41,7 @@ export default function Snackbar({ visible, message, actionLabel, onAction }) {
         whiteSpace:      'nowrap',
         display:         'flex',
         alignItems:      'center',
-        gap:             16,
+        gap:             12,
         // Only interactive (and hit-testable) while visible, and only when
         // there's actually an action to tap — a plain message toast stays
         // fully inert so it never blocks touches to whatever's behind it.
@@ -56,15 +56,15 @@ export default function Snackbar({ visible, message, actionLabel, onAction }) {
           style={{
             background:              'none',
             border:                  'none',
-            padding:                 '0 16px',
+            padding:                 '0 14px',
             margin:                  0,
-            minHeight:               44,
+            minHeight:               40,
             borderRadius:            'var(--radius-full)',
             display:                 'flex',
             alignItems:              'center',
             gap:                     6,
             color:                   'var(--color-favourite)',
-            fontSize:                16,
+            fontSize:                15,
             fontWeight:              700,
             fontFamily:              'var(--font-body)',
             cursor:                  'pointer',
@@ -73,7 +73,7 @@ export default function Snackbar({ visible, message, actionLabel, onAction }) {
             WebkitTapHighlightColor: 'transparent',
           }}
         >
-          <Undo2 size={18} strokeWidth={2.2} />
+          <Undo2 size={16} strokeWidth={2.2} />
           {actionLabel}
         </button>
       )}

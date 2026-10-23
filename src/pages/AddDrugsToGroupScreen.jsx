@@ -73,6 +73,9 @@ const NO_KEYWORDS = []
 
 // The search kept while a drug is opened from here, so Back from the drug page finds it again.
 let keptSearch = null
+// The drugs the group held when this visit to the Add drugs screen began (the person tapped Add on
+// the group page). It survives a trip to a drug page and back, and is dropped by Done / the back arrow.
+let visitStart = null  // { groupId, ids: Set }
 
 function SkeletonRows() {
   return (
@@ -110,8 +113,18 @@ export default function AddDrugsToGroupScreen() {
   const inGroup = new Set(edits.ids)
   const count = edits.ids.length
   const full = count >= drugsCap
-  // The bottom button stays grey until the group holds its first drug.
-  const noDrugsYet = count === 0
+  // The bottom button stays grey until the person has added a drug during this visit (from the
+  // moment they tapped Add on the group page), not because the group already held drugs.
+  const [startIds, setStartIds] = useState(() => (
+    keptSearch?.groupId === groupId && visitStart?.groupId === groupId ? visitStart.ids : null
+  ))
+  useEffect(() => {
+    if (!group || startIds) return
+    const ids = new Set(edits.ids)
+    visitStart = { groupId, ids }
+    setStartIds(ids)
+  }, [group, startIds, groupId, edits.ids])
+  const noDrugsYet = !startIds || edits.ids.every(id => startIds.has(id))
 
   // ── Search (its own, Brand and Generic only) ───────────────────────────────
   const [mode, setMode] = useState(() => (keptSearch?.groupId === groupId ? keptSearch.mode : 'brand'))
@@ -226,6 +239,7 @@ export default function AddDrugsToGroupScreen() {
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
   function goBack() {
+    visitStart = null
     navigate(-1)
   }
   function handleAdd(drug) {
