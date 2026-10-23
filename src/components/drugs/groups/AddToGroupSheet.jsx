@@ -49,7 +49,7 @@
  *
  * 2026-10-23 (UI refresh): the close X is gone; a round plus at the top right makes a new group (it
  * carries a small PRO tag when it would need PRO). The bottom button is a full-width Done that closes
- * the sheet. The drug being added sits in its own framed card with its category name (in the category colour) on top; the 'Changes save as you tap' and 'Adding this drug' lines are gone. The plus became a 'Create group' button.
+ * the sheet. The drug being added sits in its own framed card tinted with its category colour; the 'Changes save as you tap' and 'Adding this drug' lines are gone. The plus became a 'Create group' button.
  * A group made from here now receives the drug in the same save (the hook's list is updated at once).
  */
 
@@ -331,21 +331,11 @@ export default function AddToGroupSheet({ isOpen, onClose, drug }) {
         {drug && (
           <div style={{ flexShrink: 0, padding: 'var(--space-2) var(--space-4) var(--space-3)' }}>
             <div style={{
-              padding: '10px var(--space-3) 2px', borderRadius: 'var(--radius-lg, 16px)',
-              backgroundColor: 'var(--color-surface-muted)', border: '1px solid var(--color-border)',
+              padding: '2px var(--space-3)', borderRadius: 'var(--radius-lg, 16px)',
+              backgroundColor: `color-mix(in srgb, ${categoryTone.bg} 60%, var(--color-surface))`,
+              border: `1px solid color-mix(in srgb, ${categoryTone.fg} 22%, transparent)`,
               boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
             }}>
-              {drugCategory?.name_en && (
-                <span style={{
-                  display: 'inline-block', maxWidth: '100%', boxSizing: 'border-box',
-                  padding: '3px 10px', borderRadius: 999,
-                  backgroundColor: categoryTone.bg, color: categoryTone.fg,
-                  fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-body)',
-                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                }}>
-                  {drugCategory.name_en}
-                </span>
-              )}
               <SharedDrugCard
                 drug={drug}
                 categories={categories}

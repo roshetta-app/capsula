@@ -250,6 +250,12 @@ export default function AddDrugsToGroupScreen() {
     if (hasQuery) addSearch(savedName(drug), mode)
     edits.add(drug.id)
   }
+  function handleRemove(drug) {
+    if (!group) return
+    if (isReadOnly) { showGroupReadOnly(); return }
+    if (!inGroup.has(drug.id)) return
+    edits.remove(drug.id)
+  }
   function handleOpen(drug) {
     if (hasQuery) addSearch(savedName(drug), mode)
     keptSearch = { groupId, query, mode }
@@ -351,6 +357,7 @@ export default function AddDrugsToGroupScreen() {
           drugs={shownResults}
           inGroup={inGroup}
           onAdd={handleAdd}
+          onRemove={handleRemove}
           onOpen={handleOpen}
           categories={categories}
           isDark={isDark}

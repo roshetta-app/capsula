@@ -1,4 +1,5 @@
 /**
+ * 2026-10-23: tapping the word Added takes the drug out of the group again (onRemove).
  * 2026-10-23 (UI refresh): the round + is smaller (a 32px circle inside the same 44px tap area).
  *
  * 2026-10-22 (UI refresh plan, step 8.4b): a drug already in the group shows a tick with the word
@@ -28,7 +29,7 @@ function observeWindowOffsetThroughSheetLock(instance, cb) {
   })
 }
 
-function AddMark({ inGroup, onAdd, name }) {
+function AddMark({ inGroup, onAdd, onRemove, name }) {
   const base = {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     width: 44, height: 44, borderRadius: '50%', flexShrink: 0, border: 'none', padding: 0,
@@ -36,18 +37,22 @@ function AddMark({ inGroup, onAdd, name }) {
     WebkitTapHighlightColor: 'transparent', outline: 'none',
   }
   if (inGroup) {
+    // Tapping Added takes the drug out of the group again.
     return (
-      <span
-        role="img"
-        aria-label={`${name} is in this group`}
+      <button
+        onClick={e => { e.stopPropagation(); onRemove?.() }}
+        onPointerDown={e => e.stopPropagation()}
+        aria-label={`${name} is in this group. Tap to remove it`}
         style={{
-          display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, minHeight: 44, padding: '0 4px',
+          display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, minHeight: 44, padding: '0 8px',
+          border: 'none', background: 'none', cursor: 'pointer',
           fontSize: 13, fontWeight: 600, color: 'var(--color-accent)', fontFamily: 'var(--font-body)',
+          WebkitTapHighlightColor: 'transparent', outline: 'none',
         }}
       >
         <Check size={16} strokeWidth={2.5} aria-hidden="true" />
         Added
-      </span>
+      </button>
     )
   }
   return (
@@ -68,7 +73,7 @@ function AddMark({ inGroup, onAdd, name }) {
 }
 
 export default function AddDrugsResultList({
-  drugs, inGroup, onAdd, onOpen, categories, isDark, highlight = '', searchMode = 'brand', nameOf,
+  drugs, inGroup, onAdd, onRemove, onOpen, categories, isDark, highlight = '', searchMode = 'brand', nameOf,
 }) {
   const listRef = useRef(null)
   // Where the list starts on the page, measured once it is drawn (the count line above it
@@ -114,6 +119,7 @@ export default function AddDrugsResultList({
                   inGroup={inGroup.has(drug.id)}
                   name={nameOf(drug)}
                   onAdd={() => onAdd(drug)}
+                  onRemove={() => onRemove?.(drug)}
                 />
               }
             />
