@@ -36,6 +36,8 @@
  * removed today; step 12.4 (remove mode) and step 12.5 (Add drugs search) replace them.
  * The drug cards are not changed.
  *
+ * 2026-10-23: a free account with a full group sees the Capsula Pro upgrade banner (same one the
+ * Favourites screen uses) saying the group limit is reached; a Pro account keeps the plain message.
  * 2026-10-23 (UI refresh): the 'N of M drugs' line is gone (the bar says it; 'Full' stays). In remove mode
  * the minus is on the right, in the heart's place, the same size as the + on the Add drugs screen. The heart
  * on a drug row only shows that the drug is a favourite; it no longer un-favourites it.
@@ -77,6 +79,7 @@ import GroupDescription from '../components/drugs/groups/GroupDescription'
 import { folderWash } from '../components/drugs/groups/folderStyles'
 import { drugRowTitle, sortDrugsByTitle } from '../components/drugs/groups/groupDrugText'
 import { drugsLimitMessage } from '../components/drugs/groups/groupMessages'
+import ProUpsellBanner from '../components/ui/ProUpsellBanner'
 import { useGroupDrugEdits } from '../components/drugs/groups/useGroupDrugEdits'
 import { setPendingUndo } from '../components/drugs/groups/pendingUndo'
 import { shimmer } from '../components/drugs/home/shimmer'
@@ -511,7 +514,9 @@ export default function DrugGroupScreen() {
 
         {!isReadOnly && full && count > 0 && (
           <div style={{ marginTop: 'var(--space-2)' }}>
-            <GroupStateMessage variant="banner" title={drugsLimitMessage(isPro)} />
+            {isPro
+              ? <GroupStateMessage variant="banner" title={drugsLimitMessage(isPro)} />
+              : <ProUpsellBanner subtitle="You've reached the group limit. Upgrade to add more drugs." />}
           </div>
         )}
 

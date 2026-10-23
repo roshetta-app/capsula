@@ -7,11 +7,12 @@
  * Phase 7.
  */
 
-import { DRUG_GROUPS_CAP_FREE, DRUG_GROUP_DRUGS_CAP_FREE, DRUG_GROUP_DRUGS_CAP_PRO } from '../../../constants/features'
+import { DRUG_GROUPS_CAP_FREE, DRUG_GROUP_DRUGS_CAP_PRO } from '../../../constants/features'
 
 export const OFFLINE_MESSAGE = "You're offline. Reconnect to change your groups."
 export const READ_ONLY_MESSAGE = 'Your groups are read only. Delete a group or upgrade to edit.'
 
+// 2026-10-23: the free-account drugs message is now the short 'reached the limit, upgrade' line.
 // 2026-10-21 (limits review): wording follows the caps in constants/features.js. The Pro
 // group cap is a safety cap that is never shown as a number.
 export function groupsLimitMessage(isPro) {
@@ -23,7 +24,7 @@ export function groupsLimitMessage(isPro) {
 export function drugsLimitMessage(isPro) {
   return isPro
     ? `A group can hold up to ${DRUG_GROUP_DRUGS_CAP_PRO} drugs. Remove one to add another.`
-    : `Free accounts can have ${DRUG_GROUP_DRUGS_CAP_FREE} drugs in a group. Pro lets you have up to ${DRUG_GROUP_DRUGS_CAP_PRO}.`
+    : "You've reached the group limit. Upgrade to Pro to add more drugs."
 }
 
 // 2026-10-19 (Drug groups plan, step 8.3): Save to my groups, on the shared page.
