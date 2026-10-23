@@ -100,7 +100,7 @@ export default function GroupTile({ group, isNew = false, showProBadge = false, 
   // Tab and body share one opaque colour, so the folder has no seam and no border.
   const wash = isNew
     ? 'color-mix(in srgb, var(--color-text-primary) 5%, var(--color-bg))'
-    : `color-mix(in srgb, ${colors.fg} 12%, var(--color-surface))`
+    : `color-mix(in srgb, ${colors.fg} 8%, var(--color-surface))`
   const countColor = `color-mix(in srgb, ${colors.fg} 72%, var(--color-text-primary))`
 
   return (

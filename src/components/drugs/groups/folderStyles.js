@@ -12,7 +12,7 @@ export const FOLDER_BODY_RADIUS = '0 20px 20px 20px'
 
 // A wash of a colour over the surface colour: one opaque fill, so tab and body show no seam.
 export function folderWash(fg) {
-  return `color-mix(in srgb, ${fg} 12%, var(--color-surface))`
+  return `color-mix(in srgb, ${fg} 8%, var(--color-surface))`
 }
 
 // The plain grey wash used by the state messages and the New group card.

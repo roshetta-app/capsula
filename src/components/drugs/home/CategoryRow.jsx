@@ -45,7 +45,7 @@ export default function CategoryRow({ label, iconType, iconValue, textColor, onT
       style={{
         display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 10,
         minHeight: 92, boxSizing: 'border-box',
-        backgroundColor: `color-mix(in srgb, ${ink} 12%, var(--color-surface))`,
+        backgroundColor: `color-mix(in srgb, ${ink} 8%, var(--color-surface))`,
         border: 'none',
         borderRadius: 20,
         padding: 14,
