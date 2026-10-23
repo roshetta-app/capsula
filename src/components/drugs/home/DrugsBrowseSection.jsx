@@ -1,5 +1,7 @@
 /**
  * src/components/drugs/home/DrugsBrowseSection.jsx
+ * 2026-10-23: the 'Browse by class' row is now a full-width card in the same style as the category
+ * tiles (soft wash of the class colour, rounded corners, icon in a round chip, chevron at the right).
  * 2026-10-22 (UI refresh plan, step 8.3): the strip is now a 2 by 2 grid of four category tiles
  * (the same CategoryRow tile as the categories screen, so a name is never split inside a word)
  * and the link reads 'View all categories'. The dashed '+N more' tile is gone. Loading shows
@@ -66,20 +68,23 @@ function ClassRow({ subtitle, onTap }) {
       onPointerCancel={() => setPressed(false)}
       style={{
         display: 'flex', alignItems: 'center', gap: 12,
-        width: '100%', minHeight: 56, textAlign: 'left',
-        background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+        width: '100%', minHeight: 72, boxSizing: 'border-box', textAlign: 'left',
+        // Same card as a category tile: one soft wash of the class colour, 20px corners, no border.
+        backgroundColor: 'color-mix(in srgb, var(--color-class) 8%, var(--color-surface))',
+        border: 'none', borderRadius: 20, padding: 14, cursor: 'pointer', outline: 'none',
         fontFamily: 'var(--font-body)',
         WebkitTapHighlightColor: 'transparent',
-        opacity: pressed ? 0.7 : 1,
-        transition: 'opacity var(--motion-fast) var(--ease-settle)',
+        opacity: pressed ? 0.8 : 1,
+        transform: pressed ? 'scale(0.985)' : 'scale(1)',
+        transition: 'opacity var(--motion-fast) var(--ease-settle), transform var(--motion-fast) var(--ease-settle)',
       }}
     >
       <span style={{
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
-        background: 'var(--color-class-light)', color: 'var(--color-class)',
+        width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+        backgroundColor: 'var(--color-tint-chip)', color: 'var(--color-class)',
       }}>
-        <Layers size={20} strokeWidth={1.9} aria-hidden="true" />
+        <Layers size={18} strokeWidth={1.9} aria-hidden="true" />
       </span>
       <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, flex: 1 }}>
         <span style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.25, color: 'var(--color-text-primary)' }}>Browse by class</span>
@@ -210,7 +215,7 @@ export default function DrugsBrowseSection() {
       </DrugsSectionCard>
       <section
         aria-label="Browse by class"
-        style={{ padding: '12px 0' }}
+        style={{ padding: '12px 0 0' }}
       >
         <ClassRow subtitle={classSubtitle} onTap={openClasses} />
       </section>
