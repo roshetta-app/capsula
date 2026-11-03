@@ -188,11 +188,13 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  User, LogOut, ChevronRight, Bell, HelpCircle, Info, UserCog, Mail,
+  User, UserX, LogOut, ChevronRight, Bell, HelpCircle, Info, UserCog, Mail,
   Sun, Moon, Monitor, MessageCircle, Flag, FileText, ShieldCheck, AlertCircle,
 } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { useFavouritesContext } from '../context/FavouritesContext'
+import NameSwitch from '../components/drugs/groups/NameSwitch'
+import { isDrugGroupsOn } from '../constants/features'
 import { signOutGroupNote } from '../utils/groupSignOutNote'
 import { useDarkMode } from '../hooks/useDarkMode'
 import { usePushSubscriptionContext } from '../context/PushSubscriptionContext'
@@ -379,6 +381,63 @@ function ThemeRow({ theme, onChange, last }) {
           )
         })}
       </div>
+    </div>
+  )
+}
+
+// 2026-11-03 (optional owner name): the account-wide "Show my name on shared groups" switch. Off
+// (anonymous) is the default. Each shared group can still be changed in its own share sheet; this
+// only decides groups that have no choice of their own. Only for a signed-in person, only while
+// groups are on, and it leaves itself out until the profile has been read.
+function ShareNameRow() {
+  const { getShareNameInfo, setAccountShareName } = useFavouritesContext()
+  const { toast } = useToast()
+  const [info, setInfo] = useState(null)
+  useEffect(() => {
+    let cancelled = false
+    getShareNameInfo().then(r => {
+      if (!cancelled && r.ok) setInfo({ fullName: r.fullName, on: r.accountDefault })
+    })
+    return () => { cancelled = true }
+  }, [getShareNameInfo])
+  if (!info) return null
+
+  const hasName = !!info.fullName
+  const on = hasName && info.on
+  const Icon = on ? User : UserX
+
+  async function handleChange(next) {
+    setInfo(i => ({ ...i, on: next }))
+    const r = await setAccountShareName(next)
+    if (r.ok) return
+    setInfo(i => ({ ...i, on: !next }))
+    toast.error(r.reason === 'offline' ? "You're offline. Reconnect to change this." : "Couldn't save that. Try again.")
+  }
+
+  return (
+    <div style={{
+      width: '100%', display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
+      padding: 'var(--space-3)', paddingRight: 'var(--space-2)', borderBottom: '1px solid var(--color-border)',
+    }}>
+      <div style={{
+        width: 32, height: 32, borderRadius: 'var(--radius-full)', backgroundColor: 'var(--color-accent-light)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: 'var(--color-accent)',
+      }}>
+        <Icon size={17} strokeWidth={1.8} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-text-primary)' }}>
+          Show my name on shared groups
+        </div>
+        <div style={{ marginTop: 2, fontSize: 12, lineHeight: 1.4, color: 'var(--color-text-secondary)' }}>
+          {!hasName
+            ? 'Add your name in Edit Profile first.'
+            : on
+              ? 'On. You can change it for each group when you share it.'
+              : 'Off. Your groups are shared anonymously.'}
+        </div>
+      </div>
+      <NameSwitch checked={on} onChange={handleChange} disabled={!hasName} label="Show my name on shared groups" />
     </div>
   )
 }
@@ -1058,6 +1117,7 @@ export default function AccountScreen() {
           theme={theme}
           onChange={setTheme}
         />
+        {user && isDrugGroupsOn() && <ShareNameRow />}
         <MenuRow
           icon={<Bell size={17} strokeWidth={1.8} />}
           label="Notifications"

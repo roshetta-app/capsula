@@ -38,6 +38,10 @@
  *
  * 2026-10-23: a free account with a full group sees the Capsula Pro upgrade banner (same one the
  * Favourites screen uses) saying the group limit is reached; a Pro account keeps the plain message.
+ * 2026-11-03 (action bar): the list header is redrawn. Left: "Drugs" with "7 of 20" under it (and the
+ * Full tag when full), so the count is readable again next to the bar. Right: Add as the one solid
+ * button (plus icon) and Remove as a quieter outlined red button; in remove mode Remove becomes a
+ * solid Done. All 44 px tall, with a plain "Tap a drug's minus to remove it" hint while removing.
  * 2026-10-23 (UI refresh): the 'N of M drugs' line is gone (the bar says it; 'Full' stays). In remove mode
  * the minus is on the right, in the heart's place, the same size as the + on the Add drugs screen. The heart
  * on a drug row only shows that the drug is a favourite; it no longer un-favourites it.
@@ -65,7 +69,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Check, Minus, Pencil, Pill, Plus, Search, Share2, Trash2 } from 'lucide-react'
+import { Check, Minus, Pencil, Pill, Plus, Share2, Trash2 } from 'lucide-react'
 import SharedDrugCard from '../components/SharedDrugCard'
 import RowStarButton from '../components/ui/RowStarButton'
 import ConfirmSheet from '../components/ui/ConfirmSheet'
@@ -271,12 +275,12 @@ export default function DrugGroupScreen() {
     </div>
   )
 
-  // Add and Remove: 44 px tall pill buttons in the list header (step 12.3).
+  // Add and Remove: 44 px tall pill buttons in the list header (step 12.3, redrawn 2026-11-03).
   const pillButtonStyle = {
     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-    height: 38, width: 96, padding: 0, boxSizing: 'border-box', borderRadius: 19, flexShrink: 0,
-    background: 'var(--color-surface)', border: 'none', cursor: 'pointer',
-    fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-body)',
+    height: 44, minWidth: 88, padding: '0 16px', boxSizing: 'border-box', borderRadius: 22, flexShrink: 0,
+    background: 'transparent', border: '1px solid transparent', cursor: 'pointer',
+    fontSize: 14, fontWeight: 600, fontFamily: 'var(--font-body)',
     transition: 'background-color var(--motion-base) var(--ease-reveal), color var(--motion-base) var(--ease-reveal)',
     WebkitTapHighlightColor: 'transparent', outline: 'none',
   }
@@ -420,20 +424,6 @@ export default function DrugGroupScreen() {
           </h1>
 
           <div>
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
-              fontSize: 13, color: 'color-mix(in srgb, var(--color-text-primary) 72%, transparent)', fontFamily: 'var(--font-body)',
-            }}>
-              {full && (
-                <span style={{
-                  fontSize: 11, fontWeight: 700, letterSpacing: '0.04em',
-                  color: 'var(--color-text-secondary)', backgroundColor: 'var(--color-surface)',
-                  borderRadius: 8, padding: '2px 8px',
-                }}>
-                  Full
-                </span>
-              )}
-            </div>
             <div
               role="progressbar"
               aria-valuemin={0}
@@ -441,7 +431,7 @@ export default function DrugGroupScreen() {
               aria-valuenow={count}
               aria-label={`${count} of ${drugsCap} drugs`}
               style={{
-                marginTop: 'var(--space-2)', height: 6, borderRadius: 3, overflow: 'hidden',
+                height: 6, borderRadius: 3, overflow: 'hidden',
                 backgroundColor: 'var(--color-surface)',
               }}
             >
@@ -468,47 +458,65 @@ export default function DrugGroupScreen() {
         )}
 
         {!isReadOnly && count > 0 && (
-          <div style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            flexWrap: 'wrap', gap: 'var(--space-2)', marginTop: 'var(--space-4)',
-          }}>
-            <h2 style={{
-              margin: 0, display: 'flex', alignItems: 'baseline', gap: 'var(--space-2)',
-              fontSize: 18, fontWeight: 700, color: 'var(--color-text-primary)',
-              fontFamily: 'var(--font-body)',
+          <div style={{ marginTop: 'var(--space-4)' }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              flexWrap: 'wrap', gap: 'var(--space-2)',
             }}>
-              <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-text-secondary)' }}>{count}</span>
-              Drugs
-            </h2>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-              <button
-                onClick={openAddDrugs}
-                aria-label="Add drugs to this group"
-                style={{ ...pillButtonStyle, color: 'var(--color-accent-text)' }}
-              >
-                <Search size={18} strokeWidth={2} aria-hidden="true" />
-                Add
-              </button>
-              {removing ? (
+              <div style={{ minWidth: 0, fontFamily: 'var(--font-body)' }}>
+                <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, lineHeight: 1.2, color: 'var(--color-text-primary)' }}>
+                  Drugs
+                </h2>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2, fontSize: 13, color: 'var(--color-text-secondary)' }}>
+                  <span style={{ fontVariantNumeric: 'tabular-nums' }}>{count} of {drugsCap}</span>
+                  {full && (
+                    <span style={{
+                      fontSize: 11, fontWeight: 700, letterSpacing: '0.04em', color: 'var(--color-text-secondary)',
+                      backgroundColor: 'var(--color-surface)', borderRadius: 8, padding: '1px 7px',
+                    }}>
+                      Full
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
                 <button
-                  onClick={() => setRemoveMode(false)}
-                  aria-label="Done removing drugs"
+                  onClick={openAddDrugs}
+                  aria-label="Add drugs to this group"
                   style={{ ...pillButtonStyle, backgroundColor: 'var(--color-accent-solid)', color: '#fff' }}
                 >
-                  <Check size={18} strokeWidth={2.5} aria-hidden="true" />
-                  Done
+                  <Plus size={18} strokeWidth={2.4} aria-hidden="true" />
+                  Add
                 </button>
-              ) : (
-                <button
-                  onClick={() => setRemoveMode(true)}
-                  aria-label="Remove drugs from this group"
-                  style={{ ...pillButtonStyle, color: 'var(--color-danger)' }}
-                >
-                  <Minus size={18} strokeWidth={2} aria-hidden="true" />
-                  Remove
-                </button>
-              )}
+                {removing ? (
+                  <button
+                    onClick={() => setRemoveMode(false)}
+                    aria-label="Done removing drugs"
+                    style={{ ...pillButtonStyle, backgroundColor: 'var(--color-text-primary)', color: 'var(--color-bg)' }}
+                  >
+                    <Check size={18} strokeWidth={2.5} aria-hidden="true" />
+                    Done
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setRemoveMode(true)}
+                    aria-label="Remove drugs from this group"
+                    style={{
+                      ...pillButtonStyle, color: 'var(--color-danger)',
+                      border: '1px solid color-mix(in srgb, var(--color-danger) 35%, transparent)',
+                    }}
+                  >
+                    <Minus size={18} strokeWidth={2.2} aria-hidden="true" />
+                    Remove
+                  </button>
+                )}
+              </div>
             </div>
+            {removing && (
+              <p style={{ margin: 'var(--space-2) 0 0', fontSize: 13, lineHeight: 1.4, color: 'var(--color-text-secondary)', fontFamily: 'var(--font-body)' }}>
+                Tap the minus on a drug to remove it.
+              </p>
+            )}
           </div>
         )}
 

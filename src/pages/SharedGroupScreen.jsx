@@ -14,8 +14,11 @@
  * the bottom; that, or opening a drug, is where the welcome screen appears.
  * The first screen of a session has no Back button (nothing behind it).
  *
- * No edit controls, no heart, and the owner is never shown (the database
- * function does not return it).
+ * No edit controls, no heart. The owner is anonymous unless they chose to show their name
+ * (2026-11-03): then the line under the group name reads "Shared by <name> \u00b7 3 drugs" (the
+ * database function only returns the name when the owner turned it on).
+ * 2026-11-03: the "Shared by a Capsula user. The name and description were written by them..."
+ * note is gone from the folder; the "Shared group" tag already says what the page is.
  *
  * 2026-10-19 (step 8.3): Save to my groups, at the bottom, only when the groups
  * switch is on and the group has drugs. It makes the viewer's own copy (a new
@@ -382,18 +385,22 @@ function SharedGroupBody({ code }) {
             {group.name}
           </h1>
 
-          <div style={{ fontSize: 13, color: 'color-mix(in srgb, var(--color-text-primary) 72%, transparent)', fontFamily: 'var(--font-body)' }}>
-            {count} {count === 1 ? 'drug' : 'drugs'}
+          <div style={{
+            display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 6, rowGap: 2,
+            fontSize: 13, color: 'color-mix(in srgb, var(--color-text-primary) 72%, transparent)', fontFamily: 'var(--font-body)',
+          }}>
+            {group.ownerName && (
+              <>
+                <span>
+                  Shared by <span dir="auto" style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{group.ownerName}</span>
+                </span>
+                <span aria-hidden="true">{'\u00b7'}</span>
+              </>
+            )}
+            <span>{count} {count === 1 ? 'drug' : 'drugs'}</span>
           </div>
 
           <GroupDescription text={group.description} />
-
-          <p style={{
-            margin: 0,
-            fontSize: 12, lineHeight: 1.45, color: 'color-mix(in srgb, var(--color-text-primary) 72%, transparent)', fontFamily: 'var(--font-body)',
-          }}>
-            Shared by a Capsula user. The name and description were written by them, not by Capsula.
-          </p>
         </FolderShell>
 
         <div style={{ marginTop: 'var(--space-4)' }}>

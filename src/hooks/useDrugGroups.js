@@ -73,10 +73,14 @@
  *   deleteGroup     (id) => Promise<{ ok, reason?, group?, index? }>
  *   getShareCode    (groupId) => Promise<{ ok, code?, reason? }>   (2026-10-19, step 8.1)
  *                   Reads this group's live share code (null when not shared).
- *   createShareLink (groupId) => Promise<{ ok, code?, reason? }>
+ *   createShareLink (groupId, showName?) => Promise<{ ok, code?, reason? }>
  *                   Makes the share link (the database makes the code); if one
  *                   already exists it returns that one.
  *   stopSharing     (groupId) => Promise<{ ok, reason? }>   Deletes the code, so the link stops at once.
+ *   getShareNameInfo () => Promise<{ ok, fullName?, accountDefault?, reason? }>   (2026-11-03)
+ *                   The owner's profile name and their account-wide "show my name" choice.
+ *   setShareName    (groupId, show) => Promise<{ ok, reason? }>   The choice for one shared group.
+ *   setAccountShareName (show) => Promise<{ ok, reason? }>   The account-wide choice (groups with no choice of their own follow it).
  *   groupLimit      { open, kind, isPro }  the limit sheet state ('groups' | 'drugs' | 'readonly'), read by SignInNudge
  *   showGroupLimit  (kind) => void  opens the limit sheet (Free: with Upgrade; Pro: with OK)
  *   showGroupReadOnly () => void    opens the sheet with the read only message (not counted as a limit hit)
@@ -929,22 +933,67 @@ export function useDrugGroups(fav) {
     if (isOffline()) return { ok: false, reason: 'offline' }
     const { data, error } = await withLimit(supabase
       .from('drug_group_shares')
-      .select('share_code')
+      .select('share_code, show_name')
       .eq('group_id', groupId)
       .maybeSingle())
     if (isTimeout(error)) return { ok: false, reason: 'offline' }
     if (error) return { ok: false, reason: 'error' }
-    return { ok: true, code: data?.share_code ?? null }
+    // showName: true / false = the owner chose for this group; null = follows the account setting.
+    return { ok: true, code: data?.share_code ?? null, showName: data?.show_name ?? null }
   }, [])
 
-  const createShareLink = useCallback(async (groupId) => {
+  // 2026-11-03 (optional owner name): the owner's profile name and their account-wide choice,
+  // read straight from their own profile row (nobody else can read it).
+  const getShareNameInfo = useCallback(async () => {
+    const u = userRef.current
+    if (!u) return { ok: false, reason: 'guest' }
+    if (isOffline()) return { ok: false, reason: 'offline' }
+    const { data, error } = await withLimit(supabase
+      .from('profiles')
+      .select('full_name, share_name_default')
+      .eq('id', u.id)
+      .maybeSingle())
+    if (isTimeout(error)) return { ok: false, reason: 'offline' }
+    if (error) return { ok: false, reason: 'error' }
+    return { ok: true, fullName: (data?.full_name ?? '').trim(), accountDefault: !!data?.share_name_default }
+  }, [])
+
+  // The owner's choice for one shared group (true = show my name, false = anonymous).
+  const setShareName = useCallback(async (groupId, show) => {
+    if (userRef.current && isOffline()) return { ok: false, reason: 'offline' }
+    const refused = refuseChange()
+    if (refused) return refused
+    const { error } = await withLimit(supabase
+      .from('drug_group_shares')
+      .update({ show_name: !!show })
+      .eq('group_id', groupId))
+    if (isTimeout(error)) return { ok: false, reason: 'offline' }
+    if (error) return { ok: false, reason: 'error' }
+    return { ok: true }
+  }, [refuseChange])
+
+  // The account-wide choice: used by every shared group that has no choice of its own.
+  const setAccountShareName = useCallback(async (show) => {
+    const u = userRef.current
+    if (!u) return { ok: false, reason: 'guest' }
+    if (isOffline()) return { ok: false, reason: 'offline' }
+    const { error } = await withLimit(supabase
+      .from('profiles')
+      .update({ share_name_default: !!show })
+      .eq('id', u.id))
+    if (isTimeout(error)) return { ok: false, reason: 'offline' }
+    if (error) return { ok: false, reason: 'error' }
+    return { ok: true }
+  }, [])
+
+  const createShareLink = useCallback(async (groupId, showName) => {
     if (userRef.current && isOffline()) return { ok: false, reason: 'offline' }
     const refused = refuseChange()
     if (refused) return refused
     if (!groupsRef.current.some(g => g.id === groupId)) return { ok: false, reason: 'missing' }
     const { data, error } = await withLimit(supabase
       .from('drug_group_shares')
-      .insert({ group_id: groupId })
+      .insert(typeof showName === 'boolean' ? { group_id: groupId, show_name: showName } : { group_id: groupId })
       .select('share_code')
       .single())
     if (isTimeout(error)) return { ok: false, reason: 'offline' }
@@ -1011,6 +1060,9 @@ export function useDrugGroups(fav) {
     restoreGroup,
     saveSharedGroup,
     getShareCode,
+    getShareNameInfo,
+    setShareName,
+    setAccountShareName,
     createShareLink,
     stopSharing,
     groupLimit,

@@ -23,6 +23,13 @@
  *     one line under it: the link stops working and saved copies are kept (F5). Its
  *     question ("Stop sharing?") is unchanged.
  *
+ * 2026-11-03 (optional owner name): a "Show my name" switch under the privacy lines, in both states.
+ * Off means anonymous (the default). On shows "Shared by <profile name>" on the shared page. The
+ * choice is saved with the link: before the link exists it is kept in the sheet and saved when
+ * Create link is tapped; after, each tap on the switch saves at once (and puts it back with a
+ * message if it could not be saved). With no name in the profile the switch is off and disabled,
+ * with "Add your name in Account first.". The first value comes from the Account setting.
+ *
  * Props:
  *   isOpen         boolean
  *   onClose        () => void
@@ -31,10 +38,11 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
-import { X, Eye, PencilOff, UserX, Check, Copy, Share2 } from 'lucide-react'
+import { X, Eye, PencilOff, User, UserX, Check, Copy, Share2 } from 'lucide-react'
 import SheetShell from '../../ui/SheetShell'
 import ConfirmSheet from '../../ui/ConfirmSheet'
 import GroupStateMessage from './GroupStateMessage'
+import NameSwitch from './NameSwitch'
 import { shimmer } from '../home/shimmer'
 import { useFavouritesContext } from '../../../context/FavouritesContext'
 import { useToast } from '../../../context/ToastContext'
@@ -61,7 +69,6 @@ const PRIMARY_BUTTON = {
 const PRIVACY_LINES = [
   { Icon: Eye,       text: 'Anyone with the link can view this group: its name, description and drugs.' },
   { Icon: PencilOff, text: "They can't change it." },
-  { Icon: UserX,     text: 'Your name is never shown.' },
 ]
 
 // One line, shortened in the middle: the start of the code and its last 4 characters.
@@ -87,8 +94,34 @@ function PrivacyLines() {
   )
 }
 
+// "Show my name": one row with the switch. The line under it always says what the viewer will see.
+function NameRow({ fullName, checked, onChange }) {
+  const hasName = !!fullName
+  const on = hasName && checked
+  const Icon = on ? User : UserX
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 10, padding: '4px 4px 4px 12px',
+      marginBottom: 'var(--space-4)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-surface-muted)',
+    }}>
+      <Icon size={18} color="var(--color-text-secondary)" strokeWidth={1.8} aria-hidden="true" style={{ flexShrink: 0 }} />
+      <div style={{ flex: 1, minWidth: 0, padding: '8px 0', fontFamily: 'var(--font-body)' }}>
+        <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text-primary)' }}>Show my name</div>
+        <div style={{ marginTop: 2, fontSize: 13, lineHeight: 1.4, color: 'var(--color-text-secondary)', overflowWrap: 'anywhere' }}>
+          {!hasName
+            ? 'Add your name in Account first.'
+            : on
+              ? <>Shown as <span dir="auto" style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{fullName}</span></>
+              : 'Anonymous. Nobody sees who shared it.'}
+        </div>
+      </div>
+      <NameSwitch checked={on} onChange={onChange} disabled={!hasName} label="Show my name on this shared group" />
+    </div>
+  )
+}
+
 export default function ShareGroupSheet({ isOpen, onClose, group, onShareChange }) {
-  const { getShareCode, createShareLink, stopSharing, showGroupReadOnly } = useFavouritesContext()
+  const { getShareCode, getShareNameInfo, setShareName, createShareLink, stopSharing, showGroupReadOnly } = useFavouritesContext()
   const { toast } = useToast()
   const isDark = useIsDark()
   const dot = resolveToken(group?.color, isDark).pill
@@ -108,6 +141,10 @@ export default function ShareGroupSheet({ isOpen, onClose, group, onShareChange 
   const [attempt, setAttempt] = useState(0)
   const [busy, setBusy] = useState(false)
   const [stopOpen, setStopOpen] = useState(false)
+  // nameInfo: null until known (or when it could not be read: then the switch is left out),
+  // else { fullName, accountDefault }. showName: the switch for this group.
+  const [nameInfo, setNameInfo] = useState(null)
+  const [showName, setShowName] = useState(false)
 
   // Every time the sheet opens it asks again, so another device's change shows.
   const [wasOpen, setWasOpen] = useState(false)
@@ -121,9 +158,15 @@ export default function ShareGroupSheet({ isOpen, onClose, group, onShareChange 
     if (!isOpen || !groupId) return
     let cancelled = false
     ;(async () => {
-      const r = await getShareCode(groupId)
+      const [r, info] = await Promise.all([getShareCode(groupId), getShareNameInfo()])
       if (cancelled) return
       if (r.ok) {
+        if (info.ok) {
+          setNameInfo({ fullName: info.fullName, accountDefault: info.accountDefault })
+          setShowName(r.showName ?? info.accountDefault)
+        } else {
+          setNameInfo(null)
+        }
         setResult(r.code ? { phase: 'shared', code: r.code } : { phase: 'none' })
         onShareChange?.(r.code ?? null)
       } else {
@@ -133,7 +176,7 @@ export default function ShareGroupSheet({ isOpen, onClose, group, onShareChange 
     return () => { cancelled = true }
     // onShareChange is a plain callback from the page; it is not a reason to ask again.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, groupId, attempt, getShareCode])
+  }, [isOpen, groupId, attempt, getShareCode, getShareNameInfo])
 
   function retry() {
     setResult(null)
@@ -144,7 +187,7 @@ export default function ShareGroupSheet({ isOpen, onClose, group, onShareChange 
     if (busy || !group) return
     setBusy(true)
     try {
-      const r = await createShareLink(group.id)
+      const r = await createShareLink(group.id, nameInfo?.fullName ? showName : undefined)
       if (r.ok) {
         setResult({ phase: 'shared', code: r.code })
         onShareChange?.(r.code)
@@ -156,6 +199,21 @@ export default function ShareGroupSheet({ isOpen, onClose, group, onShareChange 
     } finally {
       setBusy(false)
     }
+  }
+
+  // Before the link exists the choice is only kept here (Create link saves it). After, it is saved
+  // at once; if that fails the switch goes back and says why.
+  async function handleNameToggle(next) {
+    if (!nameInfo) return
+    const before = showName
+    setShowName(next)
+    if (result?.phase !== 'shared') return
+    const r = await setShareName(group.id, next)
+    if (r.ok) return
+    setShowName(before)
+    if (r.reason === 'read_only') showGroupReadOnly()
+    else if (r.reason === 'offline') toast.error(OFFLINE_SHARE_MESSAGE)
+    else toast.error("Couldn't save that. Try again.")
   }
 
   async function handleCopy(code) {
@@ -195,6 +253,7 @@ export default function ShareGroupSheet({ isOpen, onClose, group, onShareChange 
     body = (
       <>
         <PrivacyLines />
+        {nameInfo && <NameRow fullName={nameInfo.fullName} checked={showName} onChange={handleNameToggle} />}
         <button onClick={handleCreate} disabled={busy} style={{ ...PRIMARY_BUTTON, opacity: busy ? 0.7 : 1 }}>
           {busy ? 'Creating\u2026' : 'Create link'}
         </button>
@@ -205,6 +264,7 @@ export default function ShareGroupSheet({ isOpen, onClose, group, onShareChange 
     body = (
       <>
         <PrivacyLines />
+        {nameInfo && <NameRow fullName={nameInfo.fullName} checked={showName} onChange={handleNameToggle} />}
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 'var(--space-2)' }}>
           <span style={{

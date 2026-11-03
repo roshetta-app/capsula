@@ -4,11 +4,13 @@
  * code for the public page (SharedGroupScreen.jsx). No sign-in is needed.
  *
  * Reads only through the database function get_shared_group(p_code), which
- * returns the group's name, description, colour and drugs, and never the owner
- * or any user id. The tables themselves are closed to the public.
+ * returns the group's name, description, colour and drugs, and never any user id.
+ * 2026-11-03: it also returns owner_name, but only when the owner chose to show their
+ * name (otherwise null, so the page stays anonymous). The tables themselves are closed
+ * to the public.
  *
  * fetchSharedGroup(code) answers one of:
- *   { status: 'ok', group: { name, description, color, drugs } }
+ *   { status: 'ok', group: { name, description, color, ownerName, drugs } }
  *   { status: 'unavailable' }  wrong, short, stopped or deleted-group link
  *                              (all the same answer, so nothing is revealed)
  *   { status: 'offline' }      the phone has no connection
@@ -94,6 +96,7 @@ export async function fetchSharedGroup(code) {
       name: data.name,
       description: data.description ?? '',
       color: data.color,
+      ownerName: typeof data.owner_name === 'string' && data.owner_name.trim() ? data.owner_name.trim() : null,
       drugs,
     },
   }
