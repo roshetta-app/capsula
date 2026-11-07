@@ -1213,6 +1213,10 @@ function AddDrugControls({ onPickBrand, onPickFormulation, onAddManual, disabled
 // Keeps the exact same visual treatment; only a cursor/click handler is
 // added. 'value' defaults to 'or' so any call site that hasn't been wired
 // up yet still renders exactly as before.
+//
+// PLUS LABEL (2026-11-07): the saved value 'and' is displayed as 'plus' to
+// match the condition page. Display only: the toggle still switches the
+// stored value between 'or' and 'and', so nothing already saved changes.
 function OrDivider({ value = 'or', onChange }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '2px 0' }}>
@@ -1229,7 +1233,7 @@ function OrDivider({ value = 'or', onChange }) {
           userSelect: 'none',
         }}
       >
-        {value}
+        {value === 'and' ? 'plus' : value}
       </span>
       <div style={{ flex: 1, height: '0.5px', backgroundColor: 'var(--color-border)' }} />
     </div>

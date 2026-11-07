@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useDrugContext } from '../../context/DrugContext'
-import { FileText, ExternalLink, ScanSearch } from 'lucide-react'
+import { FileText, ChevronRight } from 'lucide-react'
 import NoteCallout from '../ui/NoteCallout'
 import FreeTextPostBlock from './FreeTextPostBlock'
 import { toDrugOptions, doseLineInstructionText } from '../../constants/prescriptionRowSchema'
@@ -28,6 +28,19 @@ function findDrugForOption(drugs, brandId, formulationId) {
 // read as a gap between the label and the drug name.
 const RX_RAIL_WIDTH = 28
 const RX_RAIL_GAP = 8
+
+// Vertical rhythm of one prescription row (2026-11-07). Only two gaps are used
+// everywhere so the row reads as one solid block: ROW_GAP_ALT separates one
+// alternative from the next ('or' / 'plus' lines); ROW_GAP_STACK separates
+// anything stacked under a drug name (dose lines, max dose, notes).
+const ROW_GAP_ALT = 10
+const ROW_GAP_STACK = 6
+
+// Drug name type size and line height. Shared by the name spans and by the
+// right-edge arrow box, so the arrow is always exactly as tall as the first
+// line of the name and sits level with it even when the name wraps.
+const NAME_FONT_SIZE = 17
+const NAME_LINE_HEIGHT = 1.3
 
 /**
  * PrescriptionSheetBlock — renders ONE prescription_sheet's rows[] (Phase 3).
@@ -333,15 +346,16 @@ function SectionHeader({ label, children }) {
  * UnifiedDrugRow — renders a single `row_type: 'drug'` row per masterplan §2.2.
  *
  * Display rule:
- *   Main line: name [concentration badge-form] — name in text-primary for all
- *   entries; linked names get dotted underline (not accent-blue color).
- *   Concentration sits as plain lighter text right after the name.
- *   Form renders as a pill badge (not plain text).
+ *   Main line: name, then concentration, form, modifier and route as smaller
+ *   plain text on the same bottom line as the name. The name is text-primary
+ *   for all entries (never accent-blue, so it does not look selected). Linked
+ *   drugs show a quiet arrow at the right edge of the name line instead.
  *
  * Alternatives:
  *   Every boundary between alternatives renders a single OrMarker — the
  *   word itself is per-option ('or' | 'and', from data.joiner, defaulting
  *   to 'or'), left-aligned with the drug name column, not the badge.
+ *   The saved value 'and' is displayed as 'plus'; the data is not changed.
  *   Every alternative member shows its own concentration + form (not first-only).
  *
  *   buildFormulationClusters now delegates to toDrugOptions() (the same
@@ -356,8 +370,8 @@ function SectionHeader({ label, children }) {
  *   One NumberBadge per row regardless of how many alternatives it has
  *   (§2.4a) — unchanged.
  *
- *   A search icon sits to the right of each drug unit's name line, opening
- *   a Google Images search for the drug in Egypt.
+ *   Dose lines, max dose lines and notes start exactly under the drug name
+ *   (the same left edge), with the two shared vertical gaps defined above.
  */
 function buildFormulationClusters(row, drugs, mainFormulation) {
   const groups = toDrugOptions(row)
@@ -469,7 +483,7 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, dividerType 
 
           return (
             <React.Fragment key={uIdx}>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: RX_RAIL_GAP, marginTop: uIdx > 0 ? 6 : 0 }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: RX_RAIL_GAP, marginTop: uIdx > 0 ? ROW_GAP_ALT : 0 }}>
                 {/* Prefix column — fixed width so all drug names align.
                     Text is left-aligned within the column (justifyContent:
                     'flex-start') so 'Rx1' and 'or' share the same flush-left
@@ -477,7 +491,8 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, dividerType 
                     naturally varies with label length ('or' leaves more
                     room than 'Rx1'), which is the intended visual rhythm. */}
                 <div style={{ width: RX_RAIL_WIDTH, flexShrink: 0, display: 'flex', justifyContent: 'flex-start', alignItems: 'baseline' }}>
-                  {/* Rail unification pass: 'Rx{n}' and 'or' are both plain
+                  {/* The saved joiner 'and' is shown as 'plus' (display only).
+                      Rail unification pass: 'Rx{n}' and 'or' are both plain
                       positional annotations, not design elements — same
                       body font, same quiet tertiary color, same weight, so
                       neither competes visually with the drug name. */}
@@ -497,7 +512,7 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, dividerType 
                       fontSize: 12, fontWeight: 500,
                       color: 'color-mix(in srgb, var(--color-warning) 90%, black 10%)',
                       lineHeight: 1,
-                    }}>{data.joiner ?? 'or'}</span>
+                    }}>{data.joiner === 'and' ? 'plus' : (data.joiner ?? 'or')}</span>
                   )}
                 </div>
                 <div
@@ -565,138 +580,115 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, dividerType 
 // ─── Shared display pieces (used by both the unified row and its alternatives) ─
 
 /**
- * DrugMainLine — visual refinement phase.
+ * DrugMainLine — the name line of one drug.
  *
- * Name color: uniform `text-primary` for all entries (linked or not).
- * Linked names: small external-link icon after the name signals "opens
- * another screen" without implying selection state. The whole drug row
- * (not just the name) is now tappable — handled one level up in
- * UnifiedDrugRow — so this component just renders the icon as a visual cue.
- * Concentration: plain lighter text right after name, no dot prefix.
- * Form: pill/badge styling (distinct visual weight from concentration).
- * Search icon: right-side icon that opens Google Images for the drug in Egypt.
+ * Name color: uniform text-primary for all entries (linked or not), so a
+ * linked name never looks like a selected option. Linked drugs show a quiet
+ * right-pointing arrow at the right edge of the line instead. The arrow is
+ * a visual cue only (aria-hidden): the whole drug row is tappable, handled
+ * one level up in UnifiedDrugRow. It sits in a fixed box exactly as tall as
+ * the first line of the name, so it stays level with the name even when the
+ * name wraps onto a second line.
+ * Concentration, form, modifier and route: smaller plain text on the same
+ * bottom line (baseline) as the name, not floating at mid-height of it.
  *
- * Typography scale (batch 2 fine-grained fixes):
- *   name: 17→15px, concentration: 13→12px, form pill: 11→10px
- *   Inner row alignItems: baseline→center (fixes form pill vertical centering)
+ * Typography scale: name 17px, concentration / form / route 12px.
+ * Gap between the pieces is 5px so they read as one cohesive line.
  *
- * VISUAL-WEIGHT PASS: inner row gap dropped 8 -> 5, tightening the spacing
- * between the drug name, concentration, and form so they read as one
- * cohesive line rather than three loosely-spaced chips.
- *
- * UPDATED (decision 25, 2026-08-04): modifierAbbrev now renders immediately
+ * UPDATED (decision 25, 2026-08-04): modifierAbbrev renders immediately
  * after the name (not after form) — it's now at most a single
- * release-mechanism tag (e.g. "ER"), meant to read as part of identifying
- * the drug itself, same rhythm as "Adwiflam ER 50mg [Capsule]" on the box.
+ * release-mechanism tag (e.g. 'ER'), meant to read as part of identifying
+ * the drug itself, same rhythm as 'Adwiflam ER 50mg [Capsule]' on the box.
+ *
+ * UPDATED (2026-11-07): the image search icon and the external link icon
+ * were removed (the drug page already has image search), and the pieces
+ * are aligned by baseline instead of by centre.
  */
 function DrugMainLine({ name, concentration, form, modifierAbbrev, routeAbbrev, linkEnabled }) {
   if (!name) return null
 
-  const handleSearchClick = (e) => {
-    e.stopPropagation()
-    const query = [name, concentration, form, 'Egypt'].filter(Boolean).join(' ')
-    window.open(`https://www.google.com/search?tbm=isch&q=${encodeURIComponent(query)}`, '_blank', 'noopener,noreferrer')
-  }
-
   return (
-    <>
-      {/* Name line: name + modifier + conc + form + link icon + search icon — equal spacing */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 0, justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
+    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
+        <span style={{
+          fontSize: NAME_FONT_SIZE, fontWeight: 600,
+          color: 'var(--color-text-primary)',
+          lineHeight: NAME_LINE_HEIGHT,
+        }}>
+          {name}
+        </span>
+
+        {/* Modifier (decision 24, moved decision 25, styled decision 26) —
+            the drug's single release-mechanism abbreviation, e.g. 'ER'
+            for extended-release. Placed right after the name and styled
+            identically to it (same size/weight/color) so it reads as
+            one unit with the name, matching how it'd appear on the
+            actual package (e.g. 'Adwiflam ER'), rather than as a
+            separate, smaller qualifier. */}
+        {modifierAbbrev && (
           <span style={{
-            fontSize: 17, fontWeight: 600,
+            fontSize: NAME_FONT_SIZE, fontWeight: 600,
             color: 'var(--color-text-primary)',
+            lineHeight: NAME_LINE_HEIGHT,
+          }}>
+            {modifierAbbrev}
+          </span>
+        )}
+
+        {/* Concentration — raised from secondary to near-primary contrast;
+            this was reading as near-invisible at the old --color-text-secondary
+            weight, despite being clinically load-bearing information. */}
+        {concentration && (
+          <span style={{
+            fontSize: 12, fontWeight: 500,
+            color: 'color-mix(in srgb, var(--color-text-primary) 70%, var(--color-text-secondary) 30%)',
             lineHeight: 1.3,
           }}>
-            {name}
+            {concentration}
           </span>
+        )}
 
-          {/* Modifier (decision 24, moved decision 25, styled decision 26) —
-              the drug's single release-mechanism abbreviation, e.g. "ER"
-              for extended-release. Placed right after the name and styled
-              identically to it (same size/weight/color) so it reads as
-              one unit with the name, matching how it'd appear on the
-              actual package (e.g. "Adwiflam ER"), rather than as a
-              separate, smaller qualifier. */}
-          {modifierAbbrev && (
-            <span style={{
-              fontSize: 17, fontWeight: 600,
-              color: 'var(--color-text-primary)',
-              lineHeight: 1.3,
-            }}>
-              {modifierAbbrev}
-            </span>
-          )}
+        {/* Form — same contrast tier as concentration, a little bolder. */}
+        {form && (
+          <span style={{
+            fontSize: 12, fontWeight: 600,
+            color: 'color-mix(in srgb, var(--color-text-primary) 70%, var(--color-text-secondary) 30%)',
+            lineHeight: 1.3,
+            letterSpacing: '0.01em',
+            flexShrink: 0,
+          }}>
+            {form}
+          </span>
+        )}
 
-          {/* Concentration — raised from secondary to near-primary contrast;
-              this was reading as near-invisible at the old --color-text-secondary
-              weight, despite being clinically load-bearing information. */}
-          {concentration && (
-            <span style={{
-              fontSize: 12, fontWeight: 500,
-              color: 'color-mix(in srgb, var(--color-text-primary) 70%, var(--color-text-secondary) 30%)',
-              lineHeight: 1.3,
-            }}>
-              {concentration}
-            </span>
-          )}
+        {/* Route details (decision 24) — injection formulations only,
+            e.g. 'IM'. Same tier as modifier above. */}
+        {routeAbbrev && (
+          <span style={{
+            fontSize: 12, fontWeight: 500,
+            color: 'color-mix(in srgb, var(--color-text-primary) 70%, var(--color-text-secondary) 30%)',
+            lineHeight: 1.3,
+          }}>
+            {routeAbbrev}
+          </span>
+        )}
+      </div>
 
-          {/* Form — same contrast tier as concentration, kept bolder + a
-              subtle pill so it still reads as its own distinct chip. */}
-          {form && (
-            <span style={{
-              fontSize: 12, fontWeight: 600,
-              color: 'color-mix(in srgb, var(--color-text-primary) 70%, var(--color-text-secondary) 30%)',
-              lineHeight: 1.3,
-              letterSpacing: '0.01em',
-              flexShrink: 0,
-            }}>
-              {form}
-            </span>
-          )}
-
-          {/* Route details (decision 24) — injection formulations only,
-              e.g. "IM". Same tier as modifier above. */}
-          {routeAbbrev && (
-            <span style={{
-              fontSize: 12, fontWeight: 500,
-              color: 'color-mix(in srgb, var(--color-text-primary) 70%, var(--color-text-secondary) 30%)',
-              lineHeight: 1.3,
-            }}>
-              {routeAbbrev}
-            </span>
-          )}
-
-          {/* Link icon — moved to the end of the whole formula (name +
-              concentration + form), not flush against the name, so it reads
-              as "this entire entry opens a detail page" rather than being
-              visually tied to the name alone. */}
-          {linkEnabled && (
-            <span style={{
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              flexShrink: 0,
-            }}>
-              <ExternalLink size={11} strokeWidth={1.5} color="var(--color-accent)" style={{ opacity: 0.55 }} />
-            </span>
-          )}
-        </div>
-
-        {/* Image-search icon — opens Google Images for this drug in Egypt. */}
-        <button
-          onClick={handleSearchClick}
-          aria-label={`Search images for ${name}`}
+      {/* Right-edge arrow — linked drugs only. Same quiet look as the
+          arrow on the Drugs list: tertiary colour, half opacity. */}
+      {linkEnabled && (
+        <span
+          aria-hidden="true"
           style={{
-            background: 'none', border: 'none', padding: '0px 0 4px 0',
-            cursor: 'pointer', flexShrink: 0,
-            color: 'var(--color-text-secondary)',
+            height: NAME_FONT_SIZE * NAME_LINE_HEIGHT,
             display: 'flex', alignItems: 'center',
-            lineHeight: 1,
+            flexShrink: 0,
           }}
         >
-          <ScanSearch size={16} strokeWidth={1.8} color="currentColor" />
-        </button>
-      </div>
-    </>
+          <ChevronRight size={16} strokeWidth={2} color="var(--color-text-tertiary)" style={{ opacity: 0.5 }} />
+        </span>
+      )}
+    </div>
   )
 }
 
@@ -727,7 +719,7 @@ function DoseLine({ title, text, note }) {
   const isArabic = ARABIC_RE_DOSE.test(text?.trim().charAt(0)) || ARABIC_RE_DOSE.test(text ?? '')
   const noteIsArabic = ARABIC_RE_DOSE.test(note?.trim().charAt(0)) || ARABIC_RE_DOSE.test(note ?? '')
   return (
-    <div dir="auto" style={{ marginTop: 8, paddingInlineStart: 6, textAlign: isArabic ? 'right' : 'left', unicodeBidi: 'plaintext' }}>
+    <div dir="auto" style={{ marginTop: ROW_GAP_STACK, textAlign: isArabic ? 'right' : 'left', unicodeBidi: 'plaintext' }}>
       {title && (
         <span style={{
           fontSize: 13,
@@ -768,7 +760,7 @@ function DoseLine({ title, text, note }) {
 function MaxDoseLine({ text }) {
   const isArabic = ARABIC_RE_DOSE.test(text?.trim().charAt(0)) || ARABIC_RE_DOSE.test(text ?? '')
   return (
-    <div dir="auto" style={{ marginTop: 4, paddingInlineStart: 6, textAlign: isArabic ? 'right' : 'left', unicodeBidi: 'plaintext' }}>
+    <div dir="auto" style={{ marginTop: ROW_GAP_STACK, textAlign: isArabic ? 'right' : 'left', unicodeBidi: 'plaintext' }}>
       {/* BUG FIX (2026-08-06): previously printed the raw max-dose text with
           no label at all — reads ambiguously next to the dose lines above
           it. Adds a bold "Max dose:" prefix, same weight/color treatment
@@ -838,7 +830,7 @@ function RowNote({ note }) {
         flexDirection: isArabic ? 'row-reverse' : 'row',
         alignItems: 'flex-start',
         gap: 6,
-        marginTop: 6,
+        marginTop: ROW_GAP_STACK,
       }}
     >
       <span style={{
