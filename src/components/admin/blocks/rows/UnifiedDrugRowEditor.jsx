@@ -1136,6 +1136,25 @@ const addOptionButtonStyle = {
   fontFamily: 'var(--font-body)',
 }
 
+// Keeps a popup menu on screen: runs when the menu appears (it only exists
+// while open). If it runs past the right edge it anchors to the trigger's
+// right edge instead; if it runs past the bottom and there is more room
+// above, it opens upward. Plain function ref -- usable anywhere, no hooks.
+function fitMenuToScreen(el) {
+  if (!el) return
+  const r = el.getBoundingClientRect()
+  if (r.right > window.innerWidth - 8) {
+    el.style.left = 'auto'
+    el.style.right = '0'
+  }
+  if (r.bottom > window.innerHeight - 8 && r.top > r.height + 16) {
+    el.style.top = 'auto'
+    el.style.bottom = '100%'
+    el.style.marginTop = '0'
+    el.style.marginBottom = '4px'
+  }
+}
+
 const addDrugDropdownStyle = {
   position: 'absolute', top: '100%', left: 0, marginTop: 4, zIndex: 200,
   background: 'var(--color-surface)',
@@ -1189,7 +1208,7 @@ function AddDrugControls({ onPickBrand, onPickFormulation, onAddManual, disabled
           More options <ChevronDown size={12} />
         </button>
         {menuOpen && (
-          <div ref={menuRef} style={addDrugDropdownStyle}>
+          <div ref={el => { menuRef.current = el; fitMenuToScreen(el) }} style={{ ...addDrugDropdownStyle, maxWidth: 'calc(100vw - 16px)' }}>
             <button
               type="button"
               onClick={() => { setMenuOpen(false); onPickFormulation() }}
@@ -1330,7 +1349,7 @@ function OptionActionsMenu({
         <MoreHorizontal size={13} />
       </button>
       {open && (
-        <div style={addDrugDropdownStyle}>
+        <div ref={fitMenuToScreen} style={{ ...addDrugDropdownStyle, maxWidth: 'calc(100vw - 16px)' }}>
           {showLinkToggle && (
             <button
               type="button"
@@ -3273,7 +3292,7 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                             <MoreHorizontal size={13} />
                           </button>
                           {doseMenuOpenGroupIdx === groupIdx && (
-                            <div ref={doseMenuRef} style={{ ...addDrugDropdownStyle, minWidth: 150 }}>
+                            <div ref={el => { doseMenuRef.current = el; fitMenuToScreen(el) }} style={{ ...addDrugDropdownStyle, minWidth: 150, maxWidth: 'calc(100vw - 16px)' }}>
                               {(group.dose_lines ?? []).some(l => l.instruction?.trim()) && (
                                 <button
                                   type="button"
