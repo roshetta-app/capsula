@@ -512,10 +512,10 @@ const doseFieldInputStyle = {
   outline: 'none',
 }
 const doseDashedButtonStyle = {
-  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-  width: '100%', boxSizing: 'border-box', padding: '9px 10px',
-  border: '1.5px dashed var(--color-border)', borderRadius: 10,
-  background: 'none', color: 'var(--color-text-secondary)',
+  display: 'inline-flex', alignItems: 'center', gap: 6,
+  padding: '7px 14px', boxSizing: 'border-box',
+  border: '1px solid var(--color-border)', borderRadius: 99,
+  background: 'var(--color-surface)', color: 'var(--color-text-secondary)',
   fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-body)', cursor: 'pointer',
 }
 const dosePrimaryButtonStyle = {
@@ -543,8 +543,8 @@ const doseOpenPanelStyle = {
 const doseClosedRowStyle = {
   display: 'flex', alignItems: 'flex-start', gap: 10,
   width: '100%', boxSizing: 'border-box', padding: '10px 12px', textAlign: 'left',
-  border: '1px solid var(--color-border)', borderRadius: 10,
-  backgroundColor: 'var(--color-surface)', cursor: 'pointer',
+  border: 'none', borderRadius: 10,
+  backgroundColor: 'var(--color-bg)', cursor: 'pointer',
   fontFamily: 'var(--font-body)',
 }
 
@@ -856,61 +856,134 @@ function EditableMaxDose({
 // empty. Previously this was a plain, permanently read-only badge, since
 // dose_who was only ever set by a library pick — now that a dose can be
 // built from scratch (see addBracket below), it needs to be typeable too.
-function EditablePopulation({ value, onChange }) {
-  // 2026-11-08 REDESIGN: the pill itself is the button — tap it to rename.
-  // No hover needed, so it works on a phone.
-  const [isEditing, setIsEditing] = useState(false)
-
-  if (isEditing) {
-    return (
-      <input
-        type="text"
-        value={value ?? ''}
-        onChange={e => onChange(e.target.value)}
-        placeholder="Who is this dose for? e.g. Adult"
-        dir="auto"
-        autoFocus
-        style={{ ...doseFieldInputStyle, flex: 1, minWidth: 0 }}
-        onBlur={() => setIsEditing(false)}
-        onKeyDown={e => { if (e.key === 'Enter') setIsEditing(false) }}
-      />
-    )
+// ─── Populations inside one drug ────────────────────────────────────────────
+// 2026-11-08: one drug can carry several populations (Adult, Child ...), shown
+// one at a time. The first population lives in the group's normal dose fields;
+// the others live in 'extra_populations'. To keep every existing dose function
+// working unchanged, the editor looks at the group through projectGroup() —
+// the chosen population's fields appear as the group's dose fields — and
+// unprojectGroup() folds any change back into the right population.
+function projectGroup(g, pi) {
+  if (!pi) return { ...g, _pi: 0 }
+  const ex = (g.extra_populations ?? [])[pi - 1] ?? {}
+  return {
+    ...g,
+    _pi: pi,
+    _primary: {
+      dose: g.dose ?? null, dose_who: g.dose_who ?? null, dose_lines: g.dose_lines ?? [],
+      dose_max: g.dose_max ?? null, dose_max_population_id: g.dose_max_population_id ?? null,
+    },
+    dose: null,
+    dose_who: ex.dose_who ?? null,
+    dose_lines: ex.dose_lines ?? [],
+    dose_max: ex.dose_max ?? null,
+    dose_max_population_id: ex.dose_max_population_id ?? null,
   }
+}
 
-  if (!value) {
-    return (
-      <button
-        type="button"
-        onClick={() => setIsEditing(true)}
-        style={{
-          display: 'inline-flex', alignItems: 'center', gap: 5,
-          padding: '5px 12px', borderRadius: 99,
-          border: '1.5px dashed var(--color-border)', background: 'none',
-          color: 'var(--color-text-secondary)',
-          fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-body)', cursor: 'pointer',
-        }}
-      >
-        <Plus size={12} />
-        Who is it for?
-      </button>
-    )
+function unprojectGroup(g) {
+  const { _pi, _primary, ...rest } = g
+  if (!_pi || !_primary) return rest
+  const extras = [...(rest.extra_populations ?? [])]
+  const existing = extras[_pi - 1] ?? {}
+  extras[_pi - 1] = {
+    ...existing,
+    id: existing.id ?? `popx-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    dose_who: rest.dose_who ?? null,
+    dose_lines: rest.dose_lines ?? [],
+    dose_max: rest.dose_max ?? null,
+    dose_max_population_id: rest.dose_max_population_id ?? null,
+  }
+  return {
+    ...rest,
+    dose: _primary.dose,
+    dose_who: _primary.dose_who,
+    dose_lines: _primary.dose_lines,
+    dose_max: _primary.dose_max,
+    dose_max_population_id: _primary.dose_max_population_id,
+    extra_populations: extras,
+  }
+}
+
+// One row of tabs: one tab per population, the open one highlighted. Tap the
+// open tab to rename it, tap another tab to switch, tap "+ Population" to add.
+function PopulationTabs({ whos, activeIdx, onSelect, onRename, onAdd }) {
+  const [renaming, setRenaming] = useState(false)
+  useEffect(() => { setRenaming(false) }, [activeIdx])
+
+  const chipBase = {
+    display: 'inline-flex', alignItems: 'center', gap: 6,
+    padding: '5px 12px', borderRadius: 99,
+    fontSize: 13, fontWeight: 700, fontFamily: 'var(--font-body)', cursor: 'pointer',
   }
 
   return (
-    <button
-      type="button"
-      onClick={() => setIsEditing(true)}
-      aria-label="Edit population"
-      style={{
-        display: 'inline-flex', alignItems: 'center', gap: 6,
-        padding: '5px 12px', borderRadius: 99, border: 'none',
-        color: 'var(--color-accent)', background: 'var(--color-accent-light)',
-        fontSize: 13, fontWeight: 700, fontFamily: 'var(--font-body)', cursor: 'pointer',
-      }}
-    >
-      {doseWhoLabel(value)}
-      <Edit2 size={12} />
-    </button>
+    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
+      {whos.map((who, i) => {
+        const text = who ? doseWhoLabel(who) : (whos.length === 1 ? 'Who is it for?' : `Population ${i + 1}`)
+        if (i === activeIdx && renaming) {
+          return (
+            <input
+              key={i}
+              type="text"
+              value={who ?? ''}
+              onChange={e => onRename(e.target.value)}
+              placeholder="Who is this dose for? e.g. Adult"
+              dir="auto"
+              autoFocus
+              style={{ ...doseFieldInputStyle, flex: 1, minWidth: 140 }}
+              onBlur={() => setRenaming(false)}
+              onKeyDown={e => { if (e.key === 'Enter') setRenaming(false) }}
+            />
+          )
+        }
+        if (i === activeIdx) {
+          return (
+            <button
+              key={i}
+              type="button"
+              onClick={() => setRenaming(true)}
+              aria-label="Rename this population"
+              style={{
+                ...chipBase, border: 'none',
+                color: 'var(--color-accent)', background: 'var(--color-accent-light)',
+                fontStyle: who ? 'normal' : 'italic',
+              }}
+            >
+              {text}
+              <Edit2 size={12} />
+            </button>
+          )
+        }
+        return (
+          <button
+            key={i}
+            type="button"
+            onClick={() => onSelect(i)}
+            style={{
+              ...chipBase, background: 'none',
+              border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)',
+              fontStyle: who ? 'normal' : 'italic',
+            }}
+          >
+            {text}
+          </button>
+        )
+      })}
+      <button
+        type="button"
+        onClick={onAdd}
+        aria-label="Add another population"
+        style={{
+          ...chipBase, fontWeight: 600, fontSize: 12,
+          border: '1.5px dashed var(--color-border)', background: 'none',
+          color: 'var(--color-text-secondary)',
+        }}
+      >
+        <Plus size={12} />
+        Population
+      </button>
+    </div>
   )
 }
 
@@ -2288,7 +2361,13 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
   // incoming row on mount via toDrugOptions(); all mutations go through
   // emitGroups() which calls setGroups and then fromDrugOptions() → onChange
   // so the external DRUG_ROW_TEMPLATE shape is preserved unchanged.
-  const [groups, setGroups] = useState(() => toDrugOptions(row))
+  const [rawGroups, setRawGroups] = useState(() => toDrugOptions(row))
+  // Which population is open in each drug card (group_id -> position, 0 = first).
+  const [activePops, setActivePops] = useState({})
+  const activeIndexFor = g => Math.min(activePops[g.group_id] ?? 0, (g.extra_populations ?? []).length)
+  // Everything below reads and writes 'groups' as the open population's view of
+  // each card (see projectGroup); emitGroups folds the changes back in.
+  const groups = rawGroups.map(g => projectGroup(g, activeIndexFor(g)))
 
   // Add-option picker modals. Replace the old altBrandPickerOpen /
   // altFormulationPickerOpen / altScopedBrandPickerOpen state from Phase 1.
@@ -2363,6 +2442,7 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
   // Same confirm-first requirement as Save/Restore above, styled red like
   // PromoteAlternativeDialog's "Delete all" since this can't be undone.
   const [confirmClearGroup, setConfirmClearGroup] = useState(null) // groupIdx | null
+  const [confirmRemovePop, setConfirmRemovePop] = useState(null) // groupIdx | null
 
   // NOISE-REDUCTION PASS (2026-08-08): "Restore from library" used to sit
   // as its own permanently-visible underlined link at the bottom of the
@@ -2387,9 +2467,57 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
   // ── Mutation helpers ───────────────────────────────────────────────────
 
   function emitGroups(nextGroups) {
-    setGroups(nextGroups)
-    const nextRow = fromDrugOptions(row, nextGroups)
+    const nextRaw = nextGroups.map(unprojectGroup)
+    setRawGroups(nextRaw)
+    const nextRow = fromDrugOptions(row, nextRaw)
     onChange(nextRow)
+  }
+
+  // ── Populations inside one drug ──
+  function addPopulation(groupIdx) {
+    const g = rawGroups[groupIdx]
+    const extras = [...(g.extra_populations ?? []), {
+      id: `popx-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      dose_who: null, dose_lines: [], dose_max: null, dose_max_population_id: null,
+    }]
+    const nextRaw = rawGroups.map((x, i) => i === groupIdx ? { ...x, extra_populations: extras } : x)
+    setRawGroups(nextRaw)
+    onChange(fromDrugOptions(row, nextRaw))
+    setActivePops(prev => ({ ...prev, [g.group_id]: extras.length }))
+    setOpenEditorId(null)
+  }
+
+  function selectPopulation(groupIdx, position) {
+    setActivePops(prev => ({ ...prev, [rawGroups[groupIdx].group_id]: position }))
+    setOpenEditorId(null)
+  }
+
+  // Removes the open population. If it was the first, the next one moves up.
+  function removePopulation(groupIdx) {
+    const g = rawGroups[groupIdx]
+    const pi = activeIndexFor(g)
+    const pops = [
+      { dose: g.dose ?? null, dose_who: g.dose_who ?? null, dose_lines: g.dose_lines ?? [], dose_max: g.dose_max ?? null, dose_max_population_id: g.dose_max_population_id ?? null },
+      ...(g.extra_populations ?? []),
+    ]
+    if (pops.length < 2) return
+    pops.splice(pi, 1)
+    const [first, ...rest] = pops
+    const nextRaw = rawGroups.map((x, i) => i === groupIdx
+      ? {
+          ...x,
+          dose: first.dose ?? null,
+          dose_who: first.dose_who ?? null,
+          dose_lines: first.dose_lines ?? [],
+          dose_max: first.dose_max ?? null,
+          dose_max_population_id: first.dose_max_population_id ?? null,
+          extra_populations: rest,
+        }
+      : x)
+    setRawGroups(nextRaw)
+    onChange(fromDrugOptions(row, nextRaw))
+    setActivePops(prev => ({ ...prev, [g.group_id]: Math.max(0, pi - 1) }))
+    setOpenEditorId(null)
   }
 
   // Update a single option within a group (identified by groupIdx + option.id).
@@ -2888,8 +3016,9 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
           }
         : g
       )
-      setGroups(nextGroups)
-      onChange(fromDrugOptions(row, nextGroups))
+      const nextRaw = nextGroups.map(unprojectGroup)
+      setRawGroups(nextRaw)
+      onChange(fromDrugOptions(row, nextRaw))
 
       setSavedGroupIdx(groupIdx)
       setTimeout(() => {
@@ -3214,16 +3343,19 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                     the row. Padding/gap tightened slightly in the same
                     pass. */}
                 <div style={{
-                  display: 'flex', flexDirection: 'column', gap: 5,
+                  display: 'flex', flexDirection: 'column', gap: 10,
                   border: '1px solid var(--color-border)',
                   borderRadius: 12,
-                  padding: '8px 10px',
-                  backgroundColor: 'var(--color-bg)',
+                  padding: 12,
+                  backgroundColor: 'var(--color-surface)',
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                    <EditablePopulation
-                      value={group.dose_who}
-                      onChange={val => updateGroupDoseWho(groupIdx, val)}
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+                    <PopulationTabs
+                      whos={[rawGroups[groupIdx].dose_who ?? null, ...(rawGroups[groupIdx].extra_populations ?? []).map(e => e.dose_who ?? null)]}
+                      activeIdx={activeIndexFor(rawGroups[groupIdx])}
+                      onSelect={position => selectPopulation(groupIdx, position)}
+                      onRename={val => updateGroupDoseWho(groupIdx, val)}
+                      onAdd={() => addPopulation(groupIdx)}
                     />
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       {/* DECLUTTER PASS 3 (Direction 1, 2026-08-08): the
@@ -3287,14 +3419,48 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                                 onClick={() => { setDoseMenuOpenGroupIdx(null); setConfirmClearGroup(groupIdx) }}
                                 style={{ ...addDrugDropdownItemStyle, color: '#ef4444' }}
                               >
-                                Clear doses
+                                {(rawGroups[groupIdx].extra_populations ?? []).length > 0 ? 'Clear this population' : 'Clear doses'}
                               </button>
+                              {(rawGroups[groupIdx].extra_populations ?? []).length > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => { setDoseMenuOpenGroupIdx(null); setConfirmRemovePop(groupIdx) }}
+                                  style={{ ...addDrugDropdownItemStyle, color: '#ef4444' }}
+                                >
+                                  Remove this population
+                                </button>
+                              )}
                             </div>
                           )}
                         </div>
                       )}
                     </div>
                   </div>
+
+                  {confirmRemovePop === groupIdx && (
+                    <div style={{
+                      display: 'flex', flexDirection: 'column', gap: 8,
+                      padding: '10px 12px',
+                      border: '1px solid #ef4444', borderRadius: 10,
+                      backgroundColor: '#ef444410',
+                    }}>
+                      <span style={{ fontSize: 13, color: 'var(--color-text-primary)' }}>
+                        Remove this population and all its brackets from this drug?
+                      </span>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button
+                          type="button"
+                          onClick={() => { setConfirmRemovePop(null); removePopulation(groupIdx) }}
+                          style={{ ...dosePrimaryButtonStyle, background: '#ef4444' }}
+                        >
+                          Remove
+                        </button>
+                        <button type="button" onClick={() => setConfirmRemovePop(null)} style={doseSecondaryButtonStyle}>
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                   {confirmClearGroup === groupIdx && (
                     <div style={{
@@ -3436,14 +3602,15 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                     {/* 2026-11-08 REDESIGN: one clear, full-width Add bracket
                         button under the last bracket (it used to be a tiny
                         underlined link in the header). */}
-                    <button
-                      type="button"
-                      onClick={() => addBracket(groupIdx)}
-                      style={doseDashedButtonStyle}
-                    >
-                      <Plus size={14} />
-                      Add bracket
-                    </button>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: 8 }}>
+                      <button
+                        type="button"
+                        onClick={() => addBracket(groupIdx)}
+                        style={doseDashedButtonStyle}
+                      >
+                        <Plus size={14} />
+                        Add bracket
+                      </button>
 
                     {/* DECLUTTER PASS 4 (Direction 1, 2026-08-08): reverted
                         to its own line at the bottom of the dose card, now
@@ -3452,6 +3619,7 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                         only a max dose that traces back to a real library
                         population, whose group is still linked to a
                         formulation, can be saved back. */}
+                      <div style={{ flex: (group.dose_max || openEditorId === `max-${groupIdx}`) ? '1 1 100%' : '0 0 auto', minWidth: 0 }}>
                     <EditableMaxDose
                       value={group.dose_max}
                       onChange={val => updateGroupDoseMax(groupIdx, val)}
@@ -3471,6 +3639,8 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                       isSaved={savedMaxDoseGroupIdx === groupIdx}
                       saveError={maxDoseSaveError?.groupIdx === groupIdx ? maxDoseSaveError.message : null}
                     />
+                      </div>
+                    </div>
                   </div>
                 </div>
 

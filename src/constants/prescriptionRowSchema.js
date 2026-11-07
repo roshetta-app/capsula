@@ -224,6 +224,10 @@ export const DRUG_ROW_TEMPLATE = {
   // be safely saved back. Requires DoseRowList.jsx's population id
   // backfill fix to be in place for any given formulation.
   dose_max_population_id: null,
+  // 2026-11-08: more populations for this same drug (Adult is the fields above,
+  // Child etc. live here). Each: { id, dose_who, dose_lines, dose_max,
+  // dose_max_population_id }. The app shows one population at a time.
+  extra_populations: [],
   note: null,
   drug_note: null,
   source_flag: null,
@@ -334,6 +338,7 @@ export const ALTERNATIVE_DRUG_TEMPLATE = {
   group_note: null,
   group_dose_max: null,
   group_dose_max_population_id: null,
+  group_extra_populations: [],
   // OR/AND DIVIDER TOGGLE ADDENDUM (2026-08-08): the word shown on the
   // divider that sits directly before this option ('or' | 'and'). Lives
   // per-option (not per-row) since a row can have several independent
@@ -555,6 +560,7 @@ export function promoteAlternativeToMain(row, alternativeIndex) {
   // MAX-DOSE SAVE-TO-LIBRARY ADDENDUM (2026-08-06): mirrors promotedDoseMax
   // immediately above exactly.
   const promotedDoseMaxPopulationId = chosen.group_dose_max_population_id ?? row.dose_max_population_id ?? null;
+  const promotedExtraPopulations = (chosen.dose_lines?.length ? chosen.group_extra_populations : row.extra_populations) ?? [];
 
   return {
     ...DRUG_ROW_TEMPLATE,
@@ -573,6 +579,7 @@ export function promoteAlternativeToMain(row, alternativeIndex) {
     dose_lines: promotedDoseLines,
     dose_max: promotedDoseMax,
     dose_max_population_id: promotedDoseMaxPopulationId,
+    extra_populations: promotedExtraPopulations,
     note: promotedNote,
     // Per-drug note (Decision 5 two-slot model) — travels with the option.
     drug_note: chosen.note ?? null,
@@ -772,6 +779,7 @@ export function toDrugOptions(row) {
     // MAX-DOSE SAVE-TO-LIBRARY ADDENDUM (2026-08-06): mirrors 'dose_max'
     // immediately above.
     dose_max_population_id: row.dose_max_population_id ?? null,
+    extra_populations: row.extra_populations ?? [],
     note: row.note,
   };
 
@@ -855,6 +863,7 @@ export function toDrugOptions(row) {
       // MAX-DOSE SAVE-TO-LIBRARY ADDENDUM (2026-08-06): mirrors 'dose_max'
       // immediately above.
       dose_max_population_id: alt.group_dose_max_population_id ?? null,
+      extra_populations: alt.group_extra_populations ?? [],
       // PHASE A BUG FIX (2026-06-26): no longer falls back to alt.note.
       // The previous 'alt.group_note ?? alt.note ?? null' fallback was
       // written for true legacy data (alternatives saved before
@@ -959,6 +968,7 @@ export function fromDrugOptions(row, groups) {
       // MAX-DOSE SAVE-TO-LIBRARY ADDENDUM (2026-08-06): mirrors
       // group_dose_max immediately above.
       group_dose_max_population_id: sharesMainGroup ? null : (grp.dose_max_population_id ?? null),
+      group_extra_populations: sharesMainGroup ? [] : (grp.extra_populations ?? []),
     };
   });
 
@@ -982,6 +992,7 @@ export function fromDrugOptions(row, groups) {
     // MAX-DOSE SAVE-TO-LIBRARY ADDENDUM (2026-08-06): mirrors 'dose_max'
     // immediately above.
     dose_max_population_id: mainGrp.dose_max_population_id ?? null,
+    extra_populations: mainGrp.extra_populations ?? [],
     note: mainGrp.note,
     // PHASE A BUG FIX (2026-06-26): write the main option's own per-drug
     // note back onto drug_note (the group note above is a separate,
