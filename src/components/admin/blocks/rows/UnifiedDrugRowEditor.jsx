@@ -2860,11 +2860,11 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
       for (const line of linesToSave) {
         const matchIdx = line.bracket_id ? nextBrackets.findIndex(b => b.id === line.bracket_id) : -1
         if (matchIdx >= 0) {
-          nextBrackets[matchIdx] = { ...nextBrackets[matchIdx], bracket: line.bracket_title ?? '', instruction: line.instruction ?? '' }
+          nextBrackets[matchIdx] = { ...nextBrackets[matchIdx], bracket: line.bracket_title ?? '', instruction: line.instruction ?? '', note: line.note ?? '' }
           stampedBracketIds[line.id] = nextBrackets[matchIdx].id
         } else {
           const newBracketId = `bracket-${Date.now()}-${Math.random().toString(36).slice(2)}`
-          nextBrackets.push({ id: newBracketId, bracket: line.bracket_title ?? '', instruction: line.instruction ?? '' })
+          nextBrackets.push({ id: newBracketId, bracket: line.bracket_title ?? '', instruction: line.instruction ?? '', note: line.note ?? '' })
           stampedBracketIds[line.id] = newBracketId
         }
       }
