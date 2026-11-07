@@ -468,6 +468,7 @@ function EditableDoseLine({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
       {isEditing ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <span style={editLineLabelStyle}>Title (shown in bold before the dose)</span>
           <input
             type="text"
             value={line.bracket_title ?? ''}
@@ -476,6 +477,7 @@ function EditableDoseLine({
             dir="auto"
             style={editLineInputStyle}
           />
+          <span style={editLineLabelStyle}>Instruction (the dose itself)</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             <input
               type="text"
@@ -495,6 +497,7 @@ function EditableDoseLine({
               <Check size={13} />
             </button>
           </div>
+          <span style={editLineLabelStyle}>Note (optional, small italic text under the dose)</span>
           <textarea
             value={line.note ?? ''}
             onChange={e => onUpdateField('note', e.target.value || null)}
@@ -503,6 +506,11 @@ function EditableDoseLine({
             rows={1}
             style={{ ...editLineInputStyle, resize: 'vertical', fontStyle: 'italic' }}
           />
+          {canSaveToLibrary && (
+            <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
+              Edits here change this sheet only. Tap Save to library to update the drug page too.
+            </span>
+          )}
         </div>
       ) : (
         <div
@@ -541,7 +549,7 @@ function EditableDoseLine({
               accent color the moment the row is next hovered after a save,
               same feedback as before, just not competing for attention
               while the row is at rest. */}
-          {isHovered && (
+          {(
             <>
               <button
                 type="button"
@@ -561,12 +569,16 @@ function EditableDoseLine({
                   aria-label="Save this dose line back to the drug library"
                   style={{
                     ...lineIconButtonStyle,
-                    color: isSaved ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
+                    width: 'auto', padding: '0 6px', gap: 4,
+                    fontSize: 11, fontWeight: 600, fontFamily: 'var(--font-body)',
+                    border: '1px solid var(--color-border)',
+                    color: isSaved ? 'var(--color-accent)' : 'var(--color-text-secondary)',
                     cursor: isSaving ? 'default' : 'pointer',
                     opacity: isSaving ? 0.5 : 1,
                   }}
                 >
-                  <Library size={13} />
+                  <Library size={12} />
+                  Save to library
                 </button>
               )}
               <button
@@ -646,6 +658,12 @@ const editLineInputStyle = {
   backgroundColor: 'var(--color-surface)',
   color: 'var(--color-text-secondary)',
   outline: 'none',
+}
+
+const editLineLabelStyle = {
+  fontSize: 10, fontWeight: 700, letterSpacing: '0.03em',
+  color: 'var(--color-text-tertiary)',
+  fontFamily: 'var(--font-body)',
 }
 
 const lineIconButtonStyle = {

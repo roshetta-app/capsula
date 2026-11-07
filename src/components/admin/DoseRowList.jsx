@@ -263,23 +263,29 @@ export default function DoseRowList({ doses = [], onChange, disabled = false }) 
                 }}
               >
                 <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr 56px', gap: 'var(--space-2)', alignItems: 'flex-start' }}>
-                  <input
-                    type="text"
-                    value={bracket.bracket ?? ''}
-                    onChange={e => updateBracket(currentIndex, bIdx, 'bracket', e.target.value)}
-                    placeholder="Bracket title (optional)"
-                    disabled={disabled}
-                    style={inputBase}
-                  />
-                  <textarea
-                    value={bracket.instruction ?? ''}
-                    onChange={e => updateBracket(currentIndex, bIdx, 'instruction', e.target.value)}
-                    placeholder="Dose instruction…"
-                    disabled={disabled}
-                    dir="auto"
-                    rows={2}
-                    style={{ ...inputBase, resize: 'vertical', fontFamily: 'var(--font-body)' }}
-                  />
+                  <div>
+                    <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.03em', color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 2 }}>{`BRACKET ${bIdx + 1} TITLE`}</span>
+                    <input
+                      type="text"
+                      value={bracket.bracket ?? ''}
+                      onChange={e => updateBracket(currentIndex, bIdx, 'bracket', e.target.value)}
+                      placeholder="e.g. 5-7.9kg (optional)"
+                      disabled={disabled}
+                      style={inputBase}
+                    />
+                  </div>
+                  <div>
+                    <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.03em', color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 2 }}>{`BRACKET ${bIdx + 1} DOSE INSTRUCTION (required)`}</span>
+                    <textarea
+                      value={bracket.instruction ?? ''}
+                      onChange={e => updateBracket(currentIndex, bIdx, 'instruction', e.target.value)}
+                      placeholder="Dose instruction…"
+                      disabled={disabled}
+                      dir="auto"
+                      rows={2}
+                      style={{ ...inputBase, resize: 'vertical', fontFamily: 'var(--font-body)' }}
+                    />
+                  </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                     {!disabled && (
                       <>
@@ -327,6 +333,7 @@ export default function DoseRowList({ doses = [], onChange, disabled = false }) 
                   </div>
                 )}
 
+                <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.03em', color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 2 }}>{`BRACKET ${bIdx + 1} NOTE (optional)`}</span>
                 <textarea
                   value={bracket.note ?? ''}
                   onChange={e => updateBracket(currentIndex, bIdx, 'note', e.target.value)}
