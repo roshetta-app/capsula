@@ -174,6 +174,10 @@ import { useState, useRef, useEffect } from 'react'
 import { Link, Plus, X, Library, RotateCcw, Edit2, Check, ChevronDown, MoreHorizontal } from 'lucide-react'
 import DrugPickerModal from '../../DrugPickerModal'
 import DrugSearchField from '../../DrugSearchField'
+import SharedDrugCard from '../../../SharedDrugCard'
+import { useCategories } from '../../../../hooks/useCategories'
+import { supabase } from '../../../../lib/supabase'
+import { fetchFlatDrugsByBrandId } from '../../../../lib/queries'
 import { DRUG_FORMS } from '../../../../config/forms'
 import { DRUG_CATEGORIES } from '../../../../config/categories'
 import {
@@ -406,6 +410,70 @@ function resolveDosePick(dosesStructured) {
     return { needsChoice: false, ...buildDoseLinesFromPopulation(populations[0]) }
   }
   return { needsChoice: true, populations }
+}
+
+// ─── LinkedDrugCard ──────────────────────────────────────────────────────────
+// 2026-11-08: a drug picked from the library is now shown with the same
+// shared drug card the app and the drug picker use (icon, name, strength, form,
+// generic line, Arabic name), so the editor shows exactly what the pharmacist
+// will see. The card's data is loaded once per brand and kept for the session.
+// While it loads, or if the brand can't be loaded (for example unpublished),
+// the older name row ('fallback') is shown instead, so nothing ever goes blank.
+// The change (pencil) button and the options menu sit on the right of the card.
+const linkedDrugCache = new Map()
+
+function LinkedDrugCard({ brandId, onRequestChange, extraAction, fallback }) {
+  const { categories } = useCategories()
+  const [drug, setDrug] = useState(() => linkedDrugCache.get(brandId) ?? null)
+
+  useEffect(() => {
+    let cancelled = false
+    const cached = linkedDrugCache.get(brandId)
+    if (cached) { setDrug(cached); return undefined }
+    setDrug(null)
+    fetchFlatDrugsByBrandId(supabase, brandId)
+      .then(rows => {
+        const found = rows?.[0]
+        if (cancelled || !found) return
+        linkedDrugCache.set(brandId, found)
+        setDrug(found)
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [brandId])
+
+  if (!drug) return fallback
+
+  return (
+    <div style={{
+      border: '1px solid var(--color-border)', borderRadius: 12,
+      padding: '0 8px 0 10px', backgroundColor: 'var(--color-surface)',
+    }}>
+      <SharedDrugCard
+        drug={drug}
+        categories={categories}
+        isDark={false}
+        onTap={() => {}}
+        disableTap
+        showChevron={false}
+        isLast
+        trailing={(
+          <>
+            <button
+              type="button"
+              onClick={onRequestChange}
+              aria-label="Change drug"
+              title="Change drug"
+              style={{ ...lineIconButtonStyle, width: 30, height: 30 }}
+            >
+              <Edit2 size={14} />
+            </button>
+            {extraAction}
+          </>
+        )}
+      />
+    </div>
+  )
 }
 
 // ─── EditableDoseLine ────────────────────────────────────────────────────────
@@ -1828,7 +1896,8 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onOpti
               per the locked decision, manual entry is a strictly no-brand path,
               so the brand-name search box never shows alongside the manual
               fields below. */}
-          {!genericOnlyMode && (
+          {!genericOnlyMode && (() => {
+            const searchField = (
             <DrugSearchField
               value={displayName}
               isLinked={isLinked}
@@ -1843,7 +1912,16 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onOpti
               extraAction={nameRowExtraActions}
               onRequestBrandPicker={() => setBrandPickerOpen(true)}
             />
-          )}
+            )
+            return option.brand_id ? (
+              <LinkedDrugCard
+                brandId={option.brand_id}
+                onRequestChange={() => setBrandPickerOpen(true)}
+                extraAction={nameRowExtraActions}
+                fallback={searchField}
+              />
+            ) : searchField
+          })()}
 
           {/* genericOnlyMode with no brand_name yet: DrugSearchField is
               suppressed above (manual entry is a no-brand path) and nothing
