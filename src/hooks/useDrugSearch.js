@@ -198,10 +198,18 @@ const NO_KEYWORDS = []
 // { allowClass: false } Class does not exist for this search: a 'class' mode is read as
 // Brand, and the Class hint (the 'See N matches in Class mode' counts) is never worked out.
 // The Add drugs screen (12.5) uses this. The default is unchanged (Class allowed).
+// { logSearches: false } turns the search logging off (the CMS drug pop-up uses this).
 const NO_OPTIONS = {}
+const NOOP_LOG = () => {}
 
 export function useDrugSearch(drugs, mode = 'brand', classKeywords = NO_KEYWORDS, options = NO_OPTIONS) {
   const allowClass = options.allowClass !== false
+  // 2026-11-07 (CMS drug picker): { logSearches: false } switches the usage and missing-drug
+  // logging off, so the admin's searches in the CMS pop-up are not counted as real user searches.
+  // The default is unchanged (logging on).
+  const logging  = options.logSearches !== false
+  const logEvent = logging ? logUsageEvent : NOOP_LOG
+  const logGap   = logging ? logSearchGap : NOOP_LOG
   const [query,          setQuery]          = useState('')
   const [results,        setResults]        = useState(drugs)
   const [queryTooShort,  setQueryTooShort]  = useState(false)
@@ -329,13 +337,13 @@ export function useDrugSearch(drugs, mode = 'brand', classKeywords = NO_KEYWORDS
       const classTerm = trimmed.toLowerCase()
       if (classTerm.length >= 2 && !loggedSearchTermsRef.current.has(`class:${classTerm}`)) {
         loggedSearchTermsRef.current.add(`class:${classTerm}`)
-        logUsageEvent('drug_search', null, classTerm, 'class')
+        logEvent('drug_search', null, classTerm, 'class')
       }
       // Count a keyword once per session, only when it was typed in full.
       for (const kw of keywordHitsToLog(found)) {
         if (loggedKeywordHitsRef.current.has(kw)) continue
         loggedKeywordHitsRef.current.add(kw)
-        logUsageEvent('class_keyword_hit', null, kw, 'class')
+        logEvent('class_keyword_hit', null, kw, 'class')
       }
       if (found.classes.length + found.subclasses.length > 0) {
         setSuggestions([])
@@ -363,11 +371,11 @@ export function useDrugSearch(drugs, mode = 'brand', classKeywords = NO_KEYWORDS
         if (classSuggestions.length > 0) {
           if (!loggedNearMissTermsRef.current.has(classKey)) {
             loggedNearMissTermsRef.current.add(classKey)
-            logUsageEvent('drug_search_near_miss', null, classGapTerm, 'class')
+            logEvent('drug_search_near_miss', null, classGapTerm, 'class')
           }
         } else if (!(asGeneric || asBrand) && !loggedGapTermsRef.current.has(classKey)) {
           loggedGapTermsRef.current.add(classKey)
-          logSearchGap(trimmed, 'drugs', 'class')
+          logGap(trimmed, 'drugs', 'class')
         }
       }
       return
@@ -427,7 +435,7 @@ export function useDrugSearch(drugs, mode = 'brand', classKeywords = NO_KEYWORDS
     // term per session, independent of result count.
     if (normalized.length >= 2 && !loggedSearchTermsRef.current.has(normalized)) {
       loggedSearchTermsRef.current.add(normalized)
-      logUsageEvent('drug_search', null, normalized)
+      logEvent('drug_search', null, normalized)
     }
 
     const normalizedForGap = normalizeSearchText(trimmed)
@@ -442,7 +450,7 @@ export function useDrugSearch(drugs, mode = 'brand', classKeywords = NO_KEYWORDS
       !loggedNearMissTermsRef.current.has(`${currentMode}:${normalizedForGap}`)
     ) {
       loggedNearMissTermsRef.current.add(`${currentMode}:${normalizedForGap}`)
-      logUsageEvent('drug_search_near_miss', null, normalizedForGap, currentMode)
+      logEvent('drug_search_near_miss', null, normalizedForGap, currentMode)
     }
 
     // Real content gap (§4.6/§4.7): the search itself found nothing AND
@@ -473,9 +481,9 @@ export function useDrugSearch(drugs, mode = 'brand', classKeywords = NO_KEYWORDS
       !loggedGapTermsRef.current.has(gapDedupKey)
     ) {
       loggedGapTermsRef.current.add(gapDedupKey)
-      logSearchGap(trimmed, 'drugs', currentMode)
+      logGap(trimmed, 'drugs', currentMode)
     }
-  }, [drugs, allowClass])
+  }, [drugs, allowClass, logEvent, logGap])
 
   // 150ms debounce — reacts to query typing AND mode toggling. No index
   // rebuild happens here either way (both indexes are already built above),

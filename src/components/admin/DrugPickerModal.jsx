@@ -1,6 +1,11 @@
 /**
  * src/components/admin/DrugPickerModal.jsx
  * Phase 3D — Prescriptions Editor
+ * 2026-11-07 (CMS drug picker matches the app search): Pick a brand and Pick a formulation now use
+ * DrugPickerSearch.jsx, the app's own search (same bar, search engine, cards and messages) on the
+ * app's drug list. What onSelect hands back is unchanged. The old live brand / formulation searches
+ * and result rows are gone. The brand-scoped mode (same formulation, different brand, and its add
+ * new brand button) is untouched and keeps its own live search.
  *
  * Modal for selecting a brand or formulation to add as a drug slot.
  *
@@ -41,72 +46,22 @@ import { useState, useEffect, useRef } from 'react'
 import { Plus } from 'lucide-react'
 import Modal from './Modal'
 import SearchBar from '../ui/SearchBar'
-import SharedDrugCard from '../SharedDrugCard'
-import { supabase } from '../../lib/supabase'
-import { findBrandMatch, insertBrand, fetchBrandsForFormulation, searchDrugsForPicker } from '../../lib/adminQueries'
-import { useCategories } from '../../hooks/useCategories'
+import DrugPickerSearch from './DrugPickerSearch'
+import { findBrandMatch, insertBrand, fetchBrandsForFormulation } from '../../lib/adminQueries'
 
-// ─── Formulation query (existing) ─────────────────────────────────────────────
+// ─── The app's drug, turned into the shapes this pop-up has always returned ───
 
-async function searchFormulationsForPicker(query) {
-  // Fetch all published formulations with generic + brand names.
-  // Filter client-side with the query string (dataset is small enough).
-  const { data, error } = await supabase
-    .from('formulations')
-    .select(`
-      id, slug, concentration, form, route,
-      doses_structured, default_dose_override,
-      generics ( id, name_en, slug, category ),
-      brands ( id, name )
-    `)
-    .eq('is_published', true)
-    .order('concentration')
-
-  if (error) return { data: null, error }
-
-  if (!query || query.trim().length < 1) return { data: data ?? [], error: null }
-
-  const q = query.trim().toLowerCase()
-
-  const filtered = (data ?? []).filter(f => {
-    const genericName   = (f.generics?.name_en ?? '').toLowerCase()
-    const concentration = (f.concentration ?? '').toLowerCase()
-    const form          = (f.form ?? '').toLowerCase()
-    const brandNames    = (f.brands ?? []).map(b => b.name.toLowerCase()).join(' ')
-    return (
-      genericName.includes(q) ||
-      concentration.includes(q) ||
-      form.includes(q) ||
-      brandNames.includes(q)
-    )
-  })
-
-  return { data: filtered, error: null }
-}
-
-// ─── Brand query (Phase 3, Brands + Search & Add rebuild, decision 18) ────────
-// Replaces the old client-filtered brands.name search above: this now calls
-// the live, always-fresh searchDrugsForPicker (adminQueries.js, step 10.1),
-// which matches on tradename_clean and filters on all three publish flags
-// (brand + formulation + generic) — fixing both bugs the old query had.
-//
-// searchDrugsForPicker returns a flat FlatDrug-shaped object (for reuse with
-// SharedDrugCard's display). reshapeToLegacyBrandShape below converts each
-// result back into the exact old nested { id, name, formulations: { ...,
-// generics: {...} } } shape, so onSelect's existing contract — and
-// UnifiedDrugRowEditor.jsx's handleBrandPick, which reads that nested shape —
-// need no changes in this step.
-
-function reshapeToLegacyBrandShape(flat) {
+// Pick a brand.
+function flatToBrandShape(flat) {
   return {
     id:   flat.id,
     name: flat.tradenameClean,
     formulations: {
-      id:                   flat.formulationId,
-      concentration:        flat.concentration,
-      form:                 flat.form,
-      route:                flat.route,
-      doses_structured:     flat.dosesStructured,
+      id:                    flat.formulationId,
+      concentration:         flat.concentration,
+      form:                  flat.form,
+      route:                 flat.route,
+      doses_structured:      flat.doses?.length ? flat.doses : null,
       default_dose_override: flat.defaultDoseOverride,
       generics: {
         id:       flat.genericId,
@@ -114,22 +69,32 @@ function reshapeToLegacyBrandShape(flat) {
         category: flat.category,
       },
     },
-    _flat: flat, // kept for SharedDrugCard, which expects the flat shape directly
+    _flat: flat, // the Notifications screen reads the brand's slug from here
   }
 }
 
-async function searchBrandsForPicker(query) {
-  if (!query || query.trim().length < 1) return { data: [], error: null }
-
-  const { data, error } = await searchDrugsForPicker(query)
-  if (error) return { data: null, error }
-
-  return { data: (data ?? []).map(reshapeToLegacyBrandShape), error: null }
+// Pick a formulation.
+function flatToFormulationShape(flat) {
+  return {
+    id:                    flat.formulationId,
+    slug:                  flat.formulationSlug,
+    concentration:         flat.concentration,
+    form:                  flat.form,
+    route:                 flat.route,
+    doses_structured:      flat.doses?.length ? flat.doses : null,
+    default_dose_override: flat.defaultDoseOverride,
+    generics: {
+      id:       flat.genericId,
+      name_en:  flat.genericName,
+      slug:     flat.genericSlug,
+      category: flat.category,
+    },
+  }
 }
 
 // ─── Brand query, scoped to one formulation (new, Phase 3) ───────────────────
-// Unlike searchBrandsForPicker above (all brands, any formulation), this only
-// ever returns brands already attached to scopeFormulationId — used by the
+// Unlike the app search used by the other two modes (all brands, any formulation),
+// this only ever returns brands already attached to scopeFormulationId — used by the
 // "same formulation, different brand" alternative picker so the result's
 // formulation_id can never disagree with the parent row's.
 
@@ -142,51 +107,6 @@ async function searchBrandsScopedToFormulation(formulationId, query) {
   const q = query.trim().toLowerCase()
   const filtered = data.filter(b => (b.name ?? '').toLowerCase().includes(q))
   return { data: filtered, error: null }
-}
-
-function FormulationResultRow({ formulation, onSelect }) {
-  const [hovered, setHovered] = useState(false)
-  const g = formulation.generics
-
-  return (
-    <button
-      onClick={() => onSelect(formulation)}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        display:         'block',
-        width:           '100%',
-        textAlign:       'left',
-        padding:         '10px 14px',
-        background:      hovered ? 'var(--color-bg)' : 'transparent',
-        border:          'none',
-        borderBottom:    '1px solid var(--color-border)',
-        cursor:          'pointer',
-        fontFamily:      'var(--font-body)',
-        transition:      'background-color 0.1s',
-      }}
-    >
-      {/* Generic name */}
-      <div style={{
-        fontSize:     14,
-        fontWeight:   600,
-        color:        'var(--color-text-primary)',
-        marginBottom: 2,
-      }}>
-        {g?.name_en ?? 'Unknown generic'}
-      </div>
-
-      {/* Concentration + form */}
-      <div style={{
-        fontSize:     13,
-        color:        'var(--color-text-secondary)',
-        marginBottom: 0,
-      }}>
-        {formulation.concentration} · {formulation.form}
-        {formulation.route && ` · ${formulation.route}`}
-      </div>
-    </button>
-  )
 }
 
 // ─── Brand-scoped result row (new, Phase 3) ───────────────────────────────────
@@ -229,18 +149,6 @@ export default function DrugPickerModal({
   const isBrandMode  = mode === 'brand'
   const isScopedMode = mode === 'brand-scoped'
 
-  // SharedDrugCard's required props (brand-mode results only) — same hooks
-  // the Drugs screen already uses for these cards.
-  const { categories } = useCategories()
-  // Admin crash isolation (2026-09-01): this modal only renders inside
-  // AdminRoutes, which deliberately sits outside ThemeProvider now (see
-  // App.jsx's header). The CMS has no light/dark toggle of its own, so
-  // SharedDrugCard's required isDark prop is simply fixed to false here
-  // instead of reading a theme context that no longer exists on this
-  // branch — this was the last consumer-only dependency left in the
-  // admin tree, confirmed by re-checking every file this modal imports.
-  const isDark = false
-
   const [query,   setQuery]   = useState('')
   const [results, setResults] = useState([])
   const [loading, setLoading] = useState(false)
@@ -267,17 +175,14 @@ export default function DrugPickerModal({
     }
   }, [isOpen])
 
-  // Search on query change (debounced 250ms)
+  // Search on query change (debounced 250ms) — brand-scoped mode only; the other two modes search
+  // inside DrugPickerSearch.
   useEffect(() => {
-    if (!isOpen) return
+    if (!isOpen || !isScopedMode) return
     setLoading(true)
     setError(null)
     const timer = setTimeout(async () => {
-      const { data, error: err } = isScopedMode
-        ? await searchBrandsScopedToFormulation(scopeFormulationId, query)
-        : isBrandMode
-          ? await searchBrandsForPicker(query)
-          : await searchFormulationsForPicker(query)
+      const { data, error: err } = await searchBrandsScopedToFormulation(scopeFormulationId, query)
       if (err) {
         setError(err.message ?? 'Search failed')
         setResults([])
@@ -287,7 +192,7 @@ export default function DrugPickerModal({
       setLoading(false)
     }, 250)
     return () => clearTimeout(timer)
-  }, [query, isOpen, isBrandMode, isScopedMode, scopeFormulationId])
+  }, [query, isOpen, isScopedMode, scopeFormulationId])
 
   function handleSelect(item) {
     onSelect(item)
@@ -351,18 +256,14 @@ export default function DrugPickerModal({
 
   const title = isScopedMode ? 'Pick a brand (same formulation)'
     : isBrandMode ? 'Pick a brand' : 'Pick a formulation'
-  const placeholder = isScopedMode ? 'Search brands under this formulation…'
-    : isBrandMode ? 'Brand name, generic, concentration…' : 'Generic name, brand, concentration…'
-  const emptyHint = isScopedMode
-    ? (query.trim() ? `No matching brands under this formulation` : 'No other brands yet under this formulation — add one below')
-    : isBrandMode
-      ? (query.trim() ? `No brands found for "${query}"` : 'Type to search brands…')
-      : (query.trim() ? `No formulations found for "${query}"` : 'Type to search formulations…')
-  const footerHint = isScopedMode
-    ? 'Only brands already under this formulation are shown — concentration, form, and dose stay locked to the parent drug'
-    : isBrandMode
-      ? 'Select a brand to add it as a drug slot'
-      : 'Select a formulation to add it as a drug slot'
+  const emptyHint = query.trim()
+    ? 'No matching brands under this formulation'
+    : 'No other brands yet under this formulation — add one below'
+
+  // The app's drug object for the tapped card, in the shape this pop-up has always returned.
+  function handlePickFlat(flat) {
+    handleSelect(isBrandMode ? flatToBrandShape(flat) : flatToFormulationShape(flat))
+  }
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={title} size="md">
@@ -386,76 +287,72 @@ export default function DrugPickerModal({
         </div>
       )}
 
-      {/* Search input — shared SearchBar component (decision 18) */}
-      <div style={{ marginBottom: 'var(--space-3)' }}>
-        <SearchBar
-          ref={inputRef}
-          value={query}
-          onChange={setQuery}
-          placeholder={placeholder}
+      {/* Pick a brand / Pick a formulation: the app's own search */}
+      {!isScopedMode && (
+        <DrugPickerSearch
+          mode={isBrandMode ? 'brand' : 'generic'}
+          onPick={handlePickFlat}
         />
-      </div>
+      )}
 
-      {/* Results list */}
-      <div style={{
-        border:          '1.5px solid var(--color-border)',
-        borderRadius:    'var(--radius-md)',
-        maxHeight:       360,
-        overflowY:       'auto',
-        backgroundColor: 'var(--color-surface)',
-      }}>
-        {loading && (
-          <div style={{
-            padding:   'var(--space-5)',
-            textAlign: 'center',
-            fontSize:  13,
-            color:     'var(--color-text-tertiary)',
-          }}>
-            Searching…
+      {/* Brand-scoped mode: its own live search and list */}
+      {isScopedMode && (
+        <>
+          <div style={{ marginBottom: 'var(--space-3)' }}>
+            <SearchBar
+              ref={inputRef}
+              value={query}
+              onChange={setQuery}
+              placeholder="Search brands under this formulation…"
+            />
           </div>
-        )}
 
-        {!loading && error && (
           <div style={{
-            padding:   'var(--space-4)',
-            fontSize:  13,
-            color:     'var(--color-error, #ef4444)',
-            textAlign: 'center',
+            border:          '1.5px solid var(--color-border)',
+            borderRadius:    'var(--radius-md)',
+            maxHeight:       360,
+            overflowY:       'auto',
+            backgroundColor: 'var(--color-surface)',
           }}>
-            {error}
-          </div>
-        )}
+            {loading && (
+              <div style={{
+                padding:   'var(--space-5)',
+                textAlign: 'center',
+                fontSize:  13,
+                color:     'var(--color-text-tertiary)',
+              }}>
+                Searching…
+              </div>
+            )}
 
-        {!loading && !error && results.length === 0 && (
-          <div style={{
-            padding:   'var(--space-5)',
-            textAlign: 'center',
-            fontSize:  13,
-            color:     'var(--color-text-tertiary)',
-          }}>
-            {emptyHint}
-          </div>
-        )}
+            {!loading && error && (
+              <div style={{
+                padding:   'var(--space-4)',
+                fontSize:  13,
+                color:     'var(--color-error, #ef4444)',
+                textAlign: 'center',
+              }}>
+                {error}
+              </div>
+            )}
 
-        {!loading && !error && results.map((item, i) => (
-          isScopedMode
-            ? <ScopedBrandResultRow key={item.id} brand={item} onSelect={handleSelect} />
-            : isBrandMode
-              ? (
-                <SharedDrugCard
-                  key={item.id}
-                  drug={item._flat}
-                  categories={categories}
-                  isDark={isDark}
-                  onTap={() => handleSelect(item)}
-                  isLast={i === results.length - 1}
-                  searchMode="brand"
-                  highlight={query}
-                />
-              )
-              : <FormulationResultRow key={item.id} formulation={item} onSelect={handleSelect} />
-        ))}
-      </div>
+            {!loading && !error && results.length === 0 && (
+              <div style={{
+                padding:   'var(--space-5)',
+                textAlign: 'center',
+                fontSize:  13,
+                color:     'var(--color-text-tertiary)',
+              }}>
+                {emptyHint}
+              </div>
+            )}
+
+            {!loading && !error && results.map(item => (
+              <ScopedBrandResultRow key={item.id} brand={item} onSelect={handleSelect} />
+            ))}
+          </div>
+        </>
+      )}
 
       {/* Inline "add new brand" (brand-scoped mode only) */}
       {isScopedMode && (
@@ -544,15 +441,17 @@ export default function DrugPickerModal({
         </div>
       )}
 
-      {/* Footer hint */}
-      <div style={{
-        marginTop: 'var(--space-3)',
-        fontSize:  12,
-        color:     'var(--color-text-tertiary)',
-        textAlign: 'center',
-      }}>
-        {footerHint}
-      </div>
+      {/* Footer hint (brand-scoped mode only; the other two modes have their own footer) */}
+      {isScopedMode && (
+        <div style={{
+          marginTop: 'var(--space-3)',
+          fontSize:  12,
+          color:     'var(--color-text-tertiary)',
+          textAlign: 'center',
+        }}>
+          Only brands already under this formulation are shown — concentration, form, and dose stay locked to the parent drug
+        </div>
+      )}
     </Modal>
   )
 }
