@@ -5,13 +5,14 @@
  * the note rows inside a prescription sheet:
  *   NoteFlavorPicker — Info / Warning / Tip chips with the same icons and
  *                      colours the app uses.
- *   NoteLivePreview  — the real NoteCallout, drawn exactly as the app draws it
- *                      (bold, lists, Arabic side flip), updating as you type.
+ *   NoteTextArea     — one text area for the note, any language. Starts one
+ *                      line tall and grows as you type.
  *
  * Pure presentational, no DB calls.
  */
 
-import NoteCallout, { NoteFlavorIcon } from '../../ui/NoteCallout'
+import { useRef, useEffect } from 'react'
+import { NoteFlavorIcon } from '../../ui/NoteCallout'
 import { NOTE_FLAVOR_OPTIONS, noteFlavorColor } from '../../ui/noteFlavors'
 
 export function NoteFlavorPicker({ value, onChange }) {
@@ -56,27 +57,43 @@ export function NoteFlavorPicker({ value, onChange }) {
   )
 }
 
-export function NoteLivePreview({ text, flavor }) {
-  const hasText = !!(text && text.trim())
+export function NoteTextArea({ value, onChange, placeholder }) {
+  const ref = useRef(null)
+
+  useEffect(() => {
+    if (!ref.current) return
+    ref.current.style.height = 'auto'
+    ref.current.style.height = `${ref.current.scrollHeight}px`
+  }, [value])
+
   return (
-    <div>
-      <div style={{
-        fontSize: 11, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase',
-        color: 'var(--color-text-secondary)', marginBottom: 6,
-      }}>
-        Preview
-      </div>
-      {hasText ? (
-        <NoteCallout text={text} flavor={flavor ?? 'info'} flush />
-      ) : (
-        <div style={{
-          padding: '10px 14px', borderRadius: 12,
-          border: '1.5px dashed var(--color-border)',
-          fontSize: 13, color: 'var(--color-text-tertiary)',
-        }}>
-          The note will appear here as you type.
-        </div>
-      )}
-    </div>
+    <textarea
+      ref={ref}
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      placeholder={placeholder}
+      dir="auto"
+      rows={1}
+      style={{
+        width: '100%',
+        boxSizing: 'border-box',
+        padding: '7px 10px',
+        border: '1.5px solid var(--color-border)',
+        borderRadius: 'var(--radius-md)',
+        fontSize: 13,
+        fontFamily: 'var(--font-body)',
+        backgroundColor: 'var(--color-surface)',
+        color: 'var(--color-text-primary)',
+        outline: 'none',
+        resize: 'none',
+        overflow: 'hidden',
+        lineHeight: 1.55,
+        minHeight: 36,
+        display: 'block',
+        transition: 'border-color 0.15s ease',
+      }}
+      onFocus={e => { e.currentTarget.style.borderColor = 'var(--color-accent)' }}
+      onBlur={e => { e.currentTarget.style.borderColor = 'var(--color-border)' }}
+    />
   )
 }
