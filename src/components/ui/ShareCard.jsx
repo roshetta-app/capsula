@@ -12,6 +12,7 @@
  */
 
 import { forwardRef } from 'react'
+import { getFormAbbrev } from '../../config/forms'
 
 const ShareCard = forwardRef(function ShareCard({ condition, prescription }, ref) {
   const drugs = prescription?.drugs ?? []
@@ -134,7 +135,7 @@ const ShareCard = forwardRef(function ShareCard({ condition, prescription }, ref
                     padding:         '1px 7px',
                     borderRadius:    999,
                   }}>
-                    {drug.form}
+                    {getFormAbbrev(drug.form)}
                   </span>
                 )}
               </div>

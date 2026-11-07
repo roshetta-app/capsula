@@ -111,6 +111,15 @@ export const DRUG_FORM_SUFFIXES = {
   'other':                'Other',
 }
 
+// Display abbreviation for a form value, from the same DRUG_FORM_SUFFIXES list
+// the drug card titles use, so a form reads the same everywhere ('tablet' ->
+// 'Tab.'). Matching ignores case and surrounding spaces. A form that is not in
+// the list (free text on older rows) is shown as it was entered.
+export function getFormAbbrev(form) {
+  if (!form || typeof form !== 'string') return form ?? ''
+  return DRUG_FORM_SUFFIXES[form.trim().toLowerCase()] ?? form
+}
+
 export const DRUG_ROUTES = [
   { value: 'oral',        label: 'Oral' },
   { value: 'oral.solid',  label: 'Oral (solid)' },

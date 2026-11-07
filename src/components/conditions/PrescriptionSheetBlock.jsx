@@ -8,6 +8,7 @@ import BlockDivider from './BlockDivider'
 import { blockGap } from '../../utils/blockSpacing'
 import { toDrugOptions, doseLineInstructionText } from '../../constants/prescriptionRowSchema'
 import { getDrugModifierAndRouteSuffix, toTitleCase } from '../../utils/drugTitleFormat'
+import { getFormAbbrev } from '../../config/forms'
 
 // ─── Resolved-drug lookup (decision 23 fix, 2026-08-04) ───────────────────────
 // A formulation can have several brands, so matching on formulation_id alone
@@ -556,7 +557,7 @@ function UnifiedDrugRow({ row, formulation, drugs, navigate, dividerType }) {
                   <DrugMainLine
                     name={memberName}
                     concentration={data.concentration}
-                    form={data.form}
+                    form={getFormAbbrev(data.form)}
                     modifierAbbrev={modifierAbbrev}
                     routeAbbrev={routeAbbrev}
                     linkEnabled={memberLinkEnabled}
