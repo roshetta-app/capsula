@@ -13,9 +13,9 @@
  * Kinds: 'drug' | 'note' | 'text' | 'section' | 'gallery' | 'divider' | 'zigzag' | 'other'
  */
 
-export const GAP_STANDARD = 12
-export const GAP_DIVIDER = 20
-export const DRUG_ROW_PAD = 13
+export const GAP_STANDARD = 10
+export const GAP_DIVIDER = 16
+export const DRUG_ROW_PAD = 10
 
 export function blockGap(prevKind, nextKind) {
   if (!prevKind) return 0

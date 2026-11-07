@@ -35,8 +35,8 @@ const RX_RAIL_GAP = 8
 // everywhere so the row reads as one solid block: ROW_GAP_ALT separates one
 // alternative from the next ('or' / 'plus' lines); ROW_GAP_STACK separates
 // anything stacked under a drug name (dose lines, max dose, notes).
-const ROW_GAP_ALT = 10
-const ROW_GAP_STACK = 6
+const ROW_GAP_ALT = 8
+const ROW_GAP_STACK = 4
 
 // Drug name type size and line height. Shared by the name spans and by the
 // right-edge arrow box, so the arrow is always exactly as tall as the first
@@ -347,18 +347,18 @@ function SectionHeader({ label, children }) {
         dir="auto"
         style={{
           fontSize: 13,
-          fontWeight: 700,
+          fontWeight: 600,
           letterSpacing: '0.01em',
           color: 'var(--color-text-primary)',
           textTransform: 'none',
           background: 'color-mix(in srgb, var(--color-section-bg) 70%, var(--color-accent) 6%)',
-          padding: 'var(--space-3) var(--space-4)',
+          padding: 'var(--space-2) var(--space-4)',
           unicodeBidi: 'plaintext',
         }}
       >
         {label}
       </div>
-      <div style={{ padding: 'var(--space-3) var(--space-4) var(--space-3)' }}>
+      <div style={{ padding: 'var(--space-1) var(--space-4) var(--space-2)' }}>
         {children}
       </div>
     </div>
@@ -676,7 +676,7 @@ function DrugMainLine({ name, concentration, form, modifierAbbrev, routeAbbrev, 
         {/* Form — same contrast tier as concentration, a little bolder. */}
         {form && (
           <span style={{
-            fontSize: 12, fontWeight: 600,
+            fontSize: 12, fontWeight: 500,
             color: 'color-mix(in srgb, var(--color-text-primary) 70%, var(--color-text-secondary) 30%)',
             lineHeight: 1.3,
             letterSpacing: '0.01em',
@@ -748,18 +748,18 @@ function DoseLine({ title, text, note }) {
       {title && (
         <span style={{
           fontSize: 13,
-          fontWeight: 700,
+          fontWeight: 600,
           color: 'var(--color-dose)',
-          lineHeight: 1.55,
+          lineHeight: 1.5,
         }}>
           {title}{': '}
         </span>
       )}
       <span style={{
         fontSize: 13,
-        fontWeight: title ? 500 : 600,
+        fontWeight: 500,
         color: 'var(--color-dose)',
-        lineHeight: 1.55,
+        lineHeight: 1.5,
       }}>
         {text}
       </span>
@@ -792,7 +792,7 @@ function MaxDoseLine({ text }) {
           DoseLine already uses for a bracket's title. */}
       <span style={{
         fontSize: 12,
-        fontWeight: 700,
+        fontWeight: 600,
         color: '#DC2626',
         lineHeight: 1.5,
       }}>
@@ -800,7 +800,7 @@ function MaxDoseLine({ text }) {
       </span>
       <span style={{
         fontSize: 12,
-        fontWeight: 600,
+        fontWeight: 500,
         color: '#DC2626',
         lineHeight: 1.5,
       }}>
@@ -937,5 +937,5 @@ function NumberBadge({ index }) {
 const rowWrap = {
   display: 'flex',
   alignItems: 'flex-start',
-  padding: '13px 0',
+  padding: '10px 0',
 }

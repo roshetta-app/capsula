@@ -135,14 +135,14 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
         style={{
           margin: 0,
           unicodeBidi: 'plaintext',
-          lineHeight: 1.6,
+          lineHeight: 1.5,
         }}
       >
         {children}
       </div>
     ),
-    h1: ({ children }) => <div dir="auto" style={{ fontWeight: 700, unicodeBidi: 'plaintext' }}>{children}</div>,
-    h2: ({ children }) => <div dir="auto" style={{ fontWeight: 700, unicodeBidi: 'plaintext' }}>{children}</div>,
+    h1: ({ children }) => <div dir="auto" style={{ fontWeight: 600, unicodeBidi: 'plaintext' }}>{children}</div>,
+    h2: ({ children }) => <div dir="auto" style={{ fontWeight: 600, unicodeBidi: 'plaintext' }}>{children}</div>,
     h3: ({ children }) => <div dir="auto" style={{ fontWeight: 600, unicodeBidi: 'plaintext' }}>{children}</div>,
     ul: ({ children }) => (
       <ul style={{ margin: '4px 0 0', padding: 0, paddingInlineStart: 16, display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -159,7 +159,7 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
         {children}
       </li>
     ),
-    strong: ({ children }) => <strong style={{ fontWeight: 700 }}>{children}</strong>,
+    strong: ({ children }) => <strong style={{ fontWeight: 600 }}>{children}</strong>,
     em: ({ children }) => <em>{children}</em>,
   }
 
@@ -200,7 +200,7 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
       boxSizing: 'border-box',
       background: f.bg,
       borderRadius: bubbleRadius,
-      padding: '9px 14px',
+      padding: '8px 14px',
     }}>
       <div
         style={{
