@@ -239,7 +239,8 @@ export function getDrugModifierAndRouteSuffix(drug) {
 // shows after the name (normalised concentration spacing, form abbreviation,
 // modifier abbreviations, injection route details), but without pack size or
 // fill volume — a prescription row never shows the count. Built by calling
-// getDrugTitleSuffix itself, so the two can never drift apart.
+// getDrugTitleSuffix itself, so the two can never drift apart. Modifier
+// and route abbreviations are left out too: strength and form only.
 // concentration and form come from the sheet row; everything else (modifiers,
 // route, route details) comes from the resolved formulation when there is one.
 // The form is lower-cased so 'Tablet' on an older row still matches the list.
@@ -252,5 +253,10 @@ export function getSheetDrugSuffix({ concentration, form, formulation, tradename
     tradenameClean: tradenameClean ?? base.tradenameClean,
     packSize: null,
     fillVolume: null,
+    // No modifier abbreviations (FC, SR, ER...) on a prescription row — the
+    // form on its own is enough.
+    formModifier: [],
+    // No injection route details (IM, IV...) either.
+    routeDetails: [],
   }, { omitModifierTags: TITLE_HIDDEN_MODIFIER_TAGS })
 }
