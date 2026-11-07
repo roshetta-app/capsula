@@ -425,225 +425,231 @@ function resolveDosePick(dosesStructured) {
 // the admin to fill the title back in if one applies, rather than guessing
 // wrong. Once edited, the line is in the new shape going forward and
 // 'text' is no longer read for it.
+// ─── Shared look for the dose card pieces (2026-11-08 redesign) ─────────────
+// Bigger boxes and buttons so everything is easy to tap on a phone, one clear
+// label above each box, and one consistent set of buttons everywhere.
+const doseFieldLabelStyle = {
+  fontSize: 12, fontWeight: 700, color: 'var(--color-text-primary)',
+  fontFamily: 'var(--font-body)',
+}
+const doseFieldHintStyle = { fontWeight: 400, color: 'var(--color-text-tertiary)' }
+const doseFieldInputStyle = {
+  width: '100%', boxSizing: 'border-box',
+  padding: '9px 10px',
+  border: '1px solid var(--color-border)',
+  borderRadius: 8,
+  fontSize: 14, fontFamily: 'var(--font-body)',
+  backgroundColor: 'var(--color-surface)',
+  color: 'var(--color-text-primary)',
+  outline: 'none',
+}
+const doseDashedButtonStyle = {
+  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+  width: '100%', boxSizing: 'border-box', padding: '9px 10px',
+  border: '1.5px dashed var(--color-border)', borderRadius: 10,
+  background: 'none', color: 'var(--color-text-secondary)',
+  fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-body)', cursor: 'pointer',
+}
+const dosePrimaryButtonStyle = {
+  padding: '7px 14px', border: 'none', borderRadius: 8,
+  background: 'var(--color-accent-solid)', color: '#fff',
+  fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-body)', cursor: 'pointer',
+}
+const doseSecondaryButtonStyle = {
+  display: 'inline-flex', alignItems: 'center', gap: 5,
+  padding: '7px 12px', border: '1px solid var(--color-border)', borderRadius: 8,
+  background: 'none', color: 'var(--color-text-secondary)',
+  fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-body)', cursor: 'pointer',
+}
+const doseDangerButtonStyle = {
+  marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 4,
+  padding: '7px 6px', border: 'none', background: 'none', color: '#ef4444',
+  fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-body)', cursor: 'pointer',
+}
+const doseOpenPanelStyle = {
+  display: 'flex', flexDirection: 'column', gap: 10,
+  padding: 12, boxSizing: 'border-box',
+  border: '1.5px solid var(--color-accent)', borderRadius: 10,
+  backgroundColor: 'var(--color-surface)',
+}
+const doseClosedRowStyle = {
+  display: 'flex', alignItems: 'flex-start', gap: 10,
+  width: '100%', boxSizing: 'border-box', padding: '10px 12px', textAlign: 'left',
+  border: '1px solid var(--color-border)', borderRadius: 10,
+  backgroundColor: 'var(--color-surface)', cursor: 'pointer',
+  fontFamily: 'var(--font-body)',
+}
+
+// Confirm / saving / saved / error messages shared by a bracket and the max
+// dose, so the two never drift apart again.
+function DoseSaveFeedback({
+  isConfirming, confirmText, onConfirmSave, onCancelConfirm,
+  isSaving, isSaved, saveError,
+}) {
+  return (
+    <>
+      {isConfirming && (
+        <div style={{
+          display: 'flex', flexDirection: 'column', gap: 8,
+          padding: '10px 12px',
+          border: '1px solid var(--color-accent)', borderRadius: 10,
+          backgroundColor: '#EFF6FF',
+        }}>
+          <span style={{ fontSize: 13, color: 'var(--color-text-primary)' }}>{confirmText}</span>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button type="button" onClick={onConfirmSave} style={dosePrimaryButtonStyle}>Save</button>
+            <button type="button" onClick={onCancelConfirm} style={doseSecondaryButtonStyle}>Cancel</button>
+          </div>
+        </div>
+      )}
+      {isSaving && (
+        <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>Saving…</span>
+      )}
+      {isSaved && (
+        <span style={{ fontSize: 12, color: 'var(--color-accent)' }}>Saved to library</span>
+      )}
+      {saveError && (
+        <span style={{ fontSize: 12, color: '#ef4444' }}>{saveError}</span>
+      )}
+    </>
+  )
+}
+
 function EditableDoseLine({
-  line, onUpdateField, onRemove,
+  line, index, isOpen, onOpen, onClose,
+  onUpdateField, onRemove,
   canSaveToLibrary, isConfirming, onRequestSave, onConfirmSave, onCancelConfirm,
   isSaving, isSaved, saveError,
-  startInEdit = false, onEditConsumed,
 }) {
-  const [isEditing, setIsEditing] = useState(startInEdit)
-
-  // NOISE-REDUCTION PASS (2026-08-08): the read-only row's action icons
-  // (edit / save-to-library / remove) used to be permanently visible,
-  // which is most of what made a dose section with several brackets read
-  // as cluttered. Now they only render once this row is hovered — same
-  // isHovered-driven inline-style approach already used elsewhere in this
-  // file (see the plain onMouseEnter/onMouseLeave handlers a few
-  // components down), just applied at the row level instead of a single
-  // button. Editing/saving/error states are unaffected — those still show
-  // regardless of hover, since they're active feedback, not idle chrome.
-  const [isHovered, setIsHovered] = useState(false)
-
-  // Mount-time-only read (same "runs once" pattern already used elsewhere
-  // in this file, e.g. DrugOptionRow's startInManualMode) — startInEdit
-  // only matters at the instant this specific bracket is first rendered;
-  // it should never re-trigger on a later re-render.
-  useEffect(() => {
-    if (startInEdit) onEditConsumed?.()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  function startEditing() {
+  // 2026-11-08 REDESIGN: open or closed is no longer remembered per line. The
+  // card above keeps ONE 'open' id for the whole editor, so opening a bracket
+  // closes whichever one was open — two can never be open on top of each
+  // other. Every action button is always visible (no hover needed on a phone).
+  function open() {
     if (line.instruction == null) {
       // Legacy line — one-time split: move the existing flattened text into
       // the instruction box so it isn't lost, title starts blank.
       onUpdateField('instruction', line.text ?? '')
     }
-    setIsEditing(true)
+    onOpen()
   }
 
   const displayInstruction = doseLineInstructionText(line)
+  const isEmpty = !line.bracket_title && !displayInstruction && !line.note
+  const number = index + 1
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-      {isEditing ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span style={editLineLabelStyle}>Title (shown in bold before the dose)</span>
-          <input
-            type="text"
-            value={line.bracket_title ?? ''}
-            onChange={e => onUpdateField('bracket_title', e.target.value || null)}
-            placeholder="Title, e.g. 5-7.9kg (3-6 months)"
-            dir="auto"
-            style={editLineInputStyle}
-          />
-          <span style={editLineLabelStyle}>Instruction (the dose itself)</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {isOpen ? (
+        <div style={doseOpenPanelStyle}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-accent)', letterSpacing: '0.03em' }}>
+              BRACKET {number}
+            </span>
+          </div>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={doseFieldLabelStyle}>
+              Title <span style={doseFieldHintStyle}>(shown in bold before the dose)</span>
+            </span>
             <input
               type="text"
+              value={line.bracket_title ?? ''}
+              onChange={e => onUpdateField('bracket_title', e.target.value || null)}
+              placeholder="e.g. 5-7.9kg (3-6 months)"
+              dir="auto"
+              style={doseFieldInputStyle}
+            />
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={doseFieldLabelStyle}>
+              Dose <span style={doseFieldHintStyle}>(the instruction itself)</span>
+            </span>
+            <textarea
               value={line.instruction ?? ''}
               onChange={e => onUpdateField('instruction', e.target.value)}
-              placeholder="Instruction"
+              placeholder="e.g. 1gm/12hr I.V. for 5-7 days"
               dir="auto"
-              style={{ ...editLineInputStyle, flex: 1 }}
+              rows={2}
+              style={{ ...doseFieldInputStyle, resize: 'vertical' }}
             />
-            <button
-              type="button"
-              onClick={() => setIsEditing(false)}
-              title="Done editing"
-              aria-label="Done editing this dose line"
-              style={lineIconButtonStyle}
-            >
-              <Check size={13} />
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={doseFieldLabelStyle}>
+              Note <span style={doseFieldHintStyle}>(optional, small italic text under the dose)</span>
+            </span>
+            <textarea
+              value={line.note ?? ''}
+              onChange={e => onUpdateField('note', e.target.value || null)}
+              placeholder="Only for this bracket"
+              dir="auto"
+              rows={2}
+              style={{ ...doseFieldInputStyle, resize: 'vertical', fontStyle: 'italic' }}
+            />
+          </label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <button type="button" onClick={onClose} style={dosePrimaryButtonStyle}>Done</button>
+            {canSaveToLibrary && (
+              <button
+                type="button"
+                onClick={onRequestSave}
+                disabled={isSaving}
+                style={{ ...doseSecondaryButtonStyle, opacity: isSaving ? 0.5 : 1 }}
+              >
+                <Library size={13} />
+                Save to library
+              </button>
+            )}
+            <button type="button" onClick={onRemove} style={doseDangerButtonStyle}>
+              <X size={13} />
+              Remove
             </button>
           </div>
-          <span style={editLineLabelStyle}>Note (optional, small italic text under the dose)</span>
-          <textarea
-            value={line.note ?? ''}
-            onChange={e => onUpdateField('note', e.target.value || null)}
-            placeholder="Note for this bracket only (optional) — shown under this card on the app"
-            dir="auto"
-            rows={1}
-            style={{ ...editLineInputStyle, resize: 'vertical', fontStyle: 'italic' }}
-          />
           {canSaveToLibrary && (
-            <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
+            <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>
               Edits here change this sheet only. Tap Save to library to update the drug page too.
             </span>
           )}
         </div>
       ) : (
-        <div
-          onMouseEnter={() => setIsHovered(true)}
-          onMouseLeave={() => setIsHovered(false)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 4,
-            borderRadius: 'var(--radius-md)',
-            backgroundColor: isHovered ? 'var(--color-bg)' : 'transparent',
-          }}
-        >
-          <div
-            dir="auto"
-            style={{
-              flex: 1,
-              padding: '3px 8px',
-              fontSize: 12, fontFamily: 'var(--font-body)',
-              color: 'var(--color-text-secondary)',
-            }}
-          >
-            <div>
-              {line.bracket_title && (
-                <span style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                  {line.bracket_title}{': '}
-                </span>
-              )}
-              {displayInstruction}
-            </div>
-            {line.note && (
-              <div style={{ fontSize: 11, fontStyle: 'italic', color: 'var(--color-text-tertiary)' }}>
-                {line.note}
-              </div>
-            )}
-          </div>
-          {/* Action icons only render once hovered — isSaved still shows its
-              accent color the moment the row is next hovered after a save,
-              same feedback as before, just not competing for attention
-              while the row is at rest. */}
-          {(
-            <>
-              <button
-                type="button"
-                onClick={startEditing}
-                title="Edit this dose line"
-                aria-label="Edit this dose line"
-                style={lineIconButtonStyle}
-              >
-                <Edit2 size={12} />
-              </button>
-              {canSaveToLibrary && (
-                <button
-                  type="button"
-                  onClick={onRequestSave}
-                  disabled={isSaving}
-                  title="Save this wording back to the drug library"
-                  aria-label="Save this dose line back to the drug library"
-                  style={{
-                    ...lineIconButtonStyle,
-                    width: 'auto', padding: '0 6px', gap: 4,
-                    fontSize: 11, fontWeight: 600, fontFamily: 'var(--font-body)',
-                    border: '1px solid var(--color-border)',
-                    color: isSaved ? 'var(--color-accent)' : 'var(--color-text-secondary)',
-                    cursor: isSaving ? 'default' : 'pointer',
-                    opacity: isSaving ? 0.5 : 1,
-                  }}
-                >
-                  <Library size={12} />
-                  Save to library
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={onRemove}
-                title="Remove this line"
-                aria-label="Remove this dose line"
-                style={lineIconButtonStyle}
-              >
-                <X size={13} />
-              </button>
-            </>
-          )}
-        </div>
-      )}
-
-      {isConfirming && (
-        <div style={{
-          display: 'flex', flexDirection: 'column', gap: 4,
-          padding: '6px 8px',
-          border: '1px solid var(--color-accent)',
-          borderRadius: 'var(--radius-md)',
-          backgroundColor: '#EFF6FF',
-        }}>
-          <span style={{ fontSize: 11, color: 'var(--color-text-primary)' }}>
-            Save this wording to the drug library for everyone?
+        <button type="button" onClick={open} aria-label={`Edit bracket ${number}`} style={doseClosedRowStyle}>
+          <span style={{
+            flexShrink: 0, width: 22, height: 22, borderRadius: 99,
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 11, fontWeight: 700,
+            color: 'var(--color-accent)', background: 'var(--color-accent-light)',
+          }}>
+            {number}
           </span>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button
-              type="button"
-              onClick={onConfirmSave}
-              style={{
-                background: 'var(--color-accent-solid)', color: '#fff',
-                border: 'none', borderRadius: 'var(--radius-md)',
-                padding: '3px 10px', fontSize: 11, fontWeight: 600,
-                cursor: 'pointer', fontFamily: 'var(--font-body)',
-              }}
-            >
-              Save
-            </button>
-            <button
-              type="button"
-              onClick={onCancelConfirm}
-              style={{
-                background: 'none', color: 'var(--color-text-secondary)',
-                border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)',
-                padding: '3px 10px', fontSize: 11, fontWeight: 600,
-                cursor: 'pointer', fontFamily: 'var(--font-body)',
-              }}
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
+          <span dir="auto" style={{ flex: 1, minWidth: 0, display: 'block', fontSize: 14, color: 'var(--color-text-primary)' }}>
+            {isEmpty ? (
+              <span style={{ fontStyle: 'italic', color: 'var(--color-text-tertiary)' }}>Empty bracket — tap to fill in</span>
+            ) : (
+              <>
+                {line.bracket_title && (
+                  <span style={{ fontWeight: 700 }}>{line.bracket_title}{': '}</span>
+                )}
+                {displayInstruction}
+                {line.note && (
+                  <span style={{ display: 'block', marginTop: 2, fontSize: 12, fontStyle: 'italic', color: 'var(--color-text-tertiary)' }}>
+                    {line.note}
+                  </span>
+                )}
+              </>
+            )}
+          </span>
+          <Edit2 size={14} style={{ flexShrink: 0, marginTop: 3, color: 'var(--color-text-tertiary)' }} />
+        </button>
       )}
 
-      {isSaving && (
-        <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>Saving…</span>
-      )}
-      {isSaved && (
-        <span style={{ fontSize: 10, color: 'var(--color-accent)' }}>Saved to library</span>
-      )}
-      {saveError && (
-        <span style={{ fontSize: 10, color: '#ef4444' }}>{saveError}</span>
-      )}
+      <DoseSaveFeedback
+        isConfirming={isConfirming}
+        confirmText="Save this wording to the drug library for everyone?"
+        onConfirmSave={onConfirmSave}
+        onCancelConfirm={onCancelConfirm}
+        isSaving={isSaving}
+        isSaved={isSaved}
+        saveError={saveError}
+      />
     </div>
   )
 }
@@ -701,168 +707,75 @@ const lineIconButtonStyle = {
 // dose, on its own line at the bottom, with no trailingAction concept.
 function EditableMaxDose({
   value, onChange, onRemove,
+  isOpen, onOpen, onClose,
   canSaveToLibrary, isConfirming, onRequestSave, onConfirmSave, onCancelConfirm,
   isSaving, isSaved, saveError,
 }) {
-  const [isEditing, setIsEditing] = useState(false)
-  // NOISE-REDUCTION PASS (2026-08-08): same hover-gated icons as
-  // EditableDoseLine — see that component's comment for the reasoning.
-  const [isHovered, setIsHovered] = useState(false)
-
-  const trailingLinkStyle = {
-    background: 'none', border: 'none', padding: 0,
-    fontSize: 11, color: 'var(--color-text-tertiary)',
-    textDecoration: 'underline', cursor: 'pointer',
-    fontFamily: 'var(--font-body)', whiteSpace: 'nowrap',
-  }
-
-  if (!value && !isEditing) {
-    return (
-      <button
-        type="button"
-        onClick={() => setIsEditing(true)}
-        style={{ ...trailingLinkStyle, alignSelf: 'flex-start' }}
-      >
-        + Max dose
-      </button>
-    )
-  }
-
+  // 2026-11-08 REDESIGN: same one-open-at-a-time rule and same always-visible
+  // buttons as EditableDoseLine; open/closed comes from the card above.
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-      {isEditing ? (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <input
-            type="text"
-            value={value ?? ''}
-            onChange={e => onChange(e.target.value)}
-            placeholder="Max dose, shown once under all lines"
-            dir="auto"
-            style={{ ...editLineInputStyle, flex: 1 }}
-          />
-          <button
-            type="button"
-            onClick={() => setIsEditing(false)}
-            title="Done editing"
-            aria-label="Done editing max dose"
-            style={lineIconButtonStyle}
-          >
-            <Check size={13} />
-          </button>
-        </div>
-      ) : (
-        <div
-          onMouseEnter={() => setIsHovered(true)}
-          onMouseLeave={() => setIsHovered(false)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 4,
-            borderRadius: 'var(--radius-md)',
-            backgroundColor: isHovered ? 'var(--color-bg)' : 'transparent',
-          }}
-        >
-          <div
-            dir="auto"
-            style={{
-              flex: 1,
-              padding: '3px 8px',
-              fontSize: 12, fontFamily: 'var(--font-body)',
-              color: 'var(--color-text-secondary)',
-            }}
-          >
-            <span style={{ fontWeight: 600 }}>Max dose: </span>
-            <span style={{ fontStyle: 'italic' }}>{value}</span>
-          </div>
-          {isHovered && (
-            <>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {isOpen ? (
+        <div style={doseOpenPanelStyle}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={doseFieldLabelStyle}>
+              Max dose <span style={doseFieldHintStyle}>(shown once, under all brackets)</span>
+            </span>
+            <input
+              type="text"
+              value={value ?? ''}
+              onChange={e => onChange(e.target.value)}
+              placeholder="e.g. 4gm/day"
+              dir="auto"
+              autoFocus
+              style={doseFieldInputStyle}
+            />
+          </label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <button type="button" onClick={onClose} style={dosePrimaryButtonStyle}>Done</button>
+            {canSaveToLibrary && (
               <button
                 type="button"
-                onClick={() => setIsEditing(true)}
-                title="Edit max dose"
-                aria-label="Edit max dose"
-                style={lineIconButtonStyle}
+                onClick={onRequestSave}
+                disabled={isSaving}
+                style={{ ...doseSecondaryButtonStyle, opacity: isSaving ? 0.5 : 1 }}
               >
-                <Edit2 size={12} />
+                <Library size={13} />
+                Save to library
               </button>
-              {canSaveToLibrary && (
-                <button
-                  type="button"
-                  onClick={onRequestSave}
-                  disabled={isSaving}
-                  title="Save this wording back to the drug library"
-                  aria-label="Save this max dose back to the drug library"
-                  style={{
-                    ...lineIconButtonStyle,
-                    color: isSaved ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
-                    cursor: isSaving ? 'default' : 'pointer',
-                    opacity: isSaving ? 0.5 : 1,
-                  }}
-                >
-                  <Library size={13} />
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={onRemove}
-                title="Remove max dose"
-                aria-label="Remove max dose"
-                style={lineIconButtonStyle}
-              >
+            )}
+            {value && (
+              <button type="button" onClick={onRemove} style={doseDangerButtonStyle}>
                 <X size={13} />
+                Remove
               </button>
-            </>
-          )}
-        </div>
-      )}
-
-      {isConfirming && (
-        <div style={{
-          display: 'flex', flexDirection: 'column', gap: 4,
-          padding: '6px 8px',
-          border: '1px solid var(--color-accent)',
-          borderRadius: 'var(--radius-md)',
-          backgroundColor: '#EFF6FF',
-        }}>
-          <span style={{ fontSize: 11, color: 'var(--color-text-primary)' }}>
-            Save this max dose to the drug library for everyone?
-          </span>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button
-              type="button"
-              onClick={onConfirmSave}
-              style={{
-                background: 'var(--color-accent-solid)', color: '#fff',
-                border: 'none', borderRadius: 'var(--radius-md)',
-                padding: '3px 10px', fontSize: 11, fontWeight: 600,
-                cursor: 'pointer', fontFamily: 'var(--font-body)',
-              }}
-            >
-              Save
-            </button>
-            <button
-              type="button"
-              onClick={onCancelConfirm}
-              style={{
-                background: 'none', color: 'var(--color-text-secondary)',
-                border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)',
-                padding: '3px 10px', fontSize: 11, fontWeight: 600,
-                cursor: 'pointer', fontFamily: 'var(--font-body)',
-              }}
-            >
-              Cancel
-            </button>
+            )}
           </div>
         </div>
+      ) : value ? (
+        <button type="button" onClick={onOpen} aria-label="Edit max dose" style={doseClosedRowStyle}>
+          <span dir="auto" style={{ flex: 1, minWidth: 0, display: 'block', fontSize: 14, color: 'var(--color-text-primary)' }}>
+            <span style={{ fontWeight: 700 }}>Max dose: </span>
+            <span style={{ fontStyle: 'italic' }}>{value}</span>
+          </span>
+          <Edit2 size={14} style={{ flexShrink: 0, marginTop: 3, color: 'var(--color-text-tertiary)' }} />
+        </button>
+      ) : (
+        <button type="button" onClick={onOpen} style={doseDashedButtonStyle}>
+          <Plus size={14} />
+          Max dose
+        </button>
       )}
 
-      {isSaving && (
-        <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>Saving…</span>
-      )}
-      {isSaved && (
-        <span style={{ fontSize: 10, color: 'var(--color-accent)' }}>Saved to library</span>
-      )}
-      {saveError && (
-        <span style={{ fontSize: 10, color: '#ef4444' }}>{saveError}</span>
-      )}
+      <DoseSaveFeedback
+        isConfirming={isConfirming}
+        confirmText="Save this max dose to the drug library for everyone?"
+        onConfirmSave={onConfirmSave}
+        onCancelConfirm={onCancelConfirm}
+        isSaving={isSaving}
+        isSaved={isSaved}
+        saveError={saveError}
+      />
     </div>
   )
 }
@@ -876,73 +789,60 @@ function EditableMaxDose({
 // dose_who was only ever set by a library pick — now that a dose can be
 // built from scratch (see addBracket below), it needs to be typeable too.
 function EditablePopulation({ value, onChange }) {
+  // 2026-11-08 REDESIGN: the pill itself is the button — tap it to rename.
+  // No hover needed, so it works on a phone.
   const [isEditing, setIsEditing] = useState(false)
-  // NOISE-REDUCTION PASS (2026-08-08): same hover-gated icon treatment as
-  // EditableDoseLine/EditableMaxDose — the pencil only shows on hover.
-  const [isHovered, setIsHovered] = useState(false)
 
-  if (!value && !isEditing) {
+  if (isEditing) {
+    return (
+      <input
+        type="text"
+        value={value ?? ''}
+        onChange={e => onChange(e.target.value)}
+        placeholder="Who is this dose for? e.g. Adult"
+        dir="auto"
+        autoFocus
+        style={{ ...doseFieldInputStyle, flex: 1, minWidth: 0 }}
+        onBlur={() => setIsEditing(false)}
+        onKeyDown={e => { if (e.key === 'Enter') setIsEditing(false) }}
+      />
+    )
+  }
+
+  if (!value) {
     return (
       <button
         type="button"
         onClick={() => setIsEditing(true)}
         style={{
-          alignSelf: 'flex-start',
-          marginLeft: 19,
-          background: 'none', border: 'none', padding: 0,
-          fontSize: 11, color: 'var(--color-text-tertiary)',
-          textDecoration: 'underline', cursor: 'pointer',
-          fontFamily: 'var(--font-body)',
+          display: 'inline-flex', alignItems: 'center', gap: 5,
+          padding: '5px 12px', borderRadius: 99,
+          border: '1.5px dashed var(--color-border)', background: 'none',
+          color: 'var(--color-text-secondary)',
+          fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-body)', cursor: 'pointer',
         }}
       >
-        + Population
+        <Plus size={12} />
+        Who is it for?
       </button>
     )
   }
 
-  return isEditing ? (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 19 }}>
-      <input
-        type="text"
-        value={value ?? ''}
-        onChange={e => onChange(e.target.value)}
-        placeholder="Population, e.g. Adult"
-        dir="auto"
-        autoFocus
-        style={{ ...editLineInputStyle, width: 200 }}
-        onBlur={() => setIsEditing(false)}
-        onKeyDown={e => { if (e.key === 'Enter') setIsEditing(false) }}
-      />
-    </div>
-  ) : (
-    <div
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      style={{ display: 'flex', alignItems: 'center', gap: 4, alignSelf: 'flex-start', marginLeft: 19 }}
+  return (
+    <button
+      type="button"
+      onClick={() => setIsEditing(true)}
+      aria-label="Edit population"
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 6,
+        padding: '5px 12px', borderRadius: 99, border: 'none',
+        color: 'var(--color-accent)', background: 'var(--color-accent-light)',
+        fontSize: 13, fontWeight: 700, fontFamily: 'var(--font-body)', cursor: 'pointer',
+      }}
     >
-      <span style={{
-        display: 'inline-flex', alignItems: 'center',
-        padding: '1px 7px',
-        borderRadius: 99,
-        fontSize: 10, fontWeight: 700, letterSpacing: '0.03em',
-        color: 'var(--color-accent)',
-        background: 'var(--color-accent-light)',
-        fontFamily: 'var(--font-body)',
-      }}>
-        {doseWhoLabel(value)}
-      </span>
-      {isHovered && (
-        <button
-          type="button"
-          onClick={() => setIsEditing(true)}
-          title="Edit population"
-          aria-label="Edit population"
-          style={{ ...lineIconButtonStyle, width: 18, height: 18 }}
-        >
-          <Edit2 size={11} />
-        </button>
-      )}
-    </div>
+      {doseWhoLabel(value)}
+      <Edit2 size={12} />
+    </button>
   )
 }
 
@@ -2377,7 +2277,7 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
   const [savingGroupIdx, setSavingGroupIdx] = useState(null)
   const [savedGroupIdx, setSavedGroupIdx] = useState(null)
   const [groupSaveError, setGroupSaveError] = useState(null) // { groupIdx, message } | null
-  const [freshBracketId, setFreshBracketId] = useState(null) // id of a bracket just added from scratch — opens it already in edit mode
+  const [openEditorId, setOpenEditorId] = useState(null) // id of the ONE bracket (or 'max-<groupIdx>' for a max dose) currently open for editing; opening another closes this one
 
   // UI PASS (2026-08-08): "Clear doses" — a destructive dose-menu action that
   // wipes the population, all dose lines/brackets, and the max dose for a
@@ -2565,7 +2465,7 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
         : g
     )
     emitGroups(nextGroups)
-    setFreshBracketId(newLineId)
+    setOpenEditorId(newLineId)
   }
 
   // Update the shared "max dose" note for a group's dose_lines (field-
@@ -3248,22 +3148,6 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                       onChange={val => updateGroupDoseWho(groupIdx, val)}
                     />
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      {/* UI PASS (2026-08-08): "Add bracket" moved here from
-                          its own line at the top of the content column,
-                          next to the "⋯" menu — same header row as the
-                          population badge. */}
-                      <button
-                        type="button"
-                        onClick={() => addBracket(groupIdx)}
-                        style={{
-                          background: 'none', border: 'none', padding: 0,
-                          fontSize: 11, color: 'var(--color-text-tertiary)',
-                          textDecoration: 'underline', cursor: 'pointer',
-                          fontFamily: 'var(--font-body)', whiteSpace: 'nowrap',
-                        }}
-                      >
-                        + Add bracket
-                      </button>
                       {/* DECLUTTER PASS 3 (Direction 1, 2026-08-08): the
                           always-visible "Save to library" button folded
                           into this menu as a conditionally-shown item,
@@ -3377,8 +3261,7 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                   {confirmSaveGroup === groupIdx && (
                     <div style={{
                       display: 'flex', flexDirection: 'column', gap: 4,
-                      marginLeft: 19,
-                      padding: '6px 8px',
+                                            padding: '6px 8px',
                       border: '1px solid var(--color-accent)',
                       borderRadius: 'var(--radius-md)',
                       backgroundColor: '#EFF6FF',
@@ -3415,16 +3298,16 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                     </div>
                   )}
                   {savingGroupIdx === groupIdx && (
-                    <span style={{ marginLeft: 19, fontSize: 10, color: 'var(--color-text-tertiary)' }}>Saving…</span>
+                    <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>Saving…</span>
                   )}
                   {savedGroupIdx === groupIdx && (
-                    <span style={{ marginLeft: 19, fontSize: 10, color: 'var(--color-accent)' }}>Saved to library</span>
+                    <span style={{ fontSize: 10, color: 'var(--color-accent)' }}>Saved to library</span>
                   )}
                   {groupSaveError?.groupIdx === groupIdx && (
-                    <span style={{ marginLeft: 19, fontSize: 10, color: '#ef4444' }}>{groupSaveError.message}</span>
+                    <span style={{ fontSize: 10, color: '#ef4444' }}>{groupSaveError.message}</span>
                   )}
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, paddingLeft: 19 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     {(group.dose_lines ?? []).length === 0 && group.dose?.trim() && (
                       <div style={{ fontSize: 11, fontStyle: 'italic', color: 'var(--color-text-tertiary)' }}>
                         Previously entered: {group.dose}
@@ -3437,7 +3320,7 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                         read-only by default via EditableDoseLine, with its own
                         edit toggle — see that component for the legacy-line
                         split-on-first-edit behavior. */}
-                    {group.dose_lines?.map(line => {
+                    {group.dose_lines?.map((line, lineIdx) => {
                       // WRITE-BACK FEATURE (step 11.3): only lines that trace
                       // back to a real library bracket, whose group is still
                       // linked to a formulation, and that have actually been
@@ -3464,11 +3347,25 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                           isSaving={savingLineId === line.id}
                           isSaved={savedLineId === line.id}
                           saveError={lineSaveError?.lineId === line.id ? lineSaveError.message : null}
-                          startInEdit={line.id === freshBracketId}
-                          onEditConsumed={() => setFreshBracketId(null)}
+                          index={lineIdx}
+                          isOpen={openEditorId === line.id}
+                          onOpen={() => setOpenEditorId(line.id)}
+                          onClose={() => setOpenEditorId(null)}
                         />
                       )
                     })}
+
+                    {/* 2026-11-08 REDESIGN: one clear, full-width Add bracket
+                        button under the last bracket (it used to be a tiny
+                        underlined link in the header). */}
+                    <button
+                      type="button"
+                      onClick={() => addBracket(groupIdx)}
+                      style={doseDashedButtonStyle}
+                    >
+                      <Plus size={14} />
+                      Add bracket
+                    </button>
 
                     {/* DECLUTTER PASS 4 (Direction 1, 2026-08-08): reverted
                         to its own line at the bottom of the dose card, now
@@ -3480,7 +3377,10 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                     <EditableMaxDose
                       value={group.dose_max}
                       onChange={val => updateGroupDoseMax(groupIdx, val)}
-                      onRemove={() => updateGroupDoseMax(groupIdx, null)}
+                      onRemove={() => { setOpenEditorId(null); updateGroupDoseMax(groupIdx, null) }}
+                      isOpen={openEditorId === `max-${groupIdx}`}
+                      onOpen={() => setOpenEditorId(`max-${groupIdx}`)}
+                      onClose={() => setOpenEditorId(null)}
                       canSaveToLibrary={!!(group.dose_max_population_id && firstOpt.formulation_id)}
                       isConfirming={confirmSaveMaxDose === groupIdx}
                       onRequestSave={() => setConfirmSaveMaxDose(groupIdx)}
