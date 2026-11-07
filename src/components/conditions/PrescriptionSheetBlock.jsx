@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useDrugContext } from '../../context/DrugContext'
-import { FileText, ChevronRight } from 'lucide-react'
+import { FileText, ChevronRight, Plus } from 'lucide-react'
 import NoteCallout from '../ui/NoteCallout'
 import FreeTextPostBlock from './FreeTextPostBlock'
 import BlockDivider from './BlockDivider'
@@ -432,7 +432,7 @@ function buildFormulationClusters(row, drugs, mainFormulation) {
   }))
 }
 
-function UnifiedDrugRow({ index, row, formulation, drugs, navigate, dividerType }) {
+function UnifiedDrugRow({ row, formulation, drugs, navigate, dividerType }) {
   const clusters = buildFormulationClusters(row, drugs, formulation)
 
   // TAP FEEDBACK (2026-08-09): tracks which unit (by uIdx) is currently
@@ -508,36 +508,24 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, dividerType 
 
           return (
             <React.Fragment key={uIdx}>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: RX_RAIL_GAP, marginTop: uIdx > 0 ? ROW_GAP_ALT : 0 }}>
-                {/* Prefix column — fixed width so all drug names align.
-                    Text is left-aligned within the column (justifyContent:
-                    'flex-start') so 'Rx1' and 'or' share the same flush-left
-                    starting edge — the leftover space before the drug name
-                    naturally varies with label length ('or' leaves more
-                    room than 'Rx1'), which is the intended visual rhythm. */}
-                <div style={{ width: RX_RAIL_WIDTH, flexShrink: 0, display: 'flex', justifyContent: 'flex-start', alignItems: 'baseline' }}>
-                  {/* The saved joiner 'and' is shown as 'plus' (display only).
-                      Rail unification pass: 'Rx{n}' and 'or' are both plain
-                      positional annotations, not design elements — same
-                      body font, same quiet tertiary color, same weight, so
-                      neither competes visually with the drug name. */}
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: RX_RAIL_GAP, marginTop: uIdx > 0 ? ROW_GAP_ALT : 0 }}>
+                {/* Left rail — fixed width so all drug names align. Its height
+                    equals the first line of the drug name, and the content is
+                    centred in it, so the icon / chip sits level with the name
+                    even when the name wraps. First drug of a row: a blue Rx
+                    icon (no numbering). Every other drug: a small chip, 'or'
+                    for alternatives (amber) or a plus sign for drugs given
+                    together (green). The saved joiner 'and' shows as plus;
+                    the data is not changed. */}
+                <div style={{
+                  width: RX_RAIL_WIDTH, flexShrink: 0,
+                  height: NAME_FONT_SIZE * NAME_LINE_HEIGHT,
+                  display: 'flex', alignItems: 'center', justifyContent: 'flex-start',
+                }}>
                   {uIdx === 0 ? (
-                    <span style={{ lineHeight: 1 }}>
-                      <span style={{
-                        fontSize: 12, fontWeight: 500,
-                        color: 'var(--color-text-tertiary)',
-                      }}>Rx</span>
-                      <span style={{
-                        fontSize: 12, fontWeight: 600,
-                        color: 'color-mix(in srgb, var(--color-accent) 55%, var(--color-text-tertiary) 45%)',
-                      }}>{index}</span>
-                    </span>
+                    <RxIcon />
                   ) : (
-                    <span style={{
-                      fontSize: 12, fontWeight: 500,
-                      color: 'color-mix(in srgb, var(--color-warning) 90%, black 10%)',
-                      lineHeight: 1,
-                    }}>{data.joiner === 'and' ? 'plus' : (data.joiner ?? 'or')}</span>
+                    <JoinerChip kind={data.joiner === 'and' ? 'plus' : (data.joiner ?? 'or')} />
                   )}
                 </div>
                 <div
@@ -599,6 +587,54 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, dividerType 
         })}
       </div>
     </div>
+  )
+}
+
+// ─── Left rail pieces ─────────────────────────────────────────────────────────
+// RxIcon — the prescription symbol (R with a slashed leg) in blue, on a soft
+// blue tile. Drawn inline so it does not depend on any font having the
+// 'Rx' character.
+function RxIcon() {
+  return (
+    <span
+      role="img"
+      aria-label="Prescription"
+      style={{
+        width: 22, height: 22, borderRadius: 6, flexShrink: 0,
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        backgroundColor: 'color-mix(in srgb, var(--color-accent) 12%, transparent)',
+      }}
+    >
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)"
+        strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M6 4v16" />
+        <path d="M6 4h6a4 4 0 0 1 0 8H6" />
+        <path d="M10 12l7 8" />
+        <path d="M14 21l6-6" />
+      </svg>
+    </span>
+  )
+}
+
+// JoinerChip — small rounded chip that joins one drug to the one above it.
+// 'or' = alternative (amber); 'plus' = given together (green).
+function JoinerChip({ kind }) {
+  const isPlus = kind === 'plus'
+  const tone = isPlus ? 'var(--color-success)' : 'var(--color-warning)'
+  return (
+    <span
+      aria-label={isPlus ? 'plus' : kind}
+      style={{
+        height: 18, minWidth: 18, boxSizing: 'border-box', padding: isPlus ? '0 3px' : '0 6px',
+        borderRadius: 999, flexShrink: 0, whiteSpace: 'nowrap',
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        backgroundColor: `color-mix(in srgb, ${tone} 15%, transparent)`,
+        color: `color-mix(in srgb, ${tone} 85%, black 15%)`,
+        fontSize: 11, fontWeight: 600, lineHeight: 1, letterSpacing: '0.01em',
+      }}
+    >
+      {isPlus ? <Plus size={12} strokeWidth={3} aria-hidden="true" /> : kind}
+    </span>
   )
 }
 
