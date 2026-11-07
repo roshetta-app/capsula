@@ -17,9 +17,9 @@
  *   flush    bool    — no outer margins (parent sets the gap)
  *
  * Icon legend:
- *   - info:    circled i
+ *   - info:    stethoscope
  *   - tip:     lightbulb
- *   - warning: circled exclamation mark
+ *   - warning: stop hand
  *
  * CHAT-BUBBLE PASS: replaced the flat rectangular box with a message-bubble
  * shape — full width always, not shrink-wrapped or side-anchored. What
@@ -35,13 +35,13 @@
  * more margin since it stands alone between blocks rather than sitting
  * directly under prescription rows.
  */
-import { Info, CircleAlert, Lightbulb } from 'lucide-react'
+import { Stethoscope, Hand, Lightbulb } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkBreaks from 'remark-breaks'
 import { NOTE_FLAVORS, noteFlavorColor } from './noteFlavors'
 
 // ─── Icons per flavor (lucide) ───────────────────────────────────────────────
-// Info = circled i, Warning = circled exclamation mark, Tip = lightbulb.
+// Info = stethoscope, Warning = stop hand, Tip = lightbulb.
 // size/offset let the CMS chips reuse them (offset 0) while the bubble nudges
 // the icon down to sit level with the first line of text.
 function makeIcon(LucideIcon) {
@@ -52,8 +52,8 @@ function makeIcon(LucideIcon) {
     )
   }
 }
-const IconInfo = makeIcon(Info)
-const IconWarning = makeIcon(CircleAlert)
+const IconInfo = makeIcon(Stethoscope)
+const IconWarning = makeIcon(Hand)
 const IconTip = makeIcon(Lightbulb)
 
 const ICONS = { info: IconInfo, warning: IconWarning, tip: IconTip }
