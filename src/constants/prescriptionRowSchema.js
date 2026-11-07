@@ -379,6 +379,7 @@ export const NOTE_ROW_TEMPLATE = {
   id: null,
   text_en: null,
   text_ar: null,
+  flavor: 'info',   // 'info' | 'warning' | 'tip' — older rows have none and show as info
 };
 
 export const FREE_TEXT_ROW_TEMPLATE = {

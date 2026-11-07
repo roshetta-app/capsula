@@ -61,7 +61,7 @@ const NAME_LINE_HEIGHT = 1.3
  *                        recursive, not duplicated.
  *   note               — { text_en?, text_ar? } — both languages combined into one
  *                        string and rendered via NoteCallout in flat inline row style
- *                        (no per-row flavor; always defaults to NoteCallout's 'info')
+ *                        (optional row.flavor: 'info' | 'warning' | 'tip'; defaults to 'info')
  *   free_text          — { content }        — rendered via FreeTextPostBlock (markdown prose)
  *
  * PHASE 7 (2026-06-21): removed support for the legacy `section_header`,
@@ -185,7 +185,7 @@ export default function PrescriptionSheetBlock({ sheet, hasContentAfter = true }
 
       case 'note': {
         // Row schema (NOTE_ROW_TEMPLATE) stores bilingual text as text_en /
-        // text_ar and carries no flavor field. Combined into one string so
+        // text_ar plus an optional flavor (older rows have none = info). Combined into one string so
         // NoteCallout's existing per-paragraph dir="auto" handling renders
         // each language in its own correctly-directioned paragraph.
         const noteText = [row.text_en, row.text_ar].filter(Boolean).join('\n\n')
@@ -195,6 +195,7 @@ export default function PrescriptionSheetBlock({ sheet, hasContentAfter = true }
           <NoteCallout
             key={row.id ?? key}
             text={noteText}
+            flavor={row.flavor ?? 'info'}
             flush
           />
         )

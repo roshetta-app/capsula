@@ -6,14 +6,15 @@
  * note_callout blocks.
  *
  * Props:
- *   row      — { row_type, text_en, text_ar } (NOTE_ROW_TEMPLATE — no flavor;
- *              the app always renders these via NoteCallout's default flavor)
+ *   row      — { row_type, text_en, text_ar, flavor } (NOTE_ROW_TEMPLATE; rows
+ *              saved before flavor existed have none and show as info)
  *   onChange — (nextRow) => void
  *
  * Pure controlled component — zero DB calls.
  */
 
 import { useRef, useEffect } from 'react'
+import { NoteFlavorPicker, NoteLivePreview } from '../NoteFlavorPicker'
 
 function FieldLabel({ children }) {
   return (
@@ -79,6 +80,8 @@ export default function NoteRowEditor({ row, onChange }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
 
+      <NoteFlavorPicker value={row.flavor ?? 'info'} onChange={flavor => patch({ flavor })} />
+
       {/* ── Note text (English) ── */}
       <div>
         <FieldLabel>Note text (English)</FieldLabel>
@@ -98,6 +101,12 @@ export default function NoteRowEditor({ row, onChange }) {
           placeholder="النص بالعربية (اختياري)"
         />
       </div>
+
+      {/* Same combination the app uses: English paragraph, then Arabic. */}
+      <NoteLivePreview
+        text={[row.text_en, row.text_ar].filter(Boolean).join('\n\n')}
+        flavor={row.flavor ?? 'info'}
+      />
 
     </div>
   )
