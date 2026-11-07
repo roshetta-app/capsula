@@ -7,8 +7,7 @@ import FreeTextPostBlock from './FreeTextPostBlock'
 import BlockDivider from './BlockDivider'
 import { blockGap } from '../../utils/blockSpacing'
 import { toDrugOptions, doseLineInstructionText } from '../../constants/prescriptionRowSchema'
-import { getDrugModifierAndRouteSuffix, toTitleCase } from '../../utils/drugTitleFormat'
-import { getFormAbbrev } from '../../config/forms'
+import { getSheetDrugSuffix, toTitleCase } from '../../utils/drugTitleFormat'
 
 // ─── Resolved-drug lookup (decision 23 fix, 2026-08-04) ───────────────────────
 // A formulation can have several brands, so matching on formulation_id alone
@@ -505,7 +504,12 @@ function UnifiedDrugRow({ row, formulation, drugs, navigate, dividerType }) {
           // the row, only concentration/form are). Deliberately excludes
           // pack size/fill volume, unlike getDrugTitleSuffix's search-card
           // use of the same abbreviation logic.
-          const { modifierAbbrev, routeAbbrev } = getDrugModifierAndRouteSuffix(member.formulation)
+          const suffix = getSheetDrugSuffix({
+            concentration: data.concentration,
+            form: data.form,
+            formulation: member.formulation,
+            tradenameClean: member.formulation?.tradenameClean ?? data.brand_name,
+          })
 
           return (
             <React.Fragment key={uIdx}>
@@ -556,10 +560,7 @@ function UnifiedDrugRow({ row, formulation, drugs, navigate, dividerType }) {
                 >
                   <DrugMainLine
                     name={memberName}
-                    concentration={data.concentration}
-                    form={getFormAbbrev(data.form)}
-                    modifierAbbrev={modifierAbbrev}
-                    routeAbbrev={routeAbbrev}
+                    suffix={suffix}
                     linkEnabled={memberLinkEnabled}
                   />
                   {showOwnNote && <RowNote note={data.note} />}
@@ -666,7 +667,7 @@ function JoinerChip({ kind }) {
  * were removed (the drug page already has image search), and the pieces
  * are aligned by baseline instead of by centre.
  */
-function DrugMainLine({ name, concentration, form, modifierAbbrev, routeAbbrev, linkEnabled }) {
+function DrugMainLine({ name, suffix, linkEnabled }) {
   if (!name) return null
 
   return (
@@ -680,58 +681,16 @@ function DrugMainLine({ name, concentration, form, modifierAbbrev, routeAbbrev, 
           {name}
         </span>
 
-        {/* Modifier (decision 24, moved decision 25, styled decision 26) —
-            the drug's single release-mechanism abbreviation, e.g. 'ER'
-            for extended-release. Placed right after the name and styled
-            identically to it (same size/weight/color) so it reads as
-            one unit with the name, matching how it'd appear on the
-            actual package (e.g. 'Adwiflam ER'), rather than as a
-            separate, smaller qualifier. */}
-        {modifierAbbrev && (
-          <span style={{
-            fontSize: NAME_FONT_SIZE, fontWeight: 600,
-            color: 'var(--color-text-primary)',
-            lineHeight: NAME_LINE_HEIGHT,
-          }}>
-            {modifierAbbrev}
-          </span>
-        )}
-
-        {/* Concentration — raised from secondary to near-primary contrast;
-            this was reading as near-invisible at the old --color-text-secondary
-            weight, despite being clinically load-bearing information. */}
-        {concentration && (
+        {/* Suffix — one piece, written exactly as on the drug card but
+            without the count: e.g. '200mg/5ml - Susp.', '75mg - SR Cap.',
+            '75mg/3ml - Amp. - IM, IV'. Built by getSheetDrugSuffix. */}
+        {suffix && (
           <span style={{
             fontSize: 12, fontWeight: 500,
             color: 'color-mix(in srgb, var(--color-text-primary) 70%, var(--color-text-secondary) 30%)',
             lineHeight: 1.3,
           }}>
-            {concentration}
-          </span>
-        )}
-
-        {/* Form — same contrast tier as concentration, a little bolder. */}
-        {form && (
-          <span style={{
-            fontSize: 12, fontWeight: 500,
-            color: 'color-mix(in srgb, var(--color-text-primary) 70%, var(--color-text-secondary) 30%)',
-            lineHeight: 1.3,
-            letterSpacing: '0.01em',
-            flexShrink: 0,
-          }}>
-            {form}
-          </span>
-        )}
-
-        {/* Route details (decision 24) — injection formulations only,
-            e.g. 'IM'. Same tier as modifier above. */}
-        {routeAbbrev && (
-          <span style={{
-            fontSize: 12, fontWeight: 500,
-            color: 'color-mix(in srgb, var(--color-text-primary) 70%, var(--color-text-secondary) 30%)',
-            lineHeight: 1.3,
-          }}>
-            {routeAbbrev}
+            {suffix}
           </span>
         )}
       </div>

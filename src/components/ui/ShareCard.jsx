@@ -13,6 +13,7 @@
 
 import { forwardRef } from 'react'
 import { getFormAbbrev } from '../../config/forms'
+import { normalizeSpacing } from '../../utils/drugTitleFormat'
 
 const ShareCard = forwardRef(function ShareCard({ condition, prescription }, ref) {
   const drugs = prescription?.drugs ?? []
@@ -123,7 +124,7 @@ const ShareCard = forwardRef(function ShareCard({ condition, prescription }, ref
                 </span>
                 {drug.concentration && (
                   <span style={{ fontSize: 12, color: '#6B7280' }}>
-                    {drug.concentration}
+                    {normalizeSpacing(drug.concentration)}
                   </span>
                 )}
                 {drug.form && (

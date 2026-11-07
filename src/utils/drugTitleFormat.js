@@ -72,7 +72,7 @@ const RELEASE_NAME_HINT_TOKENS = {
 // Collapses redundant whitespace and strips spacing around "/" so
 // concentration values render consistently regardless of how they were
 // entered — matches the plan's own locked example format ("200mg/5ml").
-function normalizeSpacing(value) {
+export function normalizeSpacing(value) {
   if (!value) return value
   return value.trim().replace(/\s+/g, ' ').replace(/\s*\/\s*/g, '/')
 }
@@ -233,4 +233,24 @@ export function getDrugModifierAndRouteSuffix(drug) {
     modifierAbbrev: getReleaseModifierAbbrev(drug.formModifier, drug.tradenameClean),
     routeAbbrev: drug.route === 'injection' ? abbreviateRouteDetails(drug.routeDetails) : '',
   }
+}
+
+// Prescription sheet drug line (2026-11-07): the same suffix the drug card
+// shows after the name (normalised concentration spacing, form abbreviation,
+// modifier abbreviations, injection route details), but without pack size or
+// fill volume — a prescription row never shows the count. Built by calling
+// getDrugTitleSuffix itself, so the two can never drift apart.
+// concentration and form come from the sheet row; everything else (modifiers,
+// route, route details) comes from the resolved formulation when there is one.
+// The form is lower-cased so 'Tablet' on an older row still matches the list.
+export function getSheetDrugSuffix({ concentration, form, formulation, tradenameClean }) {
+  const base = formulation ?? {}
+  return getDrugTitleSuffix({
+    ...base,
+    concentration,
+    form: typeof form === 'string' ? form.trim().toLowerCase() : form,
+    tradenameClean: tradenameClean ?? base.tradenameClean,
+    packSize: null,
+    fillVolume: null,
+  }, { omitModifierTags: TITLE_HIDDEN_MODIFIER_TAGS })
 }
