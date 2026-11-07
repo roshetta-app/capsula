@@ -17,9 +17,9 @@
  *   flush    bool    — no outer margins (parent sets the gap)
  *
  * Icon legend:
- *   - info:    ECG / pulse line (clinical feel)
- *   - tip:     medical cross badge (first-aid / clinical)
- *   - warning: triangle (universally understood, unchanged)
+ *   - info:    circled i
+ *   - tip:     lightbulb
+ *   - warning: circled exclamation mark
  *
  * CHAT-BUBBLE PASS: replaced the flat rectangular box with a message-bubble
  * shape — full width always, not shrink-wrapped or side-anchored. What
@@ -35,51 +35,26 @@
  * more margin since it stands alone between blocks rather than sitting
  * directly under prescription rows.
  */
+import { Info, CircleAlert, Lightbulb } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkBreaks from 'remark-breaks'
 import { NOTE_FLAVORS, noteFlavorColor } from './noteFlavors'
 
-// ─── SVG icon components per flavor ──────────────────────────────────────────
-
-/** Medical cross — replaces the generic lightbulb for 'tip' */
-function IconTip({ color, size = 16, offset = 3 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
-      stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"
-      style={{ flexShrink: 0, marginTop: offset }}>
-      {/* Plus / cross shape */}
-      <line x1="12" y1="5" x2="12" y2="19" />
-      <line x1="5" y1="12" x2="19" y2="12" />
-      {/* Circle border to make it a medical cross badge */}
-      <circle cx="12" cy="12" r="10" strokeWidth="1.8" />
-    </svg>
-  )
+// ─── Icons per flavor (lucide) ───────────────────────────────────────────────
+// Info = circled i, Warning = circled exclamation mark, Tip = lightbulb.
+// size/offset let the CMS chips reuse them (offset 0) while the bubble nudges
+// the icon down to sit level with the first line of text.
+function makeIcon(LucideIcon) {
+  return function FlavorIcon({ color, size = 18, offset = 2 }) {
+    return (
+      <LucideIcon size={size} color={color} strokeWidth={2.2}
+        style={{ flexShrink: 0, marginTop: offset }} aria-hidden="true" />
+    )
+  }
 }
-
-/** ECG / pulse line — replaces the generic circle-i for 'info' */
-function IconInfo({ color, size = 16, offset = 3 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
-      stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-      style={{ flexShrink: 0, marginTop: offset }}>
-      {/* Heartbeat / ECG trace */}
-      <polyline points="2,12 6,12 8,6 10,18 13,9 15,14 17,12 22,12" />
-    </svg>
-  )
-}
-
-/** Warning triangle — unchanged, universally understood */
-function IconWarning({ color, size = 16, offset = 3 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
-      stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-      style={{ flexShrink: 0, marginTop: offset }}>
-      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-      <line x1="12" y1="9" x2="12" y2="13" />
-      <line x1="12" y1="17" x2="12.01" y2="17" />
-    </svg>
-  )
-}
+const IconInfo = makeIcon(Info)
+const IconWarning = makeIcon(CircleAlert)
+const IconTip = makeIcon(Lightbulb)
 
 const ICONS = { info: IconInfo, warning: IconWarning, tip: IconTip }
 
@@ -153,7 +128,7 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
         flex: 1,
         minWidth: 0,
         fontSize: 14,
-        fontWeight: 400,
+        fontWeight: 600,
         fontStyle: 'normal',
         color: 'var(--color-text-primary)',
         display: 'flex',
@@ -184,7 +159,6 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
       boxSizing: 'border-box',
       background: f.bg,
       borderRadius: bubbleRadius,
-      border: `1px solid ${f.border}`,
       padding: '10px 14px',
     }}>
       <div
