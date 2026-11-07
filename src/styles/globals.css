@@ -647,6 +647,30 @@ body {
   margin: var(--space-2) 0 3px;
 }
 
+/* ─── Title: a line starting with '# ' in a text block ────────────────────────
+   Big, bold title (e.g. 'Antibiotics'). Only single-# lines are affected;
+   '##' and '###' keep their smaller look. Spacing above is tighter inside a
+   prescription sheet, where the sheet's own gaps already separate items. */
+.dir-prose h1 {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: 0;
+  margin: var(--space-5) 0 var(--space-2);
+}
+
+.dir-prose h1:first-child {
+  margin-top: 0;
+}
+
+.rx-prose-tight .dir-prose h1 {
+  margin: var(--space-3) 0 var(--space-1);
+}
+
+.rx-prose-tight .dir-prose h1:first-child {
+  margin-top: 0;
+}
+
 /* ─── Tables (outside cards) ──────────────────────────────────────────────────── */
 
 .dir-prose table {

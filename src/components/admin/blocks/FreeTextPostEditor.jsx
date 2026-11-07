@@ -112,10 +112,39 @@ function CopyPromptButton({ onCopy, status }) {
   )
 }
 
+// Title button — turns the current line into a big bold title ('# ' at the
+// start of the line) or back into normal text if it already is one.
+function TitleButton({ onClick, disabled }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title="Make this line a big bold title (tap again to undo)"
+      style={{
+        padding: '4px 10px',
+        fontSize: 11,
+        fontWeight: 700,
+        fontFamily: 'var(--font-body)',
+        borderRadius: 'var(--radius-sm)',
+        border: '1px solid var(--color-border)',
+        cursor: disabled ? 'default' : 'pointer',
+        backgroundColor: 'var(--color-surface)',
+        color: 'var(--color-text-secondary)',
+        whiteSpace: 'nowrap',
+        opacity: disabled ? 0.5 : 1,
+      }}
+    >
+      Title
+    </button>
+  )
+}
+
 // ─── Auto-growing textarea ─────────────────────────────────────────────────────
 
-function AutoTextarea({ value, onChange, disabled, placeholder }) {
-  const ref = useRef(null)
+function AutoTextarea({ value, onChange, disabled, placeholder, textareaRef }) {
+  const innerRef = useRef(null)
+  const ref = textareaRef ?? innerRef
 
   useEffect(() => {
     if (!ref.current) return
@@ -211,6 +240,7 @@ export default function FreeTextPostEditor({ data, onChange, disabled = false })
   const [copyStatus, setCopyStatus] = useState('idle') // idle | loading | copied | error
 
   const charCount = markdown.length
+  const textareaRef = useRef(null)
 
   // Fetch the AI prompt once on mount — cached in state for the session.
   useEffect(() => {
@@ -251,6 +281,23 @@ export default function FreeTextPostEditor({ data, onChange, disabled = false })
     setTimeout(() => setCopyStatus('idle'), 2000)
   }
 
+  // Toggle a big bold title on the line the cursor is on.
+  function handleTitle() {
+    const el = textareaRef.current
+    if (!el || disabled) return
+    const pos = el.selectionStart ?? markdown.length
+    const lineStart = pos === 0 ? 0 : markdown.lastIndexOf('\n', pos - 1) + 1
+    const existing = (markdown.slice(lineStart).match(/^#{1,6} ?/) ?? [''])[0]
+    const replacement = existing === '# ' ? '' : '# '
+    const next = markdown.slice(0, lineStart) + replacement + markdown.slice(lineStart + existing.length)
+    const newPos = Math.max(lineStart, pos + replacement.length - existing.length)
+    handleChange(next)
+    requestAnimationFrame(() => {
+      el.focus()
+      el.setSelectionRange(newPos, newPos)
+    })
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
       {/* Toolbar */}
@@ -270,6 +317,7 @@ export default function FreeTextPostEditor({ data, onChange, disabled = false })
           }}>
             {charCount > 0 ? `${charCount.toLocaleString()} chars` : 'Markdown + cards supported'}
           </span>
+          {mode !== 'Preview' && <TitleButton onClick={handleTitle} disabled={disabled} />}
           <CopyPromptButton onCopy={handleCopyPrompt} status={copyStatus} />
         </div>
       </div>
@@ -280,7 +328,8 @@ export default function FreeTextPostEditor({ data, onChange, disabled = false })
           value={markdown}
           onChange={handleChange}
           disabled={disabled}
-          placeholder="Write in markdown… use :::warning, :::dose, :::redflags etc. for cards"
+          textareaRef={textareaRef}
+          placeholder="Write in markdown… tap Title for a big bold title, use :::warning, :::dose, :::redflags etc. for cards"
         />
       )}
 
@@ -299,7 +348,8 @@ export default function FreeTextPostEditor({ data, onChange, disabled = false })
             value={markdown}
             onChange={handleChange}
             disabled={disabled}
-            placeholder="Write in markdown… use :::warning, :::dose, :::redflags etc. for cards"
+            textareaRef={textareaRef}
+            placeholder="Write in markdown… tap Title for a big bold title, use :::warning, :::dose, :::redflags etc. for cards"
           />
           <PreviewPanel markdown={markdown} />
         </div>
