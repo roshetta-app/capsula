@@ -422,7 +422,7 @@ function resolveDosePick(dosesStructured) {
 // The change (pencil) button and the options menu sit on the right of the card.
 const linkedDrugCache = new Map()
 
-function LinkedDrugCard({ brandId, onRequestChange, extraAction, fallback }) {
+function LinkedDrugCard({ brandId, onRequestChange, extraAction, fallback, noteSlot = null }) {
   const { categories } = useCategories()
   const [drug, setDrug] = useState(() => linkedDrugCache.get(brandId) ?? null)
 
@@ -442,7 +442,7 @@ function LinkedDrugCard({ brandId, onRequestChange, extraAction, fallback }) {
     return () => { cancelled = true }
   }, [brandId])
 
-  if (!drug) return fallback
+  if (!drug) return <>{fallback}{noteSlot}</>
 
   return (
     <div style={{
@@ -472,6 +472,12 @@ function LinkedDrugCard({ brandId, onRequestChange, extraAction, fallback }) {
           </>
         )}
       />
+      {/* The drug's note button lives inside the card, under the drug. */}
+      {noteSlot && (
+        <div style={{ display: 'flex', flexDirection: 'column', paddingBottom: 10 }}>
+          {noteSlot}
+        </div>
+      )}
     </div>
   )
 }
@@ -1992,6 +1998,12 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onOpti
                 onRequestChange={() => setBrandPickerOpen(true)}
                 extraAction={nameRowExtraActions}
                 fallback={searchField}
+                noteSlot={(
+                  <DrugOptionNoteSlot
+                    note={option.note ?? null}
+                    onChange={value => patch({ note: value })}
+                  />
+                )}
               />
             ) : searchField
           })()}
@@ -2013,7 +2025,7 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onOpti
               Sits directly under this drug's name at all times once the option
               has any content — no gate beyond the option existing. Travels with
               the drug if it is moved to a different group. */}
-          {(isLinked || !!displayName) && (
+          {(isLinked || !!displayName) && !(option.brand_id && !genericOnlyMode) && (
             <DrugOptionNoteSlot
               note={option.note ?? null}
               onChange={value => patch({ note: value })}
