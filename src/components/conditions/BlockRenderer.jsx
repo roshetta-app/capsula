@@ -2,6 +2,7 @@ import ImageGalleryBlock from './ImageGalleryBlock'
 import FreeTextPostBlock from './FreeTextPostBlock'
 import PrescriptionSheetBlock from './PrescriptionSheetBlock'
 import NoteCallout from '../ui/NoteCallout'
+import BlockDivider from './BlockDivider'
 
 /**
  * BlockRenderer — renders a single condition_blocks row based on `block.blockType`.
@@ -17,6 +18,8 @@ import NoteCallout from '../ui/NoteCallout'
  *                         (data = { label, rows: [...] })
  *   note_callout       -> NoteCallout (2.6) — standalone divider block,
  *                         variant='divider': icon above text, lighter bg
+ *   divider            -> BlockDivider — fading line with a small centre diamond,
+ *                         no data, no settings
  *
  * Unrecognized block types render `null` + dev-only console warning (per 2.13).
  *
@@ -37,7 +40,10 @@ export default function BlockRenderer({ block }) {
       return <PrescriptionSheetBlock sheet={data} />
 
     case 'note_callout':
-      return <NoteCallout text={data?.text} flavor={data?.flavor} variant="divider" />
+      return <NoteCallout text={data?.text} flavor={data?.flavor} variant="divider" flush />
+
+    case 'divider':
+      return <BlockDivider />
 
     default:
       if (process.env.NODE_ENV !== 'production') {

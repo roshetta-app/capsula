@@ -14,6 +14,7 @@
  *   flavor   string  — 'info' | 'warning' | 'tip', default 'info'
  *   variant  string  — 'inline' (default) | 'divider'
  *   isLast   bool    — accepted but unused; kept so callers don't need updating
+ *   flush    bool    — no outer margins (parent sets the gap)
  *
  * Icon legend:
  *   - info:    ECG / pulse line (clinical feel)
@@ -108,7 +109,7 @@ const FLAVORS = {
 // Arabic-leading text so the icon side can follow text direction.
 const ARABIC_RE = /[\u0600-\u06FF\u0750-\u077F]/
 
-export default function NoteCallout({ text, flavor = 'info', variant = 'inline', isLast = false }) {
+export default function NoteCallout({ text, flavor = 'info', variant = 'inline', isLast = false, flush = false }) {
   if (!text || !text.trim()) return null
 
   const f = FLAVORS[flavor] ?? FLAVORS.info
@@ -224,6 +225,10 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
       </div>
     </div>
   )
+
+  // flush: no outer margins — the parent (sheet or BlockStack) sets the gap
+  // around this note, see utils/blockSpacing.js.
+  if (flush) return bubble
 
   if (variant === 'divider') {
     return (

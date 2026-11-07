@@ -4,6 +4,8 @@ import { useDrugContext } from '../../context/DrugContext'
 import { FileText, ChevronRight } from 'lucide-react'
 import NoteCallout from '../ui/NoteCallout'
 import FreeTextPostBlock from './FreeTextPostBlock'
+import BlockDivider from './BlockDivider'
+import { blockGap } from '../../utils/blockSpacing'
 import { toDrugOptions, doseLineInstructionText } from '../../constants/prescriptionRowSchema'
 import { getDrugModifierAndRouteSuffix, toTitleCase } from '../../utils/drugTitleFormat'
 
@@ -187,10 +189,13 @@ export default function PrescriptionSheetBlock({ sheet, hasContentAfter = true }
         // NoteCallout's existing per-paragraph dir="auto" handling renders
         // each language in its own correctly-directioned paragraph.
         const noteText = [row.text_en, row.text_ar].filter(Boolean).join('\n\n')
+        // Empty note renders nothing, and gets no gap either (see entries below).
+        if (!noteText.trim()) return null
         return (
           <NoteCallout
             key={row.id ?? key}
             text={noteText}
+            flush
           />
         )
       }
@@ -206,13 +211,18 @@ export default function PrescriptionSheetBlock({ sheet, hasContentAfter = true }
         // reads with slightly more presence at this small size, matching
         // the rest of the sheet's spacing rhythm instead of standing apart
         // with article-level whitespace.
+        if (!(row.content ?? '').trim()) return null
         return (
-          <div key={row.id ?? key} className="rx-prose-tight" style={{ padding: '6px 0' }}>
+          <div key={row.id ?? key} className="rx-prose-tight">
             <FreeTextPostBlock
               block={{ id: row.id ?? key, blockType: 'free_text_post', data: { markdown: row.content ?? '' } }}
             />
           </div>
         )
+
+      case 'divider':
+        // No data, no settings — the shared divider look (BlockDivider).
+        return <BlockDivider key={row.id ?? key} />
 
       default:
         if (process.env.NODE_ENV !== 'production') {
@@ -239,37 +249,43 @@ export default function PrescriptionSheetBlock({ sheet, hasContentAfter = true }
   }
   if (current.items.length) segments.push(current)
 
-  return (
-    <div>
-      {segments.map((segment, segIdx) => {
-        const renderItems = () => segment.items.map((row, i) => {
-          const nextRow = segment.items[i + 1]
-          return renderRowItem(row, i, nextRow)
-        })
-        return (
-          <div key={segIdx}>
-            {segment.label !== null
-              ? <SectionHeader label={segment.label}>{renderItems()}</SectionHeader>
-              : renderItems()}
-          </div>
-        )
-      })}
+  // ── Flatten into one ordered list of visible items ──────────────────
+  // Each item carries its kind so ONE rule (blockGap) sets the space between
+  // neighbours — items have no outer spacing of their own. Empty notes and
+  // empty text blocks render nothing, so they take no gap either. A divider
+  // at the very start or end of the sheet has nothing to divide and is
+  // skipped.
+  const ROW_KIND = { drug: 'drug', note: 'note', free_text: 'text', divider: 'divider' }
+  const entries = []
+  segments.forEach((segment, segIdx) => {
+    const renderItems = () => segment.items.map((row, i) => renderRowItem(row, i, segment.items[i + 1]))
+    if (segment.label !== null) {
+      entries.push({
+        kind: 'section',
+        node: <SectionHeader key={`seg-${segIdx}`} label={segment.label}>{renderItems()}</SectionHeader>,
+      })
+    } else {
+      segment.items.forEach((row, i) => {
+        const node = renderRowItem(row, i, segment.items[i + 1])
+        if (node) entries.push({ kind: ROW_KIND[row.row_type] ?? 'other', node })
+      })
+    }
+  })
+  while (entries.length && entries[0].kind === 'divider') entries.shift()
+  while (entries.length && entries[entries.length - 1].kind === 'divider') entries.pop()
+  if (!entries.length) return null
 
-      {/* ── Terminal marker — quiet zigzag, decorative only, no text ───────────────
-          Replaces the previous dashed-line + "end of sheet" label treatment.
-          Low-opacity accent stroke keeps it visually distinct from the solid
-          hairlines between prescription items without drawing attention to itself.
-          Only rendered when something (a note/text/gallery block) actually
-          follows the sheet — with nothing after it, the marker has nothing
-          to divide and just reads as a stray decoration under the last row.
-      ────────────────────────────────────────────────────────────────────────── */}
-      {hasContentAfter && (
-        <div style={{
-          display: 'flex',
-          justifyContent: 'center',
-          marginTop: 'var(--space-3)',
-          marginBottom: 'var(--space-1)',
-        }}>
+  // ── Terminal marker — quiet zigzag, decorative only, no text ───────────────
+  // Only rendered when something (a note/text/gallery block) actually follows
+  // the sheet — with nothing after it, the marker has nothing to divide and
+  // just reads as a stray decoration under the last row. Low-opacity accent
+  // stroke keeps it distinct from the solid hairlines between prescription
+  // items and from the divider's fading line + diamond.
+  if (hasContentAfter) {
+    entries.push({
+      kind: 'zigzag',
+      node: (
+        <div style={{ display: 'flex', justifyContent: 'center' }}>
           <svg width="40" height="8" viewBox="0 0 40 8" fill="none" aria-hidden="true">
             <polyline
               points="0,4 5,1 10,7 15,1 20,7 25,1 30,7 35,1 40,4"
@@ -282,7 +298,17 @@ export default function PrescriptionSheetBlock({ sheet, hasContentAfter = true }
             />
           </svg>
         </div>
-      )}
+      ),
+    })
+  }
+
+  return (
+    <div>
+      {entries.map((entry, i) => (
+        <div key={i} style={{ marginTop: blockGap(entries[i - 1]?.kind, entry.kind) }}>
+          {entry.node}
+        </div>
+      ))}
     </div>
   )
 }
@@ -314,7 +340,6 @@ function SectionHeader({ label, children }) {
       style={{
         background: 'var(--color-section-bg)',
         borderRadius: 'var(--radius-lg)',
-        margin: '16px 0',
         overflow: 'hidden',
       }}
     >

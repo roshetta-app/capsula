@@ -23,6 +23,7 @@ import { ChevronUp, ChevronDown, Trash2, Plus } from 'lucide-react'
 import ImageGalleryEditor      from './blocks/ImageGalleryEditor'
 import FreeTextPostEditor      from './blocks/FreeTextPostEditor'
 import NoteCalloutEditor       from './blocks/NoteCalloutEditor'
+import BlockDivider            from '../conditions/BlockDivider'
 import PrescriptionSheetEditor from './blocks/PrescriptionSheetEditor'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -43,6 +44,11 @@ const BLOCK_LABELS = {
     rx:       'Rx — Note',
     default:  'Note',
   },
+  divider: {
+    clinical: 'Clinical — Divider',
+    rx:       'Rx — Divider',
+    default:  'Divider',
+  },
   prescription_sheet: {
     default: 'Prescription Sheet',
   },
@@ -52,6 +58,7 @@ const BLOCK_CHIP_COLORS = {
   image_gallery:      { chipColor: '#7C3AED', chipBg: '#EDE9FE', headerTint: '#F5F3FF' },
   free_text_post:     { chipColor: '#1D4ED8', chipBg: '#DBEAFE', headerTint: '#EFF6FF' },
   note_callout:       { chipColor: '#B45309', chipBg: '#FEF3C7', headerTint: '#FFFBEB' },
+  divider:            { chipColor: '#475569', chipBg: '#E2E8F0', headerTint: '#F8FAFC' },
   prescription_sheet: { chipColor: '#047857', chipBg: '#D1FAE5', headerTint: '#F0FDF4' },
 }
 
@@ -61,17 +68,20 @@ const CLINICAL_BLOCK_OPTIONS = [
   { value: 'image_gallery',  label: '+ Image Gallery' },
   { value: 'free_text_post', label: '+ Text Post'     },
   { value: 'note_callout',   label: '+ Note'          },
+  { value: 'divider',        label: '+ Divider'       },
 ]
 const RX_BLOCK_OPTIONS = [
   { value: 'image_gallery',  label: '+ Image Gallery' },
   { value: 'free_text_post', label: '+ Text Post'     },
   { value: 'note_callout',   label: '+ Note'          },
+  { value: 'divider',        label: '+ Divider'       },
 ]
 
 function isClinicalBlock(block) {
   if (block.block_type === 'image_gallery'  && block.data?.context !== 'rx') return true
   if (block.block_type === 'free_text_post' && block.data?.context !== 'rx') return true
   if (block.block_type === 'note_callout'   && block.data?.context !== 'rx') return true
+  if (block.block_type === 'divider'        && block.data?.context !== 'rx') return true
   return false
 }
 function isRxBlock(block) {
@@ -79,6 +89,7 @@ function isRxBlock(block) {
   if (block.block_type === 'image_gallery'  && block.data?.context === 'rx') return true
   if (block.block_type === 'free_text_post' && block.data?.context === 'rx') return true
   if (block.block_type === 'note_callout'   && block.data?.context === 'rx') return true
+  if (block.block_type === 'divider'        && block.data?.context === 'rx') return true
   return false
 }
 
@@ -87,6 +98,7 @@ function defaultData(blockType, context) {
     case 'image_gallery':      return { images: [], context: context ?? 'clinical' }
     case 'free_text_post':     return { markdown: '', context: context ?? 'clinical' }
     case 'note_callout':       return { text: '', flavor: 'info', context: context ?? 'clinical' }
+    case 'divider':            return { context: context ?? 'clinical' }
     case 'prescription_sheet': return { label: 'Standard', rows: [] }
     default:                   return {}
   }
@@ -108,6 +120,8 @@ function getBlockPreview(block) {
       const plain = md.replace(/[#*_`>\-]/g, '').replace(/\n/g, ' ').trim()
       return plain.length > 60 ? plain.slice(0, 60) + '…' : plain || 'Empty text post'
     }
+    case 'divider':
+      return 'Fading line with a small diamond'
     case 'image_gallery': {
       const n = data?.images?.length ?? 0
       return n === 0 ? 'No images yet' : `${n} image${n !== 1 ? 's' : ''}`
@@ -281,6 +295,7 @@ function SummaryBar({ items, expandRefs }) {
       case 'note_callout':       return 'Note'
       case 'free_text_post':     return 'Text'
       case 'image_gallery':      return 'Images'
+      case 'divider':            return 'Divider'
       case 'prescription_sheet': return block.data?.label || 'Sheet'
       default:                   return block.block_type
     }
@@ -672,7 +687,7 @@ export default function BlockListEditor({ blocks = [], onChange, disabled = fals
     onChange(blocks.map((b, i) => i === globalIndex ? { ...b, ...patch } : b))
   }
 
-  const CONTEXT_SENSITIVE_TYPES = ['free_text_post', 'note_callout', 'image_gallery']
+  const CONTEXT_SENSITIVE_TYPES = ['free_text_post', 'note_callout', 'image_gallery', 'divider']
 
   function patchBlockData(globalIndex, dataPatch) {
     const block  = blocks[globalIndex]
@@ -720,6 +735,15 @@ export default function BlockListEditor({ blocks = [], onChange, disabled = fals
         return <FreeTextPostEditor data={block.data} onChange={patchData} disabled={disabled} />
       case 'note_callout':
         return <NoteCalloutEditor block={block} onChange={patchData} />
+      case 'divider':
+        return (
+          <div>
+            <BlockDivider />
+            <div style={{ marginTop: 'var(--space-3)', fontSize: 13, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-body)' }}>
+              This is exactly how it looks in the app. Nothing to set — move it or delete it like any other block.
+            </div>
+          </div>
+        )
       default:
         return null
     }

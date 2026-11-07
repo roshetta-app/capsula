@@ -36,6 +36,7 @@ export const ROW_TYPES = {
   SECTION: 'section',
   NOTE: 'note',
   FREE_TEXT: 'free_text',
+  DIVIDER: 'divider',
 };
 
 /**
@@ -384,6 +385,17 @@ export const FREE_TEXT_ROW_TEMPLATE = {
   row_type: ROW_TYPES.FREE_TEXT,
   id: null,
   content: null,
+};
+
+/**
+ * Divider row — a visual break between two items inside a sheet (fading
+ * line with a small centre diamond). Top level only, never inside a
+ * section. No settings: nothing but its type and id, so an "empty" divider
+ * is never treated as empty content.
+ */
+export const DIVIDER_ROW_TEMPLATE = {
+  row_type: ROW_TYPES.DIVIDER,
+  id: null,
 };
 
 /**

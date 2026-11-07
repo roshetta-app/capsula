@@ -71,6 +71,7 @@
  *       | { row_type: "section", id, label, drugs: DrugRow[] }
  *       | { row_type: "note",    id, text_en, text_ar }
  *       | { row_type: "free_text", id, content }
+ *       | { row_type: "divider", id }
  *     >
  *   }
  */
@@ -90,6 +91,7 @@ const ROW_TYPE_LABELS = {
   section:        { label: 'Section',        color: '#10b981' },
   note:           { label: 'Note',           color: '#f59e0b' },
   free_text:      { label: 'Text Block',     color: '#1D4ED8' },
+  divider:        { label: 'Divider',        color: '#64748b' },
 }
 
 // ─── Row type chip ─────────────────────────────────────────────────────────────
@@ -134,6 +136,9 @@ function rowSummary(row) {
   if (row.row_type === 'free_text') {
     const md = row.content ?? row.markdown ?? ''
     return md.length > 60 ? md.slice(0, 60) + '…' : md || 'Empty text block'
+  }
+  if (row.row_type === 'divider') {
+    return 'Fading line with a small diamond'
   }
   return ''
 }
@@ -217,7 +222,7 @@ function useRowList(list, onChange) {
 //
 // Props:
 //   insertIndex     — array index to insert before (list.length = append)
-//   onInsert        — (type: 'drug'|'section'|'note'|'free_text') => void
+//   onInsert        — (type: 'drug'|'section'|'note'|'free_text'|'divider') => void
 //   isTouchActive   — boolean, true when this gap is the touch-revealed one
 //   onTouchActivate — () => void  called on first tap to reveal
 //   onTouchDismiss  — () => void  called when picker closes / row inserted
@@ -230,6 +235,7 @@ const TOP_LEVEL_TYPES = [
   { type: 'section',   label: 'Section',    color: '#10b981' },
   { type: 'note',      label: 'Note',       color: '#f59e0b' },
   { type: 'free_text', label: 'Text Block', color: '#1D4ED8' },
+  { type: 'divider',   label: 'Divider',    color: '#64748b' },
 ]
 
 function GapInsertControl({ insertIndex, onInsert, isTouchActive, onTouchActivate, onTouchDismiss, disabled = false }) {
@@ -744,6 +750,11 @@ function RowCard({
           {row.row_type === 'note' && (
             <NoteRowEditor row={row} onChange={handleEditorChange} />
           )}
+          {row.row_type === 'divider' && (
+            <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-body)' }}>
+              A fading line with a small diamond. Nothing to set — move it or delete it like any other row.
+            </div>
+          )}
           {row.row_type === 'free_text' && (
             <FreeTextPostEditor
               data={{ markdown: row.content ?? row.markdown ?? '' }}
@@ -864,6 +875,7 @@ export default function PrescriptionSheetEditor({ block, onChange, disabled = fa
       section:   { ...SECTION_ROW_TEMPLATE,   id: nanoid() },
       note:      { row_type: 'note',      id: nanoid(), text_en: null, text_ar: null },
       free_text: { row_type: 'free_text', id: nanoid(), content: '' },
+      divider:   { row_type: 'divider',   id: nanoid() },
     }
     insertRowAt(index, templates[type])
     setActiveTouchGap(null)
@@ -885,6 +897,10 @@ export default function PrescriptionSheetEditor({ block, onChange, disabled = fa
 
   function addFreeText() {
     addRow({ row_type: 'free_text', id: nanoid(), content: '' })
+  }
+
+  function addDivider() {
+    addRow({ row_type: 'divider', id: nanoid() })
   }
 
   // Dismiss touch gap when tapping anywhere outside the active gap
@@ -986,6 +1002,7 @@ export default function PrescriptionSheetEditor({ block, onChange, disabled = fa
         <AddRowButton label="Section"      color="#10b981" onClick={addSection} disabled={disabled} />
         <AddRowButton label="Note"         color="#f59e0b" onClick={addNote} disabled={disabled} />
         <AddRowButton label="Text Block"   color="#1D4ED8" onClick={addFreeText} disabled={disabled} />
+        <AddRowButton label="Divider"      color="#64748b" onClick={addDivider} disabled={disabled} />
       </div>
 
       {/* ── Promote-alternative dialog (step 1.11) ─────────────────────────── */}

@@ -1,4 +1,4 @@
-import BlockRenderer from './BlockRenderer'
+import BlockStack from './BlockStack'
 import { getClinicalDataBlocks } from '../../utils/blockFilters'
 
 /**
@@ -40,9 +40,7 @@ export default function ClinicalDataTab({ blocks }) {
 
   return (
     <div style={{ padding: 0 }}>
-      {clinicalBlocks.map(block => (
-        <BlockRenderer key={block.id} block={block} />
-      ))}
+      <BlockStack blocks={clinicalBlocks} />
     </div>
   )
 }

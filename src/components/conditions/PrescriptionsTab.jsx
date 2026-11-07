@@ -3,8 +3,8 @@ import { Shield } from 'lucide-react'
 import PrescriptionSheetBlock from './PrescriptionSheetBlock'
 import PrescriptionPills from './PrescriptionPills'
 import PersonalNotes from './PersonalNotes'
-import BlockRenderer from './BlockRenderer'
-import { getRxBlocks } from '../../utils/blockFilters'
+import BlockStack from './BlockStack'
+import { getRxBlocks, trimDividerEdges } from '../../utils/blockFilters'
 
 /**
  * PrescriptionsTab — Rx tab container (Phase 2.8 + Phase 2 CMS refactor).
@@ -152,7 +152,7 @@ export default function PrescriptionsTab({ blocks, conditionId }) {
 
   // All non-sheet Rx blocks rendered below the active sheet in true orderIndex
   // order. getRxBlocks() already sorts by orderIndex, so filtering preserves it.
-  const rxBelowSheet = rxBlocks.filter(b => b.blockType !== 'prescription_sheet')
+  const rxBelowSheet = trimDividerEdges(rxBlocks.filter(b => b.blockType !== 'prescription_sheet'))
 
   const active = sheets[Math.min(activeIndex, sheets.length - 1)]
 
@@ -199,9 +199,7 @@ export default function PrescriptionsTab({ blocks, conditionId }) {
       ─────────────────────────────────────────────────────────────────────── */}
       {rxBelowSheet.length > 0 && (
         <div style={{ marginTop: 'var(--space-4)' }}>
-          {rxBelowSheet.map(block => (
-            <BlockRenderer key={block.id} block={block} />
-          ))}
+          <BlockStack blocks={rxBelowSheet} />
         </div>
       )}
 
