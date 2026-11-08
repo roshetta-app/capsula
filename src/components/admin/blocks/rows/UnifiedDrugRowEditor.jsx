@@ -422,8 +422,9 @@ function resolveDosePick(dosesStructured) {
 // The change (pencil) button and the options menu sit on the right of the card.
 const linkedDrugCache = new Map()
 
-function LinkedDrugCard({ brandId, onRequestChange, extraAction, fallback, noteSlot = null }) {
+function LinkedDrugCard({ brandId, onRequestChange, extraAction, fallback, note = null, onNoteChange = null }) {
   const { categories } = useCategories()
+  const [noteEditing, setNoteEditing] = useState(false)
   const [drug, setDrug] = useState(() => linkedDrugCache.get(brandId) ?? null)
 
   useEffect(() => {
@@ -442,7 +443,14 @@ function LinkedDrugCard({ brandId, onRequestChange, extraAction, fallback, noteS
     return () => { cancelled = true }
   }, [brandId])
 
-  if (!drug) return <>{fallback}{noteSlot}</>
+  if (!drug) {
+    return (
+      <>
+        {fallback}
+        {onNoteChange && <DrugOptionNoteSlot note={note} onChange={onNoteChange} />}
+      </>
+    )
+  }
 
   return (
     <div style={{
@@ -459,6 +467,23 @@ function LinkedDrugCard({ brandId, onRequestChange, extraAction, fallback, noteS
         isLast
         trailing={(
           <>
+            {onNoteChange && !note && !noteEditing && (
+              <button
+                type="button"
+                onClick={() => setNoteEditing(true)}
+                aria-label="Add drug note"
+                title="Add note"
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 3,
+                  height: 30, padding: '0 9px', boxSizing: 'border-box',
+                  border: '1px solid var(--color-border)', borderRadius: 99,
+                  background: 'var(--color-bg)', color: 'var(--color-text-secondary)',
+                  fontSize: 11, fontWeight: 600, fontFamily: 'var(--font-body)', cursor: 'pointer',
+                }}
+              >
+                <Plus size={10} /> note
+              </button>
+            )}
             <button
               type="button"
               onClick={onRequestChange}
@@ -472,10 +497,17 @@ function LinkedDrugCard({ brandId, onRequestChange, extraAction, fallback, noteS
           </>
         )}
       />
-      {/* The drug's note button lives inside the card, under the drug. */}
-      {noteSlot && (
+      {/* The '+ note' button sits on the right of the card (above); once there
+          is a note, or it is being typed, the note shows here inside the card. */}
+      {onNoteChange && (note || noteEditing) && (
         <div style={{ display: 'flex', flexDirection: 'column', paddingBottom: 10 }}>
-          {noteSlot}
+          <DrugOptionNoteSlot
+            note={note}
+            onChange={onNoteChange}
+            editing={noteEditing}
+            onEditingChange={setNoteEditing}
+            hideTrigger
+          />
         </div>
       )}
     </div>
@@ -621,32 +653,34 @@ function EditableDoseLine({
               BRACKET {number}
             </span>
           </div>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span style={doseFieldLabelStyle}>
-              Title <span style={doseFieldHintStyle}>(shown in bold before the dose)</span>
-            </span>
-            <input
-              type="text"
-              value={line.bracket_title ?? ''}
-              onChange={e => onUpdateField('bracket_title', e.target.value || null)}
-              placeholder="e.g. 5-7.9kg (3-6 months)"
-              dir="auto"
-              style={doseFieldInputStyle}
-            />
-          </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span style={doseFieldLabelStyle}>
-              Dose <span style={doseFieldHintStyle}>(the instruction itself)</span>
-            </span>
-            <textarea
-              value={line.instruction ?? ''}
-              onChange={e => onUpdateField('instruction', e.target.value)}
-              placeholder="e.g. 1gm/12hr I.V. for 5-7 days"
-              dir="auto"
-              rows={2}
-              style={{ ...doseFieldInputStyle, resize: 'vertical' }}
-            />
-          </label>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '0 0 36%', minWidth: 0 }}>
+              <span style={doseFieldLabelStyle}>
+                Title <span style={doseFieldHintStyle}>(bold)</span>
+              </span>
+              <input
+                type="text"
+                value={line.bracket_title ?? ''}
+                onChange={e => onUpdateField('bracket_title', e.target.value || null)}
+                placeholder="e.g. 5-7.9kg"
+                dir="auto"
+                style={doseFieldInputStyle}
+              />
+            </label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 0 }}>
+              <span style={doseFieldLabelStyle}>
+                Dose <span style={doseFieldHintStyle}>(the instruction)</span>
+              </span>
+              <textarea
+                value={line.instruction ?? ''}
+                onChange={e => onUpdateField('instruction', e.target.value)}
+                placeholder="e.g. 1gm/12hr I.V. for 5-7 days"
+                dir="auto"
+                rows={2}
+                style={{ ...doseFieldInputStyle, resize: 'vertical' }}
+              />
+            </label>
+          </div>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             <span style={doseFieldLabelStyle}>
               Note <span style={doseFieldHintStyle}>(optional, small italic text under the dose)</span>
@@ -1013,8 +1047,13 @@ function PopulationTabs({ whos, activeIdx, shownIdx = 0, onSelect, onRename, onA
 // content could render behind the empty-state trigger after a remount. Here,
 // a non-empty note always renders as the read-only line regardless of the
 // isEditing initializer, so that failure mode no longer exists.
-function NoteSlot({ note, onChange, label, triggerLabel, placeholder }) {
-  const [isEditing, setIsEditing] = useState(false)
+function NoteSlot({ note, onChange, label, triggerLabel, placeholder, editing, onEditingChange, hideTrigger = false }) {
+  // Optional outside control: LinkedDrugCard puts the '+ note' button on the
+  // right of the drug card, so it owns the open/closed state and hides this
+  // slot's own trigger.
+  const [localEditing, setLocalEditing] = useState(false)
+  const isEditing = editing ?? localEditing
+  const setIsEditing = onEditingChange ?? setLocalEditing
   const [isHovered, setIsHovered] = useState(false)
 
   // Pulled tight to the content above via a small negative marginTop,
@@ -1024,6 +1063,7 @@ function NoteSlot({ note, onChange, label, triggerLabel, placeholder }) {
   const wrapStyle = { marginTop: -4 }
 
   if (!note && !isEditing) {
+    if (hideTrigger) return null
     return (
       <button
         type="button"
@@ -1148,11 +1188,14 @@ function GroupNoteSlot({ note, onChange }) {
 //   note      — current per-drug note value (string|null)
 //   onChange  — (value: string|null) => void
 
-function DrugOptionNoteSlot({ note, onChange }) {
+function DrugOptionNoteSlot({ note, onChange, editing, onEditingChange, hideTrigger }) {
   return (
     <NoteSlot
       note={note}
       onChange={onChange}
+      editing={editing}
+      onEditingChange={onEditingChange}
+      hideTrigger={hideTrigger}
       label="note"
       triggerLabel="note"
       placeholder="Drug note (e.g. Preferred for children)"
@@ -1303,12 +1346,41 @@ function AddDrugControls({ onPickBrand, onPickFormulation, onAddManual, disabled
 // PLUS LABEL (2026-11-07): the saved value 'and' is displayed as 'plus' to
 // match the condition page. Display only: the toggle still switches the
 // stored value between 'or' and 'and', so nothing already saved changes.
-function OrDivider({ value = 'or', onChange }) {
+function OrDivider({ value = 'or', onChange, merged = false, atTopEdge = false }) {
+  const label = value === 'and' ? 'plus' : value
+  const toggle = onChange ? () => onChange(value === 'or' ? 'and' : 'or') : undefined
+  if (merged) {
+    // 2026-11-08: the chip sits right on the line where two drug cards touch
+    // (or on the top edge of a card that starts a new group), so the cards and
+    // the chip read as one joined piece.
+    return (
+      <div style={{
+        position: 'relative', height: 0, zIndex: 2,
+        marginTop: atTopEdge ? 8 : 0,
+        marginBottom: atTopEdge ? -8 : 0,
+      }}>
+        <span
+          onClick={toggle}
+          role={onChange ? 'button' : undefined}
+          style={{
+            position: 'absolute', left: '50%', top: 0, transform: 'translate(-50%, -50%)',
+            padding: '2px 12px', borderRadius: 99, whiteSpace: 'nowrap',
+            border: '1px solid var(--color-border)', backgroundColor: 'var(--color-surface)',
+            fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-body)',
+            color: 'var(--color-accent)', lineHeight: 1.4,
+            cursor: onChange ? 'pointer' : 'default', userSelect: 'none',
+          }}
+        >
+          {label}
+        </span>
+      </div>
+    )
+  }
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '2px 0' }}>
       <div style={{ flex: 1, height: '0.5px', backgroundColor: 'var(--color-border)' }} />
       <span
-        onClick={onChange ? () => onChange(value === 'or' ? 'and' : 'or') : undefined}
+        onClick={toggle}
         style={{
           fontSize:   12,
           fontWeight: 700,
@@ -1319,7 +1391,7 @@ function OrDivider({ value = 'or', onChange }) {
           userSelect: 'none',
         }}
       >
-        {value === 'and' ? 'plus' : value}
+        {label}
       </span>
       <div style={{ flex: 1, height: '0.5px', backgroundColor: 'var(--color-border)' }} />
     </div>
@@ -2000,12 +2072,8 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onOpti
                 onRequestChange={() => setBrandPickerOpen(true)}
                 extraAction={nameRowExtraActions}
                 fallback={searchField}
-                noteSlot={(
-                  <DrugOptionNoteSlot
-                    note={option.note ?? null}
-                    onChange={value => patch({ note: value })}
-                  />
-                )}
+                note={option.note ?? null}
+                onNoteChange={value => patch({ note: value })}
               />
             ) : searchField
           })()}
@@ -3335,6 +3403,8 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
               first group (nothing to divide yet). */}
           {groupIdx > 0 && (
             <OrDivider
+              merged={!!group.options[0].brand_id}
+              atTopEdge
               value={group.options[0].joiner ?? 'or'}
               onChange={next => updateOption(groupIdx, group.options[0].id, { ...group.options[0], joiner: next })}
             />
@@ -3344,9 +3414,13 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
               OrDivider inserted before every option after the first within
               a group, so options stacked together read as "this OR this". */}
           {group.options.map((option, optIdx) => (
-            <div key={option.id}>
+            <div
+              key={option.id}
+              style={optIdx > 0 && option.brand_id && group.options[optIdx - 1].brand_id ? { marginTop: -9 } : undefined}
+            >
               {optIdx > 0 && (
                 <OrDivider
+                  merged={!!option.brand_id && !!group.options[optIdx - 1].brand_id}
                   value={option.joiner ?? 'or'}
                   onChange={next => updateOption(groupIdx, option.id, { ...option, joiner: next })}
                 />

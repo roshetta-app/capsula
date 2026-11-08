@@ -76,13 +76,16 @@
  *   }
  */
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { ChevronUp, ChevronDown, Trash2, LogOut, Plus } from 'lucide-react'
 import UnifiedDrugRowEditor, { PromoteAlternativeDialog } from './rows/UnifiedDrugRowEditor'
 import NoteRowEditor         from './rows/NoteRowEditor'
 import FreeTextPostEditor    from './FreeTextPostEditor'
 import { DRUG_ROW_TEMPLATE, SECTION_ROW_TEMPLATE, promoteAlternativeToMain } from '../../../constants/prescriptionRowSchema'
 import { nanoid } from 'nanoid'
+import { supabase } from '../../../lib/supabase'
+import { fetchFlatDrugsByBrandId } from '../../../lib/queries'
+import { toTitleCase, getDrugTitleSuffix, TITLE_HIDDEN_MODIFIER_TAGS } from '../../../utils/drugTitleFormat'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -115,6 +118,66 @@ function RowTypeChip({ rowType }) {
       {cfg.label}
     </span>
   )
+}
+
+// --- Drug block title ---------------------------------------------------------
+// 2026-11-08: the collapsed title of a drug block names every drug in it, not
+// just the first, and writes each one the way the shared drug card does
+// (tradename + the same suffix). The first drug gets its full title. A later
+// drug with the same name as the first shows only its own suffix (so
+// 'Augmentin 1gm - Tab. or 625mg - Tab.' and not the name twice). With three
+// or more drugs only the first two are written, then '+N'.
+const blockFlatDrugCache = new Map()
+
+function useFlatDrugsByBrand(brandIds) {
+  const [, setTick] = useState(0)
+  const key = brandIds.join(',')
+  useEffect(() => {
+    let cancelled = false
+    brandIds.forEach(id => {
+      if (!id || blockFlatDrugCache.has(id)) return
+      fetchFlatDrugsByBrandId(supabase, id)
+        .then(rows => {
+          if (!rows?.[0]) return
+          blockFlatDrugCache.set(id, rows[0])
+          if (!cancelled) setTick(t => t + 1)
+        })
+        .catch(() => {})
+    })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key])
+  return id => blockFlatDrugCache.get(id) ?? null
+}
+
+function drugTitleParts(d, flat) {
+  if (flat) {
+    return {
+      name: toTitleCase(flat.tradenameClean) || '',
+      suffix: getDrugTitleSuffix(flat, { omitModifierTags: TITLE_HIDDEN_MODIFIER_TAGS }) || '',
+    }
+  }
+  return {
+    name: d.brand_name || d.generic_name || '',
+    suffix: [d.concentration, d.form].filter(Boolean).join(' '),
+  }
+}
+
+function DrugBlockTitle({ row }) {
+  const drugs = [row, ...(row.alternatives ?? [])].filter(d => d.brand_name || d.generic_name)
+  const flatOf = useFlatDrugsByBrand(drugs.map(d => d.brand_id).filter(Boolean))
+  if (drugs.length === 0) return 'Empty drug'
+
+  const parts = drugs.map(d => drugTitleParts(d, d.brand_id ? flatOf(d.brand_id) : null))
+  const full = p => [p.name, p.suffix].filter(Boolean).join(' ')
+  let title = full(parts[0])
+  const shown = Math.min(drugs.length, 2)
+  for (let i = 1; i < shown; i++) {
+    const text = parts[i].name === parts[0].name ? (parts[i].suffix || parts[i].name) : parts[i].name
+    title += (drugs[i].joiner === 'and' ? ' + ' : ' or ') + text
+  }
+  if (drugs.length > 2) title += ` +${drugs.length - 2}`
+  return title
 }
 
 // ─── Row summary (one-line collapsed view) ─────────────────────────────────────
@@ -670,7 +733,7 @@ function RowCard({
           color: 'var(--color-text-primary)',
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}>
-          {rowSummary(row)}
+          {row.row_type === 'drug' ? <DrugBlockTitle row={row} /> : rowSummary(row)}
         </span>
 
         {/* Move into section… / move out of section / ↑ ↓ 🗑 controls */}
