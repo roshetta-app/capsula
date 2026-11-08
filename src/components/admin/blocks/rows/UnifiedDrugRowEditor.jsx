@@ -913,7 +913,7 @@ function unprojectGroup(g) {
 
 // One row of tabs: one tab per population, the open one highlighted. Tap the
 // open tab to rename it, tap another tab to switch, tap "+ Population" to add.
-function PopulationTabs({ whos, activeIdx, onSelect, onRename, onAdd }) {
+function PopulationTabs({ whos, activeIdx, shownIdx = 0, onSelect, onRename, onAdd }) {
   const [renaming, setRenaming] = useState(false)
   useEffect(() => { setRenaming(false) }, [activeIdx])
 
@@ -956,6 +956,7 @@ function PopulationTabs({ whos, activeIdx, onSelect, onRename, onAdd }) {
                 fontStyle: who ? 'normal' : 'italic',
               }}
             >
+              {i === shownIdx && whos.length > 1 && <Check size={12} aria-label="Shown in app" />}
               {text}
               <Edit2 size={12} />
             </button>
@@ -972,6 +973,7 @@ function PopulationTabs({ whos, activeIdx, onSelect, onRename, onAdd }) {
               fontStyle: who ? 'normal' : 'italic',
             }}
           >
+            {i === shownIdx && whos.length > 1 && <Check size={12} aria-label="Shown in app" style={{ color: 'var(--color-accent)' }} />}
             {text}
           </button>
         )
@@ -2455,6 +2457,9 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
   // PromoteAlternativeDialog's "Delete all" since this can't be undone.
   const [confirmClearGroup, setConfirmClearGroup] = useState(null) // groupIdx | null
   const [confirmRemovePop, setConfirmRemovePop] = useState(null) // groupIdx | null
+  const [confirmDeleteLibPop, setConfirmDeleteLibPop] = useState(null) // groupIdx | null
+  const [deletingLibGroupIdx, setDeletingLibGroupIdx] = useState(null)
+  const [deletedLibGroupIdx, setDeletedLibGroupIdx] = useState(null)
 
   // NOISE-REDUCTION PASS (2026-08-08): "Restore from library" used to sit
   // as its own permanently-visible underlined link at the bottom of the
@@ -2504,6 +2509,57 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
     setOpenEditorId(null)
   }
 
+  // Picks which population the app shows to users for this drug.
+  function setShownPopulation(groupIdx, position) {
+    const nextRaw = rawGroups.map((x, i) => i === groupIdx ? { ...x, shown_population: position } : x)
+    setRawGroups(nextRaw)
+    onChange(fromDrugOptions(row, nextRaw))
+  }
+
+  // Deletes the open population from the drug library (it stays on this drug,
+  // just no longer linked to the library copy).
+  async function deleteDoseFromLibrary(groupIdx) {
+    const group = groups[groupIdx]
+    const formulationId = group.options[0]?.formulation_id
+    const libId = group.dose_max_population_id
+    if (!formulationId || !libId) return
+    setDeletingLibGroupIdx(groupIdx)
+    setGroupSaveError(null)
+    try {
+      const { data, error } = await fetchFormulationWithGeneric(formulationId)
+      if (error || !data) {
+        setGroupSaveError({ groupIdx, message: 'Could not load the library entry. Please try again.' })
+        return
+      }
+      const populations = Array.isArray(data.doses_structured) ? data.doses_structured : []
+      const nextStructured = populations.filter(p => p.id !== libId)
+      if (nextStructured.length !== populations.length) {
+        const { error: updateErr } = await updateFormulation(formulationId, { doses_structured: nextStructured })
+        if (updateErr) {
+          setGroupSaveError({ groupIdx, message: 'Deleting from the library failed. Please try again.' })
+          return
+        }
+      }
+      const nextGroups = groups.map((g, gi) => gi === groupIdx
+        ? {
+            ...g,
+            dose_max_population_id: null,
+            dose_lines: (g.dose_lines ?? []).map(l => ({ ...l, bracket_id: null })),
+          }
+        : g
+      )
+      const nextRaw = nextGroups.map(unprojectGroup)
+      setRawGroups(nextRaw)
+      onChange(fromDrugOptions(row, nextRaw))
+      setDeletedLibGroupIdx(groupIdx)
+      setTimeout(() => {
+        setDeletedLibGroupIdx(current => current === groupIdx ? null : current)
+      }, 2000)
+    } finally {
+      setDeletingLibGroupIdx(null)
+    }
+  }
+
   // Removes the open population. If it was the first, the next one moves up.
   function removePopulation(groupIdx) {
     const g = rawGroups[groupIdx]
@@ -2514,6 +2570,8 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
     ]
     if (pops.length < 2) return
     pops.splice(pi, 1)
+    const shownBefore = g.shown_population ?? 0
+    const shownAfter = pi < shownBefore ? shownBefore - 1 : pi === shownBefore ? 0 : shownBefore
     const [first, ...rest] = pops
     const nextRaw = rawGroups.map((x, i) => i === groupIdx
       ? {
@@ -2524,6 +2582,7 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
           dose_max: first.dose_max ?? null,
           dose_max_population_id: first.dose_max_population_id ?? null,
           extra_populations: rest,
+          shown_population: shownAfter,
         }
       : x)
     setRawGroups(nextRaw)
@@ -3365,6 +3424,7 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                     <PopulationTabs
                       whos={[rawGroups[groupIdx].dose_who ?? null, ...(rawGroups[groupIdx].extra_populations ?? []).map(e => e.dose_who ?? null)]}
                       activeIdx={activeIndexFor(rawGroups[groupIdx])}
+                      shownIdx={Math.min(rawGroups[groupIdx].shown_population ?? 0, (rawGroups[groupIdx].extra_populations ?? []).length)}
                       onSelect={position => selectPopulation(groupIdx, position)}
                       onRename={val => updateGroupDoseWho(groupIdx, val)}
                       onAdd={() => addPopulation(groupIdx)}
@@ -3420,6 +3480,16 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                               >
                                 {restoringGroupIdx === groupIdx ? 'Restoring…' : 'Restore from library'}
                               </button>
+                              {group.dose_max_population_id && (
+                                <button
+                                  type="button"
+                                  onClick={() => { setDoseMenuOpenGroupIdx(null); setConfirmDeleteLibPop(groupIdx) }}
+                                  disabled={deletingLibGroupIdx === groupIdx}
+                                  style={{ ...addDrugDropdownItemStyle, color: '#ef4444' }}
+                                >
+                                  Delete from library
+                                </button>
+                              )}
                               {/* UI PASS (2026-08-08): "Clear doses" — wipes
                                   population, dose lines/brackets, and max
                                   dose for this group. Destructive, so it's
@@ -3448,6 +3518,55 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                       )}
                     </div>
                   </div>
+
+                  {(rawGroups[groupIdx].extra_populations ?? []).length > 0 && (() => {
+                    const g0 = rawGroups[groupIdx]
+                    const openIdx = activeIndexFor(g0)
+                    const shownIdx = Math.min(g0.shown_population ?? 0, (g0.extra_populations ?? []).length)
+                    const isShown = openIdx === shownIdx
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => { if (!isShown) setShownPopulation(groupIdx, openIdx) }}
+                        aria-pressed={isShown}
+                        style={{
+                          alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 6,
+                          padding: '4px 10px', borderRadius: 99, fontSize: 12, fontWeight: 600,
+                          fontFamily: 'var(--font-body)', cursor: isShown ? 'default' : 'pointer',
+                          border: isShown ? 'none' : '1px solid var(--color-border)',
+                          background: isShown ? 'var(--color-accent-light)' : 'none',
+                          color: isShown ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+                        }}
+                      >
+                        {isShown ? <><Check size={12} /> Shown in the app</> : 'Show this one in the app'}
+                      </button>
+                    )
+                  })()}
+
+                  {confirmDeleteLibPop === groupIdx && (
+                    <div style={{
+                      display: 'flex', flexDirection: 'column', gap: 8,
+                      padding: '10px 12px',
+                      border: '1px solid #ef4444', borderRadius: 10,
+                      backgroundColor: '#ef444410',
+                    }}>
+                      <span style={{ fontSize: 13, color: 'var(--color-text-primary)' }}>
+                        Delete this population from the drug library for everyone? It stays on this drug.
+                      </span>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button
+                          type="button"
+                          onClick={() => { setConfirmDeleteLibPop(null); deleteDoseFromLibrary(groupIdx) }}
+                          style={{ ...dosePrimaryButtonStyle, background: '#ef4444' }}
+                        >
+                          Delete
+                        </button>
+                        <button type="button" onClick={() => setConfirmDeleteLibPop(null)} style={doseSecondaryButtonStyle}>
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                   {confirmRemovePop === groupIdx && (
                     <div style={{
@@ -3558,6 +3677,12 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                   )}
                   {savedGroupIdx === groupIdx && (
                     <span style={{ fontSize: 10, color: 'var(--color-accent)' }}>Saved to library</span>
+                  )}
+                  {deletingLibGroupIdx === groupIdx && (
+                    <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>Deleting...</span>
+                  )}
+                  {deletedLibGroupIdx === groupIdx && (
+                    <span style={{ fontSize: 10, color: 'var(--color-accent)' }}>Deleted from library</span>
                   )}
                   {groupSaveError?.groupIdx === groupIdx && (
                     <span style={{ fontSize: 10, color: '#ef4444' }}>{groupSaveError.message}</span>

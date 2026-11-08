@@ -420,25 +420,31 @@ function buildFormulationClusters(row, drugs, mainFormulation) {
     return findDrugForOption(drugs, opt.brand_id, opt.formulation_id)
   }
 
-  return groups.map(group => ({
-    dose: group.dose,
-    doseWho: group.dose_who ?? null,
-    doseLines: group.dose_lines ?? [],
-    doseMax: group.dose_max ?? null,
-    // 2026-11-08: populations of this drug — the main one first, then any
-    // extras that actually have a dose. Shown one at a time (see ClusterDoses).
-    populations: [
-      { doseWho: group.dose_who ?? null, doseLines: group.dose_lines ?? [], doseMax: group.dose_max ?? null },
-      ...(group.extra_populations ?? [])
-        .filter(p => (p.dose_lines?.length ?? 0) > 0 || p.dose_max)
-        .map(p => ({ doseWho: p.dose_who ?? null, doseLines: p.dose_lines ?? [], doseMax: p.dose_max ?? null })),
-    ],
+  return groups.map(group => {
+    // 2026-11-08: a drug can hold several populations (Adult, Child ...) but the
+    // app shows only the one the admin picked ('shown_population'). If that pick
+    // is missing or has no dose, the first population is shown instead.
+    const pops = [
+      { dose: group.dose, doseWho: group.dose_who ?? null, doseLines: group.dose_lines ?? [], doseMax: group.dose_max ?? null },
+      ...(group.extra_populations ?? []).map(p => ({
+        dose: null, doseWho: p.dose_who ?? null, doseLines: p.dose_lines ?? [], doseMax: p.dose_max ?? null,
+      })),
+    ]
+    const hasDose = p => (p.doseLines?.length ?? 0) > 0 || !!p.doseMax || !!p.dose
+    const picked = pops[group.shown_population ?? 0]
+    const shown = picked && hasDose(picked) ? picked : pops[0]
+    return {
+    dose: shown.dose,
+    doseWho: shown.doseWho,
+    doseLines: shown.doseLines,
+    doseMax: shown.doseMax,
     note: group.note,
     members: group.options.map(opt => ({
       data: opt,
       formulation: findFormulation(opt),
     })),
-  }))
+    }
+  })
 }
 
 function UnifiedDrugRow({ row, formulation, drugs, navigate, dividerType }) {
@@ -594,57 +600,19 @@ function UnifiedDrugRow({ row, formulation, drugs, navigate, dividerType }) {
   )
 }
 
-// ClusterDoses — the dose block under a drug. One population: shown exactly as
-// before. Several populations (Adult, Child ...): small tabs, one population's
-// doses visible at a time.
+// ClusterDoses — the dose block under a drug. Only the population the admin
+// picked is shown (see buildFormulationClusters), so there are no tabs here.
 function ClusterDoses({ cluster }) {
-  const [active, setActive] = useState(0)
-  const pops = cluster.populations ?? []
-
-  if (pops.length <= 1) {
-    return cluster.doseLines?.length > 0
-      ? (
-        <>
-          {cluster.doseLines.map(line => (
-            <DoseLine key={line.id} title={line.bracket_title} text={doseLineInstructionText(line)} note={line.note} />
-          ))}
-          {cluster.doseMax && <MaxDoseLine text={cluster.doseMax} />}
-        </>
-      )
-      : cluster.dose && <DoseLine text={cluster.dose} />
-  }
-
-  const current = pops[Math.min(active, pops.length - 1)]
-  return (
-    <>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: ROW_GAP_STACK }}>
-        {pops.map((pop, i) => {
-          const isActive = i === Math.min(active, pops.length - 1)
-          return (
-            <button
-              key={i}
-              type="button"
-              onClick={() => setActive(i)}
-              style={{
-                padding: '3px 10px', borderRadius: 999, cursor: 'pointer',
-                fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-                border: '1px solid ' + (isActive ? 'var(--color-accent)' : 'var(--color-border)'),
-                backgroundColor: isActive ? 'color-mix(in srgb, var(--color-accent) 12%, transparent)' : 'transparent',
-                color: isActive ? 'var(--color-accent)' : 'var(--color-text-secondary)',
-                WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              {doseWhoLabel(pop.doseWho) || `Population ${i + 1}`}
-            </button>
-          )
-        })}
-      </div>
-      {current.doseLines.map(line => (
-        <DoseLine key={line.id} title={line.bracket_title} text={doseLineInstructionText(line)} note={line.note} />
-      ))}
-      {current.doseMax && <MaxDoseLine text={current.doseMax} />}
-    </>
-  )
+  return cluster.doseLines?.length > 0
+    ? (
+      <>
+        {cluster.doseLines.map(line => (
+          <DoseLine key={line.id} title={line.bracket_title} text={doseLineInstructionText(line)} note={line.note} />
+        ))}
+        {cluster.doseMax && <MaxDoseLine text={cluster.doseMax} />}
+      </>
+    )
+    : cluster.dose && <DoseLine text={cluster.dose} />
 }
 
 // ─── Left rail pieces ─────────────────────────────────────────────────────────

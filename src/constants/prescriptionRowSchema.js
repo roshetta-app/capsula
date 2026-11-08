@@ -228,6 +228,9 @@ export const DRUG_ROW_TEMPLATE = {
   // Child etc. live here). Each: { id, dose_who, dose_lines, dose_max,
   // dose_max_population_id }. The app shows one population at a time.
   extra_populations: [],
+  // 2026-11-08: which population the app shows for this drug (0 = the first one,
+  // 1 = the next, and so on). Chosen by the admin; users never see the others.
+  shown_population: 0,
   note: null,
   drug_note: null,
   source_flag: null,
@@ -339,6 +342,7 @@ export const ALTERNATIVE_DRUG_TEMPLATE = {
   group_dose_max: null,
   group_dose_max_population_id: null,
   group_extra_populations: [],
+  group_shown_population: 0,
   // OR/AND DIVIDER TOGGLE ADDENDUM (2026-08-08): the word shown on the
   // divider that sits directly before this option ('or' | 'and'). Lives
   // per-option (not per-row) since a row can have several independent
@@ -561,6 +565,7 @@ export function promoteAlternativeToMain(row, alternativeIndex) {
   // immediately above exactly.
   const promotedDoseMaxPopulationId = chosen.group_dose_max_population_id ?? row.dose_max_population_id ?? null;
   const promotedExtraPopulations = (chosen.dose_lines?.length ? chosen.group_extra_populations : row.extra_populations) ?? [];
+  const promotedShownPopulation = (chosen.dose_lines?.length ? chosen.group_shown_population : row.shown_population) ?? 0;
 
   return {
     ...DRUG_ROW_TEMPLATE,
@@ -580,6 +585,7 @@ export function promoteAlternativeToMain(row, alternativeIndex) {
     dose_max: promotedDoseMax,
     dose_max_population_id: promotedDoseMaxPopulationId,
     extra_populations: promotedExtraPopulations,
+    shown_population: promotedShownPopulation,
     note: promotedNote,
     // Per-drug note (Decision 5 two-slot model) — travels with the option.
     drug_note: chosen.note ?? null,
@@ -780,6 +786,7 @@ export function toDrugOptions(row) {
     // immediately above.
     dose_max_population_id: row.dose_max_population_id ?? null,
     extra_populations: row.extra_populations ?? [],
+    shown_population: row.shown_population ?? 0,
     note: row.note,
   };
 
@@ -864,6 +871,7 @@ export function toDrugOptions(row) {
       // immediately above.
       dose_max_population_id: alt.group_dose_max_population_id ?? null,
       extra_populations: alt.group_extra_populations ?? [],
+      shown_population: alt.group_shown_population ?? 0,
       // PHASE A BUG FIX (2026-06-26): no longer falls back to alt.note.
       // The previous 'alt.group_note ?? alt.note ?? null' fallback was
       // written for true legacy data (alternatives saved before
@@ -969,6 +977,7 @@ export function fromDrugOptions(row, groups) {
       // group_dose_max immediately above.
       group_dose_max_population_id: sharesMainGroup ? null : (grp.dose_max_population_id ?? null),
       group_extra_populations: sharesMainGroup ? [] : (grp.extra_populations ?? []),
+      group_shown_population: sharesMainGroup ? 0 : (grp.shown_population ?? 0),
     };
   });
 
@@ -993,6 +1002,7 @@ export function fromDrugOptions(row, groups) {
     // immediately above.
     dose_max_population_id: mainGrp.dose_max_population_id ?? null,
     extra_populations: mainGrp.extra_populations ?? [],
+    shown_population: mainGrp.shown_population ?? 0,
     note: mainGrp.note,
     // PHASE A BUG FIX (2026-06-26): write the main option's own per-drug
     // note back onto drug_note (the group note above is a separate,
