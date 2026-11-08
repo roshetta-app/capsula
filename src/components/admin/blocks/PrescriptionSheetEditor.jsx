@@ -76,8 +76,8 @@
  *   }
  */
 
-import { useState, useCallback, useEffect } from 'react'
-import { ChevronUp, ChevronDown, Trash2, LogOut, Plus } from 'lucide-react'
+import { useState, useCallback, useEffect, useRef } from 'react'
+import { ChevronUp, ChevronDown, MoreHorizontal, Plus } from 'lucide-react'
 import UnifiedDrugRowEditor, { PromoteAlternativeDialog } from './rows/UnifiedDrugRowEditor'
 import NoteRowEditor         from './rows/NoteRowEditor'
 import FreeTextPostEditor    from './FreeTextPostEditor'
@@ -736,44 +736,8 @@ function RowCard({
           style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}
           onClick={e => e.stopPropagation()}
         >
-          {/* PHASE 4: top-level drug rows can be filed into an existing section */}
-          {isDrugRow && !isNested && sections.length > 0 && (
-            <select
-              value=""
-              onChange={e => { if (e.target.value) onMoveIntoSection(e.target.value) }}
-              title="Move into section…"
-              disabled={disabled}
-              style={{
-                fontSize: 11, fontWeight: 600,
-                color: 'var(--color-text-secondary)',
-                border: '1px solid var(--color-border)',
-                borderRadius: 6,
-                background: 'var(--color-surface)',
-                padding: '3px 4px',
-                maxWidth: 132,
-                cursor: disabled ? 'default' : 'pointer',
-              }}
-            >
-              <option value="">Move into section…</option>
-              {sections.map(s => (
-                <option key={s.id} value={s.id}>{s.label || 'Untitled section'}</option>
-              ))}
-            </select>
-          )}
-
-          {/* PHASE 4: nested drug rows can be moved back out to the top level */}
-          {isDrugRow && isNested && (
-            <button
-              type="button"
-              onClick={onMoveOut}
-              disabled={disabled}
-              title="Move out of section"
-              style={iconBtn(disabled)}
-            >
-              <LogOut size={13} />
-            </button>
-          )}
-
+          {/* 2026-11-08 CALMER: moving into / out of a section and removing the
+              row now live in one menu; only the two arrows stay on the bar. */}
           <button
             type="button"
             onClick={() => onMove(idx, -1)}
@@ -792,15 +756,17 @@ function RowCard({
           >
             <ChevronDown size={13} />
           </button>
-          <button
-            type="button"
-            onClick={() => onDeleteRequest(idx)}
+          <RowMenu
             disabled={disabled}
-            title="Remove row"
-            style={iconBtn(disabled, true)}
-          >
-            <Trash2 size={13} />
-          </button>
+            items={[
+              ...(isDrugRow && !isNested ? sections.map(sec => ({
+                label: `Move into “${sec.label || 'Untitled section'}”`,
+                onClick: () => onMoveIntoSection(sec.id),
+              })) : []),
+              ...(isDrugRow && isNested ? [{ label: 'Move out of section', onClick: onMoveOut }] : []),
+              { label: 'Remove row', danger: true, onClick: () => onDeleteRequest(idx) },
+            ]}
+          />
         </div>
       </div>
 
@@ -841,6 +807,55 @@ function RowCard({
 }
 
 // ─── Icon button style helper ──────────────────────────────────────────────────
+
+// One small ⋯ menu for the rarely used row actions.
+function RowMenu({ items, disabled }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+  useEffect(() => {
+    function onDown(e) { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('pointerdown', onDown)
+    return () => document.removeEventListener('pointerdown', onDown)
+  }, [])
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        disabled={disabled}
+        title="More row actions"
+        aria-label="More row actions"
+        style={iconBtn(disabled)}
+      >
+        <MoreHorizontal size={13} />
+      </button>
+      {open && (
+        <div style={{
+          position: 'absolute', right: 0, top: '100%', marginTop: 4, zIndex: 20,
+          minWidth: 180, maxWidth: 'calc(100vw - 24px)', padding: 4,
+          background: 'var(--color-surface)', border: '1px solid var(--color-border)',
+          borderRadius: 10, boxShadow: '0 4px 14px rgba(0,0,0,0.12)',
+        }}>
+          {items.map((it, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => { setOpen(false); it.onClick() }}
+              style={{
+                display: 'block', width: '100%', textAlign: 'left',
+                padding: '8px 12px', border: 'none', borderRadius: 8, background: 'none',
+                fontSize: 13, fontFamily: 'var(--font-body)', cursor: 'pointer',
+                color: it.danger ? '#ef4444' : 'var(--color-text-primary)',
+              }}
+            >
+              {it.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 function iconBtn(disabled = false, danger = false) {
   return {

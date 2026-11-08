@@ -1343,6 +1343,9 @@ const addDrugDropdownItemStyle = {
   borderRadius: 'var(--radius-md)',
 }
 
+// 2026-11-08 CALMER: plain text, no dashed boxes.
+const quietAddStyle = { border: 'none', background: 'none', padding: '6px 4px', fontSize: 13 }
+
 function AddDrugControls({ onPickBrand, onPickFormulation, onAddManual, disabled = false }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef(null)
@@ -1359,12 +1362,12 @@ function AddDrugControls({ onPickBrand, onPickFormulation, onAddManual, disabled
   }, [])
 
   return (
-    <div style={{ display: 'flex', gap: 8 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
       <button
         type="button"
         onClick={onPickBrand}
         disabled={disabled}
-        style={{ ...addOptionButtonStyle, flex: 1, justifyContent: 'center' }}
+        style={{ ...addOptionButtonStyle, ...quietAddStyle, color: 'var(--color-text-secondary)' }}
       >
         <Plus size={12} /> Add a drug
       </button>
@@ -1373,7 +1376,7 @@ function AddDrugControls({ onPickBrand, onPickFormulation, onAddManual, disabled
           type="button"
           onClick={() => setMenuOpen(v => !v)}
           disabled={disabled}
-          style={addOptionButtonStyle}
+          style={{ ...addOptionButtonStyle, ...quietAddStyle }}
         >
           More options <ChevronDown size={12} />
         </button>
