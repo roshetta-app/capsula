@@ -538,7 +538,6 @@ const doseFieldLabelStyle = {
   fontSize: 12, fontWeight: 700, color: 'var(--color-text-primary)',
   fontFamily: 'var(--font-body)',
 }
-const doseFieldHintStyle = { fontWeight: 400, color: 'var(--color-text-tertiary)' }
 const doseFieldInputStyle = {
   width: '100%', boxSizing: 'border-box',
   padding: '9px 10px',
@@ -640,6 +639,7 @@ function EditableDoseLine({
     onOpen()
   }
 
+  const [showNote, setShowNote] = useState(false)
   const displayInstruction = doseLineInstructionText(line)
   const isEmpty = !line.bracket_title && !displayInstruction && !line.note
   const number = index + 1
@@ -656,7 +656,7 @@ function EditableDoseLine({
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '0 0 36%', minWidth: 0 }}>
               <span style={doseFieldLabelStyle}>
-                Title <span style={doseFieldHintStyle}>(bold)</span>
+                Title
               </span>
               <input
                 type="text"
@@ -669,7 +669,7 @@ function EditableDoseLine({
             </label>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 0 }}>
               <span style={doseFieldLabelStyle}>
-                Dose <span style={doseFieldHintStyle}>(the instruction)</span>
+                Dose
               </span>
               <textarea
                 value={line.instruction ?? ''}
@@ -681,19 +681,27 @@ function EditableDoseLine({
               />
             </label>
           </div>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span style={doseFieldLabelStyle}>
-              Note <span style={doseFieldHintStyle}>(optional, small italic text under the dose)</span>
-            </span>
-            <textarea
-              value={line.note ?? ''}
-              onChange={e => onUpdateField('note', e.target.value || null)}
-              placeholder="Only for this bracket"
-              dir="auto"
-              rows={2}
-              style={{ ...doseFieldInputStyle, resize: 'vertical', fontStyle: 'italic' }}
-            />
-          </label>
+          {(showNote || line.note) ? (
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <span style={doseFieldLabelStyle}>Note</span>
+              <textarea
+                value={line.note ?? ''}
+                onChange={e => onUpdateField('note', e.target.value || null)}
+                placeholder="Note"
+                dir="auto"
+                rows={2}
+                autoFocus={showNote && !line.note}
+                style={{ ...doseFieldInputStyle, resize: 'vertical', fontStyle: 'italic' }}
+              />
+            </label>
+          ) : (
+            <div>
+              <button type="button" onClick={() => setShowNote(true)} style={doseDashedButtonStyle}>
+                <Plus size={14} />
+                Note
+              </button>
+            </div>
+          )}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <button type="button" onClick={onClose} style={dosePrimaryButtonStyle}>Done</button>
             {canSaveToLibrary && (
@@ -712,11 +720,6 @@ function EditableDoseLine({
               Remove
             </button>
           </div>
-          {canSaveToLibrary && (
-            <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>
-              Edits here change this sheet only. Tap Save to library to update the drug page too.
-            </span>
-          )}
         </div>
       ) : (
         <button type="button" onClick={open} aria-label={`Edit bracket ${number}`} style={doseClosedRowStyle}>
@@ -827,7 +830,7 @@ function EditableMaxDose({
         <div style={doseOpenPanelStyle}>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             <span style={doseFieldLabelStyle}>
-              Max dose <span style={doseFieldHintStyle}>(shown once, under all brackets)</span>
+              Max dose
             </span>
             <input
               type="text"
@@ -2301,7 +2304,7 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onOpti
               option.brand_name; handlePromote's existing brand-creation
               logic already reads this field unchanged. */}
           <div>
-            <FieldLabel>Brand name (optional)</FieldLabel>
+            <FieldLabel>Brand name</FieldLabel>
             <input
               type="text"
               value={option.brand_name ?? ''}
