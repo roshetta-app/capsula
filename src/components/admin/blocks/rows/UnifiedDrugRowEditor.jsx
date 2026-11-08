@@ -466,10 +466,9 @@ function LinkedDrugCard({ brandId, onRequestChange, extraAction, fallback, note 
                 title="Add note"
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 3,
-                  height: 30, padding: '0 9px', boxSizing: 'border-box',
-                  border: '1px solid var(--color-border)', borderRadius: 99,
-                  background: 'var(--color-bg)', color: 'var(--color-text-secondary)',
-                  fontSize: 11, fontWeight: 600, fontFamily: 'var(--font-body)', cursor: 'pointer',
+                  height: 30, padding: '0 4px', boxSizing: 'border-box',
+                  border: 'none', background: 'none', color: 'var(--color-text-secondary)',
+                  fontSize: 12, fontWeight: 600, fontFamily: 'var(--font-body)', cursor: 'pointer',
                 }}
               >
                 <Plus size={10} /> note
@@ -539,11 +538,11 @@ const doseFieldInputStyle = {
   color: 'var(--color-text-primary)',
   outline: 'none',
 }
-const doseDashedButtonStyle = {
-  display: 'inline-flex', alignItems: 'center', gap: 6,
-  padding: '7px 14px', boxSizing: 'border-box',
-  border: '1px solid var(--color-border)', borderRadius: 99,
-  background: 'var(--color-surface)', color: 'var(--color-text-secondary)',
+// 2026-11-08 CALMER: the add buttons are plain text with a plus, no pill.
+const doseAddLinkStyle = {
+  display: 'inline-flex', alignItems: 'center', gap: 4,
+  padding: '6px 4px', boxSizing: 'border-box',
+  border: 'none', background: 'none', color: 'var(--color-text-secondary)',
   fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-body)', cursor: 'pointer',
 }
 const dosePrimaryButtonStyle = {
@@ -572,7 +571,7 @@ const doseClosedRowStyle = {
   display: 'flex', alignItems: 'flex-start', gap: 10,
   width: '100%', boxSizing: 'border-box', padding: '10px 12px', textAlign: 'left',
   border: 'none', borderRadius: 10,
-  backgroundColor: 'var(--color-bg)', cursor: 'pointer',
+  backgroundColor: 'var(--color-surface)', cursor: 'pointer',
   fontFamily: 'var(--font-body)',
 }
 
@@ -713,7 +712,7 @@ function EditableDoseLine({
             </label>
           ) : (
             <div>
-              <button type="button" onClick={() => setShowNote(true)} style={doseDashedButtonStyle}>
+              <button type="button" onClick={() => setShowNote(true)} style={doseAddLinkStyle}>
                 <Plus size={14} />
                 Note
               </button>
@@ -908,7 +907,7 @@ function EditableMaxDose({
           <Edit2 size={14} style={{ flexShrink: 0, marginTop: 3, color: 'var(--color-text-tertiary)' }} />
         </button>
       ) : (
-        <button type="button" onClick={onOpen} style={doseDashedButtonStyle}>
+        <button type="button" onClick={onOpen} style={doseAddLinkStyle}>
           <Plus size={14} />
           Max dose
         </button>
@@ -1029,6 +1028,27 @@ function PopulationTabs({ whos, activeIdx, shownIdx = 0, onSelect, onRename, onA
     fontSize: 13, fontWeight: 700, fontFamily: 'var(--font-body)', cursor: 'pointer',
   }
 
+  if (whos.length === 1 && !whos[0] && !renaming) {
+    return (
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <button
+          type="button"
+          onClick={() => setRenaming(true)}
+          aria-label="Name this patient group"
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+            padding: '5px 4px', border: 'none', background: 'none',
+            color: 'var(--color-text-secondary)',
+            fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-body)', cursor: 'pointer',
+          }}
+        >
+          <Plus size={12} />
+          Patient group
+        </button>
+      </div>
+    )
+  }
+
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
       {whos.map((who, i) => {
@@ -1084,19 +1104,22 @@ function PopulationTabs({ whos, activeIdx, shownIdx = 0, onSelect, onRename, onA
           </button>
         )
       })}
-      <button
-        type="button"
-        onClick={onAdd}
-        aria-label="Add another patient group"
-        style={{
-          ...chipBase, fontWeight: 600, fontSize: 12,
-          border: '1.5px dashed var(--color-border)', background: 'none',
-          color: 'var(--color-text-secondary)',
-        }}
-      >
-        <Plus size={12} />
-        Patient group
-      </button>
+      {!renaming && (
+        <button
+          type="button"
+          onClick={onAdd}
+          aria-label="Add another patient group"
+          style={{
+            ...chipBase, fontWeight: 600, fontSize: 13,
+            padding: '5px 6px',
+            border: 'none', background: 'none',
+            color: 'var(--color-text-secondary)',
+          }}
+        >
+          <Plus size={12} />
+          Patient group
+        </button>
+      )}
     </div>
   )
 }
@@ -1143,12 +1166,11 @@ function NoteSlot({ note, onChange, label, triggerLabel, placeholder, editing, o
         style={{
           ...wrapStyle,
           display: 'inline-flex', alignItems: 'center', gap: 4,
-          padding: '3px 8px',
-          border: '1px solid var(--color-border)',
-          borderRadius: 'var(--radius-md)',
-          background: 'var(--color-bg)',
+          padding: '3px 4px',
+          border: 'none',
+          background: 'none',
           color: 'var(--color-text-secondary)',
-          fontSize: 11, fontWeight: 600,
+          fontSize: 12, fontWeight: 600,
           cursor: 'pointer', fontFamily: 'var(--font-body)',
           alignSelf: 'flex-start',
         }}
@@ -3680,11 +3702,8 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                     the row. Padding/gap tightened slightly in the same
                     pass. */}
                 <div style={{
-                  display: 'flex', flexDirection: 'column', gap: 10,
-                  border: '1px solid var(--color-border)',
-                  borderRadius: 12,
-                  padding: 12,
-                  backgroundColor: 'var(--color-surface)',
+                  display: 'flex', flexDirection: 'column', gap: 8,
+                  padding: '4px 2px',
                 }}>
                   <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
                     <PopulationTabs
@@ -3796,28 +3815,27 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                     const isShown = openIdx === shownIdx
                     const shared = group.options.length > 1
                     if (!st && !hasExtra && !shared) return null
-                    const chip = {
-                      display: 'inline-flex', alignItems: 'center', gap: 5,
-                      padding: '3px 10px', borderRadius: 99, fontSize: 12, fontWeight: 600,
-                      fontFamily: 'var(--font-body)',
+                    const plain = {
+                      display: 'inline-flex', alignItems: 'center', gap: 4,
+                      fontSize: 12, fontWeight: 500, fontFamily: 'var(--font-body)',
+                      color: 'var(--color-text-tertiary)',
                     }
                     return (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                         {shared && (
-                          <span style={{ ...chip, background: 'var(--color-bg)', color: 'var(--color-text-secondary)' }}>
-                            Shared by {group.options.length} drugs
-                          </span>
+                          <span style={plain}>Shared by {group.options.length} drugs</span>
                         )}
-                        {st && (
+                        {st && (warn ? (
                           <span style={{
-                            ...chip,
-                            background: warn ? '#FEF3C7' : 'var(--color-bg)',
-                            color: warn ? '#B45309' : 'var(--color-text-secondary)',
+                            ...plain, fontWeight: 600, padding: '2px 9px', borderRadius: 99,
+                            background: '#FEF3C7', color: '#B45309',
                           }}>
-                            {warn ? <Library size={12} /> : <Check size={12} />}
-                            {st === 'new' ? 'Not in library' : st === 'changed' ? 'Changed, not saved' : 'In library'}
+                            <Library size={12} />
+                            {st === 'new' ? 'Not in library' : 'Changed, not saved'}
                           </span>
-                        )}
+                        ) : (
+                          <span style={plain}><Check size={12} /> In library</span>
+                        ))}
                         {warn && canSave && (
                           <button
                             type="button"
@@ -3828,21 +3846,19 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                             Save
                           </button>
                         )}
-                        {hasExtra && (
+                        {hasExtra && (isShown ? (
+                          <span style={{ ...plain, color: 'var(--color-accent)' }}>
+                            <Check size={12} /> Shown in the app
+                          </span>
+                        ) : (
                           <button
                             type="button"
-                            onClick={() => { if (!isShown) setShownPopulation(groupIdx, openIdx) }}
-                            aria-pressed={isShown}
-                            style={{
-                              ...chip, cursor: isShown ? 'default' : 'pointer',
-                              border: isShown ? 'none' : '1px solid var(--color-border)',
-                              background: isShown ? 'var(--color-accent-light)' : 'none',
-                              color: isShown ? 'var(--color-accent)' : 'var(--color-text-secondary)',
-                            }}
+                            onClick={() => setShownPopulation(groupIdx, openIdx)}
+                            style={{ ...plain, background: 'none', border: 'none', padding: 0, cursor: 'pointer', textDecoration: 'underline' }}
                           >
-                            {isShown ? <><Check size={12} /> Shown in the app</> : 'Show in the app'}
+                            Show in the app
                           </button>
-                        )}
+                        ))}
                       </div>
                     )
                   })()}
@@ -4066,10 +4082,10 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                       <button
                         type="button"
                         onClick={() => addBracket(groupIdx)}
-                        style={doseDashedButtonStyle}
+                        style={doseAddLinkStyle}
                       >
                         <Plus size={14} />
-                        Add dose band
+                        Dose band
                       </button>
 
                     {/* DECLUTTER PASS 4 (Direction 1, 2026-08-08): reverted
