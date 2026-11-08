@@ -458,22 +458,6 @@ function LinkedDrugCard({ brandId, onRequestChange, extraAction, fallback, note 
         isLast
         trailing={(
           <>
-            {onNoteChange && !note && !noteEditing && (
-              <button
-                type="button"
-                onClick={() => setNoteEditing(true)}
-                aria-label="Add drug note"
-                title="Add note"
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 3,
-                  height: 30, padding: '0 4px', boxSizing: 'border-box',
-                  border: 'none', background: 'none', color: 'var(--color-text-secondary)',
-                  fontSize: 12, fontWeight: 600, fontFamily: 'var(--font-body)', cursor: 'pointer',
-                }}
-              >
-                <Plus size={10} /> note
-              </button>
-            )}
             <button
               type="button"
               onClick={onRequestChange}
@@ -483,11 +467,13 @@ function LinkedDrugCard({ brandId, onRequestChange, extraAction, fallback, note 
             >
               <Edit2 size={14} />
             </button>
-            {extraAction}
+            {typeof extraAction === 'function'
+              ? extraAction({ onAddNote: onNoteChange && !note && !noteEditing ? () => setNoteEditing(true) : null })
+              : extraAction}
           </>
         )}
       />
-      {/* The '+ note' button sits on the right of the card (above); once there
+      {/* The 'Add note' item sits on the right of the card (above); once there
           is a note, or it is being typed, the note shows here inside the card. */}
       {onNoteChange && (note || noteEditing) && (
         <div style={{ display: 'flex', flexDirection: 'column', paddingBottom: 10 }}>
@@ -906,12 +892,7 @@ function EditableMaxDose({
           </span>
           <Edit2 size={14} style={{ flexShrink: 0, marginTop: 3, color: 'var(--color-text-tertiary)' }} />
         </button>
-      ) : (
-        <button type="button" onClick={onOpen} style={doseAddLinkStyle}>
-          <Plus size={14} />
-          Max dose
-        </button>
-      )}
+      ) : null}
 
       <DoseSaveFeedback
         isConfirming={isConfirming}
@@ -1115,9 +1096,9 @@ function PopulationTabs({ whos, activeIdx, shownIdx = 0, onSelect, onRename, onA
             border: 'none', background: 'none',
             color: 'var(--color-text-secondary)',
           }}
+          title="Add another patient group"
         >
-          <Plus size={12} />
-          Patient group
+          <Plus size={14} />
         </button>
       )}
     </div>
@@ -1258,11 +1239,14 @@ function NoteSlot({ note, onChange, label, triggerLabel, placeholder, editing, o
 // PHASE 2.2-C/D: per-group note slot, rendered below the dose card for each
 // group. Thin wrapper over NoteSlot above.
 
-function GroupNoteSlot({ note, onChange }) {
+function GroupNoteSlot({ note, onChange, editing, onEditingChange, hideTrigger }) {
   return (
     <NoteSlot
       note={note}
       onChange={onChange}
+      editing={editing}
+      onEditingChange={onEditingChange}
+      hideTrigger={hideTrigger}
       label="group note"
       triggerLabel="group note"
       placeholder="Group note (e.g. Take with food)"
@@ -1521,6 +1505,7 @@ function OrDivider({ value = 'or', onChange, merged = false, atTopEdge = false }
 //   isOnly         — hides "Remove this option" when true
 
 function OptionActionsMenu({
+  onAddNote = null,
   showLinkToggle, showLink, onToggleLink,
   canMoveToNew, canMoveAbove, canMoveBelow, onMove,
   onRemove, isOnly,
@@ -1572,6 +1557,17 @@ function OptionActionsMenu({
       </button>
       {open && (
         <div ref={fitMenuToScreen} style={{ ...addDrugDropdownStyle, maxWidth: 'calc(100vw - 16px)' }}>
+          {onAddNote && (
+            <button
+              type="button"
+              style={menuItemStyle}
+              onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-bg)' }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
+              onClick={() => { onAddNote(); setOpen(false) }}
+            >
+              Add note
+            </button>
+          )}
           {showLinkToggle && (
             <button
               type="button"
@@ -2104,11 +2100,12 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onOpti
   // DrugSearchField's extraAction slot, where a name/identity already
   // exists (matches the old nameRowExtraActions, which was the only place
   // drugLinkToggle used to render).
-  const nameRowExtraActions = (
+  const renderNameRowExtras = ({ onAddNote = null } = {}) => (
     <>
       {showManualFields && <NotInLibraryTag />}
       {drugLinkIndicator}
       <OptionActionsMenu
+        onAddNote={onAddNote}
         showLinkToggle={true}
         showLink={showLink}
         onToggleLink={() => patch({ drug_link_enabled: !showLink })}
@@ -2121,6 +2118,7 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onOpti
       />
     </>
   )
+  const nameRowExtraActions = renderNameRowExtras()
 
   // ── Render ──────────────────────────────────────────────────────────────
   return (
@@ -2171,7 +2169,7 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onOpti
               <LinkedDrugCard
                 brandId={option.brand_id}
                 onRequestChange={() => setBrandPickerOpen(true)}
-                extraAction={nameRowExtraActions}
+                extraAction={renderNameRowExtras}
                 fallback={searchField}
                 note={option.note ?? null}
                 onNoteChange={value => patch({ note: value })}
@@ -2672,6 +2670,7 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
   // addDrugDropdownItemStyle), so this doesn't introduce a new visual
   // pattern. Only one group's menu can be open at a time.
   const [doseMenuOpenGroupIdx, setDoseMenuOpenGroupIdx] = useState(null)
+  const [groupNoteEditIdx, setGroupNoteEditIdx] = useState(null) // which group's note box is being typed in (opened from the dose menu)
   const doseMenuRef = useRef(null)
   useEffect(() => {
     function handlePointerDown(e) {
@@ -3654,6 +3653,9 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
             <GroupNoteSlot
               note={group.note}
               onChange={value => updateGroupNote(groupIdx, value)}
+              editing={groupNoteEditIdx === groupIdx}
+              onEditingChange={v => setGroupNoteEditIdx(v ? groupIdx : null)}
+              hideTrigger
             />
           )}
 
@@ -3731,7 +3733,7 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                           saveDoseToLibrary() against the library's current
                           state, same deferred-validation pattern this file
                           already uses elsewhere (e.g. saveLineToLibrary). */}
-                      {firstOpt.formulation_id && (
+                      {(
                         <div style={{ position: 'relative' }}>
                           <button
                             type="button"
@@ -3744,7 +3746,43 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                           </button>
                           {doseMenuOpenGroupIdx === groupIdx && (
                             <div ref={el => { doseMenuRef.current = el; fitMenuToScreen(el) }} style={{ ...addDrugDropdownStyle, minWidth: 150, maxWidth: 'calc(100vw - 16px)' }}>
-                              {(group.dose_lines ?? []).some(l => l.instruction?.trim()) && (
+                              {/* 2026-11-08 CALMER: the rarely used extras live here
+                                  instead of as buttons on the card. */}
+                              {!group.note?.trim() && (
+                                <button
+                                  type="button"
+                                  onClick={() => { setDoseMenuOpenGroupIdx(null); setGroupNoteEditIdx(groupIdx) }}
+                                  style={addDrugDropdownItemStyle}
+                                >
+                                  Add group note
+                                </button>
+                              )}
+                              {!group.dose_max?.trim() && (
+                                <button
+                                  type="button"
+                                  onClick={() => { setDoseMenuOpenGroupIdx(null); setOpenEditorId(`max-${groupIdx}`) }}
+                                  style={addDrugDropdownItemStyle}
+                                >
+                                  Add max dose
+                                </button>
+                              )}
+                              {(() => {
+                                const g0 = rawGroups[groupIdx]
+                                if ((g0.extra_populations ?? []).length === 0) return null
+                                const openIdx = activeIndexFor(g0)
+                                const shownIdx = Math.min(g0.shown_population ?? 0, (g0.extra_populations ?? []).length)
+                                if (openIdx === shownIdx) return null
+                                return (
+                                  <button
+                                    type="button"
+                                    onClick={() => { setDoseMenuOpenGroupIdx(null); setShownPopulation(groupIdx, openIdx) }}
+                                    style={addDrugDropdownItemStyle}
+                                  >
+                                    Show this patient group in the app
+                                  </button>
+                                )
+                              })()}
+                              {firstOpt.formulation_id && (group.dose_lines ?? []).some(l => l.instruction?.trim()) && (
                                 <button
                                   type="button"
                                   onClick={() => { setDoseMenuOpenGroupIdx(null); setConfirmSaveGroup(groupIdx) }}
@@ -3757,6 +3795,7 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                                   Save to library
                                 </button>
                               )}
+                              {firstOpt.formulation_id && (
                               <button
                                 type="button"
                                 onClick={() => { setDoseMenuOpenGroupIdx(null); setConfirmRestoreGroup(groupIdx) }}
@@ -3765,7 +3804,8 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                               >
                                 {restoringGroupIdx === groupIdx ? 'Restoring…' : 'Restore from library'}
                               </button>
-                              {group.dose_max_population_id && (
+                              )}
+                              {firstOpt.formulation_id && group.dose_max_population_id && (
                                 <button
                                   type="button"
                                   onClick={() => { setDoseMenuOpenGroupIdx(null); setConfirmDeleteLibPop(groupIdx) }}
@@ -3806,60 +3846,28 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
 
                   {(() => {
                     const st = doseSaveStatus(group, firstOpt.formulation_id, libraryDoses[firstOpt.formulation_id])
-                    const warn = st && st !== 'saved'
+                    if (!st || st === 'saved') return null
                     const canSave = (group.dose_lines ?? []).some(l => l.instruction?.trim())
-                    const g0 = rawGroups[groupIdx]
-                    const hasExtra = (g0.extra_populations ?? []).length > 0
-                    const openIdx = activeIndexFor(g0)
-                    const shownIdx = Math.min(g0.shown_population ?? 0, (g0.extra_populations ?? []).length)
-                    const isShown = openIdx === shownIdx
-                    const shared = group.options.length > 1
-                    if (!st && !hasExtra && !shared) return null
-                    const plain = {
-                      display: 'inline-flex', alignItems: 'center', gap: 4,
-                      fontSize: 12, fontWeight: 500, fontFamily: 'var(--font-body)',
-                      color: 'var(--color-text-tertiary)',
+                    const label = st === 'new' ? 'Not in library' : 'Changed, not saved'
+                    const badge = {
+                      display: 'inline-flex', alignItems: 'center', gap: 6, alignSelf: 'flex-start',
+                      padding: '3px 10px', borderRadius: 99, border: 'none',
+                      background: '#FEF3C7', color: '#B45309',
+                      fontSize: 12, fontWeight: 600, fontFamily: 'var(--font-body)',
                     }
-                    return (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                        {shared && (
-                          <span style={plain}>Shared by {group.options.length} drugs</span>
-                        )}
-                        {st && (warn ? (
-                          <span style={{
-                            ...plain, fontWeight: 600, padding: '2px 9px', borderRadius: 99,
-                            background: '#FEF3C7', color: '#B45309',
-                          }}>
-                            <Library size={12} />
-                            {st === 'new' ? 'Not in library' : 'Changed, not saved'}
-                          </span>
-                        ) : (
-                          <span style={plain}><Check size={12} /> In library</span>
-                        ))}
-                        {warn && canSave && (
-                          <button
-                            type="button"
-                            onClick={() => setConfirmSaveGroup(groupIdx)}
-                            disabled={savingGroupIdx === groupIdx}
-                            style={{ ...doseSecondaryButtonStyle, padding: '3px 10px', fontSize: 12 }}
-                          >
-                            Save
-                          </button>
-                        )}
-                        {hasExtra && (isShown ? (
-                          <span style={{ ...plain, color: 'var(--color-accent)' }}>
-                            <Check size={12} /> Shown in the app
-                          </span>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => setShownPopulation(groupIdx, openIdx)}
-                            style={{ ...plain, background: 'none', border: 'none', padding: 0, cursor: 'pointer', textDecoration: 'underline' }}
-                          >
-                            Show in the app
-                          </button>
-                        ))}
-                      </div>
+                    return canSave ? (
+                      <button
+                        type="button"
+                        onClick={() => setConfirmSaveGroup(groupIdx)}
+                        disabled={savingGroupIdx === groupIdx}
+                        title="Save this patient group to the library"
+                        style={{ ...badge, cursor: 'pointer' }}
+                      >
+                        <Library size={12} />
+                        {label} · Save
+                      </button>
+                    ) : (
+                      <span style={badge}><Library size={12} />{label}</span>
                     )
                   })()}
 
