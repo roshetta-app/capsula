@@ -626,6 +626,7 @@ function EditableDoseLine({
   line, index, isOpen, onOpen, onClose,
   onUpdateField, onRemove,
   canDeleteFromLibrary = false, isConfirmingDeleteLib = false, deleteLibText = '',
+  libraryStatus = null,
   onRequestDeleteLib, onConfirmDeleteLib, onCancelDeleteLib, isDeletingLib = false,
   canSaveToLibrary, isConfirming, onRequestSave, onConfirmSave, onCancelConfirm,
   isSaving, isSaved, saveError,
@@ -726,21 +727,31 @@ function EditableDoseLine({
               style={doseDangerButtonStyle}
             >
               <X size={13} />
-              Remove
+              Remove from sheet
             </button>
           </div>
-          {canDeleteFromLibrary && (
+          {(libraryStatus || canDeleteFromLibrary) && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', paddingTop: 8, borderTop: '1px solid var(--color-border)' }}>
-              <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>Drug library</span>
-              <button
-                type="button"
-                onClick={onRequestDeleteLib}
-                disabled={isDeletingLib}
-                style={{ ...doseDangerButtonStyle, marginLeft: 0, opacity: isDeletingLib ? 0.5 : 1 }}
-              >
-                <X size={13} />
-                Delete this dose band from library
-              </button>
+              <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>Drug library (everyone)</span>
+              {libraryStatus && (
+                <span style={{
+                  fontSize: 12, fontWeight: 600,
+                  color: libraryStatus === 'saved' ? 'var(--color-accent)' : '#B45309',
+                }}>
+                  {LIBRARY_STATUS_WORDS[libraryStatus]}
+                </span>
+              )}
+              {canDeleteFromLibrary && (
+                <button
+                  type="button"
+                  onClick={onRequestDeleteLib}
+                  disabled={isDeletingLib}
+                  style={{ ...doseDangerButtonStyle, marginLeft: 0, opacity: isDeletingLib ? 0.5 : 1 }}
+                >
+                  <X size={13} />
+                  Delete from library
+                </button>
+              )}
             </div>
           )}
           {isConfirmingDeleteLib && (
@@ -897,7 +908,7 @@ function EditableMaxDose({
             {value && (
               <button type="button" onClick={() => setConfirmRemove(true)} style={doseDangerButtonStyle}>
                 <X size={13} />
-                Remove
+                Remove from sheet
               </button>
             )}
           </div>
@@ -978,6 +989,37 @@ function doseSaveStatus(g, formulationId, libraryPops) {
     ) return 'changed'
   }
   return 'saved'
+}
+
+// 2026-11-08: the same three status words are used for a patient group (amber
+// chip) and for a single dose band (its edit panel).
+const LIBRARY_STATUS_WORDS = {
+  new: 'Not in library',
+  changed: 'Changed, not saved',
+  saved: 'In library',
+}
+
+// Same idea as doseSaveStatus, for ONE dose band of a patient group.
+function bandSaveStatus(g, line, formulationId, libraryPops) {
+  if (!formulationId || !Array.isArray(libraryPops)) return null
+  if (isDoseLineEmpty(line)) return null
+  const libPop = g.dose_max_population_id ? libraryPops.find(p => p.id === g.dose_max_population_id) : null
+  const lb = libPop && line.bracket_id
+    ? (Array.isArray(libPop.brackets) ? libPop.brackets : []).find(b => b.id === line.bracket_id)
+    : null
+  if (!lb) return 'new'
+  if (
+    normStr(line.bracket_title) !== normStr(lb.bracket) ||
+    normStr(line.instruction ?? line.text) !== normStr(lb.instruction) ||
+    normStr(line.note) !== normStr(lb.note)
+  ) return 'changed'
+  return 'saved'
+}
+
+// True when the library already holds a dose (a band or a max dose) for this drug.
+function libraryHasDose(libraryPops) {
+  return Array.isArray(libraryPops) && libraryPops.some(p =>
+    (Array.isArray(p.brackets) && p.brackets.length > 0) || normStr(p.max_dose))
 }
 
 function projectGroup(g, pi) {
@@ -1650,7 +1692,7 @@ function OptionActionsMenu({
               onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
               onClick={() => { onRemove(); setOpen(false) }}
             >
-              Remove this option
+              Remove this drug from the sheet
             </button>
           )}
         </div>
@@ -2452,7 +2494,7 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onOpti
             }}
           >
             <Library size={13} />
-            {promoteOn ? 'Save to library: ON' : 'Save to library'}
+            Add this drug to the library
           </button>
 
           {promoteOn && (
@@ -2513,7 +2555,7 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onOpti
                   fontFamily: 'var(--font-body)',
                 }}
               >
-                {promoting ? 'Saving…' : 'Promote now'}
+                {promoting ? 'Adding…' : 'Add to library now'}
               </button>
             </>
           )}
@@ -3703,7 +3745,7 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
 
           {confirmRemoveOption?.groupIdx === groupIdx && (
             <ConfirmBar
-              text="Remove this drug from the sheet?"
+              text="Remove this drug from the sheet? The library is not changed."
               onConfirm={() => { const id = confirmRemoveOption.optionId; setConfirmRemoveOption(null); removeOption(groupIdx, id) }}
               onCancel={() => setConfirmRemoveOption(null)}
             />
@@ -3810,7 +3852,7 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                           const st = doseSaveStatus(group, firstOpt.formulation_id, libraryDoses[firstOpt.formulation_id])
                           if (!st || st === 'saved') return null
                           const canSave = (group.dose_lines ?? []).some(l => l.instruction?.trim())
-                          const label = st === 'new' ? 'Not in library' : 'Changed, not saved'
+                          const label = LIBRARY_STATUS_WORDS[st]
                           const badge = {
                             display: 'inline-flex', alignItems: 'center', gap: 6, alignSelf: 'flex-start',
                             padding: '3px 10px', borderRadius: 99, border: 'none',
@@ -3865,7 +3907,7 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                                     )}
                                     <button type="button" style={{ ...addDrugDropdownItemStyle, color: '#ef4444' }}
                                       onClick={() => { setDoseMenuOpenGroupIdx(null); setConfirmClearGroup(groupIdx) }}>
-                                      Clear doses
+                                      Clear all doses
                                     </button>
                                     {firstOpt.formulation_id && (
                                       <>
@@ -3879,11 +3921,13 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                                             Save to library
                                           </button>
                                         )}
-                                        <button type="button" style={addDrugDropdownItemStyle}
-                                          disabled={restoringGroupIdx === groupIdx}
-                                          onClick={() => { setDoseMenuOpenGroupIdx(null); setConfirmRestoreGroup(groupIdx) }}>
-                                          {restoringGroupIdx === groupIdx ? 'Restoring…' : 'Restore from library'}
-                                        </button>
+                                        {libraryHasDose(libraryDoses[firstOpt.formulation_id]) && (
+                                          <button type="button" style={addDrugDropdownItemStyle}
+                                            disabled={restoringGroupIdx === groupIdx}
+                                            onClick={() => { setDoseMenuOpenGroupIdx(null); setConfirmRestoreGroup(groupIdx) }}>
+                                            {restoringGroupIdx === groupIdx ? 'Replacing…' : 'Replace with library version'}
+                                          </button>
+                                        )}
                                         {group.dose_max_population_id && (
                                           <button type="button" style={{ ...addDrugDropdownItemStyle, color: '#ef4444' }}
                                             disabled={deletingLibGroupIdx === groupIdx}
@@ -3934,8 +3978,8 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
 
                   {confirmRestoreGroup === groupIdx && (
                     <ConfirmBar
-                      text={`Restore ${popRef} from the library? Its dose bands and max dose on this sheet are replaced by the library version. Other patient groups are not changed.`}
-                      confirmLabel="Restore"
+                      text={`Replace ${popRef} with the library version? Its dose bands and max dose on this sheet are replaced. This sheet only: the library is not changed, and other patient groups are not changed.`}
+                      confirmLabel="Replace"
                       onConfirm={() => { setConfirmRestoreGroup(null); restoreDoseFromLibrary(groupIdx) }}
                       onCancel={() => setConfirmRestoreGroup(null)}
                     />
@@ -4055,6 +4099,7 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                           onRemove={() => removeDoseLine(groupIdx, line.id)}
                           canSaveToLibrary={false /* 2026-11-08: saving to the library is done per patient group only */}
                           canDeleteFromLibrary={!!(line.bracket_id && firstOpt.formulation_id)}
+                          libraryStatus={bandSaveStatus(group, line, firstOpt.formulation_id, libraryDoses[firstOpt.formulation_id])}
                           isConfirmingDeleteLib={confirmDeleteBand?.line.id === line.id}
                           deleteLibText={`Delete dose band ${lineIdx + 1} of ${popRef} from the drug library for everyone? It stays on this sheet.`}
                           onRequestDeleteLib={() => setConfirmDeleteBand({ groupIdx, line })}
@@ -4239,9 +4284,9 @@ export function PromoteAlternativeDialog({ row, onPromote, onDeleteAll, onCancel
         <div style={{
           fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 16,
         }}>
-          Deleting <strong>{row.brand_name || row.generic_name || 'this drug'}</strong> will
-          also remove its alternatives. You can promote one alternative to take over
-          the main slot, or delete everything together.
+          Removing <strong>{row.brand_name || row.generic_name || 'this drug'}</strong> from the
+          sheet will also remove its alternatives. You can promote one alternative to take
+          over the main slot, or remove everything together. The library is not changed.
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
@@ -4295,7 +4340,7 @@ export function PromoteAlternativeDialog({ row, onPromote, onDeleteAll, onCancel
               cursor: 'pointer', fontWeight: 600,
             }}
           >
-            Delete all
+            Remove all
           </button>
         </div>
       </div>

@@ -670,8 +670,12 @@ function RowCard({
   disabled = false,
 }) {
   const [expanded, setExpanded] = useState(row._isNew ?? false)
+  // 2026-11-08: removing a drug from the sheet now asks first (it used to go
+  // instantly). A drug with alternatives keeps its own box instead.
+  const [confirmRemoveRow, setConfirmRemoveRow] = useState(false)
   const cfg = ROW_TYPE_LABELS[row.row_type] ?? { color: '#9ca3af' }
   const isDrugRow = row.row_type === 'drug'
+  const hasAlternatives = isDrugRow && (row.alternatives ?? []).length > 0
 
   function handleEditorChange(nextRow) {
     onChange(nextRow)
@@ -764,11 +768,47 @@ function RowCard({
                 onClick: () => onMoveIntoSection(sec.id),
               })) : []),
               ...(isDrugRow && isNested ? [{ label: 'Move out of section', onClick: onMoveOut }] : []),
-              { label: 'Remove row', danger: true, onClick: () => onDeleteRequest(idx) },
+              isDrugRow
+                ? { label: 'Remove drug from sheet', danger: true, onClick: () => (hasAlternatives ? onDeleteRequest(idx) : setConfirmRemoveRow(true)) }
+                : { label: 'Remove row', danger: true, onClick: () => onDeleteRequest(idx) },
             ]}
           />
         </div>
       </div>
+
+      {confirmRemoveRow && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
+          padding: '8px 10px', borderBottom: '1px solid var(--color-border)',
+          background: '#ef444410',
+        }}>
+          <span style={{ flex: 1, minWidth: 180, fontSize: 13, color: 'var(--color-text-primary)' }}>
+            Remove this drug from the sheet? The library is not changed.
+          </span>
+          <button
+            type="button"
+            onClick={() => { setConfirmRemoveRow(false); onDeleteRequest(idx) }}
+            style={{
+              padding: '5px 12px', border: '1.5px solid #ef4444', borderRadius: 'var(--radius-md)',
+              background: '#ef444410', color: '#ef4444', fontSize: 13, fontWeight: 600,
+              fontFamily: 'var(--font-body)', cursor: 'pointer',
+            }}
+          >
+            Remove
+          </button>
+          <button
+            type="button"
+            onClick={() => setConfirmRemoveRow(false)}
+            style={{
+              padding: '5px 12px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)',
+              background: 'transparent', color: 'var(--color-text-secondary)', fontSize: 13, fontWeight: 500,
+              fontFamily: 'var(--font-body)', cursor: 'pointer',
+            }}
+          >
+            Cancel
+          </button>
+        </div>
+      )}
 
       {/* ── Expanded editor ── */}
       {expanded && (
