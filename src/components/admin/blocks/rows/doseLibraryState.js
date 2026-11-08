@@ -142,3 +142,114 @@ export function mergeBandsForSave(existingBrackets, lines, makeId) {
   }
   return { nextBrackets, stamped }
 }
+
+// ── What would change? ──────────────────────────────────────────────────────
+// Short name for a dose band, used in messages.
+export function bandLabel(b) {
+  const title = norm(b.bracket_title ?? b.bracket ?? b.title)
+  const text = norm(b.instruction ?? b.text)
+  const label = title || text
+  return label.length > 28 ? `${label.slice(0, 27)}…` : label
+}
+
+// Pairs the sheet's bands with the library group's bands: first by library id,
+// then by identical wording. Returns the pairs and whatever is left over on
+// each side.
+function pairBands(group, libPop) {
+  const sheet = (group?.dose_lines ?? [])
+    .map(l => ({ title: norm(l.bracket_title), instruction: norm(l.instruction ?? l.text), note: norm(l.note), id: l.bracket_id ?? null }))
+    .filter(l => l.instruction !== '')
+  const lib = (Array.isArray(libPop?.brackets) ? libPop.brackets : [])
+    .map(b => ({ title: norm(b.bracket), instruction: norm(b.instruction), note: norm(b.note), id: b.id ?? null }))
+    .filter(b => b.instruction !== '')
+  const pairs = []
+  const sheetLeft = []
+  const libLeft = [...lib]
+  for (const l of sheet) {
+    const i = l.id ? libLeft.findIndex(b => b.id === l.id) : -1
+    if (i >= 0) { pairs.push([l, libLeft[i]]); libLeft.splice(i, 1) } else sheetLeft.push(l)
+  }
+  const sheetOnly = []
+  for (const l of sheetLeft) {
+    const i = libLeft.findIndex(b => b.title === l.title && b.instruction === l.instruction && b.note === l.note)
+    if (i >= 0) { pairs.push([l, libLeft[i]]); libLeft.splice(i, 1) } else sheetOnly.push(l)
+  }
+  return { pairs, sheetOnly, libOnly: libLeft }
+}
+
+// What saving ('save': the library becomes the sheet) or replacing ('use': the
+// sheet becomes the library) would change, from the point of view of whatever
+// is being overwritten. Lists hold short band names.
+export function describeDifferences(group, libPop, direction) {
+  const { pairs, sheetOnly, libOnly } = pairBands(group, libPop)
+  const changed = pairs
+    .filter(([s, l]) => s.title !== l.title || s.instruction !== l.instruction || s.note !== l.note)
+    .map(([s]) => bandLabel(s))
+  const save = direction === 'save'
+  return {
+    added: (save ? sheetOnly : libOnly).map(bandLabel),
+    removed: (save ? libOnly : sheetOnly).map(bandLabel),
+    changed,
+    max: norm(group?.dose_max) !== norm(libPop?.max_dose),
+    name: norm(group?.dose_who) !== norm(libPop?.population),
+  }
+}
+
+// One plain sentence for a confirmation, e.g.
+// "adds 1 dose band, removes 1 (“>50kg”), changes the max dose". '' if nothing.
+export function summarizeDifferences(d) {
+  const quoted = list => (list.length > 0 && list.length <= 2 ? ` (${list.map(x => `“${x}”`).join(', ')})` : '')
+  const count = (n, word) => `${n} ${word}${n > 1 ? 's' : ''}`
+  const parts = []
+  if (d.added.length) parts.push(`adds ${count(d.added.length, 'dose band')}${quoted(d.added)}`)
+  if (d.removed.length) parts.push(`removes ${count(d.removed.length, 'dose band')}${quoted(d.removed)}`)
+  if (d.changed.length) parts.push(`changes ${count(d.changed.length, 'dose band')}${quoted(d.changed)}`)
+  if (d.max) parts.push('changes the max dose')
+  if (d.name) parts.push('changes the patient group name')
+  return parts.join(', ')
+}
+
+// ── Near-duplicate dose bands ───────────────────────────────────────────────
+const squash = v => norm(v).toLowerCase().replace(/[–—]/g, '-').replace(/[^\p{L}\p{N}/.<>=≤≥+-]+/gu, '')
+// The numbers and comparison signs in a text. Two bands can only look the same
+// when these are identical: 500mg and 600mg, or >50kg and <50kg, are different.
+const signature = v => (norm(v).replace(/[–—]/g, '-').match(/[<>=≤≥]|\d+(?:\.\d+)?/g) ?? []).join(' ')
+
+function similarity(a, b) {
+  if (a === b) return 1
+  if (!a || !b) return 0
+  const m = a.length, n = b.length
+  let prev = Array.from({ length: n + 1 }, (_, j) => j)
+  for (let i = 1; i <= m; i++) {
+    const cur = [i]
+    for (let j = 1; j <= n; j++) {
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1))
+    }
+    prev = cur
+  }
+  return 1 - prev[n] / Math.max(m, n)
+}
+
+// For each dose band that looks the same as an EARLIER band, the number of that
+// earlier band: { [lineId]: bandNumber }. 'Looks the same' = same title and the
+// wording is identical once case, spaces and punctuation are ignored, or at
+// least 90% alike. Bands without a dose written are ignored.
+export function findNearDuplicateBands(lines) {
+  const out = {}
+  const list = Array.isArray(lines) ? lines : []
+  for (let i = 0; i < list.length; i++) {
+    const a = list[i]
+    const ai = squash(a.instruction ?? a.text)
+    if (!ai) continue
+    for (let j = 0; j < i; j++) {
+      const b = list[j]
+      const bi = squash(b.instruction ?? b.text)
+      if (!bi) continue
+      if (squash(a.bracket_title) !== squash(b.bracket_title)) continue
+      if (signature(a.bracket_title) !== signature(b.bracket_title)) continue
+      if (signature(a.instruction ?? a.text) !== signature(b.instruction ?? b.text)) continue
+      if (ai === bi || similarity(ai, bi) >= 0.9) { out[a.id] = j + 1; break }
+    }
+  }
+  return out
+}

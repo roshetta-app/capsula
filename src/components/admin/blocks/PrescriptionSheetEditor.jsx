@@ -673,6 +673,11 @@ function RowCard({
   // 2026-11-08: removing a drug from the sheet now asks first (it used to go
   // instantly). A drug with alternatives keeps its own box instead.
   const [confirmRemoveRow, setConfirmRemoveRow] = useState(false)
+  // 2026-11-08: the drug editor reports how many of its patient groups are not
+  // saved to the library; closing the row then asks first (it only asks, it
+  // never saves or discards anything by itself).
+  const [unsavedCount, setUnsavedCount] = useState(0)
+  const [confirmLeave, setConfirmLeave] = useState(false)
   const cfg = ROW_TYPE_LABELS[row.row_type] ?? { color: '#9ca3af' }
   const isDrugRow = row.row_type === 'drug'
   const hasAlternatives = isDrugRow && (row.alternatives ?? []).length > 0
@@ -682,6 +687,12 @@ function RowCard({
   }
 
   function handleExpand() {
+    if (expanded && isDrugRow && unsavedCount > 0 && !confirmLeave) {
+      setConfirmLeave(true)
+      return
+    }
+    setConfirmLeave(false)
+    if (expanded) setUnsavedCount(0)
     setExpanded(!expanded)
   }
 
@@ -776,6 +787,43 @@ function RowCard({
         </div>
       </div>
 
+      {confirmLeave && expanded && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
+          padding: '8px 10px', borderBottom: '1px solid var(--color-border)',
+          background: '#FEF3C7',
+        }}>
+          <span style={{ flex: 1, minWidth: 180, fontSize: 13, color: '#B45309' }}>
+            {unsavedCount === 1
+              ? '1 patient group on this drug is not saved to the library.'
+              : `${unsavedCount} patient groups on this drug are not saved to the library.`}
+            {' '}The sheet keeps them either way.
+          </span>
+          <button
+            type="button"
+            onClick={() => setConfirmLeave(false)}
+            style={{
+              padding: '5px 12px', border: 'none', borderRadius: 'var(--radius-md)',
+              background: 'var(--color-accent-solid)', color: '#fff', fontSize: 13, fontWeight: 600,
+              fontFamily: 'var(--font-body)', cursor: 'pointer',
+            }}
+          >
+            Stay
+          </button>
+          <button
+            type="button"
+            onClick={() => { setConfirmLeave(false); setUnsavedCount(0); setExpanded(false) }}
+            style={{
+              padding: '5px 12px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)',
+              background: 'transparent', color: 'var(--color-text-secondary)', fontSize: 13, fontWeight: 500,
+              fontFamily: 'var(--font-body)', cursor: 'pointer',
+            }}
+          >
+            Close anyway
+          </button>
+        </div>
+      )}
+
       {confirmRemoveRow && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
@@ -815,7 +863,7 @@ function RowCard({
         <div style={{ padding: '12px 14px' }}>
           {isDrugRow && (
             <>
-              <UnifiedDrugRowEditor key={row.id} row={row} onChange={handleEditorChange} />
+              <UnifiedDrugRowEditor key={row.id} row={row} onChange={handleEditorChange} onUnsavedChange={setUnsavedCount} />
             </>
           )}
           {row.row_type === 'section' && (
