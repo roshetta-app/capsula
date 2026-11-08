@@ -22,11 +22,12 @@
 
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Plus, AlertTriangle, X } from 'lucide-react'
+import { Plus, AlertTriangle, X, Undo2, Redo2 } from 'lucide-react'
 import { useConditionContext } from '../../context/ConditionContext'
 import { useToast } from '../../context/ToastContext'
 import TagInput from '../../components/admin/TagInput'
 import BlockListEditor from '../../components/admin/BlockListEditor'
+import { usePageUndoRedo } from '../../hooks/usePageUndoRedo'
 import {
   insertCondition,
   updateCondition,
@@ -41,6 +42,32 @@ import {
 
 import { SectionCard, SectionCardHeader, FieldLabel } from './adminSectionPrimitives'
 import AdminPageHeader from './AdminPageHeader'
+
+// ─── Undo / Redo button ───────────────────────────────────────────────────────
+
+function UndoRedoButton({ label, onClick, disabled, children }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      title={label}
+      style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        width: 34, height: 32,
+        borderRadius: 'var(--radius-md)',
+        border: '1px solid var(--color-border)',
+        backgroundColor: 'var(--color-surface)',
+        color: 'var(--color-text-secondary)',
+        cursor: disabled ? 'default' : 'pointer',
+        opacity: disabled ? 0.4 : 1,
+      }}
+    >
+      {children}
+    </button>
+  )
+}
 
 // ─── Text input ───────────────────────────────────────────────────────────────
 
@@ -319,6 +346,31 @@ export default function ConditionEditor() {
   const [saving,  setSaving]  = useState(false)
   const [error,   setError]   = useState(null)
 
+  // ─── Undo / Redo (this editing session only) ──────────────────────────────
+  // 2026-11-09: covers what the Save button saves (details, blocks, tags).
+  // Things saved instantly (library doses, adding a drug to the library, a new
+  // specialty, image file uploads) are not part of it and are never undone.
+  // The content area is rebuilt after an undo or a redo (restoreCount is its
+  // key) because each drug row keeps its own working copy of its data and
+  // would otherwise not show the restored values. 'view' remembers the open
+  // tab and prescription sheet so the rebuild puts you back where you were.
+  const [restoreCount, setRestoreCount] = useState(0)
+  const [view, setView] = useState({ tab: 'rx', sheet: 0 })
+
+  function restorePage(page) {
+    setForm(page.form)
+    setBlocks(page.blocks)
+    setTags(page.tags)
+    setRestoreCount(c => c + 1)
+  }
+
+  const { canUndo, canRedo, undo, redo } = usePageUndoRedo({
+    form, blocks, tags,
+    ready: !loading,
+    disabled: saving,
+    onRestore: restorePage,
+  })
+
   // ─── Load existing condition (edit mode) ──────────────────────────────────
 
   useEffect(() => {
@@ -454,6 +506,9 @@ export default function ConditionEditor() {
     <AdminPageHeader
       title={isEdit ? 'Edit condition' : 'New condition'}
       actions={
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+          <UndoRedoButton label="Undo" onClick={undo} disabled={!canUndo}><Undo2 size={16} /></UndoRedoButton>
+          <UndoRedoButton label="Redo" onClick={redo} disabled={!canRedo}><Redo2 size={16} /></UndoRedoButton>
         <button
           onClick={handleSave}
           disabled={!isValid() || saving}
@@ -469,6 +524,7 @@ export default function ConditionEditor() {
         >
           {saving ? 'Saving…' : 'Save'}
         </button>
+        </div>
       }
     >
         {/* Error banner */}
@@ -628,9 +684,13 @@ export default function ConditionEditor() {
         <SectionCardHeader>Content Blocks</SectionCardHeader>
         <SectionCard>
           <BlockListEditor
+            key={restoreCount}
             blocks={blocks}
             onChange={setBlocks}
             disabled={saving}
+            initialTab={view.tab}
+            initialSheetIndex={view.sheet}
+            onViewChange={(tab, sheet) => setView(prev => (prev.tab === tab && prev.sheet === sheet ? prev : { tab, sheet }))}
           />
         </SectionCard>
 

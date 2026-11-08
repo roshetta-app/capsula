@@ -671,10 +671,16 @@ function BlockCardList({ items, disabled, onMoveUp, onMoveDown, onDelete, render
 
 // ─── Main export ──────────────────────────────────────────────────────────────
 
-export default function BlockListEditor({ blocks = [], onChange, disabled = false }) {
+export default function BlockListEditor({ blocks = [], onChange, disabled = false, initialTab = 'rx', initialSheetIndex = 0, onViewChange }) {
   // Rx is now the default active tab (was 'clinical')
-  const [activeTab, setActiveTab] = useState('rx')
-  const [activeSheetIndex, setActiveSheetIndex] = useState(0)
+  // 2026-11-09: initialTab / initialSheetIndex let the page editor put this view
+  // back where it was after an undo or redo rebuilds the list; onViewChange
+  // reports every tab or sheet change so the editor knows where it was.
+  const [activeTab, setActiveTab] = useState(initialTab)
+  const [activeSheetIndex, setActiveSheetIndex] = useState(initialSheetIndex)
+  useEffect(() => {
+    if (onViewChange) onViewChange(activeTab, activeSheetIndex)
+  }, [activeTab, activeSheetIndex]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleTabChange(tab) {
     setActiveTab(tab)
