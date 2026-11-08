@@ -3219,7 +3219,7 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
           if (blankPop) {
             setGroupSaveError({
               groupIdx,
-              message: 'This drug already has an unnamed patient group in the library. Name it before saving another one blank.',
+              message: 'Another patient group in the library is already unnamed, so this one needs a name.',
             })
             return
           }
@@ -3230,28 +3230,10 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
         // scratch, or the linked one was deleted upstream) — fall back to
         // matching/creating by name or blank, same as before.
         //
-        // OPTIONAL POPULATION NAME (2026-08-08): a formulation may have at
-        // most one population with a blank name at any time. Checked
-        // against the REAL current library state just fetched above, not
-        // stale local data — if dose_who was left blank here but the
-        // library already has an unnamed population (created here or in
-        // the formulation editor, doesn't matter which), block and ask the
-        // admin to name the existing one first, rather than silently
-        // merging into it or creating a second unnamed population.
-        if (!typedWho) {
-          const blankPop = populations.find(p => !p.population?.trim())
-          if (blankPop) {
-            setGroupSaveError({
-              groupIdx,
-              message: 'This drug already has an unnamed patient group in the library. Name it before saving another one blank.',
-            })
-            return
-          }
-          // no existing populations, or none are blank — safe to save as
-          // the one allowed blank population, same as the named-match
-          // logic below, just with population: '' instead of typedWho.
-        }
-
+        // 2026-11-08: a blank patient group no longer errors when the library
+        // already has an unnamed one. Like a named group joining the library
+        // group with the same name, it joins that unnamed group (the save
+        // prompt tells the admin this before anything is written).
         targetPopulation = typedWho
           ? populations.find(p => p.population?.trim().toLowerCase() === typedWho.toLowerCase())
           : populations.find(p => !p.population?.trim())
@@ -3854,7 +3836,19 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
 
                   {confirmSaveGroup === groupIdx && (
                     <ConfirmBar
-                      text={`Save ${popRef}${contents ? ` (${contents})` : ''} to the drug library for everyone? Other patient groups are not changed.`}
+                      text={(() => {
+                        const libPops = libraryDoses[firstOpt.formulation_id]
+                        const wanted = (group.dose_who ?? '').trim().toLowerCase()
+                        const linked = group.dose_max_population_id && Array.isArray(libPops)
+                          ? libPops.find(pp => pp.id === group.dose_max_population_id) : null
+                        const joins = !linked && Array.isArray(libPops)
+                          ? libPops.find(pp => (pp.population ?? '').trim().toLowerCase() === wanted) : null
+                        if (joins) {
+                          const joinName = (joins.population ?? '').trim()
+                          return `The library already has ${joinName ? `a patient group “${joinName}”` : 'an unnamed patient group'} for this drug. Saving adds ${contents || 'this dose'} to it, for everyone. Other patient groups are not changed.`
+                        }
+                        return `Save ${popRef}${contents ? ` (${contents})` : ''} to the drug library for everyone? Other patient groups are not changed.`
+                      })()}
                       confirmLabel="Save"
                       danger={false}
                       onConfirm={() => { setConfirmSaveGroup(null); saveDoseToLibrary(groupIdx) }}
@@ -3910,7 +3904,17 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                     <span style={{ fontSize: 12, color: 'var(--color-accent)' }}>Deleted from the library</span>
                   )}
                   {groupSaveError?.groupIdx === groupIdx && (
-                    <span style={{ fontSize: 12, color: '#ef4444' }}>{groupSaveError.message}</span>
+                    <span style={{ display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: 12, color: '#ef4444' }}>
+                      <span style={{ flex: 1 }}>{groupSaveError.message}</span>
+                      <button
+                        type="button"
+                        onClick={() => setGroupSaveError(null)}
+                        aria-label="Dismiss"
+                        style={{ border: 'none', background: 'none', padding: 0, color: '#ef4444', cursor: 'pointer', lineHeight: 0 }}
+                      >
+                        <X size={13} />
+                      </button>
+                    </span>
                   )}
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
