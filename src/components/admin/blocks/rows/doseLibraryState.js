@@ -53,6 +53,21 @@ export function libraryHasDose(libraryPops) {
     (Array.isArray(p.brackets) && p.brackets.length > 0) || norm(p.max_dose) !== '')
 }
 
+// The library group a patient group on the sheet belongs to: the one it is
+// linked to by id, or else the one with the same patient group name (a blank
+// name matches the library's unnamed group). A dose typed by hand, copied from
+// an older sheet, or whose link was lost is still recognised this way, so it is
+// not wrongly treated as 'not in library' and saved a second time.
+export function findLibraryPopulation(group, libraryPops) {
+  if (!Array.isArray(libraryPops)) return null
+  if (group?.dose_max_population_id) {
+    const byId = libraryPops.find(p => p.id === group.dose_max_population_id)
+    if (byId) return byId
+  }
+  const wanted = norm(group?.dose_who).toLowerCase()
+  return libraryPops.find(p => norm(p.population).toLowerCase() === wanted) ?? null
+}
+
 // The state of a patient group compared with the library:
 //   null            nothing to say (library not loaded yet, or nothing typed)
 //   'new'           not in the library
@@ -64,9 +79,7 @@ export function libraryHasDose(libraryPops) {
 export function groupLibraryState(group, libraryPops) {
   if (!Array.isArray(libraryPops)) return null
   if (!groupHasDose(group)) return null
-  const libPop = group?.dose_max_population_id
-    ? libraryPops.find(p => p.id === group.dose_max_population_id)
-    : null
+  const libPop = findLibraryPopulation(group, libraryPops)
   if (!libPop) return 'new'
   const sheetFp = fingerprintGroup(group)
   const libFp = fingerprintLibraryPopulation(libPop)
@@ -93,4 +106,39 @@ export function stateActions(state) {
     save: state === 'new' || state === 'you_changed' || state === 'both' || state === 'differs',
     useLibrary: state === 'library_newer' || state === 'both' || state === 'differs',
   }
+}
+
+// Builds the library group's bands when saving a patient group from the sheet.
+// The result is exactly the sheet's bands, in the sheet's order. A band keeps
+// its library id when the sheet line is linked to one, or when it has the same
+// wording as a library band that no other line has claimed; only genuinely new
+// wording gets a new id. So saving can never add the same band twice.
+// Returns { nextBrackets, stamped } where stamped maps sheet line id -> library band id.
+export function mergeBandsForSave(existingBrackets, lines, makeId) {
+  const existing = Array.isArray(existingBrackets) ? existingBrackets : []
+  const used = new Set()
+  const nextBrackets = []
+  const stamped = {}
+  const same = (b, l) =>
+    norm(b.bracket) === norm(l.bracket_title) &&
+    norm(b.instruction) === norm(l.instruction) &&
+    norm(b.note) === norm(l.note)
+  for (const line of lines) {
+    const match =
+      (line.bracket_id && !used.has(line.bracket_id)
+        ? existing.find(b => b.id === line.bracket_id) : null)
+      ?? existing.find(b => !used.has(b.id) && same(b, line))
+    const fields = { bracket: line.bracket_title ?? '', instruction: line.instruction ?? '', note: line.note ?? '' }
+    if (match) {
+      used.add(match.id)
+      nextBrackets.push({ ...match, ...fields })
+      stamped[line.id] = match.id
+    } else {
+      const id = makeId()
+      used.add(id)
+      nextBrackets.push({ id, ...fields })
+      stamped[line.id] = id
+    }
+  }
+  return { nextBrackets, stamped }
 }

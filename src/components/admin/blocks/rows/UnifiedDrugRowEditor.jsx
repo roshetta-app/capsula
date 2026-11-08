@@ -175,7 +175,7 @@ import { Plus, X, Library, RotateCcw, Edit2, Check, ChevronDown, MoreHorizontal 
 import DrugPickerModal from '../../DrugPickerModal'
 import { useDrugContext } from '../../../../context/DrugContext'
 import {
-  fingerprintLibraryPopulation, groupLibraryState, STATE_WORDS, stateActions,
+  fingerprintLibraryPopulation, groupLibraryState, findLibraryPopulation, mergeBandsForSave, STATE_WORDS, stateActions,
 } from './doseLibraryState'
 import DrugSearchField from '../../DrugSearchField'
 import SharedDrugCard from '../../../SharedDrugCard'
@@ -2606,7 +2606,7 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
   async function deleteDoseFromLibrary(groupIdx) {
     const group = groups[groupIdx]
     const formulationId = group.options[0]?.formulation_id
-    const libId = group.dose_max_population_id
+    const libId = group.dose_max_population_id ?? findLibraryPopulation(group, libraryDoses[formulationId])?.id
     if (!formulationId || !libId) return
     setDeletingLibGroupIdx(groupIdx)
     setGroupSaveError(null)
@@ -2911,9 +2911,7 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
       rememberLibrary(formulationId, libPops)
       // 2026-11-08: a group that is already linked to a library group takes
       // that group's version directly, with no question about which one.
-      const linkedPop = group.dose_max_population_id
-        ? libPops.find(p => p.id === group.dose_max_population_id)
-        : null
+      const linkedPop = findLibraryPopulation(group, libPops)
       if (linkedPop) {
         applyDoseToGroup(groupIdx, buildDoseLinesFromPopulation(linkedPop))
         return
@@ -2976,16 +2974,17 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
       // instead (as below) would treat a rename as "no population found,"
       // creating a DUPLICATE population with copied brackets rather than
       // updating the one this dose actually came from.
-      let targetPopulation = group.dose_max_population_id
-        ? populations.find(p => p.id === group.dose_max_population_id)
-        : null
+      // 2026-11-08: the library group is found by link first, then by the same
+      // patient group name (see findLibraryPopulation), so a dose that lost its
+      // link, or was typed by hand, updates the existing library group instead
+      // of adding its bands a second time.
+      let targetPopulation = findLibraryPopulation(group, populations)
       let isNewPopulation = false
 
       if (targetPopulation) {
         // OPTIONAL POPULATION NAME (2026-08-08): still enforce at-most-one-
         // blank if the admin is blanking this population out, but exclude
-        // itself from the "already blank" check — it's the same population
-        // staying/becoming blank, not a second one.
+        // itself from the "already blank" check.
         if (!typedWho) {
           const blankPop = populations.find(p => !p.population?.trim() && p.id !== targetPopulation.id)
           if (blankPop) {
@@ -2998,52 +2997,25 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
         }
         targetPopulation = { ...targetPopulation, population: typedWho || '' }
       } else {
-        // Not linked to a real population (brand-new dose built from
-        // scratch, or the linked one was deleted upstream) — fall back to
-        // matching/creating by name or blank, same as before.
-        //
-        // 2026-11-08: a blank patient group no longer errors when the library
-        // already has an unnamed one. Like a named group joining the library
-        // group with the same name, it joins that unnamed group (the save
-        // prompt tells the admin this before anything is written).
-        targetPopulation = typedWho
-          ? populations.find(p => p.population?.trim().toLowerCase() === typedWho.toLowerCase())
-          : populations.find(p => !p.population?.trim())
-        if (!targetPopulation) {
-          targetPopulation = {
-            id: `pop-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-            population: typedWho || '',
-            max_dose: '',
-            brackets: [],
-          }
-          isNewPopulation = true
+        targetPopulation = {
+          id: `pop-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          population: typedWho || '',
+          max_dose: '',
+          brackets: [],
         }
+        isNewPopulation = true
       }
 
-      // 2026-11-08 RESTRUCTURE: saving a patient group that is already linked
-      // to a library group makes the library group exactly what the sheet
-      // shows, so a dose band removed on the sheet is removed from the library
-      // too (this replaces the old per-band 'delete from library'). A group
-      // that only joins a library group with the same name keeps what the
-      // library already has and adds to it, as the confirmation says.
-      const isLinked = !!(group.dose_max_population_id && populations.some(p => p.id === group.dose_max_population_id))
-      const stampedBracketIds = {} // local line id -> library bracket id, applied after a successful save
-      const existingBrackets = Array.isArray(targetPopulation.brackets) ? targetPopulation.brackets : []
-      const nextBrackets = isLinked ? [] : [...existingBrackets]
-      for (const line of linesToSave) {
-        const pool = isLinked ? existingBrackets : nextBrackets
-        const match = line.bracket_id ? pool.find(b => b.id === line.bracket_id) : null
-        if (match) {
-          const updated = { ...match, bracket: line.bracket_title ?? '', instruction: line.instruction ?? '', note: line.note ?? '' }
-          if (isLinked) nextBrackets.push(updated)
-          else nextBrackets[nextBrackets.findIndex(b => b.id === match.id)] = updated
-          stampedBracketIds[line.id] = match.id
-        } else {
-          const newBracketId = `bracket-${Date.now()}-${Math.random().toString(36).slice(2)}`
-          nextBrackets.push({ id: newBracketId, bracket: line.bracket_title ?? '', instruction: line.instruction ?? '', note: line.note ?? '' })
-          stampedBracketIds[line.id] = newBracketId
-        }
-      }
+      // RESTRUCTURE (2026-11-08): saving makes the library group exactly what
+      // the sheet shows, so a dose band removed on the sheet is removed from the
+      // library too. A band keeps its library id when it is linked to one, or
+      // when it has the same wording as a band the library already holds (so
+      // nothing is ever added twice).
+      const { nextBrackets, stamped: stampedBracketIds } = mergeBandsForSave(
+        targetPopulation.brackets,
+        linesToSave,
+        () => `bracket-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      )
 
       const savedPopulation = { ...targetPopulation, max_dose: group.dose_max?.trim() || '', brackets: nextBrackets }
       const nextStructured = isNewPopulation
@@ -3056,35 +3028,12 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
         return
       }
 
-      // When the group joined an existing library group, the sheet takes on
-      // everything that group now holds, in the library's order, so the sheet
-      // and the library match right after the save.
-      const joinedExisting = !isLinked && !isNewPopulation
-      const nextGroups = groups.map((g, gi) => {
-        if (gi !== groupIdx) return g
-        const stamped = (g.dose_lines ?? []).map(l => stampedBracketIds[l.id] ? { ...l, bracket_id: stampedBracketIds[l.id] } : l)
-        let nextLines = stamped
-        if (joinedExisting) {
-          const lineByBracket = {}
-          stamped.forEach(l => { if (l.bracket_id) lineByBracket[l.bracket_id] = l })
-          nextLines = nextBrackets
-            .filter(b => b.instruction?.trim())
-            .map(b => lineByBracket[b.id] ?? ({
-              id: `line-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-              bracket_id: b.id,
-              bracket_title: b.bracket?.trim() || null,
-              instruction: b.instruction.trim(),
-              text: null,
-              note: b.note?.trim() || null,
-            }))
-        }
-        return {
-          ...g,
-          dose_max_population_id: savedPopulation.id,
-          dose_library_base: fingerprintLibraryPopulation(savedPopulation),
-          dose_lines: nextLines,
-        }
-      })
+      const nextGroups = groups.map((g, gi) => gi !== groupIdx ? g : ({
+        ...g,
+        dose_max_population_id: savedPopulation.id,
+        dose_library_base: fingerprintLibraryPopulation(savedPopulation),
+        dose_lines: (g.dose_lines ?? []).map(l => stampedBracketIds[l.id] ? { ...l, bracket_id: stampedBracketIds[l.id] } : l),
+      }))
       const nextRaw = nextGroups.map(unprojectGroup)
       setRawGroups(nextRaw)
       onChange(fromDrugOptions(row, nextRaw))
@@ -3510,7 +3459,7 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                     const libState = firstOpt.formulation_id ? groupLibraryState(group, libPops) : null
                     const actions = stateActions(libState)
                     const canSaveGroup = (group.dose_lines ?? []).some(l => l.instruction?.trim())
-                    const inLibrary = !!(group.dose_max_population_id && Array.isArray(libPops) && libPops.some(p => p.id === group.dose_max_population_id))
+                    const inLibrary = !!findLibraryPopulation(group, libPops)
                     const cap = { padding: '6px 12px 2px', fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-body)' }
                     return (
                       <>
@@ -3636,17 +3585,10 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                       text={(() => {
                         const libPops = libraryDoses[firstOpt.formulation_id]
                         const libStateNow = groupLibraryState(group, libPops)
-                        const wanted = (group.dose_who ?? '').trim().toLowerCase()
-                        const linked = group.dose_max_population_id && Array.isArray(libPops)
-                          ? libPops.find(pp => pp.id === group.dose_max_population_id) : null
-                        const joins = !linked && Array.isArray(libPops)
-                          ? libPops.find(pp => (pp.population ?? '').trim().toLowerCase() === wanted) : null
-                        if (joins) {
-                          const joinName = (joins.population ?? '').trim()
-                          return `The library already has ${joinName ? `a patient group “${joinName}”` : 'an unnamed patient group'} for this drug. Saving adds ${contents || 'this dose'} to it, for everyone. Other patient groups are not changed.`
-                        }
-                        if (linked) {
-                          return `Save ${popRef}${contents ? ` (${contents})` : ''} to the drug library for everyone? The library version becomes exactly what this sheet shows${libStateNow === 'both' ? ' (it was also changed in the library, and those changes are replaced)' : ''}. Other patient groups are not changed.`
+                        const target = findLibraryPopulation(group, libPops)
+                        if (target) {
+                          const tName = (target.population ?? '').trim()
+                          return `Save ${popRef}${contents ? ` (${contents})` : ''} to the drug library for everyone? The library's ${tName ? `“${tName}”` : 'unnamed'} patient group becomes exactly what this sheet shows${libStateNow === 'both' ? ' (it was also changed in the library, and those changes are replaced)' : ''}. Other patient groups are not changed.`
                         }
                         return `Save ${popRef}${contents ? ` (${contents})` : ''} to the drug library for everyone? Other patient groups are not changed.`
                       })()}
