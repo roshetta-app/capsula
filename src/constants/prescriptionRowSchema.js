@@ -224,6 +224,11 @@ export const DRUG_ROW_TEMPLATE = {
   // be safely saved back. Requires DoseRowList.jsx's population id
   // backfill fix to be in place for any given formulation.
   dose_max_population_id: null,
+  // 2026-11-08: a short fingerprint of the library version this patient group
+  // was last copied from, saved to, or replaced with (null if unknown, e.g.
+  // older sheets). It lets the editor tell 'you changed this' from 'the
+  // library has a newer version'.
+  dose_library_base: null,
   // 2026-11-08: more populations for this same drug (Adult is the fields above,
   // Child etc. live here). Each: { id, dose_who, dose_lines, dose_max,
   // dose_max_population_id }. The app shows one population at a time.
@@ -341,6 +346,7 @@ export const ALTERNATIVE_DRUG_TEMPLATE = {
   group_note: null,
   group_dose_max: null,
   group_dose_max_population_id: null,
+  group_dose_library_base: null, // mirrors dose_library_base for this group
   group_extra_populations: [],
   group_shown_population: 0,
   // OR/AND DIVIDER TOGGLE ADDENDUM (2026-08-08): the word shown on the
@@ -564,6 +570,8 @@ export function promoteAlternativeToMain(row, alternativeIndex) {
   // MAX-DOSE SAVE-TO-LIBRARY ADDENDUM (2026-08-06): mirrors promotedDoseMax
   // immediately above exactly.
   const promotedDoseMaxPopulationId = chosen.group_dose_max_population_id ?? row.dose_max_population_id ?? null;
+  // 2026-11-08: the remembered library version travels with the max-dose link.
+  const promotedDoseLibraryBase = chosen.group_dose_library_base ?? row.dose_library_base ?? null;
   const promotedExtraPopulations = (chosen.dose_lines?.length ? chosen.group_extra_populations : row.extra_populations) ?? [];
   const promotedShownPopulation = (chosen.dose_lines?.length ? chosen.group_shown_population : row.shown_population) ?? 0;
 
@@ -584,6 +592,7 @@ export function promoteAlternativeToMain(row, alternativeIndex) {
     dose_lines: promotedDoseLines,
     dose_max: promotedDoseMax,
     dose_max_population_id: promotedDoseMaxPopulationId,
+    dose_library_base: promotedDoseLibraryBase,
     extra_populations: promotedExtraPopulations,
     shown_population: promotedShownPopulation,
     note: promotedNote,
@@ -714,6 +723,9 @@ export const DRUG_OPTION_TEMPLATE = {
  * @property {string|null} dose_max_population_id
  *   - MAX-DOSE SAVE-TO-LIBRARY ADDENDUM (2026-08-06). Mirrors
  *     DrugRow.dose_max_population_id.
+ * @property {string|null} dose_library_base
+ *   - 2026-11-08. Mirrors DrugRow.dose_library_base: the library version this
+ *     patient group was last copied from or saved to.
  * @property {string|null} note
  */
 
@@ -785,6 +797,7 @@ export function toDrugOptions(row) {
     // MAX-DOSE SAVE-TO-LIBRARY ADDENDUM (2026-08-06): mirrors 'dose_max'
     // immediately above.
     dose_max_population_id: row.dose_max_population_id ?? null,
+    dose_library_base: row.dose_library_base ?? null,
     extra_populations: row.extra_populations ?? [],
     shown_population: row.shown_population ?? 0,
     note: row.note,
@@ -870,6 +883,7 @@ export function toDrugOptions(row) {
       // MAX-DOSE SAVE-TO-LIBRARY ADDENDUM (2026-08-06): mirrors 'dose_max'
       // immediately above.
       dose_max_population_id: alt.group_dose_max_population_id ?? null,
+      dose_library_base: alt.group_dose_library_base ?? null,
       extra_populations: alt.group_extra_populations ?? [],
       shown_population: alt.group_shown_population ?? 0,
       // PHASE A BUG FIX (2026-06-26): no longer falls back to alt.note.
@@ -976,6 +990,7 @@ export function fromDrugOptions(row, groups) {
       // MAX-DOSE SAVE-TO-LIBRARY ADDENDUM (2026-08-06): mirrors
       // group_dose_max immediately above.
       group_dose_max_population_id: sharesMainGroup ? null : (grp.dose_max_population_id ?? null),
+      group_dose_library_base: sharesMainGroup ? null : (grp.dose_library_base ?? null),
       group_extra_populations: sharesMainGroup ? [] : (grp.extra_populations ?? []),
       group_shown_population: sharesMainGroup ? 0 : (grp.shown_population ?? 0),
     };
@@ -1001,6 +1016,7 @@ export function fromDrugOptions(row, groups) {
     // MAX-DOSE SAVE-TO-LIBRARY ADDENDUM (2026-08-06): mirrors 'dose_max'
     // immediately above.
     dose_max_population_id: mainGrp.dose_max_population_id ?? null,
+    dose_library_base: mainGrp.dose_library_base ?? null,
     extra_populations: mainGrp.extra_populations ?? [],
     shown_population: mainGrp.shown_population ?? 0,
     note: mainGrp.note,
