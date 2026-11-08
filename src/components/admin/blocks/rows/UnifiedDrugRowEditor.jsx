@@ -173,6 +173,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { Plus, X, Library, RotateCcw, Edit2, Check, ChevronDown, MoreHorizontal } from 'lucide-react'
 import DrugPickerModal from '../../DrugPickerModal'
+import { useDrugContext } from '../../../../context/DrugContext'
 import DrugSearchField from '../../DrugSearchField'
 import SharedDrugCard from '../../../SharedDrugCard'
 import { useCategories } from '../../../../hooks/useCategories'
@@ -2573,8 +2574,20 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
   // What the library currently holds for each drug on this sheet, so each
   // patient group can show "In library / Changed / Not in library".
   const [libraryDoses, setLibraryDoses] = useState({}) // formulationId -> populations[]
-  const rememberLibrary = (formulationId, populations) =>
+  // 2026-11-08: every change to the drug library also refreshes the app's saved
+  // drug list, which is what the drug picker (e.g. a drug added in a new block)
+  // reads its doses from. Without this, a dose band deleted from the library
+  // kept coming back when the same drug was added again. One refresh at a time.
+  const { refresh: refreshDrugList } = useDrugContext()
+  const drugListRefreshing = useRef(false)
+  const rememberLibrary = (formulationId, populations) => {
     setLibraryDoses(prev => ({ ...prev, [formulationId]: populations }))
+    if (drugListRefreshing.current) return
+    drugListRefreshing.current = true
+    Promise.resolve(refreshDrugList())
+      .catch(() => {})
+      .finally(() => { drugListRefreshing.current = false })
+  }
   const libraryIdsKey = [...new Set(rawGroups.map(g => g.options?.[0]?.formulation_id).filter(Boolean))].join('|')
   useEffect(() => {
     let cancelled = false
