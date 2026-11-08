@@ -622,7 +622,6 @@ function SectionRowEditor({ row, onChange, onMoveDrugOut, disabled = false }) {
                 onChange={nextRow => updateRow(idx, nextRow)}
                 onMove={moveRow}
                 onDeleteRequest={handleDeleteRequest}
-                onAddPopulation={() => insertRowAt(idx + 1, makeAnotherPopulationRow(drug))}
                 isNested
                 onMoveOut={() => onMoveDrugOut(idx)}
                 disabled={disabled}
@@ -655,20 +654,8 @@ function SectionRowEditor({ row, onChange, onMoveDrugOut, disabled = false }) {
 }
 
 
-// 2026-11-08: "Add another population" — the same drug again as a new row,
-// with the drug identity copied and everything else (dose, population, notes,
-// alternatives) left blank, so it can carry its own population and doses.
-function makeAnotherPopulationRow(row) {
-  const copy = { ...DRUG_ROW_TEMPLATE, id: nanoid() }
-  for (const key of ['brand_name', 'brand_id', 'generic_name', 'generic_id', 'formulation_id',
-    'concentration', 'form', 'route', 'category', 'source_flag', 'drug_link_enabled']) {
-    if (row[key] !== undefined) copy[key] = row[key]
-  }
-  return copy
-}
-
 function RowCard({
-  row, idx, total, onChange, onMove, onDeleteRequest, onAddPopulation = null,
+  row, idx, total, onChange, onMove, onDeleteRequest,
   isNested = false, onMoveOut = null,
   sections = [], onMoveIntoSection = null,
   onMoveDrugOutOfSection = null,
@@ -815,26 +802,6 @@ function RowCard({
           {isDrugRow && (
             <>
               <UnifiedDrugRowEditor key={row.id} row={row} onChange={handleEditorChange} />
-              {onAddPopulation && !disabled && (row.brand_id || row.generic_id || row.formulation_id || row.brand_name) && (
-                <button
-                  type="button"
-                  onClick={onAddPopulation}
-                  style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                    width: '100%', boxSizing: 'border-box', marginTop: 10, padding: '9px 10px',
-                    border: '1.5px dashed var(--color-border)', borderRadius: 10,
-                    background: 'none', color: 'var(--color-text-secondary)',
-                    fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-body)', cursor: 'pointer',
-                  }}
-                >
-                  + Add another population
-                </button>
-              )}
-              {onAddPopulation && !disabled && (row.brand_id || row.generic_id || row.formulation_id || row.brand_name) && (
-                <div style={{ marginTop: 4, fontSize: 12, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-body)' }}>
-                  Adds this drug again as a new row just below, with a blank dose, for another population.
-                </div>
-              )}
             </>
           )}
           {row.row_type === 'section' && (
@@ -1075,7 +1042,6 @@ export default function PrescriptionSheetEditor({ block, onChange, disabled = fa
                 onChange={nextRow => updateRow(idx, nextRow)}
                 onMove={moveRow}
                 onDeleteRequest={handleDeleteRequest}
-                onAddPopulation={() => insertRowAt(idx + 1, makeAnotherPopulationRow(row))}
                 sections={sections}
                 onMoveIntoSection={sectionId => moveDrugIntoSection(idx, sectionId)}
                 onMoveDrugOutOfSection={drugIdx => moveDrugOutOfSection(idx, drugIdx)}

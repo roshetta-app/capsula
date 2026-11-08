@@ -903,6 +903,13 @@ function EditableMaxDose({
 // working unchanged, the editor looks at the group through projectGroup() —
 // the chosen population's fields appear as the group's dose fields — and
 // unprojectGroup() folds any change back into the right population.
+// A bracket / population with nothing typed in it yet. Used to stop empty ones
+// being added (a new one is not created while an empty one is waiting).
+const isDoseLineEmpty = l =>
+  !l.bracket_title?.trim() && !l.instruction?.trim() && !l.note?.trim() && !l.text?.trim()
+const isPopulationEmpty = p =>
+  !(p.dose_lines ?? []).some(l => !isDoseLineEmpty(l)) && !p.dose_max?.trim() && !p.dose?.trim()
+
 function projectGroup(g, pi) {
   if (!pi) return { ...g, _pi: 0 }
   const ex = (g.extra_populations ?? [])[pi - 1] ?? {}
@@ -2526,6 +2533,7 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
   const [confirmClearGroup, setConfirmClearGroup] = useState(null) // groupIdx | null
   const [confirmRemovePop, setConfirmRemovePop] = useState(null) // groupIdx | null
   const [confirmDeleteLibPop, setConfirmDeleteLibPop] = useState(null) // groupIdx | null
+  const [emptyPopWarnIdx, setEmptyPopWarnIdx] = useState(null) // groupIdx | null
   const [deletingLibGroupIdx, setDeletingLibGroupIdx] = useState(null)
   const [deletedLibGroupIdx, setDeletedLibGroupIdx] = useState(null)
 
@@ -2561,6 +2569,17 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
   // ── Populations inside one drug ──
   function addPopulation(groupIdx) {
     const g = rawGroups[groupIdx]
+    // No new population while one is still empty: jump to the empty one instead.
+    const allPops = [g, ...(g.extra_populations ?? [])]
+    const emptyAt = allPops.findIndex(isPopulationEmpty)
+    if (emptyAt >= 0) {
+      setActivePops(prev => ({ ...prev, [g.group_id]: emptyAt }))
+      setOpenEditorId(null)
+      setEmptyPopWarnIdx(groupIdx)
+      setTimeout(() => setEmptyPopWarnIdx(cur => cur === groupIdx ? null : cur), 5000)
+      return
+    }
+    setEmptyPopWarnIdx(null)
     const extras = [...(g.extra_populations ?? []), {
       id: `popx-${Date.now()}-${Math.random().toString(36).slice(2)}`,
       dose_who: null, dose_lines: [], dose_max: null, dose_max_population_id: null,
@@ -2573,6 +2592,7 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
   }
 
   function selectPopulation(groupIdx, position) {
+    setEmptyPopWarnIdx(null)
     setActivePops(prev => ({ ...prev, [rawGroups[groupIdx].group_id]: position }))
     setOpenEditorId(null)
   }
@@ -2794,6 +2814,9 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
   // pre-existing legacy line on its first edit.
   function addBracket(groupIdx) {
     const group = groups[groupIdx]
+    // No new bracket while an empty one is waiting: open that one instead.
+    const waiting = (group.dose_lines ?? []).find(isDoseLineEmpty)
+    if (waiting) { setOpenEditorId(waiting.id); return }
     const newLineId = `line-${Date.now()}-${Math.random().toString(36).slice(2)}`
     const carryLegacyText = (group.dose_lines ?? []).length === 0
     const newLine = {
@@ -3617,6 +3640,12 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                     )
                   })()}
 
+                  {emptyPopWarnIdx === groupIdx && (
+                    <span style={{ fontSize: 12, color: '#ef4444' }}>
+                      Fill in this population (a bracket or a max dose) before adding another.
+                    </span>
+                  )}
+
                   {confirmDeleteLibPop === groupIdx && (
                     <div style={{
                       display: 'flex', flexDirection: 'column', gap: 8,
@@ -3805,7 +3834,11 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                           index={lineIdx}
                           isOpen={openEditorId === line.id}
                           onOpen={() => setOpenEditorId(line.id)}
-                          onClose={() => setOpenEditorId(null)}
+                          onClose={() => {
+                            // Done on a bracket with nothing in it drops it.
+                            if (isDoseLineEmpty(line) && !line.bracket_id) removeDoseLine(groupIdx, line.id)
+                            setOpenEditorId(null)
+                          }}
                         />
                       )
                     })}
@@ -3837,7 +3870,11 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                       onRemove={() => { setOpenEditorId(null); updateGroupDoseMax(groupIdx, null) }}
                       isOpen={openEditorId === `max-${groupIdx}`}
                       onOpen={() => setOpenEditorId(`max-${groupIdx}`)}
-                      onClose={() => setOpenEditorId(null)}
+                      onClose={() => {
+                        // Done on an empty max dose leaves no max dose behind.
+                        if (!group.dose_max?.trim()) updateGroupDoseMax(groupIdx, null)
+                        setOpenEditorId(null)
+                      }}
                       canSaveToLibrary={!!(group.dose_max_population_id && firstOpt.formulation_id)}
                       isConfirming={confirmSaveMaxDose === groupIdx}
                       onRequestSave={() => setConfirmSaveMaxDose(groupIdx)}
