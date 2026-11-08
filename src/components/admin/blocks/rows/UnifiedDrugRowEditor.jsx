@@ -585,6 +585,31 @@ const doseClosedRowStyle = {
   fontFamily: 'var(--font-body)',
 }
 
+// One-tap "are you sure?" bar used before every delete or restore, so they all
+// look and behave the same.
+function ConfirmBar({ text, confirmLabel = 'Remove', danger = true, onConfirm, onCancel }) {
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', gap: 8,
+      padding: '10px 12px', borderRadius: 10,
+      border: `1px solid ${danger ? '#ef4444' : 'var(--color-accent)'}`,
+      backgroundColor: danger ? '#ef444410' : '#EFF6FF',
+    }}>
+      <span style={{ fontSize: 13, color: 'var(--color-text-primary)' }}>{text}</span>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button
+          type="button"
+          onClick={onConfirm}
+          style={{ ...dosePrimaryButtonStyle, background: danger ? '#ef4444' : 'var(--color-accent-solid)' }}
+        >
+          {confirmLabel}
+        </button>
+        <button type="button" onClick={onCancel} style={doseSecondaryButtonStyle}>Cancel</button>
+      </div>
+    </div>
+  )
+}
+
 // Confirm / saving / saved / error messages shared by a bracket and the max
 // dose, so the two never drift apart again.
 function DoseSaveFeedback({
@@ -640,6 +665,7 @@ function EditableDoseLine({
   }
 
   const [showNote, setShowNote] = useState(false)
+  const [confirmRemove, setConfirmRemove] = useState(false)
   const displayInstruction = doseLineInstructionText(line)
   const isEmpty = !line.bracket_title && !displayInstruction && !line.note
   const number = index + 1
@@ -715,11 +741,22 @@ function EditableDoseLine({
                 Save to library
               </button>
             )}
-            <button type="button" onClick={onRemove} style={doseDangerButtonStyle}>
+            <button
+              type="button"
+              onClick={() => (isEmpty ? onRemove() : setConfirmRemove(true))}
+              style={doseDangerButtonStyle}
+            >
               <X size={13} />
               Remove
             </button>
           </div>
+          {confirmRemove && (
+            <ConfirmBar
+              text="Remove this bracket from this sheet?"
+              onConfirm={() => { setConfirmRemove(false); onRemove() }}
+              onCancel={() => setConfirmRemove(false)}
+            />
+          )}
         </div>
       ) : (
         <button type="button" onClick={open} aria-label={`Edit bracket ${number}`} style={doseClosedRowStyle}>
@@ -824,6 +861,7 @@ function EditableMaxDose({
 }) {
   // 2026-11-08 REDESIGN: same one-open-at-a-time rule and same always-visible
   // buttons as EditableDoseLine; open/closed comes from the card above.
+  const [confirmRemove, setConfirmRemove] = useState(false)
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       {isOpen ? (
@@ -856,12 +894,19 @@ function EditableMaxDose({
               </button>
             )}
             {value && (
-              <button type="button" onClick={onRemove} style={doseDangerButtonStyle}>
+              <button type="button" onClick={() => setConfirmRemove(true)} style={doseDangerButtonStyle}>
                 <X size={13} />
                 Remove
               </button>
             )}
           </div>
+          {confirmRemove && (
+            <ConfirmBar
+              text="Remove the max dose from this sheet?"
+              onConfirm={() => { setConfirmRemove(false); onRemove() }}
+              onCancel={() => setConfirmRemove(false)}
+            />
+          )}
         </div>
       ) : value ? (
         <button type="button" onClick={onOpen} aria-label="Edit max dose" style={doseClosedRowStyle}>
@@ -2535,6 +2580,8 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
   // PromoteAlternativeDialog's "Delete all" since this can't be undone.
   const [confirmClearGroup, setConfirmClearGroup] = useState(null) // groupIdx | null
   const [confirmRemovePop, setConfirmRemovePop] = useState(null) // groupIdx | null
+  const [confirmRestoreGroup, setConfirmRestoreGroup] = useState(null) // groupIdx | null
+  const [confirmRemoveOption, setConfirmRemoveOption] = useState(null) // { groupIdx, optionId } | null
   const [confirmDeleteLibPop, setConfirmDeleteLibPop] = useState(null) // groupIdx | null
   const [emptyPopWarnIdx, setEmptyPopWarnIdx] = useState(null) // groupIdx | null
   const [deletingLibGroupIdx, setDeletingLibGroupIdx] = useState(null)
@@ -3454,7 +3501,13 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
               <DrugOptionRow
                 option={option}
                 onUpdate={nextOpt => updateOption(groupIdx, option.id, nextOpt)}
-                onRemove={() => removeOption(groupIdx, option.id)}
+                onRemove={() => {
+                  if (option.brand_name || option.generic_name || option.formulation_id) {
+                    setConfirmRemoveOption({ groupIdx, optionId: option.id })
+                  } else {
+                    removeOption(groupIdx, option.id)
+                  }
+                }}
                 isOnly={totalOptions === 1}
                 onDoseReady={doseFields => applyDoseToGroup(groupIdx, doseFields)}
                 onOptionPick={(nextOpt, doseFields) => updateOptionAndDose(groupIdx, option.id, nextOpt, doseFields)}
@@ -3473,6 +3526,14 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
               />
             </div>
           ))}
+
+          {confirmRemoveOption?.groupIdx === groupIdx && (
+            <ConfirmBar
+              text="Remove this drug from the sheet?"
+              onConfirm={() => { const id = confirmRemoveOption.optionId; setConfirmRemoveOption(null); removeOption(groupIdx, id) }}
+              onCancel={() => setConfirmRemoveOption(null)}
+            />
+          )}
 
           {/* ── Shared dose + note for this group ──
               Both gated on the same "first option has a name" check so a
@@ -3574,7 +3635,7 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                               )}
                               <button
                                 type="button"
-                                onClick={() => { setDoseMenuOpenGroupIdx(null); restoreDoseFromLibrary(groupIdx) }}
+                                onClick={() => { setDoseMenuOpenGroupIdx(null); setConfirmRestoreGroup(groupIdx) }}
                                 disabled={restoringGroupIdx === groupIdx}
                                 style={addDrugDropdownItemStyle}
                               >
@@ -3672,6 +3733,15 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                         </button>
                       </div>
                     </div>
+                  )}
+
+                  {confirmRestoreGroup === groupIdx && (
+                    <ConfirmBar
+                      text="Replace this population with the library version? Your edits on this sheet will be lost."
+                      confirmLabel="Restore"
+                      onConfirm={() => { setConfirmRestoreGroup(null); restoreDoseFromLibrary(groupIdx) }}
+                      onCancel={() => setConfirmRestoreGroup(null)}
+                    />
                   )}
 
                   {confirmRemovePop === groupIdx && (
