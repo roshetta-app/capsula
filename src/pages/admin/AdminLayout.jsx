@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { LogOut } from 'lucide-react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
@@ -7,6 +8,8 @@ import {
   faMagnifyingGlass,
 } from '@fortawesome/free-solid-svg-icons'
 import { useAuth } from '../../hooks/useAuth'
+import ConfirmModal from '../../components/admin/ConfirmModal'
+import { requestLeave, setLeaveAsker } from '../../utils/leaveGuard'
 
 /**
  * AdminLayout — shared shell for all /admin/* screens (post-D1/D2).
@@ -23,6 +26,11 @@ import { useAuth } from '../../hooks/useAuth'
  * Per D4, this shell now owns all admin page chrome — including sign out,
  * which previously lived in AdminDashboard's own header and has no other
  * home now that that header is gone.
+ *
+ * Unsaved-changes guard (2026-11-09): menu clicks and Sign out go through
+ * requestLeave() (src/utils/leaveGuard.js). When the screen on show has
+ * unsaved changes (the condition editor says so), the shared Leave / Stay
+ * dialog below is shown first. Screens that say nothing are not affected.
  */
 
 const NAV_GROUPS = [
@@ -74,9 +82,33 @@ export default function AdminLayout() {
   const navigate     = useNavigate()
   const location      = useLocation()
 
-  async function handleSignOut() {
-    await signOut()
-    navigate('/admin/login', { replace: true })
+  // Leave / Stay dialog. 'pendingLeave' holds the question being asked
+  // ({ leave, stay, path }). It only shows while still on the page it was
+  // asked on, so a stale question never pops up on another screen.
+  const [pendingLeave, setPendingLeave] = useState(null)
+
+  useEffect(() => {
+    return setLeaveAsker(request => {
+      setPendingLeave({ ...request, path: window.location.pathname })
+    })
+  }, [])
+
+  function goTo(path) {
+    requestLeave(() => navigate(path))
+  }
+
+  function handleSignOut() {
+    requestLeave(async () => {
+      await signOut()
+      navigate('/admin/login', { replace: true })
+    })
+  }
+
+  function handleLeaveClose() {
+    // Closing without pressing Leave means Stay. (After a Leave this is
+    // ignored, the first answer wins.)
+    if (pendingLeave) pendingLeave.stay()
+    setPendingLeave(null)
   }
 
   return (
@@ -152,7 +184,7 @@ export default function AdminLayout() {
                 return (
                   <button
                     key={item.path}
-                    onClick={() => navigate(item.path)}
+                    onClick={() => goTo(item.path)}
                     style={{
                       position: 'relative',
                       display: 'flex',
@@ -238,6 +270,17 @@ export default function AdminLayout() {
       }}>
         <Outlet />
       </main>
+
+      {/* Shared Leave / Stay dialog for unsaved changes */}
+      <ConfirmModal
+        isOpen={pendingLeave !== null && pendingLeave.path === location.pathname}
+        onClose={handleLeaveClose}
+        onConfirm={() => { if (pendingLeave) pendingLeave.leave() }}
+        title="Leave this page?"
+        message="You have changes that are not saved. If you leave now, they will be lost. Cancel keeps you here."
+        confirmLabel="Leave"
+        confirmVariant="danger"
+      />
     </div>
   )
 }

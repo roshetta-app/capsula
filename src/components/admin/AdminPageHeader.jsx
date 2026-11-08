@@ -26,9 +26,28 @@
  *   live drug name, not fixed text.
  * - `actions` is optional — each screen's existing Add/Refresh/Export
  *   button slots in next to the title instead of sitting alone above it.
+ * - `sticky` (optional, off by default) keeps the title + actions bar at the
+ *   top of the screen while the page scrolls. Added 2026-11-09 for the
+ *   condition editor only; every other screen leaves it off and renders
+ *   exactly as before. The bar is full width (negative margins cancel the
+ *   wrapper's padding), has a solid background and a thin line under it, and
+ *   sits at z-index 300: above page content and the drug-row menus (about
+ *   200), below dialogs (1000).
  */
 
-export default function AdminPageHeader({ title, actions, maxWidth, children }) {
+export default function AdminPageHeader({ title, actions, maxWidth, sticky = false, children }) {
+  const rowStyle = sticky
+    ? {
+        position: 'sticky',
+        top: 0,
+        zIndex: 300,
+        margin: 'calc(var(--space-6) * -1) calc(var(--space-5) * -1) var(--space-5)',
+        padding: 'var(--space-3) var(--space-5)',
+        backgroundColor: 'var(--color-bg)',
+        borderBottom: '1px solid var(--color-border)',
+      }
+    : { marginBottom: 'var(--space-5)' }
+
   return (
     <div style={{
       padding: 'var(--space-6) var(--space-5)',
@@ -41,7 +60,7 @@ export default function AdminPageHeader({ title, actions, maxWidth, children }) 
         alignItems: 'center',
         justifyContent: 'space-between',
         gap: 'var(--space-4)',
-        marginBottom: 'var(--space-5)',
+        ...rowStyle,
       }}>
         <div style={{
           fontSize: 22,

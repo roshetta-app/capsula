@@ -20,7 +20,7 @@
  *    not in this file.
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Plus, AlertTriangle, X, Undo2, Redo2 } from 'lucide-react'
 import { useConditionContext } from '../../context/ConditionContext'
@@ -28,6 +28,8 @@ import { useToast } from '../../context/ToastContext'
 import TagInput from '../../components/admin/TagInput'
 import BlockListEditor from '../../components/admin/BlockListEditor'
 import { usePageUndoRedo } from '../../hooks/usePageUndoRedo'
+import { useDirtyState } from '../../hooks/useDirtyState'
+import { useLeaveWarning } from '../../hooks/useLeaveWarning'
 import {
   insertCondition,
   updateCondition,
@@ -371,6 +373,24 @@ export default function ConditionEditor() {
     onRestore: restorePage,
   })
 
+  // ─── Unsaved-changes warning (2026-11-09) ─────────────────────────────────
+  // 'savedPage' is the version last loaded or last saved. The page counts as
+  // unsaved when it differs from that version, so undoing back to it clears
+  // the warning, and a failed Save (which never updates it) keeps the warning.
+  // A new empty condition starts out equal to its empty version, so it is not
+  // unsaved until something is typed. While an existing condition is still
+  // loading there is no saved version yet and nothing counts as unsaved.
+  // Instant library saves are not part of the page, so they are not counted.
+  const [savedPage, setSavedPage] = useState(
+    isEdit ? null : { form: EMPTY_CONDITION, blocks: [], tags: [] }
+  )
+  const currentPage = useMemo(() => ({ form, blocks, tags }), [form, blocks, tags])
+  const differsFromSaved = useDirtyState(savedPage, currentPage)
+  const isUnsaved = !loading && savedPage !== null && differsFromSaved
+
+  // Menu clicks, Sign out, browser Back, refresh and close (see useLeaveWarning).
+  useLeaveWarning(isUnsaved)
+
   // ─── Load existing condition (edit mode) ──────────────────────────────────
 
   useEffect(() => {
@@ -384,23 +404,27 @@ export default function ConditionEditor() {
         return
       }
 
-      setForm({
+      const loadedForm = {
         name:         data.name         ?? '',
         specialty_id: data.specialty_id ?? '',
         is_published: data.is_published ?? false,
         needs_review: data.needs_review ?? false,
         card_tagline: data.card_tagline ?? '',
-      })
+      }
+      setForm(loadedForm)
 
-      setBlocks(
-        (data.condition_blocks ?? [])
-          .slice()
-          .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
-      )
+      const loadedBlocks = (data.condition_blocks ?? [])
+        .slice()
+        .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
+      setBlocks(loadedBlocks)
 
       // Load existing condition tags
       const { data: tagNames } = await fetchTagsForCondition(id)
-      setTags(tagNames ?? [])
+      const loadedTags = tagNames ?? []
+      setTags(loadedTags)
+
+      // The version just loaded is the starting 'saved' version.
+      setSavedPage({ form: loadedForm, blocks: loadedBlocks, tags: loadedTags })
 
       setLoading(false)
     }
@@ -425,6 +449,10 @@ export default function ConditionEditor() {
   async function handleSave() {
     setError(null)
     setSaving(true)
+
+    // What is being saved right now. Anything typed while the save runs is
+    // not in it, so it stays marked as unsaved.
+    const pageBeingSaved = { form, blocks, tags }
 
     const slug = toSlug(form.name.trim())
 
@@ -472,6 +500,9 @@ export default function ConditionEditor() {
       return
     }
 
+    // Everything is stored now: this is the new 'saved' version.
+    setSavedPage(pageBeingSaved)
+
     await refresh()
     setSaving(false)
     toast.success('Condition saved')
@@ -505,10 +536,23 @@ export default function ConditionEditor() {
   return (
     <AdminPageHeader
       title={isEdit ? 'Edit condition' : 'New condition'}
+      sticky
       actions={
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
           <UndoRedoButton label="Undo" onClick={undo} disabled={!canUndo}><Undo2 size={16} /></UndoRedoButton>
           <UndoRedoButton label="Redo" onClick={redo} disabled={!canRedo}><Redo2 size={16} /></UndoRedoButton>
+        {isUnsaved && (
+          <span
+            role="status"
+            style={{
+              fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap',
+              color: 'var(--color-warning)', fontFamily: 'var(--font-body)',
+              padding: '0 var(--space-1)',
+            }}
+          >
+            Unsaved changes
+          </span>
+        )}
         <button
           onClick={handleSave}
           disabled={!isValid() || saving}
