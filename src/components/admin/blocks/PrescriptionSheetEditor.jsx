@@ -83,8 +83,7 @@ import NoteRowEditor         from './rows/NoteRowEditor'
 import FreeTextPostEditor    from './FreeTextPostEditor'
 import { DRUG_ROW_TEMPLATE, SECTION_ROW_TEMPLATE, promoteAlternativeToMain } from '../../../constants/prescriptionRowSchema'
 import { nanoid } from 'nanoid'
-import { supabase } from '../../../lib/supabase'
-import { fetchFlatDrugsByBrandId } from '../../../lib/queries'
+import { peekFlatDrug, loadFlatDrug, prefetchFlatDrugs } from '../../../utils/flatDrugCache'
 import { toTitleCase, getDrugTitleSuffix, TITLE_HIDDEN_MODIFIER_TAGS } from '../../../utils/drugTitleFormat'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -127,27 +126,33 @@ function RowTypeChip({ rowType }) {
 // drug with the same name as the first shows only its own suffix (so
 // 'Augmentin 1gm - Tab. or 625mg - Tab.' and not the name twice). With three
 // or more drugs only the first two are written, then '+N'.
-const blockFlatDrugCache = new Map()
-
 function useFlatDrugsByBrand(brandIds) {
   const [, setTick] = useState(0)
   const key = brandIds.join(',')
   useEffect(() => {
     let cancelled = false
     brandIds.forEach(id => {
-      if (!id || blockFlatDrugCache.has(id)) return
-      fetchFlatDrugsByBrandId(supabase, id)
-        .then(rows => {
-          if (!rows?.[0]) return
-          blockFlatDrugCache.set(id, rows[0])
-          if (!cancelled) setTick(t => t + 1)
-        })
-        .catch(() => {})
+      if (!id || peekFlatDrug(id)) return
+      loadFlatDrug(id).then(found => { if (found && !cancelled) setTick(t => t + 1) })
     })
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key])
-  return id => blockFlatDrugCache.get(id) ?? null
+  return id => peekFlatDrug(id)
+}
+
+// Every brand used anywhere on the sheet (drugs, their alternatives, and the
+// drugs inside sections), so their cards can be loaded as soon as it opens.
+function collectBrandIds(rows) {
+  const out = []
+  const add = d => {
+    if (!d) return
+    if (d.brand_id) out.push(d.brand_id)
+    ;(d.alternatives ?? []).forEach(a => { if (a?.brand_id) out.push(a.brand_id) })
+    ;(d.drugs ?? []).forEach(add)
+  }
+  ;(rows ?? []).forEach(add)
+  return out
 }
 
 function drugTitleParts(d, flat) {
@@ -170,10 +175,13 @@ function DrugBlockTitle({ row }) {
 
   const parts = drugs.map(d => drugTitleParts(d, d.brand_id ? flatOf(d.brand_id) : null))
   const full = p => [p.name, p.suffix].filter(Boolean).join(' ')
-  let title = full(parts[0])
   const shown = Math.min(drugs.length, 2)
+  // Names only ('Panadol + Gastreg'). If two shown drugs share a name, fall
+  // back to the strength/form so they can still be told apart.
+  const sameName = shown > 1 && parts[0].name === parts[1].name
+  let title = sameName ? full(parts[0]) : (parts[0].name || full(parts[0]))
   for (let i = 1; i < shown; i++) {
-    const text = parts[i].name === parts[0].name ? (parts[i].suffix || parts[i].name) : parts[i].name
+    const text = sameName ? (parts[i].suffix || parts[i].name) : (parts[i].name || full(parts[i]))
     title += (drugs[i].joiner === 'and' ? ' + ' : ' or ') + text
   }
   if (drugs.length > 2) title += ` +${drugs.length - 2}`
@@ -886,6 +894,10 @@ export default function PrescriptionSheetEditor({ block, onChange, disabled = fa
   const data  = block?.data ?? {}
   const label = data.label ?? ''
   const rows  = data.rows  ?? []
+
+  // Start loading every drug card on the sheet right away.
+  const brandIdsKey = collectBrandIds(rows).join(',')
+  useEffect(() => { prefetchFlatDrugs(brandIdsKey.split(',')) }, [brandIdsKey])
 
   // Touch gap reveal state for the top-level list.
   // null = no gap revealed; number = gap index currently active on touch.

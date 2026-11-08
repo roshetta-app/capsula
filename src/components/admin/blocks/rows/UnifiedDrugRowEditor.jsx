@@ -176,8 +176,7 @@ import DrugPickerModal from '../../DrugPickerModal'
 import DrugSearchField from '../../DrugSearchField'
 import SharedDrugCard from '../../../SharedDrugCard'
 import { useCategories } from '../../../../hooks/useCategories'
-import { supabase } from '../../../../lib/supabase'
-import { fetchFlatDrugsByBrandId } from '../../../../lib/queries'
+import { peekFlatDrug, loadFlatDrug } from '../../../../utils/flatDrugCache'
 import { DRUG_FORMS } from '../../../../config/forms'
 import { DRUG_CATEGORIES } from '../../../../config/categories'
 import {
@@ -420,26 +419,18 @@ function resolveDosePick(dosesStructured) {
 // While it loads, or if the brand can't be loaded (for example unpublished),
 // the older name row ('fallback') is shown instead, so nothing ever goes blank.
 // The change (pencil) button and the options menu sit on the right of the card.
-const linkedDrugCache = new Map()
 
 function LinkedDrugCard({ brandId, onRequestChange, extraAction, fallback, note = null, onNoteChange = null }) {
   const { categories } = useCategories()
   const [noteEditing, setNoteEditing] = useState(false)
-  const [drug, setDrug] = useState(() => linkedDrugCache.get(brandId) ?? null)
+  const [drug, setDrug] = useState(() => peekFlatDrug(brandId))
 
   useEffect(() => {
     let cancelled = false
-    const cached = linkedDrugCache.get(brandId)
+    const cached = peekFlatDrug(brandId)
     if (cached) { setDrug(cached); return undefined }
     setDrug(null)
-    fetchFlatDrugsByBrandId(supabase, brandId)
-      .then(rows => {
-        const found = rows?.[0]
-        if (cancelled || !found) return
-        linkedDrugCache.set(brandId, found)
-        setDrug(found)
-      })
-      .catch(() => {})
+    loadFlatDrug(brandId).then(found => { if (!cancelled && found) setDrug(found) })
     return () => { cancelled = true }
   }, [brandId])
 
@@ -1427,6 +1418,20 @@ function AddDrugControls({ onPickBrand, onPickFormulation, onAddManual, disabled
 // PLUS LABEL (2026-11-07): the saved value 'and' is displayed as 'plus' to
 // match the condition page. Display only: the toggle still switches the
 // stored value between 'or' and 'and', so nothing already saved changes.
+// 'or' and 'plus' are small colour tags so the two kinds of join are told
+// apart at a glance: amber for 'or' (alternatives), green for 'plus' (together).
+function joinTagStyle(label) {
+  const plus = label === 'plus'
+  return {
+    padding: '2px 12px', borderRadius: 99, whiteSpace: 'nowrap',
+    border: `1px solid ${plus ? '#86EFAC' : '#FCD34D'}`,
+    backgroundColor: plus ? '#DCFCE7' : '#FEF3C7',
+    color: plus ? '#15803D' : '#B45309',
+    fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-body)', lineHeight: 1.4,
+    userSelect: 'none',
+  }
+}
+
 function OrDivider({ value = 'or', onChange, merged = false, atTopEdge = false }) {
   const label = value === 'and' ? 'plus' : value
   const toggle = onChange ? () => onChange(value === 'or' ? 'and' : 'or') : undefined
@@ -1444,12 +1449,9 @@ function OrDivider({ value = 'or', onChange, merged = false, atTopEdge = false }
           onClick={toggle}
           role={onChange ? 'button' : undefined}
           style={{
+            ...joinTagStyle(label),
             position: 'absolute', left: '50%', top: 0, transform: 'translate(-50%, -50%)',
-            padding: '2px 12px', borderRadius: 99, whiteSpace: 'nowrap',
-            border: '1px solid var(--color-border)', backgroundColor: 'var(--color-surface)',
-            fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-body)',
-            color: 'var(--color-accent)', lineHeight: 1.4,
-            cursor: onChange ? 'pointer' : 'default', userSelect: 'none',
+            cursor: onChange ? 'pointer' : 'default',
           }}
         >
           {label}
@@ -1463,13 +1465,9 @@ function OrDivider({ value = 'or', onChange, merged = false, atTopEdge = false }
       <span
         onClick={toggle}
         style={{
-          fontSize:   12,
-          fontWeight: 700,
-          fontFamily: 'var(--font-body)',
-          color:      'var(--color-accent)',
+          ...joinTagStyle(label),
           flexShrink: 0,
           cursor:     onChange ? 'pointer' : 'default',
-          userSelect: 'none',
         }}
       >
         {label}
@@ -3574,9 +3572,9 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
           <div style={groupHasDoseArea(group) ? {
             display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: 10,
             padding: 10, borderRadius: 16,
-            border: '1px solid var(--color-border)', backgroundColor: 'var(--color-bg)',
+            backgroundColor: 'var(--color-bg)',
           } : { display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div style={{ flex: '1 1 260px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ flex: '1 1 240px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
 
           {/* ── Stacked drug-name lines ──
               OrDivider inserted before every option after the first within
@@ -3640,7 +3638,7 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
           </div>
 
           {groupHasDoseArea(group) && (
-          <div style={{ flex: '1 1 320px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ flex: '1.5 1 320px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
 
           {/* ── Shared dose + note for this group ──
               Both gated on the same "first option has a name" check so a
@@ -3655,12 +3653,6 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
             if (!firstIsLinked && !firstHasName) return null
             return (
               <>
-                <span style={{
-                  fontSize: 11, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase',
-                  color: 'var(--color-accent)', paddingLeft: 2,
-                }}>
-                  {group.options.length > 1 ? `Dose shared by ${group.options.length} drugs` : 'Dose for this drug'}
-                </span>
                 {/* PHASE 2.2-D — dose area, 19px left indent to align under the
                     drug names above it. FieldLabel removed (Decision 4 +
                     Decision 5 hierarchy — dose position communicates its
@@ -3690,7 +3682,6 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                 <div style={{
                   display: 'flex', flexDirection: 'column', gap: 10,
                   border: '1px solid var(--color-border)',
-                  borderLeft: '3px solid var(--color-accent)',
                   borderRadius: 12,
                   padding: 12,
                   backgroundColor: 'var(--color-surface)',
@@ -3796,21 +3787,37 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
 
                   {(() => {
                     const st = doseSaveStatus(group, firstOpt.formulation_id, libraryDoses[firstOpt.formulation_id])
-                    if (!st) return null
-                    const warn = st !== 'saved'
+                    const warn = st && st !== 'saved'
                     const canSave = (group.dose_lines ?? []).some(l => l.instruction?.trim())
+                    const g0 = rawGroups[groupIdx]
+                    const hasExtra = (g0.extra_populations ?? []).length > 0
+                    const openIdx = activeIndexFor(g0)
+                    const shownIdx = Math.min(g0.shown_population ?? 0, (g0.extra_populations ?? []).length)
+                    const isShown = openIdx === shownIdx
+                    const shared = group.options.length > 1
+                    if (!st && !hasExtra && !shared) return null
+                    const chip = {
+                      display: 'inline-flex', alignItems: 'center', gap: 5,
+                      padding: '3px 10px', borderRadius: 99, fontSize: 12, fontWeight: 600,
+                      fontFamily: 'var(--font-body)',
+                    }
                     return (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                        <span style={{
-                          display: 'inline-flex', alignItems: 'center', gap: 5,
-                          padding: '3px 10px', borderRadius: 99, fontSize: 12, fontWeight: 600,
-                          fontFamily: 'var(--font-body)',
-                          background: warn ? '#FEF3C7' : 'var(--color-bg)',
-                          color: warn ? '#B45309' : 'var(--color-text-secondary)',
-                        }}>
-                          {warn ? <Library size={12} /> : <Check size={12} />}
-                          {st === 'new' ? 'Not in library' : st === 'changed' ? 'Changed, not saved to library' : 'In library'}
-                        </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        {shared && (
+                          <span style={{ ...chip, background: 'var(--color-bg)', color: 'var(--color-text-secondary)' }}>
+                            Shared by {group.options.length} drugs
+                          </span>
+                        )}
+                        {st && (
+                          <span style={{
+                            ...chip,
+                            background: warn ? '#FEF3C7' : 'var(--color-bg)',
+                            color: warn ? '#B45309' : 'var(--color-text-secondary)',
+                          }}>
+                            {warn ? <Library size={12} /> : <Check size={12} />}
+                            {st === 'new' ? 'Not in library' : st === 'changed' ? 'Changed, not saved' : 'In library'}
+                          </span>
+                        )}
                         {warn && canSave && (
                           <button
                             type="button"
@@ -3818,34 +3825,25 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                             disabled={savingGroupIdx === groupIdx}
                             style={{ ...doseSecondaryButtonStyle, padding: '3px 10px', fontSize: 12 }}
                           >
-                            Save to library
+                            Save
+                          </button>
+                        )}
+                        {hasExtra && (
+                          <button
+                            type="button"
+                            onClick={() => { if (!isShown) setShownPopulation(groupIdx, openIdx) }}
+                            aria-pressed={isShown}
+                            style={{
+                              ...chip, cursor: isShown ? 'default' : 'pointer',
+                              border: isShown ? 'none' : '1px solid var(--color-border)',
+                              background: isShown ? 'var(--color-accent-light)' : 'none',
+                              color: isShown ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+                            }}
+                          >
+                            {isShown ? <><Check size={12} /> Shown in the app</> : 'Show in the app'}
                           </button>
                         )}
                       </div>
-                    )
-                  })()}
-
-                  {(rawGroups[groupIdx].extra_populations ?? []).length > 0 && (() => {
-                    const g0 = rawGroups[groupIdx]
-                    const openIdx = activeIndexFor(g0)
-                    const shownIdx = Math.min(g0.shown_population ?? 0, (g0.extra_populations ?? []).length)
-                    const isShown = openIdx === shownIdx
-                    return (
-                      <button
-                        type="button"
-                        onClick={() => { if (!isShown) setShownPopulation(groupIdx, openIdx) }}
-                        aria-pressed={isShown}
-                        style={{
-                          alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 6,
-                          padding: '4px 10px', borderRadius: 99, fontSize: 12, fontWeight: 600,
-                          fontFamily: 'var(--font-body)', cursor: isShown ? 'default' : 'pointer',
-                          border: isShown ? 'none' : '1px solid var(--color-border)',
-                          background: isShown ? 'var(--color-accent-light)' : 'none',
-                          color: isShown ? 'var(--color-accent)' : 'var(--color-text-secondary)',
-                        }}
-                      >
-                        {isShown ? <><Check size={12} /> Shown in the app</> : 'Show this one in the app'}
-                      </button>
                     )
                   })()}
 
