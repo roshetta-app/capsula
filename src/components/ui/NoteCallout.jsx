@@ -145,7 +145,7 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
 
   // ── Bubble shape — shared by both variants ────────────────────────────────
   // Full width, always. Icon side follows the text direction (Arabic: right).
-  // v7: tail is now a small rounded beak flush with the bubble edge (no overhang). v6 simplified: plain flavour-coloured icon (no badge circle), 1px outline, no shadow, 14px radius, small tail, 15px text. v5 (2026-11-09): iMessage shape + tail kept; the earlier outlined look is
+  // v8: beak halved in height with a soft rounded tip (subtle hint, not a point). v7: tail is a small rounded beak flush with the bubble edge (no overhang). v6 simplified: plain flavour-coloured icon (no badge circle), 1px outline, no shadow, 14px radius, small tail, 15px text. v5 (2026-11-09): iMessage shape + tail kept; the earlier outlined look is
   // back on top of it — near-white fill tinted 6% with the flavour colour, a
   // 1.5px outline (flavour 38% over the surface) and a soft shadow. The tail
   // is drawn with the same fill and outline so bubble and tail read as one
@@ -186,9 +186,9 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
           bottom border where the beak joins, so the outline flows round it. */}
       <svg
         aria-hidden="true"
-        width="15"
-        height="12"
-        viewBox="0 0 15 12"
+        width="10"
+        height="6"
+        viewBox="0 0 10 6"
         style={{
           position: 'absolute',
           top: 'calc(100% - 1.5px)',
@@ -199,11 +199,11 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
         }}
       >
         <path
-          d="M0.75 0 V9 Q0.75 10.8 2.5 10.1 Q9 7.6 14 0.75 V0 Z"
+          d="M0.75 0 V3.4 Q0.75 5.3 2.4 4.7 Q6 3.4 9 0.75 V0 Z"
           style={{ fill }}
         />
         <path
-          d="M0.75 0.5 V9 Q0.75 10.8 2.5 10.1 Q9 7.6 14 0.75"
+          d="M0.75 0.5 V3.4 Q0.75 5.3 2.4 4.7 Q6 3.4 9 0.75"
           style={{ fill: 'none', stroke: line, strokeWidth: 1.5, strokeLinejoin: 'round', strokeLinecap: 'round' }}
         />
       </svg>
