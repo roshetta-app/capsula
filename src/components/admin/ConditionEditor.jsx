@@ -535,7 +535,9 @@ export default function ConditionEditor() {
 
   return (
     <AdminPageHeader
-      title={isEdit ? 'Edit condition' : 'New condition'}
+      // Shows the condition's name as you type it; falls back to the old
+      // wording while the name is still empty.
+      title={form.name.trim() || (isEdit ? 'Edit condition' : 'New condition')}
       sticky
       actions={
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
