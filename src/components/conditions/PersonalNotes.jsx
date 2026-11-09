@@ -1669,6 +1669,8 @@ export default function PersonalNotes({ conditionId }) {
                 lineHeight: '20px',
                 fontFamily: 'var(--font-body)',
                 whiteSpace: 'pre-wrap',
+                overflowWrap: 'anywhere',
+                minWidth: 0,
                 color: 'var(--color-text-primary)',
                 unicodeBidi: 'plaintext',
               }}

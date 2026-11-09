@@ -135,6 +135,7 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
         flexDirection: 'column',
         gap: 4,
         textAlign: 'start',
+        overflowWrap: 'anywhere',
       }}
     >
       <ReactMarkdown remarkPlugins={[remarkBreaks]} components={components}>

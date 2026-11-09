@@ -531,6 +531,7 @@ body {
   font-size: 14px;
   line-height: 1.65;
   color: var(--color-text-primary);
+  overflow-wrap: anywhere; /* long unbroken words/paths wrap instead of overflowing */
 }
 
 .dir-prose p {
@@ -723,6 +724,7 @@ body {
 /* ─── Tables (outside cards) ──────────────────────────────────────────────────── */
 
 .dir-prose table {
+  overflow-wrap: normal; /* keep table columns from breaking words mid-cell */
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
