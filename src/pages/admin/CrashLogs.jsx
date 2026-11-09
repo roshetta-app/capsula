@@ -194,7 +194,7 @@ export default function CrashLogs() {
       )}
 
       {!loading && logs.length > 0 && (
-        <div style={{
+        <div className="cms-scroll-x" style={{
           backgroundColor: 'var(--color-surface)',
           border: '1px solid var(--color-border)',
           borderRadius: 'var(--radius-lg)',

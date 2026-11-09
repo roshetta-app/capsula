@@ -69,7 +69,7 @@ html.cms-surface .cms-only-phone {
      Wraps a wide list so that only the box scrolls sideways, not the page. The
      list inside keeps at least --cms-scroll-min wide (default 640px). */
   html.cms-surface .cms-scroll-x {
-    overflow-x: auto;
+    overflow-x: auto !important;
     -webkit-overflow-scrolling: touch;
     max-width: 100%;
   }
@@ -444,4 +444,14 @@ html.cms-surface .cms-only-phone {
   html.cms-surface .cms-notif-hist > :nth-child(5)::before { content: 'Sent'; }
   html.cms-surface .cms-notif-hist > :nth-child(6)::before { content: 'Failed'; }
   html.cms-surface .cms-notif-hist > :nth-child(7)::before { content: 'Clicks'; }
+
+  /* --- Phase 6: logs and analytics ----------------------------------------------
+     .cms-label-narrow  a fixed label next to a bar gets a smaller width.
+     .cms-bar-narrow    a fixed progress bar gets a smaller width. */
+  html.cms-surface .cms-label-narrow {
+    width: 96px !important;
+  }
+  html.cms-surface .cms-bar-narrow {
+    width: 64px !important;
+  }
 }

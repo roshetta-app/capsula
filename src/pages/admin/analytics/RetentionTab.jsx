@@ -100,7 +100,7 @@ function RetentionTable({ rows }) {
       </div>
 
       {/* Column headers */}
-      <div style={{ ...gridStyle, backgroundColor: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)' }}>
+      <div className="cms-cols" style={{ '--cols-phone': 'minmax(60px, 1fr) 52px 40px 40px 40px', ...gridStyle, backgroundColor: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)' }}>
         <span style={thStyle}>Signup Week</span>
         <span style={{ ...thStyle, textAlign: 'right' }}>Signups</span>
         <span style={{ ...thStyle, textAlign: 'right' }}>D1</span>
@@ -113,7 +113,9 @@ function RetentionTable({ rows }) {
         {rows.map(row => (
           <div
             key={row.week}
+            className="cms-cols"
             style={{
+              '--cols-phone': 'minmax(60px, 1fr) 52px 40px 40px 40px',
               ...gridStyle,
               borderBottom: '1px solid var(--color-border-subtle)',
               padding: 'var(--space-3) var(--space-4)',
