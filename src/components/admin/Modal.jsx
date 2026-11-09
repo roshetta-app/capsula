@@ -10,6 +10,11 @@
  *   title     string          — shown in header
  *   size      'sm' | 'md' | 'lg'  (default 'md')
  *   children  ReactNode
+ *
+ * Phone (2026-11-09, CMS_RESPONSIVE_PLAN.md Phase 1): the cms-modal-* class
+ * names are the hooks for src/styles/cms-responsive.css, which turns the
+ * dialog into a bottom sheet on a phone. ConfirmModal and both picker
+ * pop-ups are built on this, so they follow. No change on desktop.
  */
 
 import { useEffect, useRef } from 'react'
@@ -44,6 +49,7 @@ export default function Modal({ isOpen, onClose, title, size = 'md', children })
   return (
     <div
       ref={overlayRef}
+      className="cms-modal-overlay"
       onClick={e => { if (e.target === overlayRef.current) onClose() }}
       style={{
         position:        'fixed',
@@ -61,6 +67,7 @@ export default function Modal({ isOpen, onClose, title, size = 'md', children })
         role="dialog"
         aria-modal="true"
         aria-label={title}
+        className="cms-modal-sheet"
         style={{
           width:           '100%',
           maxWidth:        width,
@@ -94,6 +101,7 @@ export default function Modal({ isOpen, onClose, title, size = 'md', children })
           <button
             onClick={onClose}
             aria-label="Close modal"
+            className="cms-modal-close"
             style={{
               background:  'none',
               border:      'none',

@@ -192,13 +192,13 @@ function NewSpecialtyModal({ isOpen, onClose, onCreated }) {
   if (!isOpen) return null
 
   return (
-    <div style={{
+    <div className="cms-modal-overlay" style={{
       position: 'fixed', inset: 0, zIndex: 200,
       backgroundColor: 'rgba(0,0,0,0.4)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       padding: 'var(--space-4)',
     }}>
-      <div style={{
+      <div className="cms-modal-sheet cms-sheet-scroll" style={{
         backgroundColor: 'var(--color-surface)',
         borderRadius: 'var(--radius-lg)',
         padding: 'var(--space-5)',

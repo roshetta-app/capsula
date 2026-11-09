@@ -33,6 +33,10 @@
  *   wrapper's padding), has a solid background and a thin line under it, and
  *   sits at z-index 300: above page content and the drug-row menus (about
  *   200), below dialogs (1000).
+ * - Phone (2026-11-09, CMS_RESPONSIVE_PLAN.md Phase 1): the cms-page-* class
+ *   names below are the hooks for the phone rules in src/styles/cms-responsive.css
+ *   (smaller title, actions wrap under the title, sticky bar sits under the
+ *   admin top bar). They change nothing on desktop.
  */
 
 export default function AdminPageHeader({ title, actions, maxWidth, sticky = false, children }) {
@@ -49,20 +53,20 @@ export default function AdminPageHeader({ title, actions, maxWidth, sticky = fal
     : { marginBottom: 'var(--space-5)' }
 
   return (
-    <div style={{
+    <div className="cms-page" style={{
       padding: 'var(--space-6) var(--space-5)',
       maxWidth,
       width: '100%',
       fontFamily: 'var(--font-body)',
     }}>
-      <div style={{
+      <div className={sticky ? 'cms-page-head cms-page-head-sticky' : 'cms-page-head'} style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         gap: 'var(--space-4)',
         ...rowStyle,
       }}>
-        <div style={{
+        <div className="cms-page-title" style={{
           fontSize: 22,
           fontWeight: 700,
           color: 'var(--color-text-primary)',
@@ -74,7 +78,7 @@ export default function AdminPageHeader({ title, actions, maxWidth, sticky = fal
         </div>
 
         {actions && (
-          <div style={{
+          <div className="cms-page-actions" style={{
             display: 'flex',
             alignItems: 'center',
             gap: 'var(--space-2)',

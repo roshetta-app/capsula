@@ -4401,12 +4401,12 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
 export function PromoteAlternativeDialog({ row, onPromote, onDeleteAll, onCancel }) {
   const alts = row.alternatives ?? []
   return (
-    <div style={{
+    <div className="cms-modal-overlay" style={{
       position: 'fixed', inset: 0, zIndex: 1000,
       background: 'rgba(0,0,0,0.4)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
     }}>
-      <div style={{
+      <div className="cms-modal-sheet cms-sheet-scroll" style={{
         background: 'var(--color-surface)',
         border: '1.5px solid var(--color-border)',
         borderRadius: 'var(--radius-md)',

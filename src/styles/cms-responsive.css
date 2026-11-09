@@ -1,0 +1,249 @@
+/* =============================================================================
+   Capsula — src/styles/cms-responsive.css
+   Phone rules for the admin CMS (/admin/*). See CMS_RESPONSIVE_PLAN.md.
+
+   SAFETY RULES
+   - One breakpoint: a screen up to 767px wide is "phone". Nothing above it is
+     touched. (Keep in sync with PHONE_MAX_WIDTH in hooks/useIsPhone.js.)
+   - Every rule sits under html.cms-surface, the class hooks/useCmsSurface.js
+     puts on <html> only while the page is under /admin, so the public app
+     cannot be affected.
+   - The CMS styles its elements inline, and inline styles beat normal CSS, so
+     the rules that must change an inline value use !important. That is why
+     it shows up so often below, and it is also why nothing here can change
+     the desktop look: the rules only exist inside the phone media query.
+   - Every new class, variable and file starts with cms-, so it is easy to
+     find and remove.
+   ============================================================================= */
+
+/* The "only on phone" helper is hidden everywhere the phone rules do not
+   apply. It is the one rule outside the media query, and it only hides. */
+html.cms-surface .cms-only-phone {
+  display: none !important;
+}
+
+@media (max-width: 767px) {
+
+  /* ─── T6: smaller spacing on phone ──────────────────────────────────────────
+     Pages already use these spacing values for padding and gaps, so shrinking
+     the larger ones here tightens every screen at once. space-1 to space-4 stay
+     as they are. The numbers are a starting point, to be tuned on a device. */
+  html.cms-surface {
+    --space-5:  16px;   /* desktop 20px */
+    --space-6:  18px;   /* desktop 24px */
+    --space-8:  24px;   /* desktop 32px */
+    --space-10: 28px;   /* desktop 40px */
+    --space-12: 36px;   /* desktop 48px */
+
+    /* Height of the top bar (plus the phone's top edge, if it has one). */
+    --cms-topbar-h: calc(52px + env(safe-area-inset-top, 0px));
+  }
+
+  /* The phone preview shows the PUBLIC app, so inside it the spacing must stay
+     exactly what the app uses, not the smaller CMS values. */
+  html.cms-surface .cms-phone-preview {
+    --space-5:  20px;
+    --space-6:  24px;
+    --space-8:  32px;
+    --space-10: 40px;
+    --space-12: 48px;
+  }
+
+  /* ─── T9: 16px inputs, so the browser does not zoom in on every tap ───────── */
+  html.cms-surface input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+  html.cms-surface select,
+  html.cms-surface textarea {
+    font-size: 16px !important;
+  }
+
+  /* ─── T3: .cms-cols ──────────────────────────────────────────────────────────
+     Put the class on a grid whose columns are written inline. Desktop keeps
+     the inline columns untouched; on phone the grid switches to the columns in
+     --cols-phone (default: one column). Set it inline, for example
+     style={{ '--cols-phone': '1fr 1fr' }}. */
+  html.cms-surface .cms-cols {
+    grid-template-columns: var(--cols-phone, minmax(0, 1fr)) !important;
+  }
+
+  /* ─── T4: .cms-scroll-x ──────────────────────────────────────────────────────
+     Wraps a wide list so that only the box scrolls sideways, not the page. The
+     list inside keeps at least --cms-scroll-min wide (default 640px). */
+  html.cms-surface .cms-scroll-x {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+  }
+  html.cms-surface .cms-scroll-x > * {
+    min-width: var(--cms-scroll-min, 640px);
+  }
+
+  /* ─── T5: show / hide by screen size ────────────────────────────────────────*/
+  html.cms-surface .cms-hide-phone {
+    display: none !important;
+  }
+  html.cms-surface .cms-only-phone {
+    display: block !important;
+  }
+
+  /* ─── T7: admin shell — top bar and slide-out menu ──────────────────────────*/
+  html.cms-surface .cms-shell {
+    flex-direction: column !important;
+  }
+
+  html.cms-surface .cms-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 350;               /* above page content (300 and below), below the menu */
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    box-sizing: border-box;
+    height: var(--cms-topbar-h);
+    padding: env(safe-area-inset-top, 0px) var(--space-3) 0 max(var(--space-3), env(safe-area-inset-left, 0px));
+    background-color: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+    font-family: var(--font-body);
+  }
+  html.cms-surface .cms-topbar-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    margin-left: -8px;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--color-text-primary);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  html.cms-surface .cms-topbar-title {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--color-text-primary);
+  }
+
+  /* The sidebar becomes a menu that slides in over the page. It stays in the
+     page but hidden (off screen) while closed. */
+  html.cms-surface .cms-drawer {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    bottom: 0 !important;
+    width: min(280px, 85vw) !important;
+    height: auto !important;
+    align-self: auto !important;
+    z-index: 900;               /* above the top bar, below dialogs (1000) */
+    box-sizing: border-box;
+    padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+    transform: translateX(-100%);
+    visibility: hidden;
+    transition: transform var(--motion-base) ease, visibility 0s linear var(--motion-base);
+  }
+  html.cms-surface .cms-drawer.is-open {
+    transform: none;
+    visibility: visible;
+    box-shadow: 0 0 32px rgba(0, 0, 0, 0.25);
+    transition: transform var(--motion-base) ease, visibility 0s;
+  }
+  html.cms-surface .cms-drawer-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 899;
+    background-color: rgba(0, 0, 0, 0.45);
+    touch-action: none;
+  }
+  /* Menu items are easier to hit with a thumb. */
+  html.cms-surface .cms-drawer nav button {
+    min-height: 44px;
+  }
+
+  /* ─── Page header (AdminPageHeader) ─────────────────────────────────────────*/
+  html.cms-surface .cms-page-head {
+    flex-wrap: wrap !important;
+    gap: var(--space-2) var(--space-3) !important;
+  }
+  html.cms-surface .cms-page-title {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 18px !important;
+  }
+  html.cms-surface .cms-page-actions {
+    flex-shrink: 1 !important;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    max-width: 100%;
+  }
+  /* A sticky header sits just under the top bar instead of at the screen top. */
+  html.cms-surface .cms-page-head-sticky {
+    top: var(--cms-topbar-h) !important;
+  }
+
+  /* ─── T8: pop-ups become bottom sheets ──────────────────────────────────────
+     Modal.jsx, ConfirmModal.jsx (built on Modal), the two picker pop-ups (built
+     on Modal), the New Specialty dialog and the Promote Alternative dialog. */
+  html.cms-surface .cms-modal-overlay {
+    align-items: flex-end !important;
+    justify-content: center !important;
+    padding: 0 !important;
+  }
+  html.cms-surface .cms-modal-sheet {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: calc(100dvh - 16px - env(safe-area-inset-top, 0px)) !important;
+    box-sizing: border-box;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0 !important;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  /* For the two pop-ups that are not built on Modal: scroll inside the sheet
+     when the content is taller than the screen. */
+  html.cms-surface .cms-sheet-scroll {
+    overflow-y: auto !important;
+    padding-bottom: calc(var(--space-5) + env(safe-area-inset-bottom, 0px)) !important;
+  }
+  html.cms-surface .cms-modal-close {
+    padding: 10px !important;
+    margin: -6px -6px -6px 0;
+  }
+  /* Confirm dialog: stacked full-width buttons, Confirm on top. */
+  html.cms-surface .cms-confirm-actions {
+    flex-direction: column-reverse !important;
+    align-items: stretch !important;
+  }
+  html.cms-surface .cms-confirm-actions button {
+    min-height: 44px;
+  }
+
+  /* ─── Phone preview: the screen is already phone sized, so no frame ─────────*/
+  html.cms-surface .cms-preview-overlay {
+    padding: 0 !important;
+    align-items: stretch !important;
+  }
+  html.cms-surface .cms-preview-wrap {
+    width: 100%;
+    gap: 0 !important;
+    align-items: stretch !important;
+    box-sizing: border-box;
+    padding: env(safe-area-inset-top, 0px) 0 0;
+  }
+  html.cms-surface .cms-preview-close {
+    margin: 8px 12px;
+  }
+  html.cms-surface .cms-phone-preview {
+    width: 100% !important;
+    height: auto !important;
+    flex: 1;
+    min-height: 0;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}

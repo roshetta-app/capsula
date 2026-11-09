@@ -55,7 +55,7 @@ export default function ConfirmModal({
         </p>
       )}
 
-      <div style={{
+      <div className="cms-confirm-actions" style={{
         display: 'flex',
         justifyContent: 'flex-end',
         gap: 'var(--space-2)',

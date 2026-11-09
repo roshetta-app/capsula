@@ -70,6 +70,7 @@ export default function PhonePreviewModal({ isOpen, onClose, name, blocks }) {
 
   return (
     <div
+      className="cms-preview-overlay"
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
       style={{
         position: 'fixed', inset: 0, zIndex: 1000,
@@ -78,9 +79,10 @@ export default function PhonePreviewModal({ isOpen, onClose, name, blocks }) {
         padding: 'var(--space-4)', fontFamily: 'var(--font-body)',
       }}
     >
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+      <div className="cms-preview-wrap" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
         <button
           type="button"
+          className="cms-preview-close"
           onClick={onClose}
           aria-label="Close preview"
           style={{
@@ -98,6 +100,7 @@ export default function PhonePreviewModal({ isOpen, onClose, name, blocks }) {
           role="dialog"
           aria-modal="true"
           aria-label="Phone preview"
+          className="cms-phone-preview"
           style={{
             width: 390, maxWidth: '100%',
             height: 'min(780px, calc(100dvh - 90px))',

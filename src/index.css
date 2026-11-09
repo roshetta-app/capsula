@@ -1,5 +1,7 @@
 /* Single entry point — all styles, tokens, and Tailwind come from globals.css */
 @import "./styles/globals.css";
+/* Phone rules for the admin CMS only (gated by html.cms-surface), see CMS_RESPONSIVE_PLAN.md */
+@import "./styles/cms-responsive.css";
 
 /*
  * Bug fix, 2026-09-07 (bg-bounce-scope) — replaces the app-wide native

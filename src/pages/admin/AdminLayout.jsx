@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
-import { LogOut } from 'lucide-react'
+import { LogOut, Menu } from 'lucide-react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
   faHouse, faCapsules, faNotesMedical, faStethoscope, faTags,
@@ -8,6 +8,7 @@ import {
   faMagnifyingGlass,
 } from '@fortawesome/free-solid-svg-icons'
 import { useAuth } from '../../hooks/useAuth'
+import useIsPhone from '../../hooks/useIsPhone'
 import ConfirmModal from '../../components/admin/ConfirmModal'
 import { requestLeave, setLeaveAsker } from '../../utils/leaveGuard'
 
@@ -26,6 +27,13 @@ import { requestLeave, setLeaveAsker } from '../../utils/leaveGuard'
  * Per D4, this shell now owns all admin page chrome — including sign out,
  * which previously lived in AdminDashboard's own header and has no other
  * home now that that header is gone.
+ *
+ * Phone (2026-11-09, CMS_RESPONSIVE_PLAN.md Phase 1): on a screen 767px wide or
+ * narrower the sidebar becomes a menu that slides in from the left, opened
+ * from a top bar that shows the current page name. The menu closes after a
+ * page is chosen, and still goes through requestLeave() below. The look of the
+ * phone layout lives in src/styles/cms-responsive.css (cms-shell, cms-topbar,
+ * cms-drawer); desktop is not changed.
  *
  * Unsaved-changes guard (2026-11-09): menu clicks and Sign out go through
  * requestLeave() (src/utils/leaveGuard.js). When the screen on show has
@@ -77,8 +85,25 @@ const NAV_GROUPS = [
   },
 ]
 
+// Name shown in the phone top bar: the nav entry whose path matches best
+// (longest match wins, so /admin/drugs/123 shows 'Drug Library').
+function currentPageLabel(pathname) {
+  let best = null
+  for (const group of NAV_GROUPS) {
+    for (const item of group.items) {
+      const hit = item.exact
+        ? pathname === item.path
+        : (pathname === item.path || pathname.startsWith(item.path + '/'))
+      if (hit && (!best || item.path.length > best.path.length)) best = item
+    }
+  }
+  return best ? best.label : 'Capsula Admin'
+}
+
 export default function AdminLayout() {
   const { signOut } = useAuth()
+  const isPhone = useIsPhone()
+  const [menuOpen, setMenuOpen] = useState(false)
   const navigate     = useNavigate()
   const location      = useLocation()
 
@@ -95,6 +120,23 @@ export default function AdminLayout() {
     pathRef.current = location.pathname
   }, [location.pathname])
 
+  // Phone menu: close on any page change (including the browser Back button),
+  // when the screen grows past the phone width, and on Escape.
+  useEffect(() => {
+    setMenuOpen(false)
+  }, [location.pathname])
+
+  useEffect(() => {
+    if (!isPhone) setMenuOpen(false)
+  }, [isPhone])
+
+  useEffect(() => {
+    if (!menuOpen) return undefined
+    function onKey(e) { if (e.key === 'Escape') setMenuOpen(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [menuOpen])
+
   useEffect(() => {
     return setLeaveAsker(request => {
       setPendingLeave({ ...request, path: pathRef.current })
@@ -102,10 +144,14 @@ export default function AdminLayout() {
   }, [])
 
   function goTo(path) {
+    // Close the phone menu straight away, so the Leave / Stay question (if any)
+    // is not shown behind it.
+    setMenuOpen(false)
     requestLeave(() => navigate(path))
   }
 
   function handleSignOut() {
+    setMenuOpen(false)
     requestLeave(async () => {
       await signOut()
       navigate('/admin/login', { replace: true })
@@ -120,15 +166,43 @@ export default function AdminLayout() {
   }
 
   return (
-    <div style={{
+    <div className="cms-shell" style={{
       minHeight: '100dvh',
       backgroundColor: 'var(--color-bg)',
       display: 'flex',
     }}>
 
+      {/* Phone only: top bar with the menu button and the current page name,
+          plus the dimmed backdrop behind the open menu */}
+      {isPhone && (
+        <header className="cms-topbar">
+          <button
+            type="button"
+            className="cms-topbar-btn"
+            onClick={() => setMenuOpen(true)}
+            aria-label="Open menu"
+            aria-expanded={menuOpen}
+          >
+            <Menu size={22} />
+          </button>
+          <div className="cms-topbar-title">{currentPageLabel(location.pathname)}</div>
+        </header>
+      )}
+      {isPhone && menuOpen && (
+        <div
+          className="cms-drawer-backdrop"
+          onClick={() => setMenuOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
       {/* Sidebar — sticky to the viewport so it stays put while the
-          content pane scrolls, instead of scrolling away with it */}
-      <aside style={{
+          content pane scrolls, instead of scrolling away with it.
+          On phone it is the slide-out menu (see cms-drawer in cms-responsive.css) */}
+      <aside
+        className={menuOpen ? 'cms-drawer is-open' : 'cms-drawer'}
+        aria-hidden={isPhone && !menuOpen ? true : undefined}
+        style={{
         width: 248,
         flexShrink: 0,
         display: 'flex',
