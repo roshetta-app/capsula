@@ -145,7 +145,7 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
 
   // ── Bubble shape — shared by both variants ────────────────────────────────
   // Full width, always. Icon side follows the text direction (Arabic: right).
-  // v6 simplified: plain flavour-coloured icon (no badge circle), 1px outline, no shadow, 14px radius, small tail, 15px text. v5 (2026-11-09): iMessage shape + tail kept; the earlier outlined look is
+  // v7: tail is now a small rounded beak flush with the bubble edge (no overhang). v6 simplified: plain flavour-coloured icon (no badge circle), 1px outline, no shadow, 14px radius, small tail, 15px text. v5 (2026-11-09): iMessage shape + tail kept; the earlier outlined look is
   // back on top of it — near-white fill tinted 6% with the flavour colour, a
   // 1.5px outline (flavour 38% over the surface) and a soft shadow. The tail
   // is drawn with the same fill and outline so bubble and tail read as one
@@ -180,27 +180,30 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
           {textContent}
         </div>
       </div>
-      {/* Tail — same fill + outline as the bubble. The strip hides the
-          bubble's own side border where the tail begins; the stroked curve
-          and bottom line carry the outline out to the tip. Pokes 10px out. */}
+      {/* Tail — a small rounded beak hanging under the bottom corner, flush
+          with the bubble's own side edge (no overhang into the margin). Same
+          fill and outline as the bubble; the fill strip hides the bubble's
+          bottom border where the beak joins, so the outline flows round it. */}
       <svg
         aria-hidden="true"
-        width="7.5"
-        height="9"
-        viewBox="0 0 7.5 9"
+        width="15"
+        height="12"
+        viewBox="0 0 15 12"
         style={{
           position: 'absolute',
-          bottom: 0,
-          [isArabic ? 'right' : 'left']: -5,
+          top: 'calc(100% - 1.5px)',
+          [isArabic ? 'right' : 'left']: 0,
           transform: isArabic ? 'scaleX(-1)' : 'none',
           overflow: 'visible',
           pointerEvents: 'none',
         }}
       >
-        <path d="M5.75 4 C5.75 7 3.75 8 0.75 8.25 L5.75 8.25 Z" style={{ fill }} />
-        <path d="M4.9 4 H6.6 V7.5 H4.9 Z" style={{ fill }} />
         <path
-          d="M5.75 4 C5.75 7 3.75 8 0.75 8.25 L6.5 8.25"
+          d="M0.75 0 V9 Q0.75 10.8 2.5 10.1 Q9 7.6 14 0.75 V0 Z"
+          style={{ fill }}
+        />
+        <path
+          d="M0.75 0.5 V9 Q0.75 10.8 2.5 10.1 Q9 7.6 14 0.75"
           style={{ fill: 'none', stroke: line, strokeWidth: 1.5, strokeLinejoin: 'round', strokeLinecap: 'round' }}
         />
       </svg>
@@ -213,7 +216,7 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
 
   if (variant === 'divider') {
     return (
-      <div style={{ marginTop: 12, marginBottom: 8 }}>
+      <div style={{ marginTop: 12, marginBottom: 16 }}>
         {bubble}
       </div>
     )
@@ -221,7 +224,7 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
 
   // variant='inline' — sits directly under prescription rows, tighter margins
   return (
-    <div style={{ marginTop: 10, marginBottom: 2 }}>
+    <div style={{ marginTop: 10, marginBottom: 12 }}>
       {bubble}
     </div>
   )
