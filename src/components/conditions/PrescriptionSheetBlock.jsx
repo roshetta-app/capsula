@@ -538,7 +538,7 @@ function UnifiedDrugRow({ row, formulation, drugs, navigate, dividerType }) {
   // off before the note begins).
   const dividerStyle =
     dividerType === 'drug'
-      ? '1.5px solid color-mix(in srgb, var(--color-border) 55%, transparent 45%)'
+      ? '1.5px solid color-mix(in srgb, var(--color-text-tertiary) 30%, transparent 70%)'
       : dividerType === 'note'
         ? '1.5px solid var(--color-border)'
         : 'none'
