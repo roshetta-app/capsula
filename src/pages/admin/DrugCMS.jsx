@@ -127,7 +127,7 @@ export default function DrugCMS() {
 
   // ── Debounce search input — one query per pause-in-typing, not per keystroke ──
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedQuery(query), 300)
+    const t = setTimeout(() => setDebouncedQuery(query), 150)
     return () => clearTimeout(t)
   }, [query])
 
@@ -390,6 +390,7 @@ export default function DrugCMS() {
                     </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); navigate(`/admin/drugs/generic/${b.genericId}?formulation=${b.formulationId}&brand=${b.id}`) }}
+                      className="cms-hide-phone"
                       aria-label="Edit"
                       title="Edit generic, formulations & brands"
                       style={iconBtnStyle}
@@ -441,7 +442,8 @@ export default function DrugCMS() {
                       </button>
                       <button
                         onClick={(e) => { e.stopPropagation(); navigate(`/admin/drugs/generic/${g.id}`) }}
-                        aria-label="Edit"
+                        className="cms-hide-phone"
+                      aria-label="Edit"
                         title="Edit generic, formulations & brands"
                         style={iconBtnStyle}
                       >

@@ -150,6 +150,7 @@ export default function GenericDrugCard({
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)', flexShrink: 0 }}>
         {trailing}
         <svg
+          className="cms-hide-phone"
           width="12" height="12" viewBox="0 0 24 24"
           fill="none" stroke="currentColor" strokeWidth="2.5"
           strokeLinecap="round" strokeLinejoin="round"
