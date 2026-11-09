@@ -205,8 +205,13 @@ function rowSummary(row) {
     return [name, rest].filter(Boolean).join(' ') || 'Empty drug'
   }
   if (row.row_type === 'section') {
-    const count = (row.drugs ?? []).length
-    const countLabel = count === 1 ? '1 drug' : `${count} drugs`
+    const items = row.drugs ?? []
+    const count = items.filter(r => r.row_type === 'drug').length
+    const texts = items.filter(r => r.row_type === 'free_text').length
+    const countLabel = [
+      count === 1 ? '1 drug' : `${count} drugs`,
+      texts ? (texts === 1 ? '1 text' : `${texts} texts`) : null,
+    ].filter(Boolean).join(', ')
     return [row.label || 'Untitled section', `(${countLabel})`].join(' ')
   }
   if (row.row_type === 'note') {
@@ -324,7 +329,12 @@ const TOP_LEVEL_TYPES = [
   { type: 'image',     label: 'Image',      color: '#7C3AED' },
 ]
 
-function GapInsertControl({ insertIndex, onInsert, isTouchActive, onTouchActivate, onTouchDismiss, disabled = false }) {
+const SECTION_TYPES = [
+  { type: 'drug',      label: 'Drug',       color: '#6366f1' },
+  { type: 'free_text', label: 'Text Block', color: '#1D4ED8' },
+]
+
+function GapInsertControl({ insertIndex, onInsert, isTouchActive, onTouchActivate, onTouchDismiss, disabled = false, types = TOP_LEVEL_TYPES }) {
   const [hovered,    setHovered]    = useState(false)
   const [focused,    setFocused]    = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -428,7 +438,7 @@ function GapInsertControl({ insertIndex, onInsert, isTouchActive, onTouchActivat
             whiteSpace: 'nowrap',
           }}
         >
-          {TOP_LEVEL_TYPES.map(({ type, label, color }) => (
+          {types.map(({ type, label, color }) => (
             <button
               key={type}
               type="button"
@@ -470,84 +480,11 @@ function GapInsertControl({ insertIndex, onInsert, isTouchActive, onTouchActivat
   )
 }
 
-// ─── Gap insert control — section nested list (drug-only, no picker) ──────────
-//
-// Sections can only contain drug rows, so there is no type ambiguity —
-// clicking inserts a drug row immediately. No picker UI is shown.
-
-function GapInsertDrugOnly({ insertIndex, onInsert, isTouchActive, onTouchActivate, onTouchDismiss, disabled = false }) {
-  const [hovered, setHovered] = useState(false)
-  const [focused, setFocused] = useState(false)
-
-  const visible = hovered || focused || isTouchActive
-
-  function handleClick(e) {
-    if (disabled) return
-    e.stopPropagation()
-    onInsert()
-    onTouchDismiss()
-  }
-
-  function handleTouchStart(e) {
-    if (disabled) return
-    if (!isTouchActive) {
-      e.preventDefault()
-      onTouchActivate()
-    }
-    // second tap falls through to onClick
-  }
-
-  return (
-    <div
-      style={{ position: 'relative', height: 16, marginTop: -3, marginBottom: -3, zIndex: 10 }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
-      <div style={{
-        position: 'absolute', inset: '50% 0 auto 0',
-        transform: 'translateY(-50%)',
-        display: 'flex', alignItems: 'center',
-        opacity: visible ? 1 : 0,
-        transition: 'opacity 0.15s ease',
-        pointerEvents: visible ? 'auto' : 'none',
-      }}>
-        <div style={{ flex: 1, height: 1, background: 'var(--color-border)' }} />
-        <button
-          type="button"
-          aria-label={`Insert drug at position ${insertIndex + 1}`}
-          disabled={disabled}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
-          onTouchStart={handleTouchStart}
-          onClick={handleClick}
-          title="Insert drug here"
-          style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            width: 18, height: 18, flexShrink: 0,
-            borderRadius: '50%',
-            border: '1.5px solid #6366f1',
-            background: 'var(--color-surface)',
-            color: '#6366f1',
-            cursor: disabled ? 'default' : 'pointer',
-            opacity: disabled ? 0.5 : 1,
-            padding: 0,
-            margin: '0 5px',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-          }}
-        >
-          <Plus size={10} />
-        </button>
-        <div style={{ flex: 1, height: 1, background: 'var(--color-border)' }} />
-      </div>
-    </div>
-  )
-}
-
 // ─── Section row editor (PHASE 4 — nested drugs[] card) ──────────────────────
 // Renders a 'section' row's label field plus its own nested drug-row list,
 // each member rendered via the same RowCard component used at the top level
-// (recursion, not duplication). Only drug-type rows belong here — two levels
-// max (sheet -> section -> drugs).
+// (recursion, not duplication). Drug rows and text-only blocks belong here —
+// two levels max (sheet -> section -> items).
 
 function SectionRowEditor({ row, onChange, onMoveDrugOut, disabled = false }) {
   const drugs = row.drugs ?? []
@@ -559,8 +496,13 @@ function SectionRowEditor({ row, onChange, onMoveDrugOut, disabled = false }) {
   // Touch gap reveal state for the nested list
   const [activeTouchGap, setActiveTouchGap] = useState(null)
 
-  function addDrugAt(index) {
-    insertRowAt(index, { ...DRUG_ROW_TEMPLATE, id: nanoid() })
+  // A section holds drugs and text-only blocks (no heading field — the text
+  // block's own markdown is all there is). Text blocks can't be moved out.
+  function addItemAt(index, type) {
+    const next = type === 'free_text'
+      ? { row_type: 'free_text', id: nanoid(), content: '' }
+      : { ...DRUG_ROW_TEMPLATE, id: nanoid() }
+    insertRowAt(index, next)
     setActiveTouchGap(null)
   }
 
@@ -607,13 +549,14 @@ function SectionRowEditor({ row, onChange, onMoveDrugOut, disabled = false }) {
       {/* ── Nested drug rows ── */}
       {drugs.length === 0 ? (
         <>
-          <GapInsertDrugOnly
+          <GapInsertControl
             insertIndex={0}
-            onInsert={() => addDrugAt(0)}
+            onInsert={type => addItemAt(0, type)}
             isTouchActive={activeTouchGap === 0}
             onTouchActivate={() => setActiveTouchGap(0)}
             onTouchDismiss={() => setActiveTouchGap(null)}
             disabled={disabled}
+            types={SECTION_TYPES}
           />
           <div style={{
             textAlign: 'center', fontSize: 12,
@@ -622,19 +565,20 @@ function SectionRowEditor({ row, onChange, onMoveDrugOut, disabled = false }) {
             border: '1.5px dashed var(--color-border)',
             borderRadius: 'var(--radius-md)',
           }}>
-            No drugs in this section yet.
+            Nothing in this section yet.
           </div>
         </>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           {/* Gap before the first row */}
-          <GapInsertDrugOnly
+          <GapInsertControl
             insertIndex={0}
-            onInsert={() => addDrugAt(0)}
+            onInsert={type => addItemAt(0, type)}
             isTouchActive={activeTouchGap === 0}
             onTouchActivate={() => setActiveTouchGap(0)}
             onTouchDismiss={() => setActiveTouchGap(null)}
             disabled={disabled}
+            types={SECTION_TYPES}
           />
           {drugs.map((drug, idx) => (
             <div key={drug.id ?? idx}>
@@ -650,13 +594,14 @@ function SectionRowEditor({ row, onChange, onMoveDrugOut, disabled = false }) {
                 disabled={disabled}
               />
               {/* Gap after every row (including the last — acts as append) */}
-              <GapInsertDrugOnly
+              <GapInsertControl
                 insertIndex={idx + 1}
-                onInsert={() => addDrugAt(idx + 1)}
+                onInsert={type => addItemAt(idx + 1, type)}
                 isTouchActive={activeTouchGap === idx + 1}
                 onTouchActivate={() => setActiveTouchGap(idx + 1)}
                 onTouchDismiss={() => setActiveTouchGap(null)}
                 disabled={disabled}
+                types={SECTION_TYPES}
               />
             </div>
           ))}

@@ -149,38 +149,72 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
   // the icon's side: LTR notes square the top-LEFT corner with the icon on
   // the left; RTL notes square the top-RIGHT corner with the icon on the
   // right — the tail always points toward the side the text reads FROM.
-  const bubbleRadius = isArabic
-    ? '20px 0px 20px 20px'   // squared top-right, RTL
-    : '0px 20px 20px 20px'   // squared top-left, LTR
+  // MESSAGE-BUBBLE PASS (2026-11-09): reads like a chat message. The bubble is
+  // inset 9px on the side the text reads from, and a small tail sticks out of
+  // that top corner into the gap (the corner itself stays square, so tail and
+  // bubble join cleanly). The flavour icon sits in a round badge instead of
+  // floating bare. Soft 18px radius on the other three corners.
+  // CSS order: top-left, top-right, bottom-right, bottom-left.
+  const radius = isArabic
+    ? '18px 0px 18px 18px'   // squared top-right, RTL
+    : '0px 18px 18px 18px'   // squared top-left, LTR
 
   const bubble = (
     <div style={{
-      width: '100%',
-      boxSizing: 'border-box',
-      background: f.bg,
-      borderRadius: bubbleRadius,
-      padding: '10px 14px',
+      position: 'relative',
+      marginLeft: isArabic ? 0 : 9,
+      marginRight: isArabic ? 9 : 0,
     }}>
+      {/* Tail */}
       <div
+        aria-hidden="true"
         style={{
-          display: 'flex',
-          flexDirection: isArabic ? 'row-reverse' : 'row',
-          alignItems: 'flex-start',
-          gap: 10,
+          position: 'absolute',
+          top: 0,
+          [isArabic ? 'right' : 'left']: -9,
+          width: 10,
+          height: 13,
+          background: f.bg,
+          clipPath: isArabic
+            ? 'polygon(0 0, 0 100%, 100% 0)'
+            : 'polygon(100% 0, 100% 100%, 0 0)',
         }}
-      >
-        {/* Icon side is controlled ONLY by flexDirection here — no dir
-            attribute on this row. Combining dir="rtl" with row-reverse (or
-            with reordered JSX children) caused competing flip logic across
-            browser engines, which is why earlier attempts left the icon
-            stuck on the left for Arabic notes. flexDirection alone, with
-            no dir on this element, is unambiguous: row-reverse always
-            renders the icon first-in-source visually second (i.e. on the
-            right), regardless of any dir inherited from an ancestor.
-            dir stays on the inner text content below, where it's needed
-            for correct bidi character shaping — not here. */}
-        <Icon color={f.iconColor} />
-        {textContent}
+      />
+      <div style={{
+        width: '100%',
+        boxSizing: 'border-box',
+        background: f.bg,
+        borderRadius: radius,
+        padding: '11px 14px',
+        boxShadow: '0 1px 1px rgba(0,0,0,0.04)',
+      }}>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: isArabic ? 'row-reverse' : 'row',
+            alignItems: 'flex-start',
+            gap: 10,
+          }}
+        >
+          {/* Icon side is controlled ONLY by flexDirection here — no dir
+              attribute on this row (dir + row-reverse double-flips in some
+              engines). dir stays on the inner text content, where it is
+              needed for correct bidi shaping. */}
+          <span style={{
+            width: 28,
+            height: 28,
+            flexShrink: 0,
+            marginTop: -2,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: '50%',
+            background: `color-mix(in srgb, ${f.iconColor} 16%, transparent)`,
+          }}>
+            <Icon color={f.iconColor} size={16} offset={0} />
+          </span>
+          {textContent}
+        </div>
       </div>
     </div>
   )

@@ -446,9 +446,14 @@ export default function ConditionDetailScreen() {
             // BottomNav's visibility, which left dead white space below
             // the last block (e.g. the disclaimer footer) whenever the
             // keyboard opened and BottomNav unmounted (Phase 16).
-            paddingBottom: keyboardOpen
-              ? 'var(--space-4)'
-              : 'calc(60px + env(safe-area-inset-bottom) + var(--space-4))',
+            // The Treatment tab's footer section reaches the bottom itself
+            // (it gets this same clearance as its own padding), so the tab
+            // container adds none there.
+            paddingBottom: activeTab === 0
+              ? 0
+              : keyboardOpen
+                ? 'var(--space-4)'
+                : 'calc(60px + env(safe-area-inset-bottom) + var(--space-4))',
             // Only animate on a real tab switch (tap or swipe), never on
             // mount/refresh — hasSwitchedRef stays false through the first
             // render. Direction picks which side the incoming tab slides in from.
@@ -463,6 +468,10 @@ export default function ConditionDetailScreen() {
               conditionId={condition.id}
               activeIndex={rxPlanIndex}
               onActiveIndexChange={setRxPlanIndex}
+              footerBleed
+              bottomInset={keyboardOpen
+                ? 'var(--space-4)'
+                : 'calc(60px + env(safe-area-inset-bottom) + var(--space-4))'}
             />
           ) : (
             <ClinicalDataTab blocks={condition.blocks ?? []} />

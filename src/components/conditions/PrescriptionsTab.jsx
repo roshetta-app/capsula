@@ -147,7 +147,10 @@ import { getRxBlocks, trimDividerEdges } from '../../utils/blockFilters'
  *                kept by the parent so it survives tab switches and a trip to
  *                a drug page and back. Falls back to local state if omitted.
  */
-export default function PrescriptionsTab({ blocks, conditionId, activeIndex: activeIndexProp, onActiveIndexChange }) {
+// footerBleed — true on the real screen: the footer section breaks out of the page's side
+// padding to run edge to edge. bottomInset — space under the footer (the screen passes the
+// bottom-nav clearance so the footer reaches down to the nav bar instead of leaving a gap).
+export default function PrescriptionsTab({ blocks, conditionId, activeIndex: activeIndexProp, onActiveIndexChange, footerBleed = false, bottomInset = 'var(--space-6)' }) {
   const [localIndex, setLocalIndex] = useState(0)
   const activeIndex    = activeIndexProp ?? localIndex
   const setActiveIndex = onActiveIndexChange ?? setLocalIndex
@@ -208,16 +211,26 @@ export default function PrescriptionsTab({ blocks, conditionId, activeIndex: act
         </div>
       )}
 
+      {/* ── Footer section (2026-11-09) — Personal Notes + disclaimer sit in
+          their own tinted section with a rounded top, so the page reads as
+          "treatment content" then "footer". Slightly darker than the page
+          background; Personal Notes' own white cards stand out on it. ── */}
+      <div style={{
+        marginTop: 'var(--space-8)',
+        marginLeft: footerBleed ? 'calc(var(--space-6) * -1)' : 0,
+        marginRight: footerBleed ? 'calc(var(--space-6) * -1)' : 0,
+        padding: `var(--space-2) ${footerBleed ? 'var(--space-6)' : 0} ${bottomInset}`,
+        background: 'color-mix(in srgb, var(--color-text-primary) 5%, var(--color-bg))',
+        borderRadius: '28px 28px 0 0',
+      }}>
       {/* Personal Notes */}
       {conditionId && <PersonalNotes conditionId={conditionId} />}
 
       {/* Quiet editorial footnote — no divider, no card, no heading.
-          Spacing alone (56dp above) separates it from Personal Notes;
           opacity-muted icon is vertically centered against the text
           block so the two read as a single low-emphasis unit. */}
       <div style={{
-        marginTop: 56,
-        paddingBottom: 'var(--space-6)',
+        marginTop: 'var(--space-6)',
       }}>
         <div style={{
           display: 'flex',
@@ -236,6 +249,7 @@ export default function PrescriptionsTab({ blocks, conditionId, activeIndex: act
             <span style={{ fontWeight: 400 }}> Verify doses, contraindications, patient-specific factors, and local guidelines before prescribing.</span>
           </p>
         </div>
+      </div>
       </div>
     </div>
   )

@@ -271,7 +271,18 @@ export default function PrescriptionSheetBlock({ sheet, hasContentAfter = true }
   const ROW_KIND = { drug: 'drug', note: 'note', free_text: 'text', divider: 'divider', image: 'gallery' }
   const entries = []
   segments.forEach((segment, segIdx) => {
-    const renderItems = () => segment.items.map((row, i) => renderRowItem(row, i, segment.items[i + 1]))
+    // Inside a section, drug rows stack tight (their own dividers space them).
+    // A text block or note next to anything else gets a small gap so it does
+    // not run into the drug rows around it.
+    const renderItems = () => segment.items.map((row, i) => {
+      const node = renderRowItem(row, i, segment.items[i + 1])
+      if (!node) return null
+      const prev = segment.items[i - 1]
+      const needsGap = i > 0 && (row.row_type !== 'drug' || prev?.row_type !== 'drug')
+      return needsGap
+        ? <div key={row.id ?? `sec-${segIdx}-${i}`} style={{ marginTop: 12 }}>{node}</div>
+        : node
+    })
     if (segment.label !== null) {
       entries.push({
         kind: 'section',
