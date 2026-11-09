@@ -80,14 +80,25 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
   const accentSolid = 'var(--color-accent-solid, var(--color-accent))'
 
   return (
-    <>
+    // Selector section — a full-width white sheet under the page header, same
+    // look as the header (white surface, soft shadow, rounded corners). It
+    // breaks out of the content column's side padding and pulls up toward the
+    // header so the page reads as three zones: header, selector, content.
+    <div
+      style={{
+        margin: 'calc(var(--space-5) * -1 + var(--space-3)) calc(var(--space-6) * -1) var(--space-5)',
+        padding: 'var(--space-4) var(--space-6)',
+        background: 'var(--color-surface)',
+        borderRadius: 18,
+        boxShadow: '0 2px 6px rgba(0,0,0,0.05)',
+      }}
+    >
     <div
       ref={containerRef}
       onTouchStart={e => e.stopPropagation()}
       onTouchMove={e => e.stopPropagation()}
       style={{
         position: 'relative',
-        marginBottom: 'var(--space-4)',
         zIndex: open ? 56 : 'auto',
       }}
     >
@@ -278,15 +289,6 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
       )}
     </div>
 
-    {/* Divider — marks where the selector ends and the plan's content begins */}
-    <div
-      aria-hidden="true"
-      style={{
-        height: 1,
-        margin: '0 var(--space-1) var(--space-4)',
-        background: 'linear-gradient(to right, transparent, var(--color-border) 12%, var(--color-border) 88%, transparent)',
-      }}
-    />
-    </>
+    </div>
   )
 }
