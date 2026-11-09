@@ -245,7 +245,7 @@ export default function GatesManager() {
                 />
               </label>
 
-              <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
+              <div className="cms-stack" style={{ display: 'flex', gap: 'var(--space-3)' }}>
                 <label style={{ ...styles.fieldLabel, flex: 1 }}>
                   CTA label (optional)
                   <input
@@ -293,7 +293,7 @@ export default function GatesManager() {
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
+          <div className="cms-stack" style={{ display: 'flex', gap: 'var(--space-3)' }}>
             <label style={{ ...styles.fieldLabel, flex: 1 }}>
               Starts (optional)
               <input

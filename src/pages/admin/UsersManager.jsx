@@ -153,7 +153,8 @@ function UserModal({ open, user, onClose, onSaved, onRequestBanConfirm }) {
         </div>
 
         {profileFields.length > 0 && (
-          <div style={{
+          <div className="cms-cols cms-wrap-any" style={{
+            '--cols-phone': 'minmax(0, 1fr) minmax(0, 1fr)',
             display:      'grid',
             gridTemplateColumns: '1fr 1fr',
             gap:          '8px 16px',
@@ -341,7 +342,7 @@ export default function UsersManager() {
           overflow: 'hidden',
           backgroundColor: 'var(--color-surface)',
         }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <table className="cms-table-cards" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ backgroundColor: 'var(--color-surface-muted)' }}>
                 <th style={thStyle}>Name</th>

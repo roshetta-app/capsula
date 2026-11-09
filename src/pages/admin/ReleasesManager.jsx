@@ -154,8 +154,8 @@ export default function ReleasesManager() {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
           {releases.map(r => (
-            <div key={r.id} style={styles.row}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+            <div key={r.id} className="cms-row-wrap" style={styles.row}>
+              <div className="cms-fill-phone" style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
                   <span style={{ fontWeight: 700, fontSize: 14, fontFamily: 'var(--font-body)', color: 'var(--color-text-primary)' }}>
                     {r.version}
@@ -177,11 +177,11 @@ export default function ReleasesManager() {
               </div>
 
               {r.is_minimum_supported ? (
-                <button onClick={() => setUnsetTarget(r)} style={styles.unsetMinButton}>
+                <button onClick={() => setUnsetTarget(r)} className="cms-push-right" style={styles.unsetMinButton}>
                   Unset minimum
                 </button>
               ) : (
-                <button onClick={() => setConfirmTarget(r)} style={styles.setMinButton}>
+                <button onClick={() => setConfirmTarget(r)} className="cms-push-right" style={styles.setMinButton}>
                   Set as minimum
                 </button>
               )}

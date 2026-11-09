@@ -458,7 +458,7 @@ export default function NotificationsPanel() {
             <label style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 8 }}>
               Type
             </label>
-            <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+            <div className="cms-row-wrap" style={{ display: 'flex', gap: 'var(--space-2)' }}>
               {TYPES.map(t => (
                 <button
                   key={t.id}
@@ -603,7 +603,7 @@ export default function NotificationsPanel() {
               Link to (optional)
             </label>
             {linkType === 'none' ? (
-              <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+              <div className="cms-row-wrap" style={{ display: 'flex', gap: 'var(--space-2)' }}>
                 <button
                   type="button"
                   onClick={() => setDrugPickerOpen(true)}
@@ -632,7 +632,7 @@ export default function NotificationsPanel() {
                 </button>
               </div>
             ) : (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+              <div className="cms-row-wrap" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
                 <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>
                   {linkTarget?.label}
                 </span>
@@ -664,7 +664,7 @@ export default function NotificationsPanel() {
             <label style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 8 }}>
               Send time
             </label>
-            <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: scheduleMode === 'custom' ? 8 : 0 }}>
+            <div className="cms-row-wrap" style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: scheduleMode === 'custom' ? 8 : 0 }}>
               <button
                 type="button"
                 onClick={() => { setScheduleMode('default'); setCustomScheduleAt('') }}
@@ -957,7 +957,7 @@ export default function NotificationsPanel() {
                         outline: 'none', resize: 'vertical', lineHeight: 1.5,
                       }}
                     />
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+                    <div className="cms-row-wrap" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
                       <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                         Send at
                       </label>
@@ -1005,7 +1005,7 @@ export default function NotificationsPanel() {
               }
 
               return (
-                <div key={row.id} style={{
+                <div key={row.id} className="cms-notif-sched" style={{
                   display: 'grid',
                   gridTemplateColumns: '90px 80px minmax(0,1fr) auto auto auto',
                   gap: 'var(--space-3)',
@@ -1196,7 +1196,7 @@ export default function NotificationsPanel() {
           }}>
 
             {/* Table head */}
-            <div style={theadStyle}>
+            <div className="cms-hide-phone" style={theadStyle}>
               <span style={thStyle}>Sent</span>
               <span style={thStyle}>Type</span>
               <span style={thStyle}>Title / Message</span>
@@ -1215,7 +1215,7 @@ export default function NotificationsPanel() {
 
               return (
                 <div key={entry.id}>
-                  <div style={{
+                  <div className="cms-notif-hist" style={{
                     display: 'grid',
                     gridTemplateColumns: '140px 80px minmax(0,1fr) 55px 55px 55px 55px 32px',
                     gap: 'var(--space-3)',
