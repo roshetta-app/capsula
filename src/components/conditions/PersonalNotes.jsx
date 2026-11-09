@@ -1100,7 +1100,6 @@ export default function PersonalNotes({ conditionId }) {
   return (
     <div style={{
       marginTop: 'var(--space-4)',
-      borderTop: '1px solid var(--color-border)',
       paddingTop: 'var(--space-4)',
     }}>
       {/* Scoped placeholder color — inline style attributes can't target

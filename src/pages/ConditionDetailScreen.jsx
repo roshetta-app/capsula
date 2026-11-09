@@ -372,11 +372,11 @@ export default function ConditionDetailScreen() {
           push-transition curve) replaces the earlier flat opacity fade. */}
       <style>{`
         @keyframes conditionTabSlideFromRight {
-          from { opacity: 0; transform: translateX(16px); }
+          from { opacity: 0; transform: translateX(12px); }
           to   { opacity: 1; transform: translateX(0); }
         }
         @keyframes conditionTabSlideFromLeft {
-          from { opacity: 0; transform: translateX(-16px); }
+          from { opacity: 0; transform: translateX(-12px); }
           to   { opacity: 1; transform: translateX(0); }
         }
       `}</style>
@@ -426,7 +426,7 @@ export default function ConditionDetailScreen() {
             // mount/refresh — hasSwitchedRef stays false through the first
             // render. Direction picks which side the incoming tab slides in from.
             animation: hasSwitchedRef.current
-              ? `${tabDirection.current === 1 ? 'conditionTabSlideFromRight' : 'conditionTabSlideFromLeft'} 0.3s cubic-bezier(0.25, 0.1, 0.25, 1)`
+              ? `${tabDirection.current === 1 ? 'conditionTabSlideFromRight' : 'conditionTabSlideFromLeft'} 0.26s var(--ease-settle)`
               : 'none',
           }}
         >
@@ -681,7 +681,7 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTa
         )}
 
         {/* ─── Tab strip ─────────────────────────────────────────────────────── */}
-        <div style={{ display: 'flex' }}>
+        <div style={{ display: 'flex', position: 'relative', paddingBottom: 6 }}>
           {TABS.map(({ label, renderIcon }, i) => {
             const isActive = activeTab === i
             // Inactive tab contrast — text-secondary (was text-tertiary), matching
@@ -724,22 +724,31 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTa
                     {label}
                   </span>
                 </button>
-                {/* Underline — full width of the tab cell, flush edge-to-edge.
-                    Thickness/radius kept in lockstep with FavouritesScreen's
-                    renderTabs underline — the two are required to be
-                    pixel-identical, so any change here must be mirrored there. */}
-                <span style={{
-                  display: 'block',
-                  height: 2,
-                  width: '100%',
-                  marginTop: 4,
-                  borderRadius: 'var(--radius-full)',
-                  backgroundColor: isActive ? 'var(--color-accent)' : 'transparent',
-                  transition: 'background-color 0.15s ease',
-                }} />
               </div>
             )
           })}
+          {/* Sliding indicator — one rounded bar that glides to the active
+              tab (each tab is an equal share of the strip). Inset a little
+              from the cell edges so both ends read as soft pills. */}
+          <span aria-hidden="true" style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            width: `${100 / TABS.length}%`,
+            height: 3,
+            padding: '0 var(--space-4)',
+            boxSizing: 'border-box',
+            transform: `translateX(${activeTab * 100}%)`,
+            transition: 'transform var(--motion-screen) var(--ease-settle)',
+            pointerEvents: 'none',
+          }}>
+            <span style={{
+              display: 'block',
+              height: '100%',
+              borderRadius: 'var(--radius-full)',
+              backgroundColor: 'var(--color-accent)',
+            }} />
+          </span>
         </div>
 
       </div>
