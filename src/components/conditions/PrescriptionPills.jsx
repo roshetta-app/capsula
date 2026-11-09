@@ -115,10 +115,11 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
           WebkitTapHighlightColor: 'transparent',
           outline: 'none',
           background: open
-            ? 'color-mix(in srgb, var(--color-accent) 14%, var(--color-surface))'
-            : 'color-mix(in srgb, var(--color-accent) 8%, var(--color-surface))',
-          border: `1.5px solid color-mix(in srgb, var(--color-accent) ${open ? 60 : 28}%, transparent)`,
+            ? 'var(--color-accent-hover, var(--color-accent-solid, var(--color-accent)))'
+            : accentSolid,
+          border: 'none',
           borderRadius: 'var(--radius-lg)',
+          boxShadow: '0 6px 16px color-mix(in srgb, var(--color-accent) 32%, transparent)',
           transform: pressed ? 'scale(0.992)' : 'scale(1)',
           transition: 'background 0.15s ease, border-color 0.15s ease, transform 0.12s ease',
         }}
@@ -132,7 +133,7 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
           alignItems: 'center',
           justifyContent: 'center',
           borderRadius: 'var(--radius-md)',
-          background: accentSolid,
+          background: 'rgba(255,255,255,0.18)',
           color: '#fff',
         }}>
           <ClipboardPlus size={18} strokeWidth={2} aria-hidden="true" />
@@ -144,7 +145,7 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
             fontSize: 11,
             fontWeight: 600,
             letterSpacing: '0.02em',
-            color: accentText,
+            color: 'rgba(255,255,255,0.8)',
           }}>
             Tap to change
           </span>
@@ -160,7 +161,7 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
               lineHeight: 1.25,
               fontWeight: 700,
               letterSpacing: '-0.2px',
-              color: 'var(--color-text-primary)',
+              color: '#fff',
             }}
           >
             {selected.label}
@@ -178,7 +179,6 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
           borderRadius: 'var(--radius-full, 9999px)',
           background: 'var(--color-surface)',
           color: accentText,
-          boxShadow: 'var(--shadow-card)',
         }}>
           <ChevronDown
             size={18}
