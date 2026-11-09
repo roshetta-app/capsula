@@ -80,13 +80,14 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
   const accentSolid = 'var(--color-accent-solid, var(--color-accent))'
 
   return (
+    <>
     <div
       ref={containerRef}
       onTouchStart={e => e.stopPropagation()}
       onTouchMove={e => e.stopPropagation()}
       style={{
         position: 'relative',
-        marginBottom: 'var(--space-3)',
+        marginBottom: 'var(--space-4)',
         zIndex: open ? 56 : 'auto',
       }}
     >
@@ -150,10 +151,13 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
           <span
             dir="auto"
             style={{
+              display: '-webkit-box',
+              WebkitBoxOrient: 'vertical',
+              WebkitLineClamp: 2,
               overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
+              overflowWrap: 'anywhere',
               fontSize: 16,
+              lineHeight: 1.25,
               fontWeight: 700,
               letterSpacing: '-0.2px',
               color: 'var(--color-text-primary)',
@@ -273,5 +277,16 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
         </div>
       )}
     </div>
+
+    {/* Divider — marks where the selector ends and the plan's content begins */}
+    <div
+      aria-hidden="true"
+      style={{
+        height: 1,
+        margin: '0 var(--space-1) var(--space-4)',
+        background: 'linear-gradient(to right, transparent, var(--color-border) 12%, var(--color-border) 88%, transparent)',
+      }}
+    />
+    </>
   )
 }
