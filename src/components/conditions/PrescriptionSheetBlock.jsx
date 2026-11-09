@@ -350,9 +350,9 @@ export default function PrescriptionSheetBlock({ sheet, hasContentAfter = true }
 
 /**
  * DrugCard — the section card's twin without a header: a full-width tinted
- * card around loose drug rows. Uses --color-drug-card-bg (sage-teal), a
+ * card around loose drug rows. Uses --color-drug-card-bg (faint blue), a
  * different hue from --color-section-bg (violet) and --color-note-bg (grey).
- * Same radius and inner padding as SectionHeader so the two line up.
+ * Same radius and the same equal top/bottom padding as SectionHeader.
  */
 function DrugCard({ children }) {
   return (
@@ -361,7 +361,7 @@ function DrugCard({ children }) {
         background: 'var(--color-drug-card-bg)',
         borderRadius: 'var(--radius-lg)',
         overflow: 'hidden',
-        padding: 'var(--space-1) var(--space-4) var(--space-2)',
+        padding: 'var(--space-1) var(--space-4)',
       }}
     >
       {children}
@@ -394,7 +394,8 @@ function SectionHeader({ label, children }) {
   return (
     <div
       style={{
-        background: 'var(--color-section-bg)',
+        // Fainter than the raw token (which the class search mode also uses).
+        background: 'color-mix(in srgb, var(--color-section-bg) 60%, transparent)',
         borderRadius: 'var(--radius-lg)',
         overflow: 'hidden',
       }}
@@ -414,7 +415,7 @@ function SectionHeader({ label, children }) {
       >
         {label}
       </div>
-      <div style={{ padding: 'var(--space-1) var(--space-4) var(--space-2)' }}>
+      <div style={{ padding: 'var(--space-1) var(--space-4)' }}>
         {children}
       </div>
     </div>
