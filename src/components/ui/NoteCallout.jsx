@@ -144,16 +144,15 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
   )
 
   // ── Bubble shape — shared by both variants ────────────────────────────────
+  // v10 (2026-11-09): modern messaging-app bubble — flat tinted fill, no
+  // outline, big 20px corners (a one-line note becomes a pill), and a small
+  // curved hook tail at the bottom corner (bottom-left for English,
+  // bottom-right for Arabic) that pokes out ~8px past the side edge. The
+  // bubble's own bottom corner on the tail side is square; the tail's fill
+  // covers it, so bubble and tail read as one smooth shape.
   // Full width, always. Icon side follows the text direction (Arabic: right).
-  // v9: rounder modern bubble — 20px corners, smooth curved tail. v8: beak halved in height with a soft rounded tip (subtle hint, not a point). v7: tail is a small rounded beak flush with the bubble edge (no overhang). v6 simplified: plain flavour-coloured icon (no badge circle), 1px outline, no shadow, 14px radius, small tail, 15px text. v5 (2026-11-09): iMessage shape + tail kept; the earlier outlined look is
-  // back on top of it — near-white fill tinted 6% with the flavour colour, a
-  // 1.5px outline (flavour 38% over the surface) and a soft shadow. The tail
-  // is drawn with the same fill and outline so bubble and tail read as one
-  // shape. Tighter padding, 32px badge, and badge + text centred against each
-  // other vertically.
   const radius = isArabic ? '20px 20px 0px 20px' : '20px 20px 20px 0px'
-  const fill = `color-mix(in srgb, ${f.iconColor} 14%, var(--color-surface) 86%)`
-  const line = `color-mix(in srgb, ${f.iconColor} 75%, var(--color-surface) 25%)`
+  const fill = `color-mix(in srgb, ${f.iconColor} 16%, var(--color-surface) 84%)`
 
   const bubble = (
     <div style={{ position: 'relative' }}>
@@ -161,9 +160,8 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
         width: '100%',
         boxSizing: 'border-box',
         background: fill,
-        border: `1.5px solid ${line}`,
         borderRadius: radius,
-        padding: '9px 15px',
+        padding: '10px 16px',
       }}>
         <div
           style={{
@@ -180,31 +178,26 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
           {textContent}
         </div>
       </div>
-      {/* Tail — a small rounded beak hanging under the bottom corner, flush
-          with the bubble's own side edge (no overhang into the margin). Same
-          fill and outline as the bubble; the fill strip hides the bubble's
-          bottom border where the beak joins, so the outline flows round it. */}
+      {/* Tail — curved hook, same fill as the bubble, bottom aligned with the
+          bubble's bottom edge. Its right part sits inside the bubble (same
+          colour, so invisible); the left part pokes out 8px. */}
       <svg
         aria-hidden="true"
-        width="14"
-        height="8"
-        viewBox="0 0 14 8"
+        width="19"
+        height="16"
+        viewBox="0 0 19 16"
         style={{
           position: 'absolute',
-          top: 'calc(100% - 1.5px)',
-          [isArabic ? 'right' : 'left']: 0,
+          bottom: 0,
+          [isArabic ? 'right' : 'left']: -8,
           transform: isArabic ? 'scaleX(-1)' : 'none',
           overflow: 'visible',
           pointerEvents: 'none',
         }}
       >
         <path
-          d="M0.75 0 V4 C0.75 6.3 2.5 7.1 4.2 6.3 C7.2 5 10.6 3.2 13 0.75 V0 Z"
+          d="M8 0 V6.5 C8 11.8 4.6 14.8 0.7 15.4 Q-0.3 15.6 0.8 16 C6 16.2 12.5 15 19 11.5 V0 Z"
           style={{ fill }}
-        />
-        <path
-          d="M0.75 0.5 V4 C0.75 6.3 2.5 7.1 4.2 6.3 C7.2 5 10.6 3.2 13 0.75"
-          style={{ fill: 'none', stroke: line, strokeWidth: 1.5, strokeLinejoin: 'round', strokeLinecap: 'round' }}
         />
       </svg>
     </div>
