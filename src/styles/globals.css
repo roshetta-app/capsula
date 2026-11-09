@@ -1025,3 +1025,21 @@ body {
   @keyframes cap-heart-ring  { from { opacity: 0; } to { opacity: 0; } }
   @keyframes cap-heart-spark { from { opacity: 0; } to { opacity: 0; } }
 }
+
+/* ── Toasts (context/ToastContext.jsx) ───────────────────────────────────── */
+@keyframes cap-toast-in {
+  from { opacity: 0; transform: translateY(18px) scale(0.94); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes cap-toast-out {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to   { opacity: 0; transform: translateY(10px) scale(0.96); }
+}
+@keyframes cap-toast-pulse {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.04); }
+  100% { transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-cap-toast] { animation-duration: 1ms !important; }
+}
