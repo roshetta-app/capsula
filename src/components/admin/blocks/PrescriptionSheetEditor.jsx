@@ -78,11 +78,12 @@
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { ChevronUp, ChevronDown, MoreHorizontal, Plus, Pill, LayoutList, StickyNote, Type, Minus, Image as ImageIcon } from 'lucide-react'
+import { ChevronUp, ChevronDown, MoreHorizontal, Plus, Pill, LayoutList, StickyNote, Type, Minus, X, Image as ImageIcon } from 'lucide-react'
 import UnifiedDrugRowEditor, { PromoteAlternativeDialog } from './rows/UnifiedDrugRowEditor'
 import NoteRowEditor         from './rows/NoteRowEditor'
 import FreeTextPostEditor    from './FreeTextPostEditor'
 import ImageGalleryEditor    from './ImageGalleryEditor'
+import BlockDivider          from '../../conditions/BlockDivider'
 import { DRUG_ROW_TEMPLATE, SECTION_ROW_TEMPLATE, promoteAlternativeToMain } from '../../../constants/prescriptionRowSchema'
 import { nanoid } from 'nanoid'
 import { peekFlatDrug, loadFlatDrug, prefetchFlatDrugs } from '../../../utils/flatDrugCache'
@@ -211,7 +212,7 @@ function rowSummary(row) {
     return row.text_en || row.text || 'Empty note'
   }
   if (row.row_type === 'free_text') {
-    const md = row.content ?? row.markdown ?? ''
+    const md = (row.content ?? row.markdown ?? '').replace(/^\s*#+\s*/, '')
     return md.length > 60 ? md.slice(0, 60) + '…' : md || 'Empty text block'
   }
   if (row.row_type === 'divider') {
@@ -693,6 +694,8 @@ function RowCard({
   const cfg = ROW_TYPE_LABELS[row.row_type] ?? { color: '#9ca3af' }
   const isDrugRow = row.row_type === 'drug'
   const isDivider = row.row_type === 'divider'
+  // A text block that starts with # is a heading on the sheet; show it as one.
+  const isHeading = row.row_type === 'free_text' && /^\s*#/.test(row.content ?? row.markdown ?? '')
   const hasAlternatives = isDrugRow && (row.alternatives ?? []).length > 0
 
   function handleEditorChange(nextRow) {
@@ -709,10 +712,33 @@ function RowCard({
     setExpanded(!expanded)
   }
 
+  // 2026-11-09: a divider shows as the real divider (fading line with a small
+  // diamond), with its arrows and a one-tap remove. Nothing to open or edit.
+  if (isDivider) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 10px' }}>
+        <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontWeight: 600, minWidth: 18, textAlign: 'center' }}>
+          {idx + 1}
+        </span>
+        <div style={{ flex: 1, minWidth: 0 }}><BlockDivider /></div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+          <button type="button" onClick={() => onMove(idx, -1)} disabled={disabled || idx === 0} title="Move up" style={iconBtn(disabled || idx === 0)}>
+            <ChevronUp size={13} />
+          </button>
+          <button type="button" onClick={() => onMove(idx, 1)} disabled={disabled || idx === total - 1} title="Move down" style={iconBtn(disabled || idx === total - 1)}>
+            <ChevronDown size={13} />
+          </button>
+          <button type="button" onClick={() => onDeleteRequest(idx)} disabled={disabled} title="Remove divider" aria-label="Remove divider" style={iconBtn(disabled)}>
+            <X size={13} />
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div style={{
       border: '1px solid var(--color-border)',
-      borderLeft: `5px solid ${cfg.color}`,
       borderRadius: 'var(--radius-md)',
       background: 'var(--color-surface)',
     }}>
@@ -721,9 +747,9 @@ function RowCard({
         onClick={handleExpand}
         style={{
           display: 'flex', alignItems: 'center', gap: 8,
-          padding: isDivider ? '3px 10px' : '8px 10px',
+          padding: '8px 10px',
           cursor: 'pointer',
-          background: cfg.color + (isDrugRow ? '1A' : row.row_type === 'section' ? '2E' : isDivider ? '0F' : '1F'),
+          background: cfg.color + (isDrugRow ? '1A' : row.row_type === 'section' ? '2E' : '1F'),
           borderBottom: expanded ? '1px solid var(--color-border)' : 'none',
           userSelect: 'none',
           // BUG FIX (2026-08-08): the card used to rely on overflow: hidden
@@ -753,9 +779,9 @@ function RowCard({
 
         {/* Summary */}
         <span style={{
-          flex: 1, fontSize: isDivider ? 11 : 13,
-          fontWeight: isDrugRow || row.row_type === 'section' ? 600 : 400,
-          color: isDivider ? 'var(--color-text-tertiary)' : 'var(--color-text-primary)',
+          flex: 1, fontSize: isHeading ? 14 : 13,
+          fontWeight: isDrugRow || row.row_type === 'section' || isHeading ? 700 : 400,
+          color: 'var(--color-text-primary)',
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}>
           {row.row_type === 'drug' ? <DrugBlockTitle row={row} /> : rowSummary(row)}
