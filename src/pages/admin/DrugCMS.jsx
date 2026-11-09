@@ -14,6 +14,12 @@
  *     re-filter of a preloaded list. Category options come from the real
  *     drug_categories table via useCategories, shown as a full-width dropdown.
  *
+ * 2026-11-10 (CMS drug library search, same look as the app): the search bar and the
+ * Brand / Generic chips are now the app's own (DrugSearchBar, ModeSegmentedControl) on the same
+ * tinted block, and a generic is a flat GenericDrugCard row (the twin of SharedDrugCard) instead
+ * of a table row, so Generic and Brand results look alike. Category filter, sort, Live / Draft,
+ * edit and delete work as before. The old table column header is gone.
+ *
  * 12.2 (decisions 27-28): added a Generic/Brand mode toggle, styled like the
  * existing Alphabetical/Most Common sort toggle. Generic mode is the table
  * above, completely unchanged. Brand mode searches brands.tradename_clean
@@ -39,12 +45,15 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Plus, Edit2, Trash2, Search, X, AlertTriangle, Layers } from 'lucide-react'
+import { Plus, Edit2, Trash2, Search, X, AlertTriangle, Tag, FlaskConical } from 'lucide-react'
 import { useToast } from '../../context/ToastContext'
 import { useCategories } from '../../hooks/useCategories'
 import { useIsDark } from '../../utils/specialtyIcon'
 import ConfirmModal from '../../components/admin/ConfirmModal'
 import SharedDrugCard from '../../components/SharedDrugCard'
+import GenericDrugCard from '../../components/admin/GenericDrugCard'
+import DrugSearchBar from '../../components/drugs/DrugSearchBar'
+import ModeSegmentedControl from '../../components/drugs/home/ModeSegmentedControl'
 import AdminPageHeader from '../../components/admin/AdminPageHeader'
 import {
   fetchGenericsPage,
@@ -58,10 +67,11 @@ import {
 
 const PAGE_SIZE = 50
 
-function formatDate(iso) {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' })
-}
+// Same chips as the app's Drugs search, minus Class.
+const SEARCH_MODES = [
+  { value: 'brand',   label: 'Brand',   icon: Tag },
+  { value: 'generic', label: 'Generic', icon: FlaskConical },
+]
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
@@ -258,44 +268,27 @@ export default function DrugCMS() {
         </button>
       }
     >
-      {/* Search */}
-      <div style={{ position: 'relative', marginBottom: 'var(--space-3)' }}>
-        <Search size={15} style={{
-          position: 'absolute', left: 'var(--space-3)', top: '50%',
-          transform: 'translateY(-50%)', color: 'var(--color-text-tertiary)',
-          pointerEvents: 'none',
-        }} />
-        <input
-          type="text"
-          className="cms-search-input"
+      {/* Search block — the same search bar and Brand / Generic chips as the app's
+          Drugs screen, on the same tinted background. Class mode does not exist here. */}
+      <div style={{
+        backgroundColor: 'var(--color-header-tint)',
+        borderRadius:    'var(--radius-lg)',
+        padding:         'var(--space-4)',
+        marginBottom:    'var(--space-3)',
+      }}>
+        <DrugSearchBar
           value={query}
-          onChange={e => setQuery(e.target.value)}
-          placeholder={mode === 'brand' ? 'Search brand name…' : 'Search generic name…'}
-          style={searchInputStyle}
+          onChange={setQuery}
+          placeholder={mode === 'brand' ? 'Search brand names…' : 'Search generic names…'}
+          tall
         />
-        {query && (
-          <button onClick={() => setQuery('')} style={clearBtnStyle}>
-            <X size={14} />
-          </button>
-        )}
-      </div>
-
-      {/* Generic/Brand toggle (12.2, decision 27) — Brand mode is its own
-          full results list on SharedDrugCard, not a few extra matches
-          folded into the generic table below. */}
-      <div style={sortToggleWrapStyle}>
-        <button
-          onClick={() => updateSearchParams({ mode: 'generic', page: 0 })}
-          style={{ ...sortToggleBtnStyle, ...(mode === 'generic' ? sortToggleBtnActiveStyle : {}) }}
-        >
-          Generic
-        </button>
-        <button
-          onClick={() => updateSearchParams({ mode: 'brand', page: 0 })}
-          style={{ ...sortToggleBtnStyle, ...(mode === 'brand' ? sortToggleBtnActiveStyle : {}) }}
-        >
-          Brand
-        </button>
+        <div style={{ marginTop: 'var(--space-3)' }}>
+          <ModeSegmentedControl
+            options={SEARCH_MODES}
+            mode={mode}
+            onChange={m => updateSearchParams({ mode: m, page: 0 })}
+          />
+        </div>
       </div>
 
       {/* Category filter — generics only; a brand list has no category of its own */}
@@ -363,18 +356,8 @@ export default function DrugCMS() {
           boxShadow: 'var(--shadow-card)',
         }}>
 
-          {/* Header row — generic table only */}
-          {mode === 'generic' && (
-            <div className="cms-hide-phone" style={theadStyle}>
-              <span style={thStyle}>Generic</span>
-              <span style={{ ...thStyle, textAlign: 'center' }}>Forms</span>
-              <span style={{ ...thStyle, textAlign: 'center' }}>Published</span>
-              <span style={thStyle}>Actions</span>
-            </div>
-          )}
-
           {loading ? (
-            [1,2,3,4].map(i => <SkeletonRow key={i} height={mode === 'brand' ? 64 : 56} />)
+            [1,2,3,4].map(i => <SkeletonRow key={i} height={64} />)
           ) : mode === 'brand' ? (
             brands.map((b, idx) => (
               <SharedDrugCard
@@ -427,78 +410,23 @@ export default function DrugCMS() {
             ))
           ) : (
             generics.map((g, idx) => {
-                const isLast   = idx === generics.length - 1
-                const isActing = actionId === g.id
-
-                return (
-                  <div
-                    key={g.id}
-                    className="cms-cols"
-                    style={{
-                      '--cols-phone': 'auto auto 1fr',
-                      display: 'grid',
-                      gridTemplateColumns: 'minmax(0,1fr) 64px 90px 80px',
-                      alignItems: 'center',
-                      padding: 'var(--space-3) var(--space-4)',
-                      gap: 'var(--space-3)',
-                      borderBottom: isLast ? 'none' : '1px solid var(--color-border-subtle)',
+              const isActing = actionId === g.id
+              return (
+                <GenericDrugCard
+                  key={g.id}
+                  generic={g}
+                  categories={categories}
+                  isDark={isDark}
+                  isLast={idx === generics.length - 1}
+                  highlight={query}
+                  onTap={() => navigate(`/admin/drugs/generic/${g.id}`)}
+                  trailing={
+                    <div style={{
+                      display: 'flex', gap: 'var(--space-1)', alignItems: 'center',
                       opacity: isActing ? 0.5 : 1,
-                      transition: 'opacity 0.15s ease',
-                      backgroundColor: g.is_published ? 'transparent' : 'var(--color-bg)',
-                    }}
-                  >
-                    {/* Name + meta */}
-                    <div className="cms-span-all" style={{ minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                        <span
-                          title={g.name_en}
-                          style={{
-                            fontSize: 14, fontWeight: 600,
-                            color: g.is_published ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
-                            minWidth: 0, flex: '1 1 auto',
-                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {g.name_en}
-                        </span>
-                        {!g.is_published && (
-                          <span style={{ ...draftBadgeStyle, flexShrink: 0 }}>Draft</span>
-                        )}
-                      </div>
-                      <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 3, flexWrap: 'wrap', alignItems: 'center' }}>
-                        {g.category && (
-                          <span style={catChipStyle}>{g.category}</span>
-                        )}
-                        <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
-                          {formatDate(g.updated_at)}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Formulation count — click to open DrugEditor */}
-                    <div style={{ textAlign: 'center' }}>
+                    }}>
                       <button
-                        onClick={() => navigate(`/admin/drugs/generic/${g.id}`)}
-                        title="Edit formulations & brands"
-                        style={{
-                          display: 'inline-flex', alignItems: 'center', gap: 4,
-                          fontSize: 13, fontWeight: 500,
-                          color: 'var(--color-accent)',
-                          background: 'none', border: 'none', cursor: 'pointer',
-                          padding: '2px 4px', borderRadius: 'var(--radius-sm)',
-                          fontFamily: 'var(--font-body)',
-                          textDecoration: 'underline', textUnderlineOffset: 2,
-                        }}
-                      >
-                        <Layers size={12} />
-                        {g.formulationCount}
-                      </button>
-                    </div>
-
-                    {/* Publish toggle */}
-                    <div style={{ display: 'flex', justifyContent: 'center' }}>
-                      <button
-                        onClick={() => !isActing && handlePublishToggle(g)}
+                        onClick={(e) => { e.stopPropagation(); !isActing && handlePublishToggle(g) }}
                         disabled={isActing}
                         aria-label={g.is_published ? 'Unpublish' : 'Publish'}
                         title={g.is_published ? 'Click to unpublish' : 'Click to publish'}
@@ -511,12 +439,8 @@ export default function DrugCMS() {
                       >
                         {g.is_published ? '● Live' : '○ Draft'}
                       </button>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="cms-push-right" style={{ display: 'flex', gap: 'var(--space-1)', justifyContent: 'flex-end' }}>
                       <button
-                        onClick={() => navigate(`/admin/drugs/generic/${g.id}`)}
+                        onClick={(e) => { e.stopPropagation(); navigate(`/admin/drugs/generic/${g.id}`) }}
                         aria-label="Edit"
                         title="Edit generic, formulations & brands"
                         style={iconBtnStyle}
@@ -524,7 +448,7 @@ export default function DrugCMS() {
                         <Edit2 size={14} />
                       </button>
                       <button
-                        onClick={() => setConfirmDel(g)}
+                        onClick={(e) => { e.stopPropagation(); setConfirmDel(g) }}
                         aria-label="Delete"
                         title="Delete"
                         style={{ ...iconBtnStyle, color: '#DC2626' }}
@@ -532,9 +456,10 @@ export default function DrugCMS() {
                         <Trash2 size={14} />
                       </button>
                     </div>
-                  </div>
-                )
-              })
+                  }
+                />
+              )
+            })
           )}
         </div>
       )}
@@ -669,43 +594,6 @@ function SkeletonRow({ height = 56 }) {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const theadStyle = {
-  display: 'grid',
-  gridTemplateColumns: 'minmax(0,1fr) 64px 90px 80px',
-  gap: 'var(--space-3)',
-  padding: 'var(--space-2) var(--space-4)',
-  backgroundColor: 'var(--color-bg)',
-  borderBottom: '1px solid var(--color-border)',
-}
-
-const thStyle = {
-  fontSize: 11,
-  fontWeight: 700,
-  textTransform: 'uppercase',
-  letterSpacing: '0.06em',
-  color: 'var(--color-text-tertiary)',
-}
-
-const catChipStyle = {
-  fontSize: 10, fontWeight: 500,
-  textTransform: 'uppercase', letterSpacing: '0.04em',
-  color: 'var(--color-text-tertiary)',
-  backgroundColor: 'var(--color-bg)',
-  border: '1px solid var(--color-border)',
-  borderRadius: 'var(--radius-full)',
-  padding: '1px 7px',
-}
-
-const draftBadgeStyle = {
-  fontSize: 10, fontWeight: 600,
-  textTransform: 'uppercase', letterSpacing: '0.05em',
-  color: 'var(--color-text-tertiary)',
-  backgroundColor: 'var(--color-bg)',
-  border: '1px solid var(--color-border)',
-  borderRadius: 'var(--radius-full)',
-  padding: '1px 7px',
-}
-
 const toggleBtnStyle = {
   padding: '3px 10px',
   borderRadius: 'var(--radius-full)',
@@ -737,20 +625,6 @@ const primaryBtnStyle = {
   fontSize: 13, fontWeight: 600,
   fontFamily: 'var(--font-body)',
   cursor: 'pointer',
-}
-
-const searchInputStyle = {
-  width: '100%',
-  boxSizing: 'border-box',
-  padding: 'var(--space-2) var(--space-3) var(--space-2) var(--space-8)',
-  fontSize: 14,
-  fontFamily: 'var(--font-body)',
-  backgroundColor: 'var(--color-surface)',
-  border: '1px solid var(--color-border)',
-  borderRadius: 'var(--radius-lg)',
-  color: 'var(--color-text-primary)',
-  outline: 'none',
-  boxShadow: 'var(--shadow-card)',
 }
 
 const sortToggleWrapStyle = {
@@ -814,10 +688,3 @@ const categorySelectStyle = {
   cursor: 'pointer',
 }
 
-const clearBtnStyle = {
-  position: 'absolute', right: 'var(--space-3)', top: '50%',
-  transform: 'translateY(-50%)',
-  background: 'none', border: 'none', cursor: 'pointer',
-  color: 'var(--color-text-tertiary)',
-  display: 'flex', alignItems: 'center', padding: 0,
-}
