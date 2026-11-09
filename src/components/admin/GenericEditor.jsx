@@ -273,7 +273,7 @@ export default function GenericEditor({ generic = {}, onChange, disabled = false
         <Field label="Uses (structured)">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
             {(generic.uses_structured ?? []).map((u, idx) => (
-              <div key={idx} style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'flex-start' }}>
+              <div key={idx} className="cms-wrap-row" style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'flex-start' }}>
                 <input
                   type="text"
                   value={u.use_name}
@@ -313,7 +313,7 @@ export default function GenericEditor({ generic = {}, onChange, disabled = false
         <SectionCardHeader>Dose Adjustments</SectionCardHeader>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
           {(generic.dose_adjustments ?? []).map((x, idx) => (
-            <div key={idx} style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'flex-start' }}>
+            <div key={idx} className="cms-wrap-row" style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'flex-start' }}>
               <input
                 type="text"
                 value={x.condition ?? ''}
@@ -500,7 +500,7 @@ export default function GenericEditor({ generic = {}, onChange, disabled = false
         <SectionCardHeader>Drug Interactions</SectionCardHeader>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
           {(generic.drug_interactions ?? []).map((x, idx) => (
-            <div key={idx} style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'flex-start' }}>
+            <div key={idx} className="cms-wrap-row" style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'flex-start' }}>
               <input
                 type="text"
                 value={x.drug}

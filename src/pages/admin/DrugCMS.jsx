@@ -267,6 +267,7 @@ export default function DrugCMS() {
         }} />
         <input
           type="text"
+          className="cms-search-input"
           value={query}
           onChange={e => setQuery(e.target.value)}
           placeholder={mode === 'brand' ? 'Search brand name…' : 'Search generic name…'}
@@ -364,7 +365,7 @@ export default function DrugCMS() {
 
           {/* Header row — generic table only */}
           {mode === 'generic' && (
-            <div style={theadStyle}>
+            <div className="cms-hide-phone" style={theadStyle}>
               <span style={thStyle}>Generic</span>
               <span style={{ ...thStyle, textAlign: 'center' }}>Forms</span>
               <span style={{ ...thStyle, textAlign: 'center' }}>Published</span>
@@ -432,7 +433,9 @@ export default function DrugCMS() {
                 return (
                   <div
                     key={g.id}
+                    className="cms-cols"
                     style={{
+                      '--cols-phone': 'auto auto 1fr',
                       display: 'grid',
                       gridTemplateColumns: 'minmax(0,1fr) 64px 90px 80px',
                       alignItems: 'center',
@@ -445,7 +448,7 @@ export default function DrugCMS() {
                     }}
                   >
                     {/* Name + meta */}
-                    <div style={{ minWidth: 0 }}>
+                    <div className="cms-span-all" style={{ minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
                         <span
                           title={g.name_en}
@@ -511,7 +514,7 @@ export default function DrugCMS() {
                     </div>
 
                     {/* Actions */}
-                    <div style={{ display: 'flex', gap: 'var(--space-1)', justifyContent: 'flex-end' }}>
+                    <div className="cms-push-right" style={{ display: 'flex', gap: 'var(--space-1)', justifyContent: 'flex-end' }}>
                       <button
                         onClick={() => navigate(`/admin/drugs/generic/${g.id}`)}
                         aria-label="Edit"

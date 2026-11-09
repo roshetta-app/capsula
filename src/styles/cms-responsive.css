@@ -261,6 +261,29 @@ html.cms-surface .cms-only-phone {
     max-width: calc(100vw - 48px) !important;
   }
 
+  /* .cms-span-all: in a .cms-cols grid, this item takes the whole first row. */
+  html.cms-surface .cms-span-all {
+    grid-column: 1 / -1;
+  }
+  /* .cms-wrap-row: a row of "label field + detail field + button" wraps so the
+     first field gets the full width and the detail field sits under it. */
+  html.cms-surface .cms-wrap-row {
+    flex-wrap: wrap !important;
+  }
+  html.cms-surface .cms-wrap-row > :first-child {
+    flex: 1 1 100% !important;
+    width: 100% !important;
+  }
+  html.cms-surface .cms-wrap-row > :nth-child(2) {
+    flex: 1 1 0 !important;
+    min-width: 0 !important;
+  }
+  /* The drug list search box keeps room for its magnifier icon even though the
+     large spacing values are smaller on phone. */
+  html.cms-surface .cms-search-input {
+    padding-left: 36px !important;
+  }
+
   /* ─── Condition editor top bar ───────────────────────────────────────────────
      The screen is narrow, so the sticky bar keeps one row: the four tools as
      icons, an "unsaved" dot, and Save on the right. The condition name (also in
