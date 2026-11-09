@@ -454,4 +454,37 @@ html.cms-surface .cms-only-phone {
   html.cms-surface .cms-bar-narrow {
     width: 64px !important;
   }
+
+  /* --- Phase 7: final sweep --------------------------------------------------------
+     Small icon buttons (22 to 32px wide, sized inline) keep their look but get a
+     thumb sized hit area, the same trick as .cms-tap-expand. Buttons that are
+     positioned absolutely or clip their content are left out on purpose. */
+  html.cms-surface button:is(
+    [style*="width: 22px"], [style*="width: 24px"], [style*="width: 26px"],
+    [style*="width: 28px"], [style*="width: 30px"], [style*="width: 32px"]
+  ):not([style*="position: absolute"]):not([style*="overflow"]) {
+    position: relative;
+  }
+  html.cms-surface button:is(
+    [style*="width: 22px"], [style*="width: 24px"], [style*="width: 26px"]
+  ):not([style*="position: absolute"]):not([style*="overflow"])::after {
+    content: '';
+    position: absolute;
+    inset: -9px;
+  }
+  html.cms-surface button:is(
+    [style*="width: 28px"], [style*="width: 30px"], [style*="width: 32px"]
+  ):not([style*="position: absolute"]):not([style*="overflow"])::after {
+    content: '';
+    position: absolute;
+    inset: -6px;
+  }
+  /* Long names, emails and Arabic text break inside their box instead of
+     pushing the layout wide. Images never exceed the screen. */
+  html.cms-surface :where(h1, h2, h3, h4, p, span, label, td, li, a):not(.cms-phone-preview *) {
+    overflow-wrap: break-word;
+  }
+  html.cms-surface img:not(.cms-phone-preview img) {
+    max-width: 100%;
+  }
 }
