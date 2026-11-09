@@ -171,7 +171,7 @@
  */
 
 import { useState, useRef, useEffect } from 'react'
-import { Plus, X, Library, RotateCcw, Edit2, Check, ChevronDown, MoreHorizontal } from 'lucide-react'
+import { Plus, X, Library, RotateCcw, Edit2, Check, ChevronDown, MoreHorizontal, StickyNote } from 'lucide-react'
 import DrugPickerModal from '../../DrugPickerModal'
 import { useDrugContext } from '../../../../context/DrugContext'
 import {
@@ -980,7 +980,7 @@ const lineIconButtonStyle = {
 // Empty state: no value and not currently editing shows a "+ Max dose"
 // trigger instead of an empty box, matching the existing "+ note" /
 // "+ group note" convention used elsewhere in this same editor
-// (see GroupNoteSlot below).
+// (see GroupNoteEditor below).
 // DECLUTTER PASS 4 (Direction 1, 2026-08-08): the pass-3 merge of "Add
 // bracket" into this line (as a trailingAction joined by a middle dot) is
 // reverted here — "Add bracket" moved back to its own line at the top of
@@ -1186,7 +1186,7 @@ function PopulationTabs({ whos, activeIdx, shownIdx = 0, renaming = false, onRen
 }
 
 // ─── NoteSlot ───────────────────────────────────────────────────────────────
-// UI PASS (2026-08-08): shared implementation for both GroupNoteSlot and
+// UI PASS (2026-08-08): shared implementation for the one-line notes (the group note now has its own GroupNoteEditor) and
 // DrugOptionNoteSlot below. Replaces the old "+ note" bare-text trigger that,
 // once clicked, turned into a permanently-open full-width bordered input with
 // no way to close it back down. Now matches the read-only-by-default +
@@ -1315,22 +1315,133 @@ function NoteSlot({ note, onChange, label, triggerLabel, placeholder, editing, o
   )
 }
 
-// ─── GroupNoteSlot ───────────────────────────────────────────────────────────
-// PHASE 2.2-C/D: per-group note slot, rendered below the dose card for each
-// group. Thin wrapper over NoteSlot above.
+// ─── GroupNoteEditor ─────────────────────────────────────────────────────────
+// 2026-11-09: the note for a whole patient group, shown inside the dose card
+// right under the dose bands and max dose. Read view: a soft box with a note
+// icon, the text, and edit / remove buttons that are always visible (they used
+// to appear only on hover, which never works on a phone). Edit view: a roomy
+// box that grows with the text, with Remove and Done. Enter or Done saves,
+// Esc closes, and a note left empty is dropped. (The per-drug note keeps the
+// older one-line NoteSlot.)
 
-function GroupNoteSlot({ note, onChange, editing, onEditingChange, hideTrigger }) {
+function GroupNoteEditor({ note, editing, onEditingChange, onChange }) {
+  const taRef = useRef(null)
+  useEffect(() => {
+    const el = taRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${el.scrollHeight}px`
+  }, [note, editing])
+
+  const hasNote = !!note?.trim()
+  if (!hasNote && !editing) return null
+
+  const boxStyle = {
+    margin: '4px 4px 6px',
+    padding: '8px 10px',
+    borderRadius: 'var(--radius-md)',
+    border: '1px solid var(--color-border)',
+    backgroundColor: 'var(--color-bg)',
+    fontFamily: 'var(--font-body)',
+  }
+  const headerStyle = {
+    display: 'flex', alignItems: 'center', gap: 6,
+    fontSize: 11, fontWeight: 700, letterSpacing: 0.2,
+    color: 'var(--color-text-secondary)',
+  }
+  function finish() {
+    if (!note?.trim()) onChange(null)
+    onEditingChange(false)
+  }
+
+  if (editing) {
+    return (
+      <div style={{ ...boxStyle, borderColor: 'var(--color-accent)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={headerStyle}><StickyNote size={13} /> Group note</div>
+        <textarea
+          ref={taRef}
+          value={note ?? ''}
+          onChange={e => onChange(e.target.value.replace(/\n/g, ' ') || null)}
+          onKeyDown={e => {
+            if (e.key === 'Enter') { e.preventDefault(); finish() }
+            if (e.key === 'Escape') { e.preventDefault(); finish() }
+          }}
+          placeholder="Applies to every dose band above, e.g. Take with food"
+          dir="auto"
+          rows={2}
+          autoFocus
+          style={{
+            width: '100%', boxSizing: 'border-box', resize: 'none', overflow: 'hidden',
+            padding: '7px 9px', fontSize: 13, lineHeight: 1.45,
+            border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)',
+            backgroundColor: 'var(--color-surface)', color: 'var(--color-text-primary)',
+            fontFamily: 'var(--font-body)', outline: 'none',
+          }}
+        />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
+            Enter to finish
+          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {hasNote && (
+              <button
+                type="button"
+                onClick={() => { onChange(null); onEditingChange(false) }}
+                style={{
+                  padding: '4px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                  border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)',
+                  background: 'var(--color-surface)', color: '#ef4444', fontFamily: 'var(--font-body)',
+                }}
+              >
+                Remove
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={finish}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                padding: '4px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                border: 'none', borderRadius: 'var(--radius-md)',
+                background: 'var(--color-accent-solid)', color: '#fff', fontFamily: 'var(--font-body)',
+              }}
+            >
+              <Check size={13} /> Done
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <NoteSlot
-      note={note}
-      onChange={onChange}
-      editing={editing}
-      onEditingChange={onEditingChange}
-      hideTrigger={hideTrigger}
-      label="group note"
-      triggerLabel="group note"
-      placeholder="Group note (e.g. Take with food)"
-    />
+    <div style={{ ...boxStyle, display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+      <StickyNote size={14} style={{ flexShrink: 0, marginTop: 2, color: 'var(--color-text-secondary)' }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={headerStyle}>Group note</div>
+        <div dir="auto" style={{ fontSize: 13, lineHeight: 1.45, color: 'var(--color-text-primary)', marginTop: 2, wordBreak: 'break-word' }}>
+          {note}
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={() => onEditingChange(true)}
+        title="Edit group note"
+        aria-label="Edit group note"
+        style={lineIconButtonStyle}
+      >
+        <Edit2 size={13} />
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange(null)}
+        title="Remove group note"
+        aria-label="Remove group note"
+        style={lineIconButtonStyle}
+      >
+        <X size={14} />
+      </button>
+    </div>
   )
 }
 
@@ -3730,16 +3841,6 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
             />
           )}
 
-          {groupHasDoseArea(group) && (
-            <GroupNoteSlot
-              note={group.note}
-              onChange={value => updateGroupNote(groupIdx, value)}
-              editing={groupNoteEditIdx === groupIdx}
-              onEditingChange={v => setGroupNoteEditIdx(v ? groupIdx : null)}
-              hideTrigger
-            />
-          )}
-
           </div>
 
           {groupHasDoseArea(group) && (
@@ -3748,7 +3849,7 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
           {/* ── Shared dose + note for this group ──
               Both gated on the same "first option has a name" check so a
               brand-new empty group doesn't expose dose/note prematurely.
-              Note uses GroupNoteSlot so each group's open/closed state is
+              Note uses GroupNoteEditor so each group's open/closed state is
               independent (PHASE 2.2-C). */}
           {(() => {
             const firstOpt = group.options[0]
@@ -3944,6 +4045,13 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
                       </div>
                     ) : null}
 
+                    <GroupNoteEditor
+                      note={group.note}
+                      editing={groupNoteEditIdx === groupIdx}
+                      onEditingChange={v => setGroupNoteEditIdx(v ? groupIdx : null)}
+                      onChange={value => updateGroupNote(groupIdx, value)}
+                    />
+
                     <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 4, padding: '2px 0 4px' }}>
                       {!emptyDose && (
                         <button type="button" onClick={() => addBracket(groupIdx)} style={doseAddLinkStyle}>
@@ -3955,6 +4063,12 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
                         <button type="button" onClick={() => setOpenEditorId(`max-${groupIdx}`)} style={doseAddLinkStyle}>
                           <Plus size={14} />
                           Max dose
+                        </button>
+                      )}
+                      {!group.note?.trim() && groupNoteEditIdx !== groupIdx && (
+                        <button type="button" onClick={() => setGroupNoteEditIdx(groupIdx)} style={doseAddLinkStyle}>
+                          <Plus size={14} />
+                          Note
                         </button>
                       )}
                       <button type="button" onClick={() => addPopulation(groupIdx)} style={doseAddLinkStyle}>
