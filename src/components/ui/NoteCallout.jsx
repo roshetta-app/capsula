@@ -114,7 +114,7 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
       </ol>
     ),
     li: ({ children }) => (
-      <li dir="auto" style={{ fontSize: 14, lineHeight: 1.55, color: 'var(--color-text-primary)', unicodeBidi: 'plaintext' }}>
+      <li dir="auto" style={{ fontSize: 16, lineHeight: 1.55, color: 'var(--color-text-primary)', unicodeBidi: 'plaintext' }}>
         {children}
       </li>
     ),
@@ -127,7 +127,7 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
       style={{
         flex: 1,
         minWidth: 0,
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: 600,
         fontStyle: 'normal',
         color: 'var(--color-text-primary)',
@@ -145,44 +145,31 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
   // ── Bubble shape — shared by both variants ────────────────────────────────
   // Full width, always — a note block that borrows the speech-bubble idiom.
   // Icon side follows the text direction (Arabic-leading notes: icon on the right).
-  // MESSAGE-BUBBLE PASS (2026-11-09, v2): a speech bubble with its tail BELOW
-  // the bottom corner on the side the text reads from. The bubble itself stays
-  // full width and level with every other card (no side inset), so the text and
-  // icon line up with the rest of the page. All four corners share one soft
-  // radius; the tail hangs 8px under the bubble.
-  const radius = 18
+  // MESSAGE-BUBBLE PASS (2026-11-09, v3): an outlined chat bubble. Full width,
+  // level with every other card (no side inset). Near-white fill with a thin
+  // flavour-tinted outline and a soft shadow, a classic tail (a rotated square
+  // with outline on its two outer sides) under the bottom corner on the side
+  // the text reads from, and a solid round avatar-style badge for the icon.
+  const fill = `color-mix(in srgb, ${f.iconColor} 6%, var(--color-surface))`
+  const edge = `color-mix(in srgb, ${f.iconColor} 38%, var(--color-surface))`
 
   const bubble = (
-    <div style={{ position: 'relative', paddingBottom: 7 }}>
-      {/* Tail — under the bottom corner, pointing down and outward */}
-      <div
-        aria-hidden="true"
-        style={{
-          position: 'absolute',
-          bottom: 0,
-          [isArabic ? 'right' : 'left']: 20,
-          width: 14,
-          height: 8,
-          background: f.bg,
-          clipPath: isArabic
-            ? 'polygon(0 0, 100% 0, 100% 100%)'
-            : 'polygon(0 0, 100% 0, 0 100%)',
-        }}
-      />
+    <div style={{ position: 'relative', paddingBottom: 8 }}>
       <div style={{
         width: '100%',
         boxSizing: 'border-box',
-        background: f.bg,
-        borderRadius: radius,
-        padding: '11px 14px',
-        boxShadow: '0 1px 1px rgba(0,0,0,0.04)',
+        background: fill,
+        border: `1.5px solid ${edge}`,
+        borderRadius: 22,
+        padding: '14px 16px',
+        boxShadow: '0 2px 6px rgba(0,0,0,0.05)',
       }}>
         <div
           style={{
             display: 'flex',
             flexDirection: isArabic ? 'row-reverse' : 'row',
             alignItems: 'flex-start',
-            gap: 10,
+            gap: 12,
           }}
         >
           {/* Icon side is controlled ONLY by flexDirection here — no dir
@@ -190,21 +177,37 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
               engines). dir stays on the inner text content, where it is
               needed for correct bidi shaping. */}
           <span style={{
-            width: 28,
-            height: 28,
+            width: 40,
+            height: 40,
             flexShrink: 0,
-            marginTop: -2,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             borderRadius: '50%',
-            background: `color-mix(in srgb, ${f.iconColor} 16%, transparent)`,
+            background: f.iconColor,
           }}>
-            <Icon color={f.iconColor} size={16} offset={0} />
+            <Icon color="#fff" size={22} offset={0} />
           </span>
           {textContent}
         </div>
       </div>
+      {/* Tail — rotated square, outlined on its two outer sides only, so it
+          merges into the bubble's fill and breaks its bottom outline */}
+      <div
+        aria-hidden="true"
+        style={{
+          position: 'absolute',
+          bottom: 1,
+          [isArabic ? 'right' : 'left']: 26,
+          width: 13,
+          height: 13,
+          background: fill,
+          borderRight: `1.5px solid ${edge}`,
+          borderBottom: `1.5px solid ${edge}`,
+          transform: 'rotate(45deg)',
+          boxSizing: 'border-box',
+        }}
+      />
     </div>
   )
 
