@@ -291,6 +291,31 @@ export function describeDifferences(group, libPop, direction) {
   }
 }
 
+// The same comparison as describeDifferences, but with the actual wording on
+// both sides, so a confirmation can show a before / after instead of a
+// paragraph. Each entry: { kind: 'changed'|'added'|'removed'|'max'|'name',
+// label, from, to } where 'from' is what is being overwritten and 'to' what it
+// becomes ('save': library -> sheet, 'use': sheet -> library). Bands are
+// { title, text }; max dose and name are plain text. 'from' or 'to' is null
+// when there is nothing on that side.
+export function describeChanges(group, libPop, direction) {
+  const { pairs, sheetOnly, libOnly } = pairBands(group, libPop)
+  const save = direction === 'save'
+  const band = b => ({ title: b.title, text: [b.instruction, b.note].filter(Boolean).join(' · ') })
+  const out = []
+  for (const [s, l] of pairs) {
+    if (s.title === l.title && s.instruction === l.instruction && s.note === l.note) continue
+    out.push({ kind: 'changed', label: bandLabel(s), from: band(save ? l : s), to: band(save ? s : l) })
+  }
+  for (const b of (save ? sheetOnly : libOnly)) out.push({ kind: 'added', label: bandLabel(b), from: null, to: band(b) })
+  for (const b of (save ? libOnly : sheetOnly)) out.push({ kind: 'removed', label: bandLabel(b), from: band(b), to: null })
+  const sheetMax = norm(group?.dose_max), libMax = norm(libPop?.max_dose)
+  if (sheetMax !== libMax) out.push({ kind: 'max', label: 'Max dose', from: (save ? libMax : sheetMax) || null, to: (save ? sheetMax : libMax) || null })
+  const sheetName = norm(group?.dose_who), libName = norm(libPop?.population)
+  if (sheetName !== libName) out.push({ kind: 'name', label: 'Patient group name', from: (save ? libName : sheetName) || null, to: (save ? sheetName : libName) || null })
+  return out
+}
+
 // One plain sentence for a confirmation, e.g.
 // "adds 1 dose band, removes 1 (“>50kg”), changes the max dose". '' if nothing.
 export function summarizeDifferences(d) {

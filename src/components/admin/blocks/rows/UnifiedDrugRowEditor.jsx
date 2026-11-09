@@ -175,7 +175,7 @@ import { Plus, X, Library, RotateCcw, Edit2, Check, ChevronDown, MoreHorizontal 
 import DrugPickerModal from '../../DrugPickerModal'
 import { useDrugContext } from '../../../../context/DrugContext'
 import {
-  fingerprintLibraryPopulation, groupLibraryState, findLibraryPopulation, mergeBandsForSave, findNearDuplicateBands, describeDifferences, summarizeDifferences, STATE_WORDS, stateActions,
+  fingerprintLibraryPopulation, groupLibraryState, findLibraryPopulation, mergeBandsForSave, findNearDuplicateBands, describeChanges, STATE_WORDS, stateActions,
   groupDrugs, primaryFormulationId, drugSaveStatus, drugSaveNote, withoutLibraryLinks,
 } from './doseLibraryState'
 import DrugSearchField from '../../DrugSearchField'
@@ -595,6 +595,95 @@ function ConfirmBar({ text, confirmLabel = 'Remove', danger = true, onConfirm, o
   )
 }
 
+
+// 2026-11-09: a confirmation that SHOWS what will change instead of describing
+// it in a paragraph. 'changes' come from describeChanges: each is a small card
+// with a tag (Changed / Added / Removed), the band name, and the old and new
+// wording on two clearly coloured lines.
+const CHANGE_TAGS = {
+  changed: { word: 'Changed', bg: '#FEF3C7', fg: '#B45309' },
+  added:   { word: 'Added',   bg: '#DCFCE7', fg: '#15803D' },
+  removed: { word: 'Removed', bg: '#FEE2E2', fg: '#B91C1C' },
+  max:     { word: 'Changed', bg: '#FEF3C7', fg: '#B45309' },
+  name:    { word: 'Changed', bg: '#FEF3C7', fg: '#B45309' },
+}
+
+function ChangeSide({ caption, tone, value }) {
+  const isBand = value && typeof value === 'object'
+  const text = isBand ? value.text : value
+  const title = isBand ? value.title : ''
+  const bad = tone === 'old'
+  return (
+    <div style={{
+      padding: '6px 10px', borderRadius: 8,
+      backgroundColor: bad ? '#FEF2F2' : '#F0FDF4',
+      border: `1px solid ${bad ? '#FECACA' : '#BBF7D0'}`,
+    }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: bad ? '#B91C1C' : '#15803D', fontFamily: 'var(--font-body)' }}>{caption}</div>
+      {value == null || (!title && !text)
+        ? <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', fontStyle: 'italic' }}>nothing</div>
+        : (
+          <div dir="auto" style={{ fontSize: 13, color: 'var(--color-text-primary)', fontFamily: 'var(--font-body)' }}>
+            {title && <strong>{title}{text ? ': ' : ''}</strong>}{text}
+          </div>
+        )}
+    </div>
+  )
+}
+
+function ChangeConfirm({ title, group, fromCaption, toCaption, changes, notes = [], confirmLabel, onConfirm, onCancel }) {
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', gap: 10,
+      padding: '12px', borderRadius: 10,
+      border: '1px solid var(--color-accent)', backgroundColor: '#EFF6FF',
+    }}>
+      <div>
+        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-text-primary)', fontFamily: 'var(--font-body)' }}>{title}</div>
+        <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', fontFamily: 'var(--font-body)' }}>{group}</div>
+      </div>
+
+      {changes.length === 0 ? (
+        <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>No dose bands change.</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {changes.map((c, i) => {
+            const tag = CHANGE_TAGS[c.kind]
+            return (
+              <div key={i} style={{
+                display: 'flex', flexDirection: 'column', gap: 6,
+                padding: 8, borderRadius: 10, backgroundColor: 'var(--color-surface)',
+                border: '1px solid var(--color-border)',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{
+                    padding: '1px 8px', borderRadius: 99, fontSize: 11, fontWeight: 700,
+                    backgroundColor: tag.bg, color: tag.fg, fontFamily: 'var(--font-body)',
+                  }}>{tag.word}</span>
+                  {c.label && <span dir="auto" style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>{c.label}</span>}
+                </div>
+                {c.kind !== 'added' && <ChangeSide caption={fromCaption} tone="old" value={c.from} />}
+                {c.kind !== 'removed' && <ChangeSide caption={toCaption} tone="new" value={c.to} />}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {notes.map((n, i) => (
+        <div key={i} style={{
+          fontSize: 12, color: n.warn ? '#B45309' : 'var(--color-text-secondary)',
+          fontWeight: n.warn ? 600 : 400, fontFamily: 'var(--font-body)',
+        }}>{n.text}</div>
+      ))}
+
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button type="button" onClick={onConfirm} style={dosePrimaryButtonStyle}>{confirmLabel}</button>
+        <button type="button" onClick={onCancel} style={doseSecondaryButtonStyle}>Cancel</button>
+      </div>
+    </div>
+  )
+}
 
 // 2026-11-09: shown when a patient group is shared by two or more library
 // drugs. One line per drug with a tick; 'rows' carry { key, label, note,
@@ -3897,38 +3986,47 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
                         </span>
                       )}
 
-                      {confirmSaveGroup === groupIdx && (
-                        <ConfirmBar
-                          text={(() => {
-                            const libPops = libraryDoses[primaryFid]
-                            const libStateNow = groupLibraryState(group, libPops)
-                            const target = findLibraryPopulation(group, libPops)
-                            if (target) {
-                              const tName = (target.population ?? '').trim()
-                              const change = summarizeDifferences(describeDifferences(group, target, 'save'))
-                              return `Save ${popRef}${contents ? ` (${contents})` : ''} to the drug library for everyone? The library's ${tName ? `“${tName}”` : 'unnamed'} patient group becomes exactly what this sheet shows${change ? `. This ${change}` : ''}${libStateNow === 'both' ? ' (it was also changed in the library, and those changes are replaced)' : ''}. Other patient groups are not changed.`
-                            }
-                            return `Save ${popRef}${contents ? ` (${contents})` : ''} to the drug library for everyone? Other patient groups are not changed.`
-                          })()}
-                          confirmLabel="Save"
-                          danger={false}
-                          onConfirm={() => { setConfirmSaveGroup(null); saveDoseToLibrary(groupIdx) }}
-                          onCancel={() => setConfirmSaveGroup(null)}
-                        />
-                      )}
+                      {confirmSaveGroup === groupIdx && (() => {
+                        const libPops = libraryDoses[primaryFid]
+                        const libStateNow = groupLibraryState(group, libPops)
+                        const target = findLibraryPopulation(group, libPops)
+                        const changes = describeChanges(group, target ?? { brackets: [], max_dose: '', population: '' }, 'save')
+                        const notes = [
+                          ...(libStateNow === 'both' ? [{ warn: true, text: 'It was also changed in the library. Those changes are replaced.' }] : []),
+                          { text: 'Everyone sees this change. Other patient groups are not changed.' },
+                        ]
+                        return (
+                          <ChangeConfirm
+                            title="Save to the library?"
+                            group={popName ? `Patient group: ${popName}` : 'This patient group'}
+                            fromCaption="Library now"
+                            toCaption="After saving"
+                            changes={changes}
+                            notes={notes}
+                            confirmLabel="Save"
+                            onConfirm={() => { setConfirmSaveGroup(null); saveDoseToLibrary(groupIdx) }}
+                            onCancel={() => setConfirmSaveGroup(null)}
+                          />
+                        )
+                      })()}
 
-                      {confirmRestoreGroup === groupIdx && (
-                        <ConfirmBar
-                          text={(() => {
-                            const target = targetRow ? targetRow.status.libPop : findLibraryPopulation(group, libraryDoses[firstOpt.formulation_id])
-                            const change = target ? summarizeDifferences(describeDifferences(group, target, 'use')) : ''
-                            return `Replace ${popRef} with the library version${targetName ? ` of ${targetName}` : ''}? Its dose bands and max dose on this sheet are replaced${change ? `. This ${change}` : ''}. This sheet only: the library is not changed, and other patient groups are not changed.`
-                          })()}
-                          confirmLabel="Replace"
-                          onConfirm={() => { setConfirmRestoreGroup(null); clearChosen(); restoreDoseFromLibrary(groupIdx, targetFid) }}
-                          onCancel={() => { setConfirmRestoreGroup(null); clearChosen() }}
-                        />
-                      )}
+                      {confirmRestoreGroup === groupIdx && (() => {
+                        const target = targetRow ? targetRow.status.libPop : findLibraryPopulation(group, libraryDoses[firstOpt.formulation_id])
+                        const changes = target ? describeChanges(group, target, 'use') : []
+                        return (
+                          <ChangeConfirm
+                            title={`Use the library version${targetName ? ` of ${targetName}` : ''}?`}
+                            group={popName ? `Patient group: ${popName}` : 'This patient group'}
+                            fromCaption="This sheet now"
+                            toCaption="After replacing"
+                            changes={changes}
+                            notes={[{ text: 'This sheet only. The library and other patient groups are not changed.' }]}
+                            confirmLabel="Replace"
+                            onConfirm={() => { setConfirmRestoreGroup(null); clearChosen(); restoreDoseFromLibrary(groupIdx, targetFid) }}
+                            onCancel={() => { setConfirmRestoreGroup(null); clearChosen() }}
+                          />
+                        )
+                      })()}
 
                       {confirmDeleteLibPop === groupIdx && (
                         <ConfirmBar
