@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { LogOut } from 'lucide-react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
@@ -85,11 +85,19 @@ export default function AdminLayout() {
   // Leave / Stay dialog. 'pendingLeave' holds the question being asked
   // ({ leave, stay, path }). It only shows while still on the page it was
   // asked on, so a stale question never pops up on another screen.
+  // The page address is the router's own (it leaves out the app's '/capsula'
+  // base path that the browser address has), kept in a ref so the asker
+  // below always sees the current one.
   const [pendingLeave, setPendingLeave] = useState(null)
+  const pathRef = useRef(location.pathname)
+
+  useEffect(() => {
+    pathRef.current = location.pathname
+  }, [location.pathname])
 
   useEffect(() => {
     return setLeaveAsker(request => {
-      setPendingLeave({ ...request, path: window.location.pathname })
+      setPendingLeave({ ...request, path: pathRef.current })
     })
   }, [])
 
