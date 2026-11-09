@@ -176,6 +176,7 @@ import DrugPickerModal from '../../DrugPickerModal'
 import { useDrugContext } from '../../../../context/DrugContext'
 import {
   fingerprintLibraryPopulation, groupLibraryState, findLibraryPopulation, mergeBandsForSave, findNearDuplicateBands, describeDifferences, summarizeDifferences, STATE_WORDS, stateActions,
+  groupDrugs, primaryFormulationId, drugSaveStatus, drugSaveNote, withoutLibraryLinks,
 } from './doseLibraryState'
 import DrugSearchField from '../../DrugSearchField'
 import SharedDrugCard from '../../../SharedDrugCard'
@@ -586,6 +587,85 @@ function ConfirmBar({ text, confirmLabel = 'Remove', danger = true, onConfirm, o
         >
           {confirmLabel}
         </button>
+        <button type="button" onClick={onCancel} style={doseSecondaryButtonStyle}>Cancel</button>
+      </div>
+    </div>
+  )
+}
+
+
+// 2026-11-09: shown when a patient group is shared by two or more library
+// drugs. One line per drug with a tick; 'rows' carry { key, label, note,
+// savable, checked }. Drugs that cannot be saved are shown but not tickable.
+function DrugSaveChooser({ rows, unlinked, onToggle, onConfirm, onCancel }) {
+  const picked = rows.filter(r => r.savable && r.checked).length
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', gap: 8,
+      padding: '10px 12px', borderRadius: 10,
+      border: '1px solid var(--color-accent)', backgroundColor: '#EFF6FF',
+    }}>
+      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>
+        This dose is shared by {rows.length + unlinked.length} drugs. Save it to the library for:
+      </span>
+      {rows.map(r => (
+        <label key={r.key} style={{
+          display: 'flex', alignItems: 'flex-start', gap: 8,
+          opacity: r.savable ? 1 : 0.6, cursor: r.savable ? 'pointer' : 'default',
+        }}>
+          <input
+            type="checkbox"
+            checked={r.savable && r.checked}
+            disabled={!r.savable}
+            onChange={() => onToggle(r.key)}
+            style={{ marginTop: 3 }}
+          />
+          <span style={{ fontSize: 13, color: 'var(--color-text-primary)' }}>
+            <strong>{r.label}</strong>
+            <span style={{ display: 'block', fontSize: 12, color: 'var(--color-text-secondary)' }}>{r.note}</span>
+          </span>
+        </label>
+      ))}
+      {unlinked.map((label, i) => (
+        <div key={`u${i}`} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, opacity: 0.6 }}>
+          <input type="checkbox" disabled style={{ marginTop: 3 }} />
+          <span style={{ fontSize: 13, color: 'var(--color-text-primary)' }}>
+            <strong>{label}</strong>
+            <span style={{ display: 'block', fontSize: 12, color: 'var(--color-text-secondary)' }}>
+              Not in the library. Add the drug to the library first.
+            </span>
+          </span>
+        </div>
+      ))}
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button
+          type="button"
+          onClick={onConfirm}
+          disabled={picked === 0}
+          style={{ ...dosePrimaryButtonStyle, opacity: picked === 0 ? 0.5 : 1 }}
+        >
+          {picked === 1 ? 'Save to 1 drug' : `Save to ${picked} drugs`}
+        </button>
+        <button type="button" onClick={onCancel} style={doseSecondaryButtonStyle}>Cancel</button>
+      </div>
+    </div>
+  )
+}
+
+// 2026-11-09: asks which drug's library entry to use or delete from, when a
+// patient group is shared by several drugs. 'options' are { key, label }.
+function DrugPickBar({ text, options, onPick, onCancel }) {
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', gap: 8,
+      padding: '10px 12px', borderRadius: 10,
+      border: '1px solid var(--color-accent)', backgroundColor: '#EFF6FF',
+    }}>
+      <span style={{ fontSize: 13, color: 'var(--color-text-primary)' }}>{text}</span>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        {options.map(o => (
+          <button key={o.key} type="button" onClick={() => onPick(o.key)} style={doseSecondaryButtonStyle}>{o.label}</button>
+        ))}
         <button type="button" onClick={onCancel} style={doseSecondaryButtonStyle}>Cancel</button>
       </div>
     </div>
@@ -2435,7 +2515,7 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
       .catch(() => {})
       .finally(() => { drugListRefreshing.current = false })
   }
-  const libraryIdsKey = [...new Set(rawGroups.map(g => g.options?.[0]?.formulation_id).filter(Boolean))].join('|')
+  const libraryIdsKey = [...new Set(rawGroups.flatMap(g => (g.options ?? []).map(o => o?.formulation_id)).filter(Boolean))].join('|')
   useEffect(() => {
     let cancelled = false
     libraryIdsKey.split('|').filter(Boolean).forEach(id => {
@@ -2454,14 +2534,24 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
   // row reports this to its card so closing the row can ask first. A group
   // whose library entry has not loaded yet is not counted, and neither is one
   // where only the library has changed (nothing of yours would be lost).
+  // 2026-11-09: every library drug of the group counts, not just the first. The
+  // linked (first) drug counts as before; another drug only counts when the
+  // group is missing from its library entry (a deliberately different library
+  // dose is not nagged about).
   const unsavedPatientGroups = rawGroups.reduce((total, raw, gi) => {
-    const fid = groups[gi]?.options?.[0]?.formulation_id
-    const pops = fid ? libraryDoses[fid] : null
-    if (!Array.isArray(pops)) return total
+    const primaryFid = primaryFormulationId(groups[gi])
+    const { drugs } = groupDrugs(groups[gi]?.options)
     let n = 0
     for (let pi = 0; pi <= (raw.extra_populations ?? []).length; pi++) {
-      const st = groupLibraryState(projectGroup(raw, pi), pops)
-      if (st === 'new' || st === 'you_changed' || st === 'both' || st === 'differs') n++
+      const pg = projectGroup(raw, pi)
+      const counted = drugs.some(d => {
+        const pops = libraryDoses[d.formulationId]
+        if (!Array.isArray(pops)) return false
+        const isPrimary = d.formulationId === primaryFid
+        const st = drugSaveStatus(pg, pops, isPrimary).state
+        return isPrimary ? (st === 'new' || st === 'you_changed' || st === 'both' || st === 'differs') : st === 'new'
+      })
+      if (counted) n++
     }
     return total + n
   }, 0)
@@ -2537,6 +2627,11 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
   const [savingGroupIdx, setSavingGroupIdx] = useState(null)
   const [savedGroupIdx, setSavedGroupIdx] = useState(null)
   const [groupSaveError, setGroupSaveError] = useState(null) // { groupIdx, message } | null
+  // 2026-11-09: patient groups shared by several library drugs.
+  const [saveChooser, setSaveChooser] = useState(null) // { groupIdx, ticks: { [formulationId]: boolean } } | null
+  const [pickDrug, setPickDrug] = useState(null)       // { groupIdx, action: 'use' | 'delete' } | null
+  const [chosenDrug, setChosenDrug] = useState(null)   // { groupIdx, fid } | null — which drug a use/delete applies to
+  const [saveReport, setSaveReport] = useState(null)   // { groupIdx, saved: string[], failed: { label, message }[] } | null
   const [openEditorId, setOpenEditorId] = useState(null) // id of the ONE bracket (or 'max-<groupIdx>' for a max dose) currently open for editing; opening another closes this one
 
   // UI PASS (2026-08-08): "Clear doses" — a destructive dose-menu action that
@@ -2624,10 +2719,16 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
 
   // Deletes the open population from the drug library (it stays on this drug,
   // just no longer linked to the library copy).
-  async function deleteDoseFromLibrary(groupIdx) {
+  // 2026-11-09: fidOverride picks another drug of the group. The sheet's own
+  // link belongs to the first linked drug, so for any other drug the library
+  // group is found by name and the sheet's link is left alone.
+  async function deleteDoseFromLibrary(groupIdx, fidOverride) {
     const group = groups[groupIdx]
-    const formulationId = group.options[0]?.formulation_id
-    const libId = group.dose_max_population_id ?? findLibraryPopulation(group, libraryDoses[formulationId])?.id
+    const primaryFid = primaryFormulationId(group)
+    const formulationId = fidOverride ?? primaryFid
+    const isPrimary = formulationId === primaryFid
+    const target = drugSaveStatus(group, libraryDoses[formulationId], isPrimary).libPop
+    const libId = isPrimary ? (group.dose_max_population_id ?? target?.id) : target?.id
     if (!formulationId || !libId) return
     setDeletingLibGroupIdx(groupIdx)
     setGroupSaveError(null)
@@ -2646,18 +2747,20 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
           return
         }
       }
-      const nextGroups = groups.map((g, gi) => gi === groupIdx
-        ? {
-            ...g,
-            dose_max_population_id: null,
-            dose_library_base: null,
-            dose_lines: (g.dose_lines ?? []).map(l => ({ ...l, bracket_id: null })),
-          }
-        : g
-      )
-      const nextRaw = nextGroups.map(unprojectGroup)
-      setRawGroups(nextRaw)
-      onChange(fromDrugOptions(row, nextRaw))
+      if (isPrimary) {
+        const nextGroups = groups.map((g, gi) => gi === groupIdx
+          ? {
+              ...g,
+              dose_max_population_id: null,
+              dose_library_base: null,
+              dose_lines: (g.dose_lines ?? []).map(l => ({ ...l, bracket_id: null })),
+            }
+          : g
+        )
+        const nextRaw = nextGroups.map(unprojectGroup)
+        setRawGroups(nextRaw)
+        onChange(fromDrugOptions(row, nextRaw))
+      }
       rememberLibrary(formulationId, nextStructured)
       setDeletedLibGroupIdx(groupIdx)
       setTimeout(() => {
@@ -2918,9 +3021,14 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
   //                     which patient group to restore.
   // Only ever touches group.dose / group.dose_who / group.dose_lines —
   // never the group note, never any option's identity fields.
-  async function restoreDoseFromLibrary(groupIdx) {
+  // 2026-11-09: fidOverride picks another drug of the group. A dose copied from
+  // a drug the sheet is not linked to is copied without any link to it.
+  async function restoreDoseFromLibrary(groupIdx, fidOverride) {
     const group = groups[groupIdx]
-    const formulationId = group.options[0]?.formulation_id
+    const primaryFid = primaryFormulationId(group)
+    const formulationId = fidOverride ?? primaryFid
+    const isPrimary = formulationId === primaryFid
+    const keep = fields => (isPrimary ? fields : withoutLibraryLinks(fields))
     if (!formulationId) return // defensive — button shouldn't render without this
 
     setRestoringGroupIdx(groupIdx)
@@ -2932,16 +3040,16 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
       rememberLibrary(formulationId, libPops)
       // 2026-11-08: a group that is already linked to a library group takes
       // that group's version directly, with no question about which one.
-      const linkedPop = findLibraryPopulation(group, libPops)
+      const linkedPop = drugSaveStatus(group, libPops, isPrimary).libPop
       if (linkedPop) {
-        applyDoseToGroup(groupIdx, buildDoseLinesFromPopulation(linkedPop))
+        applyDoseToGroup(groupIdx, keep(buildDoseLinesFromPopulation(linkedPop)))
         return
       }
       const resolved = resolveDosePick(data.doses_structured)
       if (resolved.needsChoice) {
-        setRestorePendingChoice({ groupIdx, populations: resolved.populations })
+        setRestorePendingChoice({ groupIdx, populations: resolved.populations, isPrimary })
       } else if (resolved.dose_lines.length || resolved.dose) {
-        applyDoseToGroup(groupIdx, resolved)
+        applyDoseToGroup(groupIdx, keep(resolved))
       }
       // no populations at all -> no-op, nothing to restore to; existing
       // group.dose/dose_lines are left exactly as-is.
@@ -2969,101 +3077,149 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
   // save, every local id is stamped back (population id onto
   // dose_max_population_id, each new bracket's id onto its line) so a
   // second save on the same group is a clean update, not another create.
+  // 2026-11-09: writes the sheet's patient group into ONE drug's library entry
+  // (each drug of a shared group has its own). Returns { error } or
+  // { savedPopulation, nextStructured, stamped }. isPrimary: the drug the
+  // sheet's patient group is linked to. For any other drug the sheet's link
+  // ids are ignored (they belong to the primary drug's entry) and the library
+  // group is found by patient group name only.
+  async function writeGroupToDrugLibrary(group, formulationId, isPrimary) {
+    const typedWho = group.dose_who?.trim()
+    const linesAll = (group.dose_lines ?? []).filter(l => l.instruction?.trim())
+    const linesToSave = isPrimary ? linesAll : linesAll.map(l => ({ ...l, bracket_id: null }))
+    const g = isPrimary ? group : { ...group, dose_max_population_id: null, dose_library_base: null }
+
+    const { data, error } = await fetchFormulationWithGeneric(formulationId)
+    if (error || !data) return { error: 'Could not load the library entry to save to. Please try again.' }
+
+    const populations = Array.isArray(data.doses_structured) ? data.doses_structured : []
+
+    // LINKED-RENAME FIX (2026-08-08): a dose that already traces back to a
+    // real library group (dose_max_population_id) updates that group even if
+    // the admin renamed it on the sheet; resolving by name alone would create
+    // a DUPLICATE group. 2026-11-08: found by link first, then by the same
+    // patient group name (see findLibraryPopulation), so a dose that lost its
+    // link, or was typed by hand, updates the existing library group instead
+    // of adding its bands a second time.
+    let targetPopulation = findLibraryPopulation(g, populations)
+    let isNewPopulation = false
+
+    if (targetPopulation) {
+      // OPTIONAL POPULATION NAME (2026-08-08): at most one blank-named group
+      // per drug; this group itself is excluded from the 'already blank' check.
+      if (!typedWho) {
+        const blankPop = populations.find(p => !p.population?.trim() && p.id !== targetPopulation.id)
+        if (blankPop) {
+          return { error: 'Another patient group in the library is already unnamed, so this one needs a name.' }
+        }
+      }
+      targetPopulation = { ...targetPopulation, population: typedWho || '' }
+    } else {
+      targetPopulation = {
+        id: `pop-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        population: typedWho || '',
+        max_dose: '',
+        brackets: [],
+      }
+      isNewPopulation = true
+    }
+
+    // RESTRUCTURE (2026-11-08): saving makes the library group exactly what the
+    // sheet shows, so a dose band removed on the sheet is removed from the
+    // library too. A band keeps its library id when it is linked to one, or
+    // when it has the same wording as a band the library already holds (so
+    // nothing is ever added twice).
+    const { nextBrackets, stamped } = mergeBandsForSave(
+      targetPopulation.brackets,
+      linesToSave,
+      () => `bracket-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    )
+
+    const savedPopulation = { ...targetPopulation, max_dose: group.dose_max?.trim() || '', brackets: nextBrackets }
+    const nextStructured = isNewPopulation
+      ? [...populations, savedPopulation]
+      : populations.map(p => p.id === savedPopulation.id ? savedPopulation : p)
+
+    const { error: updateErr } = await updateFormulation(formulationId, { doses_structured: nextStructured })
+    if (updateErr) return { error: 'Saving to the library failed. Please try again.' }
+    return { savedPopulation, nextStructured, stamped }
+  }
+
+  // After a successful save to the linked (first) drug: stamp every local id
+  // back (population id onto dose_max_population_id, each new band's id onto
+  // its line) so a second save on the same group is a clean update, not
+  // another create.
+  function stampSavedGroup(groupIdx, res) {
+    const nextGroups = groups.map((g, gi) => gi !== groupIdx ? g : ({
+      ...g,
+      dose_max_population_id: res.savedPopulation.id,
+      dose_library_base: fingerprintLibraryPopulation(res.savedPopulation),
+      dose_lines: (g.dose_lines ?? []).map(l => res.stamped[l.id] ? { ...l, bracket_id: res.stamped[l.id] } : l),
+    }))
+    const nextRaw = nextGroups.map(unprojectGroup)
+    setRawGroups(nextRaw)
+    onChange(fromDrugOptions(row, nextRaw))
+  }
+
+  // One library drug in the group: the original single save.
   async function saveDoseToLibrary(groupIdx) {
     const group = groups[groupIdx]
-    const formulationId = group.options[0]?.formulation_id
-    const typedWho = group.dose_who?.trim()
-    const linesToSave = (group.dose_lines ?? []).filter(l => l.instruction?.trim())
-    if (!formulationId || linesToSave.length === 0) return // defensive — button shouldn't render without these
+    const formulationId = primaryFormulationId(group)
+    const hasLines = (group.dose_lines ?? []).some(l => l.instruction?.trim())
+    if (!formulationId || !hasLines) return // defensive — button shouldn't render without these
 
     setSavingGroupIdx(groupIdx)
     setGroupSaveError(null)
     try {
-      const { data, error } = await fetchFormulationWithGeneric(formulationId)
-      if (error || !data) {
-        setGroupSaveError({ groupIdx, message: 'Could not load the library entry to save to. Please try again.' })
+      const res = await writeGroupToDrugLibrary(group, formulationId, true)
+      if (res.error) {
+        setGroupSaveError({ groupIdx, message: res.error })
         return
       }
-
-      const populations = Array.isArray(data.doses_structured) ? data.doses_structured : []
-
-      // LINKED-RENAME FIX (2026-08-08): if this dose already traces back to
-      // a real library population — dose_max_population_id, stamped
-      // whenever a dose is picked from the library or previously saved
-      // here — that population is the real target, regardless of what the
-      // admin has since typed into the name field. Resolving by name
-      // instead (as below) would treat a rename as "no population found,"
-      // creating a DUPLICATE population with copied brackets rather than
-      // updating the one this dose actually came from.
-      // 2026-11-08: the library group is found by link first, then by the same
-      // patient group name (see findLibraryPopulation), so a dose that lost its
-      // link, or was typed by hand, updates the existing library group instead
-      // of adding its bands a second time.
-      let targetPopulation = findLibraryPopulation(group, populations)
-      let isNewPopulation = false
-
-      if (targetPopulation) {
-        // OPTIONAL POPULATION NAME (2026-08-08): still enforce at-most-one-
-        // blank if the admin is blanking this population out, but exclude
-        // itself from the "already blank" check.
-        if (!typedWho) {
-          const blankPop = populations.find(p => !p.population?.trim() && p.id !== targetPopulation.id)
-          if (blankPop) {
-            setGroupSaveError({
-              groupIdx,
-              message: 'Another patient group in the library is already unnamed, so this one needs a name.',
-            })
-            return
-          }
-        }
-        targetPopulation = { ...targetPopulation, population: typedWho || '' }
-      } else {
-        targetPopulation = {
-          id: `pop-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-          population: typedWho || '',
-          max_dose: '',
-          brackets: [],
-        }
-        isNewPopulation = true
-      }
-
-      // RESTRUCTURE (2026-11-08): saving makes the library group exactly what
-      // the sheet shows, so a dose band removed on the sheet is removed from the
-      // library too. A band keeps its library id when it is linked to one, or
-      // when it has the same wording as a band the library already holds (so
-      // nothing is ever added twice).
-      const { nextBrackets, stamped: stampedBracketIds } = mergeBandsForSave(
-        targetPopulation.brackets,
-        linesToSave,
-        () => `bracket-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-      )
-
-      const savedPopulation = { ...targetPopulation, max_dose: group.dose_max?.trim() || '', brackets: nextBrackets }
-      const nextStructured = isNewPopulation
-        ? [...populations, savedPopulation]
-        : populations.map(p => p.id === savedPopulation.id ? savedPopulation : p)
-
-      const { error: updateErr } = await updateFormulation(formulationId, { doses_structured: nextStructured })
-      if (updateErr) {
-        setGroupSaveError({ groupIdx, message: 'Saving to the library failed. Please try again.' })
-        return
-      }
-
-      const nextGroups = groups.map((g, gi) => gi !== groupIdx ? g : ({
-        ...g,
-        dose_max_population_id: savedPopulation.id,
-        dose_library_base: fingerprintLibraryPopulation(savedPopulation),
-        dose_lines: (g.dose_lines ?? []).map(l => stampedBracketIds[l.id] ? { ...l, bracket_id: stampedBracketIds[l.id] } : l),
-      }))
-      const nextRaw = nextGroups.map(unprojectGroup)
-      setRawGroups(nextRaw)
-      onChange(fromDrugOptions(row, nextRaw))
-
-      rememberLibrary(formulationId, nextStructured)
+      stampSavedGroup(groupIdx, res)
+      rememberLibrary(formulationId, res.nextStructured)
       setSavedGroupIdx(groupIdx)
       setTimeout(() => {
         setSavedGroupIdx(current => current === groupIdx ? null : current)
       }, 2000)
+    } finally {
+      setSavingGroupIdx(null)
+    }
+  }
+
+  // Several library drugs share the group: saves to each ticked drug, one by
+  // one. A failure on one drug does not undo the others; the report names
+  // which were saved and which failed.
+  async function saveDoseToSelectedDrugs(groupIdx, formulationIds) {
+    const group = groups[groupIdx]
+    const primaryFid = primaryFormulationId(group)
+    const { drugs } = groupDrugs(group.options)
+    const labelOf = fid => drugs.find(d => d.formulationId === fid)?.label ?? 'This drug'
+    const hasLines = (group.dose_lines ?? []).some(l => l.instruction?.trim())
+    if (!hasLines || formulationIds.length === 0) return
+
+    setSavingGroupIdx(groupIdx)
+    setGroupSaveError(null)
+    setSaveReport(null)
+    const saved = []
+    const failed = []
+    try {
+      for (const fid of formulationIds) {
+        const res = await writeGroupToDrugLibrary(group, fid, fid === primaryFid)
+        if (res.error) {
+          failed.push({ label: labelOf(fid), message: res.error })
+          continue
+        }
+        saved.push(labelOf(fid))
+        rememberLibrary(fid, res.nextStructured)
+        if (fid === primaryFid) stampSavedGroup(groupIdx, res)
+      }
+      setSaveReport({ groupIdx, saved, failed })
+      if (failed.length === 0) {
+        setTimeout(() => {
+          setSaveReport(cur => (cur && cur.groupIdx === groupIdx && cur.failed.length === 0 ? null : cur))
+        }, 6000)
+      }
     } finally {
       setSavingGroupIdx(null)
     }
@@ -3426,7 +3582,17 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
             const popName = group.dose_who?.trim() ? doseWhoLabel(group.dose_who) : null
             const popRef = popName ? `patient group “${popName}”` : 'this patient group'
             const nBands = (group.dose_lines ?? []).filter(l => !isDoseLineEmpty(l)).length
-            const libPops = libraryDoses[firstOpt.formulation_id]
+            // 2026-11-09: several library drugs can share this group. The sheet's
+            // link belongs to the primary (first linked) drug; every drug is
+            // compared with its own library entry.
+            const primaryFid = primaryFormulationId(group)
+            const { drugs, unlinked } = groupDrugs(group.options)
+            const multi = drugs.length >= 2
+            const drugRows = drugs.map(d => {
+              const isPrimary = d.formulationId === primaryFid
+              return { ...d, isPrimary, status: drugSaveStatus(group, libraryDoses[d.formulationId], isPrimary) }
+            })
+            const libPops = libraryDoses[primaryFid]
             const libHasDose = Array.isArray(libPops) && libPops.some(pp => (pp.brackets ?? []).length > 0)
             const emptyDose = (group.dose_lines ?? []).length === 0 && !group.dose?.trim()
               && !group.dose_max?.trim() && openEditorId !== `max-${groupIdx}`
@@ -3441,10 +3607,23 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
             const many = extraCount > 0
             const activeIdx = activeIndexFor(rg)
             const shownIdx = Math.min(rg.shown_population ?? 0, extraCount)
-            const libState = firstOpt.formulation_id ? groupLibraryState(group, libPops) : null
-            const actions = stateActions(libState)
+            const libState = !multi && primaryFid ? groupLibraryState(group, libPops) : null
+            const actions = multi
+              ? { save: drugRows.some(r => r.status.canSave), useLibrary: drugRows.some(r => r.status.canUse) }
+              : stateActions(libState)
+            // The colour of the footer: for several drugs, calm only when every drug is in step.
+            const footerState = multi
+              ? (drugRows.every(r => r.status.state === null) ? null : (actions.save || actions.useLibrary ? 'differs' : 'saved'))
+              : libState
             const canSaveGroup = (group.dose_lines ?? []).some(l => l.instruction?.trim())
-            const inLibrary = !!findLibraryPopulation(group, libPops)
+            const inLibrary = multi
+              ? drugRows.some(r => !!r.status.libPop)
+              : !!findLibraryPopulation(group, libPops)
+            // Which drug a 'use library version' / 'delete' applies to (the first one unless asked).
+            const targetFid = chosenDrug?.groupIdx === groupIdx ? chosenDrug.fid : primaryFid
+            const targetRow = drugRows.find(r => r.formulationId === targetFid)
+            const targetName = multi && targetRow ? targetRow.label : ''
+            const clearChosen = () => setChosenDrug(cur => (cur?.groupIdx === groupIdx ? null : cur))
             const showTabs = many || !!rg.dose_who?.trim() || renamingGroupIdx === groupIdx
             const nearDuplicates = findNearDuplicateBands(group.dose_lines)
             const menuCaption = { padding: '6px 12px 2px', fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-body)' }
@@ -3505,7 +3684,7 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
                         border: '1px dashed var(--color-border)',
                       }}>
                         {(() => {
-                          const msg = !firstOpt.formulation_id
+                          const msg = !primaryFid
                             ? 'Not in the library. Doses you add stay on this sheet only.'
                             : Array.isArray(libPops)
                               ? (libHasDose ? 'The library already has a dose for this drug.' : 'No dose in the library yet. Add one here, then save it to the library.')
@@ -3611,7 +3790,9 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
                   {(emptyPopWarnIdx === groupIdx || confirmSaveGroup === groupIdx || confirmRestoreGroup === groupIdx
                     || confirmClearGroup === groupIdx || confirmRemovePop === groupIdx || confirmDeleteLibPop === groupIdx
                     || savingGroupIdx === groupIdx || savedGroupIdx === groupIdx || deletingLibGroupIdx === groupIdx
-                    || deletedLibGroupIdx === groupIdx || groupSaveError?.groupIdx === groupIdx) && (
+                    || deletedLibGroupIdx === groupIdx || groupSaveError?.groupIdx === groupIdx
+                    || saveChooser?.groupIdx === groupIdx || pickDrug?.groupIdx === groupIdx
+                    || saveReport?.groupIdx === groupIdx) && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '4px 10px 10px' }}>
                       {emptyPopWarnIdx === groupIdx && (
                         <span style={{ fontSize: 12, color: '#ef4444' }}>
@@ -3619,10 +3800,74 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
                         </span>
                       )}
 
+                      {saveChooser?.groupIdx === groupIdx && (
+                        <DrugSaveChooser
+                          rows={drugRows.map(r => ({
+                            key: r.formulationId,
+                            label: r.label,
+                            note: drugSaveNote(r.status.state, r.status.summary),
+                            savable: r.status.canSave,
+                            checked: !!saveChooser.ticks[r.formulationId],
+                          }))}
+                          unlinked={unlinked}
+                          onToggle={key => setSaveChooser(cur => (cur ? { ...cur, ticks: { ...cur.ticks, [key]: !cur.ticks[key] } } : cur))}
+                          onConfirm={() => {
+                            const ids = drugRows
+                              .filter(r => r.status.canSave && saveChooser.ticks[r.formulationId])
+                              .map(r => r.formulationId)
+                            setSaveChooser(null)
+                            saveDoseToSelectedDrugs(groupIdx, ids)
+                          }}
+                          onCancel={() => setSaveChooser(null)}
+                        />
+                      )}
+
+                      {pickDrug?.groupIdx === groupIdx && (
+                        <DrugPickBar
+                          text={pickDrug.action === 'use'
+                            ? `Which drug's library version should replace ${popRef} on this sheet?`
+                            : `Delete ${popRef} from which drug's library entry?`}
+                          options={drugRows
+                            .filter(r => (pickDrug.action === 'use' ? r.status.canUse : !!r.status.libPop))
+                            .map(r => ({ key: r.formulationId, label: r.label }))}
+                          onPick={fid => {
+                            const action = pickDrug.action
+                            setPickDrug(null)
+                            setChosenDrug({ groupIdx, fid })
+                            if (action === 'use') setConfirmRestoreGroup(groupIdx)
+                            else setConfirmDeleteLibPop(groupIdx)
+                          }}
+                          onCancel={() => setPickDrug(null)}
+                        />
+                      )}
+
+                      {saveReport?.groupIdx === groupIdx && (
+                        <span style={{ display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: 12 }}>
+                          <span style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                            {saveReport.saved.length > 0 && (
+                              <span style={{ color: 'var(--color-accent)' }}>
+                                Saved to the library: {saveReport.saved.join(', ')}
+                              </span>
+                            )}
+                            {saveReport.failed.map((f, i) => (
+                              <span key={i} style={{ color: '#ef4444' }}>{f.label}: {f.message}</span>
+                            ))}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setSaveReport(null)}
+                            aria-label="Dismiss"
+                            style={{ border: 'none', background: 'none', padding: 0, color: 'var(--color-text-tertiary)', cursor: 'pointer', lineHeight: 0 }}
+                          >
+                            <X size={13} />
+                          </button>
+                        </span>
+                      )}
+
                       {confirmSaveGroup === groupIdx && (
                         <ConfirmBar
                           text={(() => {
-                            const libPops = libraryDoses[firstOpt.formulation_id]
+                            const libPops = libraryDoses[primaryFid]
                             const libStateNow = groupLibraryState(group, libPops)
                             const target = findLibraryPopulation(group, libPops)
                             if (target) {
@@ -3642,22 +3887,22 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
                       {confirmRestoreGroup === groupIdx && (
                         <ConfirmBar
                           text={(() => {
-                            const target = findLibraryPopulation(group, libraryDoses[firstOpt.formulation_id])
+                            const target = targetRow ? targetRow.status.libPop : findLibraryPopulation(group, libraryDoses[firstOpt.formulation_id])
                             const change = target ? summarizeDifferences(describeDifferences(group, target, 'use')) : ''
-                            return `Replace ${popRef} with the library version? Its dose bands and max dose on this sheet are replaced${change ? `. This ${change}` : ''}. This sheet only: the library is not changed, and other patient groups are not changed.`
+                            return `Replace ${popRef} with the library version${targetName ? ` of ${targetName}` : ''}? Its dose bands and max dose on this sheet are replaced${change ? `. This ${change}` : ''}. This sheet only: the library is not changed, and other patient groups are not changed.`
                           })()}
                           confirmLabel="Replace"
-                          onConfirm={() => { setConfirmRestoreGroup(null); restoreDoseFromLibrary(groupIdx) }}
-                          onCancel={() => setConfirmRestoreGroup(null)}
+                          onConfirm={() => { setConfirmRestoreGroup(null); clearChosen(); restoreDoseFromLibrary(groupIdx, targetFid) }}
+                          onCancel={() => { setConfirmRestoreGroup(null); clearChosen() }}
                         />
                       )}
 
                       {confirmDeleteLibPop === groupIdx && (
                         <ConfirmBar
-                          text={`Delete ${popRef} from the drug library for everyone? It stays on this sheet.`}
+                          text={`Delete ${popRef} from the drug library${targetName ? ` (${targetName})` : ''} for everyone? It stays on this sheet.`}
                           confirmLabel="Delete from library"
-                          onConfirm={() => { setConfirmDeleteLibPop(null); deleteDoseFromLibrary(groupIdx) }}
-                          onCancel={() => setConfirmDeleteLibPop(null)}
+                          onConfirm={() => { setConfirmDeleteLibPop(null); clearChosen(); deleteDoseFromLibrary(groupIdx, targetFid) }}
+                          onCancel={() => { setConfirmDeleteLibPop(null); clearChosen() }}
                         />
                       )}
 
@@ -3713,29 +3958,55 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
                     padding: '6px 8px 6px 12px',
                     borderTop: '1px solid var(--color-border)',
                     borderRadius: '0 0 11px 11px',
-                    background: !libState || libState === 'saved' ? 'var(--color-bg)' : '#FEF3C7',
+                    background: !footerState || footerState === 'saved' ? 'var(--color-bg)' : '#FEF3C7',
                   }}>
-                    <Library size={13} style={{ flexShrink: 0, color: libState === 'saved' ? 'var(--color-accent)' : libState ? '#B45309' : 'var(--color-text-tertiary)' }} />
+                    <Library size={13} style={{ flexShrink: 0, color: footerState === 'saved' ? 'var(--color-accent)' : footerState ? '#B45309' : 'var(--color-text-tertiary)' }} />
                     <span style={{
                       fontSize: 12, fontWeight: 600, flex: '1 1 auto',
-                      color: libState === 'saved' ? 'var(--color-accent)' : libState ? '#B45309' : 'var(--color-text-tertiary)',
+                      color: footerState === 'saved' ? 'var(--color-accent)' : footerState ? '#B45309' : 'var(--color-text-tertiary)',
                     }}>
-                      {libState ? STATE_WORDS[libState] : (!firstOpt.formulation_id ? 'This sheet only' : '')}
+                      {multi ? (
+                        <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          {drugRows.map(r => (
+                            <span key={r.formulationId}>
+                              {r.label}: {r.status.state ? STATE_WORDS[r.status.state] : '…'}
+                            </span>
+                          ))}
+                          {unlinked.map((label, i) => (
+                            <span key={`u${i}`}>{label}: Not in library</span>
+                          ))}
+                        </span>
+                      ) : (libState ? STATE_WORDS[libState] : (!primaryFid ? 'This sheet only' : ''))}
                     </span>
                     {actions.save && canSaveGroup && (
                       <button
                         type="button"
-                        onClick={() => setConfirmSaveGroup(groupIdx)}
+                        onClick={() => {
+                          if (!multi) { setConfirmSaveGroup(groupIdx); return }
+                          setSaveChooser({
+                            groupIdx,
+                            ticks: Object.fromEntries(drugRows.filter(r => r.status.canSave).map(r => [r.formulationId, r.status.ticked])),
+                          })
+                        }}
                         disabled={savingGroupIdx === groupIdx}
                         style={{ ...doseSecondaryButtonStyle, opacity: savingGroupIdx === groupIdx ? 0.5 : 1 }}
                       >
-                        {libState === 'new' ? 'Save to library' : 'Save my version'}
+                        {multi || libState === 'new' ? 'Save to library' : 'Save my version'}
                       </button>
                     )}
                     {actions.useLibrary && (
                       <button
                         type="button"
-                        onClick={() => setConfirmRestoreGroup(groupIdx)}
+                        onClick={() => {
+                          if (!multi) { setConfirmRestoreGroup(groupIdx); return }
+                          const cands = drugRows.filter(r => r.status.canUse)
+                          if (cands.length === 1) {
+                            setChosenDrug({ groupIdx, fid: cands[0].formulationId })
+                            setConfirmRestoreGroup(groupIdx)
+                          } else {
+                            setPickDrug({ groupIdx, action: 'use' })
+                          }
+                        }}
                         disabled={restoringGroupIdx === groupIdx}
                         style={{ ...doseSecondaryButtonStyle, opacity: restoringGroupIdx === groupIdx ? 0.5 : 1 }}
                       >
@@ -3787,7 +4058,17 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
                               </div>
                               <button type="button" style={{ ...addDrugDropdownItemStyle, color: '#ef4444' }}
                                 disabled={deletingLibGroupIdx === groupIdx}
-                                onClick={() => { setDoseMenuOpenGroupIdx(null); setConfirmDeleteLibPop(groupIdx) }}>
+                                onClick={() => {
+                                  setDoseMenuOpenGroupIdx(null)
+                                  if (!multi) { setConfirmDeleteLibPop(groupIdx); return }
+                                  const cands = drugRows.filter(r => !!r.status.libPop)
+                                  if (cands.length === 1) {
+                                    setChosenDrug({ groupIdx, fid: cands[0].formulationId })
+                                    setConfirmDeleteLibPop(groupIdx)
+                                  } else {
+                                    setPickDrug({ groupIdx, action: 'delete' })
+                                  }
+                                }}>
                                 Delete from library
                               </button>
                             </>
@@ -3808,7 +4089,8 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
                   <PopulationChooser
                     populations={restorePendingChoice.populations}
                     onChoose={(population) => {
-                      applyDoseToGroup(groupIdx, buildDoseLinesFromPopulation(population))
+                      const picked = buildDoseLinesFromPopulation(population)
+                      applyDoseToGroup(groupIdx, restorePendingChoice.isPrimary === false ? withoutLibraryLinks(picked) : picked)
                       setRestorePendingChoice(null)
                     }}
                     onSkip={() => setRestorePendingChoice(null)}

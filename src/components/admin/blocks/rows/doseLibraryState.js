@@ -108,6 +108,100 @@ export function stateActions(state) {
   }
 }
 
+// ── Several drugs sharing one dose ──────────────────────────────────────────
+// A group on a sheet can hold several drugs that share one dose. The library
+// keeps doses per drug (per formulation), so each drug has its own entry.
+// Brands of the same formulation count as ONE drug.
+
+// A short name for a drug option, e.g. 'Ceftriaxone 1 g vial'.
+function optionLabel(o) {
+  const name = norm(o?.generic_name) || norm(o?.brand_name) || norm(o?._formulationMeta?.name_en)
+  if (!name) return ''
+  const extra = [o?._formulationMeta?.concentration, o?._formulationMeta?.form].map(norm).filter(Boolean).join(' ')
+  return extra ? `${name} ${extra}` : name
+}
+
+// The distinct library drugs of a group (in order) and the names of the
+// options that are not in the library (free text).
+export function groupDrugs(options) {
+  const seen = new Map()
+  const unlinked = []
+  for (const o of Array.isArray(options) ? options : []) {
+    const fid = o?.formulation_id
+    if (!fid) {
+      const label = optionLabel(o)
+      if (label) unlinked.push(label)
+      continue
+    }
+    if (!seen.has(fid)) seen.set(fid, { formulationId: fid, label: optionLabel(o) || 'This drug' })
+  }
+  return { drugs: [...seen.values()], unlinked }
+}
+
+// The drug the sheet's patient group is linked to: the first option's library
+// entry, or else the first drug of the group that has one.
+export function primaryFormulationId(group) {
+  const opts = Array.isArray(group?.options) ? group.options : []
+  return opts[0]?.formulation_id || opts.find(o => o?.formulation_id)?.formulation_id || null
+}
+
+// How the sheet's patient group compares with ONE drug's library entry, and
+// what saving to it would do. The sheet's link ids (patient group id, band ids,
+// remembered copy) belong to the primary drug only; for any other drug they
+// are ignored and the library group is found by patient group name.
+//   state     as groupLibraryState (null when not loaded or nothing typed)
+//   libPop    that drug's library group for this patient group, or null
+//   summary   plain words for what saving would change ('' if nothing)
+//   canSave / canUse   which buttons the state offers
+//   ticked    saving is ticked by default: the group is new to that drug, or
+//             only the sheet changed since it was copied from there
+export function drugSaveStatus(group, libraryPops, isPrimary) {
+  const g = isPrimary
+    ? group
+    : {
+        ...group,
+        dose_max_population_id: null,
+        dose_library_base: null,
+        dose_lines: (group?.dose_lines ?? []).map(l => ({ ...l, bracket_id: null })),
+      }
+  const state = groupLibraryState(g, libraryPops)
+  const libPop = Array.isArray(libraryPops) ? findLibraryPopulation(g, libraryPops) : null
+  const summary = libPop && state && state !== 'saved'
+    ? summarizeDifferences(describeDifferences(g, libPop, 'save'))
+    : ''
+  const actions = stateActions(state)
+  return {
+    state,
+    libPop,
+    summary,
+    canSave: actions.save,
+    canUse: actions.useLibrary,
+    ticked: state === 'new' || state === 'you_changed',
+  }
+}
+
+// One plain sentence for a drug's line in the save list.
+export function drugSaveNote(state, summary) {
+  const detail = summary ? ` (${summary})` : ''
+  if (state === 'new') return 'Not in the library yet. It will be added.'
+  if (state === 'you_changed') return `Updates the library with your changes${detail}.`
+  if (state === 'both') return `Also changed in the library; those changes are replaced${detail}.`
+  if (state === 'differs') return `The library has a different dose${detail}. Saving replaces it for everyone.`
+  if (state === 'saved') return 'Already the same. No change.'
+  return 'Checking the library…'
+}
+
+// The dose fields of a library pick without any link to that library entry
+// (used when a dose is copied from a drug the sheet is not linked to).
+export function withoutLibraryLinks(fields) {
+  return {
+    ...fields,
+    dose_max_population_id: null,
+    dose_library_base: null,
+    dose_lines: (fields?.dose_lines ?? []).map(l => ({ ...l, bracket_id: null })),
+  }
+}
+
 // Builds the library group's bands when saving a patient group from the sheet.
 // The result is exactly the sheet's bands, in the sheet's order. A band keeps
 // its library id when the sheet line is linked to one, or when it has the same
