@@ -597,9 +597,9 @@ export default function DrugEditor() {
           title="Delete formulation?"
           message={`Delete "${confirmDel.concentration} ${confirmDel.form}"? All its brands will also be deleted. This cannot be undone.`}
           confirmLabel={deleting ? 'Deleting…' : 'Delete'}
-          danger
+          confirmVariant="danger"
           onConfirm={handleDeleteFormulation}
-          onCancel={() => setConfirmDel(null)}
+          onClose={() => setConfirmDel(null)}
         />
       )}
 

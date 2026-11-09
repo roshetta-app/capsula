@@ -573,9 +573,9 @@ export default function DrugCMS() {
           title="Unpublish generic?"
           message={`"${confirmUnpub.name_en}" will be hidden from the app. You can republish it at any time.`}
           confirmLabel="Unpublish"
-          danger
+          confirmVariant="danger"
           onConfirm={confirmUnpublish}
-          onCancel={() => setConfirmUnpub(null)}
+          onClose={() => setConfirmUnpub(null)}
         />
       )}
 
@@ -586,9 +586,9 @@ export default function DrugCMS() {
           title="Delete generic?"
           message={`Delete "${confirmDel.name_en}"? This will also delete all formulations and brands under it. This cannot be undone.`}
           confirmLabel="Delete"
-          danger
+          confirmVariant="danger"
           onConfirm={handleDelete}
-          onCancel={() => setConfirmDel(null)}
+          onClose={() => setConfirmDel(null)}
         />
       )}
 
@@ -599,9 +599,9 @@ export default function DrugCMS() {
           title="Unpublish brand?"
           message="This brand will be hidden from the app. You can republish it at any time."
           confirmLabel="Unpublish"
-          danger
+          confirmVariant="danger"
           onConfirm={confirmUnpublishBrand}
-          onCancel={() => setConfirmUnpubBrand(null)}
+          onClose={() => setConfirmUnpubBrand(null)}
         />
       )}
 
@@ -613,9 +613,9 @@ export default function DrugCMS() {
           title="Retire this brand?"
           message="This brand will be hidden from the app, the same as unpublishing it. You can bring it back at any time from the generic's editor."
           confirmLabel="Retire"
-          danger
+          confirmVariant="danger"
           onConfirm={handleDeleteBrand}
-          onCancel={() => setConfirmDelBrand(null)}
+          onClose={() => setConfirmDelBrand(null)}
         />
       )}
 
