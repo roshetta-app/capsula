@@ -997,3 +997,31 @@ body {
 .fav-sticky-header {
   background: var(--color-accent-light);
 }
+/* ── Favourite heart (components/ui/FavouriteHeart.jsx) ───────────────────
+   Pop: squash, spring past full size, settle. Ring and sparks play only when
+   favouriting. All switched off by the phone's reduce-motion setting. */
+@keyframes cap-heart-pop {
+  0%   { transform: scale(1); }
+  25%  { transform: scale(0.78); }
+  60%  { transform: scale(1.28); }
+  100% { transform: scale(1); }
+}
+@keyframes cap-heart-unpop {
+  0%   { transform: scale(1); }
+  45%  { transform: scale(0.84); }
+  100% { transform: scale(1); }
+}
+@keyframes cap-heart-ring {
+  0%   { transform: scale(0.5); opacity: 0.55; }
+  100% { transform: scale(1.9); opacity: 0; }
+}
+@keyframes cap-heart-spark {
+  0%   { transform: rotate(var(--a)) translateY(calc(var(--d) * -0.3)) scale(0.5); opacity: 1; }
+  100% { transform: rotate(var(--a)) translateY(calc(var(--d) * -0.85)) scale(1); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  @keyframes cap-heart-pop   { from { transform: none; } to { transform: none; } }
+  @keyframes cap-heart-unpop { from { transform: none; } to { transform: none; } }
+  @keyframes cap-heart-ring  { from { opacity: 0; } to { opacity: 0; } }
+  @keyframes cap-heart-spark { from { opacity: 0; } to { opacity: 0; } }
+}

@@ -1,6 +1,10 @@
 import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { useParams, useNavigate, useNavigationType } from 'react-router-dom'
-import { ArrowLeft, Share2, Heart, WifiOff } from 'lucide-react'
+import { ArrowLeft, Share2, BookOpenCheck, WifiOff } from 'lucide-react'
+import FavouriteHeart from '../components/ui/FavouriteHeart'
+import { useToast } from '../context/ToastContext'
+import { usePressed } from '../hooks/usePressed'
+import { shareCondition } from '../utils/shareConditionLink'
 import { useConditionContext } from '../context/ConditionContext'
 import { useFavouritesContext } from '../context/FavouritesContext'
 import { useKeyboardOpen } from '../hooks/useKeyboardOpen'
@@ -9,8 +13,6 @@ import { useBackLabel } from '../hooks/useBackLabel'
 import PrescriptionsTab from '../components/conditions/PrescriptionsTab'
 import ClinicalDataTab from '../components/conditions/ClinicalDataTab'
 import BottomNav from '../components/BottomNav'
-import ShareCard from '../components/ui/ShareCard'
-import { shareConditionPrescription } from '../utils/sharing'
 import { logUsageEvent } from '../analytics/usageEvents'
 import { SpecialtyIcon, useIsDark } from '../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN } from '../utils/specialtyTokens'
@@ -31,21 +33,9 @@ function IconWritingHand({ color }) {
   )
 }
 
-/** Stethoscope icon for Clinical tab — unchanged */
-function IconStethoscope({ color }) {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-      stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3" />
-      <path d="M8 15v1a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6v-4" />
-      <circle cx="20" cy="10" r="2" />
-    </svg>
-  )
-}
-
 const TABS = [
   { label: 'Treatment', renderIcon: (color) => <IconWritingHand color={color} /> },
-  { label: 'Clinical',  renderIcon: (color) => <IconStethoscope color={color} /> },
+  { label: 'Review',    renderIcon: (color) => <BookOpenCheck size={16} strokeWidth={1.8} color={color} /> },
 ]
 
 // Module-level (outside the component) so it survives this screen unmounting
@@ -74,6 +64,7 @@ export default function ConditionDetailScreen() {
   const navigationType = useNavigationType() // 'POP' | 'PUSH' | 'REPLACE'
   const { conditions, loading, error, refresh, addRecentlyViewed } = useConditionContext()
   const { isConditionFavourited, toggleCondition } = useFavouritesContext()
+  const { toast } = useToast()
 
   const [activeTab, setActiveTab] = useState(0)
 
@@ -86,7 +77,6 @@ export default function ConditionDetailScreen() {
   useEffect(() => { planMemory.set(slug, rxPlanIndex) }, [slug, rxPlanIndex])
   const touchStartX  = useRef(null)
   const touchStartY  = useRef(null)
-  const shareCardRef = useRef(null)
   const tabDirection  = useRef(1) // +1 = forward (slide from right), -1 = backward (slide from left)
 
   // Tracks whether the user has actually switched tabs at least once (tap
@@ -244,23 +234,10 @@ export default function ConditionDetailScreen() {
     }
   }, [condition?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  function buildSharePrescription() {
-    const rx = condition?.prescriptions?.[0]
-    if (!rx) return null
-    return {
-      label: rx.label,
-      drugs: (rx.drugs ?? []).map(d => ({
-        brandName:     d.primaryBrand ?? d.brandName ?? d.name ?? '',
-        concentration: d.concentration ?? '',
-        form:          d.form ?? '',
-        dose:          d.dose_override ?? d.instruction ?? '',
-        note:          d.drug_note ?? '',
-      })),
-    }
-  }
-
-  function handleShare() {
-    shareConditionPrescription(condition, buildSharePrescription(), shareCardRef)
+  async function handleShare() {
+    const result = await shareCondition(condition)
+    if (result === 'copied') toast.success('Link copied. Paste it in any chat.')
+    else if (result === 'failed') toast.error('Could not share the link. Try again.')
   }
 
   // Phase 9 (back-arrow consistency, §9.5): every render state below now
@@ -388,15 +365,6 @@ export default function ConditionDetailScreen() {
         activeTab={activeTab}
         setActiveTab={switchTab}
       />
-
-      {/* Hidden ShareCard */}
-      <div style={{ position: 'fixed', top: -9999, left: -9999, zIndex: -1, pointerEvents: 'none' }}>
-        <ShareCard
-          ref={shareCardRef}
-          condition={{ name: condition.name, specialtyName: condition.specialtyName }}
-          prescription={buildSharePrescription()}
-        />
-      </div>
 
       {/* Local keyframes for the tab-switch transition — kept scoped to this
           file rather than added to globals.css, since this is the only
@@ -575,6 +543,7 @@ function ConditionDetailSkeleton() {
 function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTab, setActiveTab }) {
   const isDark = useIsDark()
   const backLabel = useBackLabel()
+  const { pressed: sharePressed, handlers: shareHandlers } = usePressed()
 
   const tokenKey  = condition?.specialtyColorToken ?? FALLBACK_TOKEN
   const iconType  = condition?.specialtyIconType   ?? 'lucide'
@@ -673,37 +642,26 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTa
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
               <button
                 onClick={onShare}
-                aria-label="Share prescription"
+                {...shareHandlers}
+                aria-label="Share this condition"
                 style={{
                   background: 'none', border: 'none', cursor: 'pointer', padding: 2,
                   color: 'var(--color-text-tertiary)',
                   WebkitTapHighlightColor: 'transparent', outline: 'none',
+                  transform: sharePressed ? 'scale(0.86)' : 'scale(1)',
+                  opacity: sharePressed ? 0.6 : 1,
+                  transition: 'transform var(--motion-fast) var(--ease-settle), opacity var(--motion-fast) var(--ease-settle)',
                 }}
               >
                 <Share2 size={20} strokeWidth={2} />
               </button>
 
-              <button
-                onClick={onFavToggle}
-                aria-label={isFav ? 'Remove from favourites' : 'Add to favourites'}
-                style={{
-                  background: 'none', border: 'none', cursor: 'pointer', padding: 2,
-                  // Uses the dedicated var(--color-favourite) token
-                  // (globals.css), not the shared destructive-action
-                  // var(--color-danger) — favouriting isn't a warning, so
-                  // it shouldn't be tied to the alarm-red used elsewhere.
-                  color: isFav ? 'var(--color-favourite)' : 'var(--color-text-tertiary)',
-                  transition: 'color 0.15s ease',
-                  WebkitTapHighlightColor: 'transparent', outline: 'none',
-                }}
-              >
-                {/* Was a hand-rolled star <polygon> — swapped for lucide's
-                    Heart so this matches the Heart used everywhere else the
-                    favourite identity appears (FavouritesScreen's title
-                    badge and condition-card row icon), instead of a
-                    one-off custom shape. */}
-                <Heart size={20} strokeWidth={2} fill={isFav ? 'currentColor' : 'none'} />
-              </button>
+              <FavouriteHeart
+                active={isFav}
+                onToggle={onFavToggle}
+                size={22}
+                idleColor="var(--color-text-tertiary)"
+              />
             </div>
           )}
         </div>

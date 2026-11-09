@@ -191,7 +191,8 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
-import { ArrowLeft, Share2, Heart, FolderPlus } from 'lucide-react'
+import { ArrowLeft, Share2, FolderPlus } from 'lucide-react'
+import FavouriteHeart from '../ui/FavouriteHeart'
 import { useToast } from '../../context/ToastContext'
 import { shareDrug } from '../../utils/shareDrugLink'
 import { usePressed } from '../../hooks/usePressed'
@@ -280,23 +281,12 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, on
   // itself overshooting 1 — scale target is just 1, the curve does the
   // bounce on the way there.
   const { toast } = useToast()
-  const [popped, setPopped] = useState(false)
-  const popTimeoutRef = useRef(null)
   const { pressed: sharePressed, handlers: shareHandlers } = usePressed()
-
-  useEffect(() => () => clearTimeout(popTimeoutRef.current), [])
 
   async function handleShare() {
     const result = await shareDrug(drug)
     if (result === 'copied') toast.success('Link copied. Paste it in any chat.')
     else if (result === 'failed') toast.error('Could not share the link. Try again.')
-  }
-
-  function handleToggleFav() {
-    onToggleFav()
-    setPopped(true)
-    clearTimeout(popTimeoutRef.current)
-    popTimeoutRef.current = setTimeout(() => setPopped(false), 220)
   }
 
   // Image-search icon — opens Google Images for this drug in Egypt.
@@ -512,30 +502,12 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, on
               </div>
             )}
           </div>
-          <button
-            onClick={handleToggleFav}
-            aria-label={isFavourited ? 'Remove from favourites' : 'Add to favourites'}
-            style={{
-              flexShrink: 0,
-              // 44px tap area (icon 28px + 8px around it). The negative top and
-              // bottom margin keeps a one-line title from growing taller.
-              margin: '-10px -8px -10px 0', padding: 8,
-              background: 'none', border: 'none', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: 'var(--color-favourite)',
-              WebkitTapHighlightColor: 'transparent', outline: 'none',
-            }}
-          >
-            <Heart
-              size={28}
-              strokeWidth={2}
-              fill={isFavourited ? 'currentColor' : 'none'}
-              style={{
-                transform:  popped ? 'scale(1.2)' : 'scale(1)',
-                transition: 'transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1)',
-              }}
-            />
-          </button>
+          <FavouriteHeart
+            active={isFavourited}
+            onToggle={onToggleFav}
+            size={28}
+            style={{ margin: '-10px -8px -10px 0' }}
+          />
         </div>
 
       </div>
