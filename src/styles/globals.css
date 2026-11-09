@@ -154,6 +154,12 @@
      and a section never read as "the same kind of box" at a glance. */
   --color-section-bg:       #F3EFFA;
 
+  /* Drug card — soft sage-teal card behind a prescription sheet's loose drug
+     rows (the ones not inside a labelled section). Same shape as the section
+     card but no header, and a different hue so the two never read as the
+     same kind of box. */
+  --color-drug-card-bg:     #EBF5F2;
+
   /* Class search mode accent (violet): icon and text colour, with its soft
      tint. The tint reuses the section card violet above, so light and dark
      mode stay in step with it. Used by the search mode info sheet. */
@@ -300,6 +306,10 @@
   /* Section card — dark mode: deep violet, kept distinct in hue from the
      note card's slate-grey above (same pairing logic as light mode). */
   --color-section-bg:       #241F33;
+
+  /* Drug card — dark mode: deep sage-teal, distinct from the violet section
+     card and the slate note card. */
+  --color-drug-card-bg:     #1A2B28;
 
   /* Class search mode accent — dark mode (tint follows --color-section-bg). */
   --color-class:            #A78BFA;

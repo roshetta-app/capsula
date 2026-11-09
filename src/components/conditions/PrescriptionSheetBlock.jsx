@@ -278,10 +278,30 @@ export default function PrescriptionSheetBlock({ sheet, hasContentAfter = true }
         node: <SectionHeader key={`seg-${segIdx}`} label={segment.label}>{renderItems()}</SectionHeader>,
       })
     } else {
-      segment.items.forEach((row, i) => {
-        const node = renderRowItem(row, i, segment.items[i + 1])
-        if (node) entries.push({ kind: ROW_KIND[row.row_type] ?? 'other', node })
-      })
+      // 2026-11-09: loose drug rows (not inside a labelled section) sit
+      // together in one header-less card. Consecutive drug rows share one
+      // card; notes, text, dividers and images stay outside it.
+      const items = segment.items
+      let i = 0
+      while (i < items.length) {
+        if (items[i].row_type === 'drug') {
+          const start = i
+          const group = []
+          while (i < items.length && items[i].row_type === 'drug') {
+            group.push(items[i])
+            i += 1
+          }
+          const nodes = group.map((row, gi) => renderRowItem(row, start + gi, group[gi + 1]))
+          entries.push({
+            kind: 'drugcard',
+            node: <DrugCard key={`drugcard-${segIdx}-${start}`}>{nodes}</DrugCard>,
+          })
+        } else {
+          const node = renderRowItem(items[i], i, items[i + 1])
+          if (node) entries.push({ kind: ROW_KIND[items[i].row_type] ?? 'other', node })
+          i += 1
+        }
+      }
     }
   })
   while (entries.length && entries[0].kind === 'divider') entries.shift()
@@ -322,6 +342,29 @@ export default function PrescriptionSheetBlock({ sheet, hasContentAfter = true }
           {entry.node}
         </div>
       ))}
+    </div>
+  )
+}
+
+// ─── DrugCard ─────────────────────────────────────────────────────────────────
+
+/**
+ * DrugCard — the section card's twin without a header: a full-width tinted
+ * card around loose drug rows. Uses --color-drug-card-bg (sage-teal), a
+ * different hue from --color-section-bg (violet) and --color-note-bg (grey).
+ * Same radius and inner padding as SectionHeader so the two line up.
+ */
+function DrugCard({ children }) {
+  return (
+    <div
+      style={{
+        background: 'var(--color-drug-card-bg)',
+        borderRadius: 'var(--radius-lg)',
+        overflow: 'hidden',
+        padding: 'var(--space-1) var(--space-4) var(--space-2)',
+      }}
+    >
+      {children}
     </div>
   )
 }
