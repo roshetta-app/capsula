@@ -5,8 +5,8 @@
 export const NOTE_FLAVORS = {
   info: {
     label: 'Info',
-    iconColor: 'var(--color-accent-text)',
-    bg: 'color-mix(in srgb, var(--color-accent) 7%, var(--color-note-bg) 93%)',
+    iconColor: 'var(--color-note-info)',
+    bg: 'color-mix(in srgb, var(--color-note-info) 7%, var(--color-note-bg) 93%)',
   },
   warning: {
     label: 'Warning',
