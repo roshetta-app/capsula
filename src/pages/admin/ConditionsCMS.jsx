@@ -251,6 +251,7 @@ function ConditionRow({ condition, isPublished, onEdit, onDelete, onTogglePublis
       <button
         onClick={onTogglePublished}
         title={isPublished ? 'Published — click to unpublish' : 'Draft — click to publish'}
+        className="cms-tap-expand"
         style={{
           flexShrink: 0,
           width: 10, height: 10,

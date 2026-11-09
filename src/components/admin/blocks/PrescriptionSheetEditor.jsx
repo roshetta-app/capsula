@@ -424,6 +424,7 @@ function GapInsertControl({ insertIndex, onInsert, isTouchActive, onTouchActivat
         <div
           tabIndex={-1}
           onBlur={handlePickerBlur}
+          className="cms-inline-picker"
           style={{
             position: 'absolute',
             top: '50%', left: '50%',

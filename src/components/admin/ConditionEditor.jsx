@@ -81,6 +81,7 @@ function ToolButton({ label, onClick, children }) {
       type="button"
       onClick={onClick}
       title={label}
+      aria-label={label}
       style={{
         display: 'flex', alignItems: 'center', gap: 6,
         height: 32, padding: '0 10px', whiteSpace: 'nowrap',
@@ -93,7 +94,7 @@ function ToolButton({ label, onClick, children }) {
       }}
     >
       {children}
-      {label}
+      <span className="cms-tool-label">{label}</span>
     </button>
   )
 }
@@ -612,7 +613,7 @@ export default function ConditionEditor() {
       title={form.name.trim() || (isEdit ? 'Edit condition' : 'New condition')}
       sticky
       actions={
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+        <div className="cms-editor-bar" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
           <ToolButton label="Collapse all" onClick={() => setCollapseSignal(n => n + 1)}><ChevronsDownUp size={15} /></ToolButton>
           <ToolButton label="Phone preview" onClick={() => setPreviewOpen(true)}><Smartphone size={15} /></ToolButton>
           <UndoRedoButton label="Undo" onClick={undo} disabled={!canUndo}><Undo2 size={16} /></UndoRedoButton>
@@ -620,6 +621,18 @@ export default function ConditionEditor() {
         {isUnsaved && (
           <span
             role="status"
+            aria-label="Unsaved changes"
+            className="cms-only-phone"
+            style={{
+              flexShrink: 0, width: 8, height: 8, borderRadius: '50%',
+              backgroundColor: 'var(--color-warning)',
+            }}
+          />
+        )}
+        {isUnsaved && (
+          <span
+            role="status"
+            className="cms-hide-phone"
             style={{
               fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap',
               color: 'var(--color-warning)', fontFamily: 'var(--font-body)',
@@ -632,6 +645,7 @@ export default function ConditionEditor() {
         <button
           onClick={handleSave}
           disabled={!isValid() || saving}
+          className="cms-push-right"
           style={{
             padding: '7px 18px', borderRadius: 'var(--radius-md)',
             fontSize: 13, fontWeight: 600, cursor: !isValid() || saving ? 'default' : 'pointer',

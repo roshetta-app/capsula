@@ -221,6 +221,62 @@ html.cms-surface .cms-only-phone {
     min-height: 44px;
   }
 
+  /* ─── Helpers used by the screens (Phase 2 on) ──────────────────────────────*/
+
+  /* .cms-stack: a row of fields becomes a column. */
+  html.cms-surface .cms-stack {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+  html.cms-surface .cms-stack > * {
+    flex: 0 0 auto !important;
+    width: 100% !important;
+  }
+  /* .cms-tool-label: the words next to a toolbar icon are hidden, the icon stays. */
+  html.cms-surface .cms-tool-label {
+    display: none !important;
+  }
+  /* .cms-push-right: pushes one item to the right end of a flex row. */
+  html.cms-surface .cms-push-right {
+    margin-left: auto !important;
+  }
+  /* .cms-tap-expand: a tiny control keeps its look but gets a thumb sized hit area. */
+  html.cms-surface .cms-tap-expand {
+    position: relative !important;
+  }
+  html.cms-surface .cms-tap-expand::after {
+    content: '';
+    position: absolute;
+    inset: -14px;
+  }
+  /* .cms-menu-fit: a drop-down never grows wider than the screen. */
+  html.cms-surface .cms-menu-fit {
+    max-width: calc(100vw - 32px) !important;
+  }
+  /* .cms-inline-picker: the small type picker wraps instead of running off screen. */
+  html.cms-surface .cms-inline-picker {
+    flex-wrap: wrap !important;
+    justify-content: center;
+    width: max-content !important;
+    max-width: calc(100vw - 48px) !important;
+  }
+
+  /* ─── Condition editor top bar ───────────────────────────────────────────────
+     The screen is narrow, so the sticky bar keeps one row: the four tools as
+     icons, an "unsaved" dot, and Save on the right. The condition name (also in
+     the Name field right below) is left out of the bar on phone. */
+  html.cms-surface .cms-page-head-sticky .cms-page-title {
+    display: none !important;
+  }
+  html.cms-surface .cms-page-head-sticky .cms-page-actions {
+    flex: 1 1 100% !important;
+    flex-wrap: nowrap;
+  }
+  html.cms-surface .cms-editor-bar {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
   /* ─── Phone preview: the screen is already phone sized, so no frame ─────────*/
   html.cms-surface .cms-preview-overlay {
     padding: 0 !important;

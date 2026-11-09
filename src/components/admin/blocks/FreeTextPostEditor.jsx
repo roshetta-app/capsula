@@ -33,6 +33,7 @@
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react'
+import useIsPhone from '../../../hooks/useIsPhone'
 import { renderTitledMarkdown } from '../../../lib/directiveRenderer'
 import RichTextToolbar, { applyFormat, getActiveFormats, EMPTY_ACTIVE } from './RichTextToolbar'
 import { supabase } from '../../../lib/supabase'
@@ -41,8 +42,10 @@ import { fetchCmsConfig } from '../../../lib/queries'
 // ─── View mode toggle ──────────────────────────────────────────────────────────
 
 const MODES = ['Edit', 'Split', 'Preview']
+// On a phone there is no room for two columns, so Split is not offered.
+const PHONE_MODES = ['Edit', 'Preview']
 
-function ModeToggle({ mode, onChange }) {
+function ModeToggle({ mode, onChange, modes = MODES }) {
   return (
     <div style={{
       display: 'flex',
@@ -52,7 +55,7 @@ function ModeToggle({ mode, onChange }) {
       padding: 2,
       gap: 2,
     }}>
-      {MODES.map(m => {
+      {modes.map(m => {
         const isActive = mode === m
         return (
           <button
@@ -253,6 +256,10 @@ export default function FreeTextPostEditor({ data, onChange, disabled = false })
   const markdown = data?.markdown ?? ''
   const title = data?.title ?? ''
   const [mode, setMode]             = useState('Split')
+  const isPhone = useIsPhone()
+  // On a phone a Split choice is shown as Edit (the choice itself is kept, so
+  // turning the phone sideways or widening the window brings Split back).
+  const viewMode = isPhone && mode === 'Split' ? 'Edit' : mode
   const [aiPrompt, setAiPrompt]     = useState(null)   // null = not yet fetched
   const [copyStatus, setCopyStatus] = useState('idle') // idle | loading | copied | error
 
@@ -380,7 +387,7 @@ export default function FreeTextPostEditor({ data, onChange, disabled = false })
         gap: 'var(--space-2)',
         flexWrap: 'wrap',
       }}>
-        <ModeToggle mode={mode} onChange={setMode} />
+        <ModeToggle mode={viewMode} onChange={setMode} modes={isPhone ? PHONE_MODES : MODES} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
           <span style={{
             fontSize: 11,
@@ -397,12 +404,12 @@ export default function FreeTextPostEditor({ data, onChange, disabled = false })
       <TitleField value={title} onChange={val => onChange({ title: val })} disabled={disabled} />
 
       {/* Formatting toolbar for the body */}
-      {mode !== 'Preview' && (
+      {viewMode !== 'Preview' && (
         <RichTextToolbar active={active} onAction={runFormat} disabled={disabled} />
       )}
 
       {/* Editor area */}
-      {mode === 'Edit' && (
+      {viewMode === 'Edit' && (
         <AutoTextarea
           value={markdown}
           onChange={handleChange}
@@ -413,11 +420,11 @@ export default function FreeTextPostEditor({ data, onChange, disabled = false })
         />
       )}
 
-      {mode === 'Preview' && (
+      {viewMode === 'Preview' && (
         <PreviewPanel title={title} markdown={markdown} />
       )}
 
-      {mode === 'Split' && (
+      {viewMode === 'Split' && (
         <div style={{
           display: 'grid',
           gridTemplateColumns: '1fr 1fr',

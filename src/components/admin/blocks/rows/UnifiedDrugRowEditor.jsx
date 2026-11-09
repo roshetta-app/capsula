@@ -834,7 +834,7 @@ function EditableDoseLine({
               DOSE BAND {number}
             </span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+          <div className="cms-stack" style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '0 0 36%', minWidth: 0 }}>
               <span style={doseFieldLabelStyle}>
                 Applies to
@@ -2467,7 +2467,7 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onOpti
               existing formulation is picked instead, its own strength data
               already lives in the library — these inputs don't apply. */}
           {!(pickedFormulationId && pickedFormulationId !== 'new') && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+            <div className="cms-cols" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, '--cols-phone': '1fr 1fr' }}>
               <div>
                 <FieldLabel>Strength Value</FieldLabel>
                 <input
@@ -2501,7 +2501,7 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onOpti
             </div>
           )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <div className="cms-cols" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <div>
               <FieldLabel hint={pickedFormulationId && pickedFormulationId !== 'new'
                 ? 'Copied from the existing formulation'

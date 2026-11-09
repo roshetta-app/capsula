@@ -262,7 +262,7 @@ export default function DoseRowList({ doses = [], onChange, disabled = false }) 
                   backgroundColor: '#F9FAFB',
                 }}
               >
-                <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr 56px', gap: 'var(--space-2)', alignItems: 'flex-start' }}>
+                <div className="cms-cols" style={{ display: 'grid', gridTemplateColumns: '130px 1fr 56px', gap: 'var(--space-2)', alignItems: 'flex-start' }}>
                   <div>
                     <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.03em', color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 2 }}>{`BRACKET ${bIdx + 1} TITLE`}</span>
                     <input

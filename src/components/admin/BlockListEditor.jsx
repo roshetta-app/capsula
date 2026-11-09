@@ -573,7 +573,7 @@ function AddBlockButton({ activeTab, onAdd, disabled, options: optionsOverride }
             onClick={() => setOpen(false)}
             style={{ position: 'fixed', inset: 0, zIndex: 49 }}
           />
-          <div style={{
+          <div className="cms-menu-fit" style={{
             position: 'absolute', top: 'calc(100% + 6px)', left: 0,
             zIndex: 50,
             backgroundColor: 'var(--color-surface)',
@@ -863,7 +863,7 @@ export default function BlockListEditor({ blocks = [], onChange, disabled = fals
                   height: 1,
                   backgroundColor: 'var(--color-border)',
                 }} />
-                <span style={{
+                <span className="cms-hide-phone" style={{
                   fontSize: 11,
                   color: 'var(--color-text-tertiary)',
                   fontFamily: 'var(--font-body)',
