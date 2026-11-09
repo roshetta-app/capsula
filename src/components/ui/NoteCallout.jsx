@@ -114,7 +114,7 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
       </ol>
     ),
     li: ({ children }) => (
-      <li dir="auto" style={{ fontSize: 16, lineHeight: 1.45, color: 'var(--color-text-primary)', unicodeBidi: 'plaintext' }}>
+      <li dir="auto" style={{ fontSize: 15, lineHeight: 1.45, color: 'var(--color-text-primary)', unicodeBidi: 'plaintext' }}>
         {children}
       </li>
     ),
@@ -127,7 +127,7 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
       style={{
         flex: 1,
         minWidth: 0,
-        fontSize: 16,
+        fontSize: 15,
         fontWeight: 600,
         fontStyle: 'normal',
         color: 'var(--color-text-primary)',
@@ -145,15 +145,15 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
 
   // ── Bubble shape — shared by both variants ────────────────────────────────
   // Full width, always. Icon side follows the text direction (Arabic: right).
-  // v5 (2026-11-09): iMessage shape + tail kept; the earlier outlined look is
+  // v6 simplified: plain flavour-coloured icon (no badge circle), 1px outline, no shadow, 14px radius, small tail, 15px text. v5 (2026-11-09): iMessage shape + tail kept; the earlier outlined look is
   // back on top of it — near-white fill tinted 6% with the flavour colour, a
   // 1.5px outline (flavour 38% over the surface) and a soft shadow. The tail
   // is drawn with the same fill and outline so bubble and tail read as one
   // shape. Tighter padding, 32px badge, and badge + text centred against each
   // other vertically.
-  const radius = isArabic ? '20px 20px 0px 20px' : '20px 20px 20px 0px'
-  const fill = `color-mix(in srgb, ${f.iconColor} 6%, var(--color-surface) 94%)`
-  const line = `color-mix(in srgb, ${f.iconColor} 38%, var(--color-surface) 62%)`
+  const radius = isArabic ? '14px 14px 0px 14px' : '14px 14px 14px 0px'
+  const fill = `color-mix(in srgb, ${f.iconColor} 5%, var(--color-surface) 95%)`
+  const line = `color-mix(in srgb, ${f.iconColor} 45%, var(--color-surface) 55%)`
 
   const bubble = (
     <div style={{ position: 'relative' }}>
@@ -161,34 +161,22 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
         width: '100%',
         boxSizing: 'border-box',
         background: fill,
-        border: `1.5px solid ${line}`,
-        boxShadow: '0 2px 6px rgba(0,0,0,0.05)',
+        border: `1px solid ${line}`,
         borderRadius: radius,
-        padding: '8px 14px',
+        padding: '7px 12px',
       }}>
         <div
           style={{
             display: 'flex',
             flexDirection: isArabic ? 'row-reverse' : 'row',
             alignItems: 'center',
-            gap: 10,
+            gap: 9,
           }}
         >
           {/* Icon side is controlled ONLY by flexDirection here — no dir
               attribute on this row (dir + row-reverse double-flips in some
               engines). dir stays on the inner text content. */}
-          <span style={{
-            width: 32,
-            height: 32,
-            flexShrink: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderRadius: '50%',
-            background: f.iconColor,
-          }}>
-            <Icon color="#fff" size={18} offset={0} />
-          </span>
+          <Icon color={f.iconColor} size={20} offset={0} />
           {textContent}
         </div>
       </div>
@@ -197,23 +185,23 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
           and bottom line carry the outline out to the tip. Pokes 10px out. */}
       <svg
         aria-hidden="true"
-        width="12"
-        height="18"
-        viewBox="0 0 12 18"
+        width="9"
+        height="12"
+        viewBox="0 0 9 12"
         style={{
           position: 'absolute',
           bottom: 0,
-          [isArabic ? 'right' : 'left']: -10,
+          [isArabic ? 'right' : 'left']: -7,
           transform: isArabic ? 'scaleX(-1)' : 'none',
           overflow: 'visible',
           pointerEvents: 'none',
         }}
       >
-        <path d="M10.75 8 C10.75 13 6.5 16.4 0.75 17.25 L10.75 17.25 Z" style={{ fill }} />
-        <path d="M10 8 H11.6 V16.5 H10 Z" style={{ fill }} />
+        <path d="M7.5 5 C7.5 9 4.5 11 0.5 11.5 L7.5 11.5 Z" style={{ fill }} />
+        <path d="M6.9 5 H8.1 V11 H6.9 Z" style={{ fill }} />
         <path
-          d="M10.75 8 C10.75 13 6.5 16.4 0.75 17.25 L11 17.25"
-          style={{ fill: 'none', stroke: line, strokeWidth: 1.5, strokeLinejoin: 'round', strokeLinecap: 'round' }}
+          d="M7.5 5 C7.5 9 4.5 11 0.5 11.5 L8 11.5"
+          style={{ fill: 'none', stroke: line, strokeWidth: 1, strokeLinejoin: 'round', strokeLinecap: 'round' }}
         />
       </svg>
     </div>
