@@ -213,14 +213,15 @@ export default function PrescriptionsTab({ blocks, conditionId, activeIndex: act
 
       {/* ── Footer section (2026-11-09) — Personal Notes + disclaimer sit in
           their own tinted section with a rounded top, so the page reads as
-          "treatment content" then "footer". Slightly darker than the page
-          background; Personal Notes' own white cards stand out on it. ── */}
+          "treatment content" then "footer". Colour sits between the blue header tint
+          and the violet drug cards, so the three belong together; Personal Notes'
+          white cards stand out on it. ── */}
       <div style={{
         marginTop: 'var(--space-8)',
         marginLeft: footerBleed ? 'calc(var(--space-6) * -1)' : 0,
         marginRight: footerBleed ? 'calc(var(--space-6) * -1)' : 0,
         padding: `var(--space-2) ${footerBleed ? 'var(--space-6)' : 0} ${bottomInset}`,
-        background: 'color-mix(in srgb, var(--color-text-primary) 5%, var(--color-bg))',
+        background: 'color-mix(in srgb, var(--color-header-tint) 50%, var(--color-section-bg) 50%)',
         borderRadius: '28px 28px 0 0',
       }}>
       {/* Personal Notes */}
