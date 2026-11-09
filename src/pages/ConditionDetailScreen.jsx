@@ -56,6 +56,11 @@ const TABS = [
 // independently of one another.
 const scrollMemory = new Map()
 
+// Same idea for the chosen treatment plan in the Rx tab dropdown, keyed by
+// condition slug. Read only when this screen is re-entered by Back (POP), so
+// a fresh visit from the list always starts on the first plan.
+const planMemory = new Map()
+
 export default function ConditionDetailScreen() {
   const { slug }    = useParams()
   const navigate    = useNavigate()
@@ -71,6 +76,14 @@ export default function ConditionDetailScreen() {
   const { isConditionFavourited, toggleCondition } = useFavouritesContext()
 
   const [activeTab, setActiveTab] = useState(0)
+
+  // Chosen treatment plan (Rx tab dropdown). Lives here, not inside the Rx tab,
+  // so it survives switching to the Clinical tab and back; planMemory carries it
+  // across the condition -> drug -> Back round trip.
+  const [rxPlanIndex, setRxPlanIndex] = useState(
+    () => (navigationType === 'POP' ? planMemory.get(slug) ?? 0 : 0)
+  )
+  useEffect(() => { planMemory.set(slug, rxPlanIndex) }, [slug, rxPlanIndex])
   const touchStartX  = useRef(null)
   const touchStartY  = useRef(null)
   const shareCardRef = useRef(null)
@@ -448,6 +461,8 @@ export default function ConditionDetailScreen() {
             <PrescriptionsTab
               blocks={condition.blocks ?? []}
               conditionId={condition.id}
+              activeIndex={rxPlanIndex}
+              onActiveIndexChange={setRxPlanIndex}
             />
           ) : (
             <ClinicalDataTab blocks={condition.blocks ?? []} />

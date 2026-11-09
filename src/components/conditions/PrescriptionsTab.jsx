@@ -143,9 +143,14 @@ import { getRxBlocks, trimDividerEdges } from '../../utils/blockFilters'
  * Props:
  *   blocks       Block[]  — condition.blocks (Phase 2.1 shape)
  *   conditionId  string   — for PersonalNotes localStorage key
+ *   activeIndex / onActiveIndexChange  optional — the chosen treatment plan,
+ *                kept by the parent so it survives tab switches and a trip to
+ *                a drug page and back. Falls back to local state if omitted.
  */
-export default function PrescriptionsTab({ blocks, conditionId }) {
-  const [activeIndex, setActiveIndex] = useState(0)
+export default function PrescriptionsTab({ blocks, conditionId, activeIndex: activeIndexProp, onActiveIndexChange }) {
+  const [localIndex, setLocalIndex] = useState(0)
+  const activeIndex    = activeIndexProp ?? localIndex
+  const setActiveIndex = onActiveIndexChange ?? setLocalIndex
 
   const rxBlocks = getRxBlocks(blocks)
   const sheets   = rxBlocks.filter(b => b.blockType === 'prescription_sheet')
