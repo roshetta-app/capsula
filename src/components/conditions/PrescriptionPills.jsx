@@ -28,6 +28,9 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
   const [open, setOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [pressed, setPressed] = useState(false)
+  // entered: flips one frame after the menu mounts, so the blur and the menu
+  // actually animate in (mounting already-open would just snap).
+  const [entered, setEntered] = useState(false)
   const containerRef = useRef(null)
   const unmountTimer = useRef(null)
 
@@ -38,12 +41,19 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
       if (unmountTimer.current) clearTimeout(unmountTimer.current)
       setMounted(true)
     } else if (mounted) {
-      unmountTimer.current = setTimeout(() => setMounted(false), 160)
+      unmountTimer.current = setTimeout(() => setMounted(false), 240)
     }
     return () => {
       if (unmountTimer.current) clearTimeout(unmountTimer.current)
     }
   }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!open) { setEntered(false); return }
+    if (!mounted) return
+    const id = requestAnimationFrame(() => requestAnimationFrame(() => setEntered(true)))
+    return () => cancelAnimationFrame(id)
+  }, [open, mounted])
 
   // Close on outside tap/click and on Escape
   useEffect(() => {
@@ -91,6 +101,28 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
         zIndex: open ? 56 : 'auto',
       }}
     >
+      {/* ── Blur scrim — softly blurs and dims the page behind the open menu.
+          Sits behind the trigger and menu (same stacking context), fades and
+          blurs in/out with the menu; tapping it closes the menu. ───────── */}
+      {mounted && (
+        <div
+          aria-hidden="true"
+          onClick={() => setOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 0,
+            background: entered
+              ? 'color-mix(in srgb, var(--color-bg) 38%, transparent)'
+              : 'color-mix(in srgb, var(--color-bg) 0%, transparent)',
+            backdropFilter: entered ? 'blur(7px)' : 'blur(0px)',
+            WebkitBackdropFilter: entered ? 'blur(7px)' : 'blur(0px)',
+            transition: 'background 0.24s ease, backdrop-filter 0.24s ease, -webkit-backdrop-filter 0.24s ease',
+            pointerEvents: open ? 'auto' : 'none',
+          }}
+        />
+      )}
+
       {/* ── Trigger ─────────────────────────────────────────────────────── */}
       <button
         type="button"
@@ -102,6 +134,8 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
         aria-expanded={open}
         aria-label={`${selected.label}. Tap to change.`}
         style={{
+          position: 'relative',
+          zIndex: 1,
           width: '100%',
           display: 'flex',
           alignItems: 'center',
@@ -214,9 +248,9 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
             maxHeight: '60vh',
             overflowY: 'auto',
             transformOrigin: 'top',
-            opacity: open ? 1 : 0,
-            transform: open ? 'scaleY(1) translateY(0)' : 'scaleY(0.96) translateY(-4px)',
-            transition: 'opacity 0.16s ease, transform 0.16s ease',
+            opacity: entered ? 1 : 0,
+            transform: entered ? 'scaleY(1) translateY(0)' : 'scaleY(0.96) translateY(-6px)',
+            transition: 'opacity 0.22s ease, transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1)',
           }}
         >
           {prescriptions.map((rx, i) => {
