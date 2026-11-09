@@ -1,6 +1,7 @@
-import React, { useState } from 'react'
+import React, { useState, useContext } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useDrugContext } from '../../context/DrugContext'
+import { PreviewModeContext } from '../../context/PreviewModeContext'
 import { FileText, ChevronRight, Plus } from 'lucide-react'
 import NoteCallout from '../ui/NoteCallout'
 import FreeTextPostBlock from './FreeTextPostBlock'
@@ -116,7 +117,10 @@ const NAME_LINE_HEIGHT = 1.3
  *                     other call site is unaffected.
  */
 export default function PrescriptionSheetBlock({ sheet, hasContentAfter = true }) {
-  const navigate = useNavigate()
+  const realNavigate = useNavigate()
+  // In the CMS phone preview, tapping a drug must not leave the editor.
+  const inPreview = useContext(PreviewModeContext)
+  const navigate = inPreview ? () => {} : realNavigate
   // BUG FIX (2026-08-09): this used to call useDrugs() directly, which
   // spins up its own independent cache-read + fetch cycle every time this
   // component mounts — completely separate from the app-wide DrugProvider

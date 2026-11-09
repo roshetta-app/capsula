@@ -8,12 +8,17 @@
  * It uses the app's own Treatment and Clinical tab components, so it follows
  * the real screen. Two deliberate differences: the Personal Notes section is
  * left out (it needs the signed-in app, which the editor does not have), and
- * tapping a drug does nothing (the preview has its own private address bar).
+ * tapping a drug does nothing (PreviewModeContext turns navigation off).
  * A crash inside the preview is caught here and never takes the editor down.
+ *
+ * 2026-11-09 fix: the preview used to wrap its content in its own MemoryRouter.
+ * The editor already sits inside the app's router, and React Router refuses a
+ * router inside a router, so every open showed the "could not draw" message.
+ * It now reuses the editor's router.
  */
 import { Component, useEffect, useMemo, useState } from 'react'
-import { MemoryRouter } from 'react-router-dom'
 import { X, ArrowLeft } from 'lucide-react'
+import { PreviewModeContext } from '../../context/PreviewModeContext'
 import PrescriptionsTab from '../conditions/PrescriptionsTab'
 import ClinicalDataTab from '../conditions/ClinicalDataTab'
 
@@ -145,11 +150,11 @@ export default function PhonePreviewModal({ isOpen, onClose, name, blocks }) {
           <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden' }}>
             <div style={{ padding: 'var(--space-5) var(--space-6) var(--space-6)' }}>
               <PreviewBoundary resetKey={appBlocks}>
-                <MemoryRouter>
+                <PreviewModeContext.Provider value={true}>
                   {tab === 0
                     ? <PrescriptionsTab blocks={appBlocks} />
                     : <ClinicalDataTab blocks={appBlocks} />}
-                </MemoryRouter>
+                </PreviewModeContext.Provider>
               </PreviewBoundary>
             </div>
           </div>
