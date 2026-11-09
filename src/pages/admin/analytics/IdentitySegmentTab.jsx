@@ -90,6 +90,7 @@ function RankedList({ title, rows, color = 'var(--color-accent)' }) {
           return (
             <div
               key={row.name}
+              className="cms-rank-row"
               style={{
                 display: 'grid',
                 gridTemplateColumns: '24px minmax(0,1fr) minmax(80px,180px) 52px',
@@ -110,7 +111,7 @@ function RankedList({ title, rows, color = 'var(--color-accent)' }) {
                 {row.name}
               </span>
 
-              <div style={{
+              <div className="cms-rank-bar" style={{
                 height: 6,
                 backgroundColor: 'var(--color-border)',
                 borderRadius: 'var(--radius-full)',

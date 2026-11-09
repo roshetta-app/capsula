@@ -490,6 +490,17 @@ html.cms-surface .cms-only-phone {
 
   /* .cms-wrap-text: a name that is cut with "..." on desktop wraps on phone, so
      the full text can be read. */
+  /* .cms-rank-row / .cms-rank-bar: a ranked list row (number, name, bar, count).
+     On phone the name gets the whole width, and the bar moves under it. */
+  html.cms-surface .cms-rank-row {
+    grid-template-columns: 24px minmax(0, 1fr) auto !important;
+    row-gap: 6px;
+  }
+  html.cms-surface .cms-rank-row > .cms-rank-bar {
+    grid-column: 2 / -1;
+    grid-row: 2;
+  }
+
   html.cms-surface .cms-wrap-text {
     overflow: visible !important;
     text-overflow: clip !important;

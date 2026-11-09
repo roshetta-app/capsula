@@ -99,6 +99,7 @@ function RankedList({ title, rows, color = 'var(--color-accent)', emptyLabel = '
           return (
             <div
               key={row.name}
+              className="cms-rank-row"
               style={{
                 display: 'grid',
                 gridTemplateColumns: '24px minmax(0,1fr) minmax(80px,180px) 52px',
@@ -119,7 +120,7 @@ function RankedList({ title, rows, color = 'var(--color-accent)', emptyLabel = '
                 {row.name}
               </span>
 
-              <div style={{
+              <div className="cms-rank-bar" style={{
                 height: 6,
                 backgroundColor: 'var(--color-border)',
                 borderRadius: 'var(--radius-full)',
@@ -218,7 +219,7 @@ function SessionsPerWeekChart({ rows }) {
               }}>
                 <div style={{
                   width: `${pct}%`, height: '100%',
-                  backgroundColor: 'var(--color-primary)',
+                  backgroundColor: 'var(--color-accent)',
                   borderRadius: 'var(--radius-sm)',
                   transition: 'width 0.5s ease',
                   display: 'flex', alignItems: 'center',
