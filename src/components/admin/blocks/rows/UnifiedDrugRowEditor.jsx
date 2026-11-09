@@ -941,18 +941,6 @@ function EditableDoseLine({
   )
 }
 
-const editLineInputStyle = {
-  width: '100%', boxSizing: 'border-box',
-  padding: '3px 8px',
-  border: '1px solid var(--color-border)',
-  borderRadius: 'var(--radius-md)',
-  fontSize: 12, fontWeight: 400,
-  fontFamily: 'var(--font-body)',
-  backgroundColor: 'var(--color-surface)',
-  color: 'var(--color-text-secondary)',
-  outline: 'none',
-}
-
 const lineIconButtonStyle = {
   flexShrink: 0,
   display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
@@ -969,7 +957,7 @@ const lineIconButtonStyle = {
 // EditableDoseLine above — clean text by default, pencil opens it into a
 // real input, checkmark closes it back to read-only. Mirrors
 // EditableDoseLine's edit/remove buttons exactly (same icons, same
-// lineIconButtonStyle/editLineInputStyle).
+// lineIconButtonStyle).
 //
 // MAX-DOSE SAVE-TO-LIBRARY ADDENDUM (2026-08-06): also mirrors
 // EditableDoseLine's "save this wording back to the drug library" button
@@ -1203,20 +1191,13 @@ function PopulationTabs({ whos, activeIdx, shownIdx = 0, renaming = false, onRen
 // content could render behind the empty-state trigger after a remount. Here,
 // a non-empty note always renders as the read-only line regardless of the
 // isEditing initializer, so that failure mode no longer exists.
-function NoteSlot({ note, onChange, label, triggerLabel, placeholder, editing, onEditingChange, hideTrigger = false }) {
+function NoteSlot({ note, onChange, label, heading, triggerLabel, placeholder, hint, editing, onEditingChange, hideTrigger = false }) {
   // Optional outside control: LinkedDrugCard puts the '+ note' button on the
   // right of the drug card, so it owns the open/closed state and hides this
   // slot's own trigger.
   const [localEditing, setLocalEditing] = useState(false)
   const isEditing = editing ?? localEditing
   const setIsEditing = onEditingChange ?? setLocalEditing
-  const [isHovered, setIsHovered] = useState(false)
-
-  // Pulled tight to the content above via a small negative marginTop,
-  // instead of taking the full block-level gap the rest of the column
-  // uses (DECLUTTER PASS 4) — applied to all three states so switching
-  // between them doesn't shift the layout.
-  const wrapStyle = { marginTop: -4 }
 
   if (!note && !isEditing) {
     if (hideTrigger) return null
@@ -1225,7 +1206,7 @@ function NoteSlot({ note, onChange, label, triggerLabel, placeholder, editing, o
         type="button"
         onClick={() => setIsEditing(true)}
         style={{
-          ...wrapStyle,
+          marginTop: -4,
           display: 'inline-flex', alignItems: 'center', gap: 4,
           padding: '3px 4px',
           border: 'none',
@@ -1241,90 +1222,33 @@ function NoteSlot({ note, onChange, label, triggerLabel, placeholder, editing, o
     )
   }
 
-  if (isEditing) {
-    return (
-      <div style={{ ...wrapStyle, display: 'flex', alignItems: 'center', gap: 4 }}>
-        <input
-          type="text"
-          value={note ?? ''}
-          onChange={e => onChange(e.target.value || null)}
-          placeholder={placeholder}
-          dir="auto"
-          autoFocus
-          onKeyDown={e => { if (e.key === 'Enter') setIsEditing(false) }}
-          style={{ ...editLineInputStyle, flex: 1, fontSize: 11, fontStyle: 'italic' }}
-        />
-        <button
-          type="button"
-          onClick={() => setIsEditing(false)}
-          title="Done editing"
-          aria-label={`Done editing ${label}`}
-          style={lineIconButtonStyle}
-        >
-          <Check size={13} />
-        </button>
-      </div>
-    )
-  }
-
+  // 2026-11-09: reading and editing use the same note box as the group note.
   return (
-    <div
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      style={{
-        ...wrapStyle,
-        display: 'flex', alignItems: 'center', gap: 4,
-        borderRadius: 'var(--radius-md)',
-        backgroundColor: isHovered ? 'var(--color-bg)' : 'transparent',
-      }}
-    >
-      <div
-        dir="auto"
-        style={{
-          flex: 1,
-          padding: '3px 8px',
-          fontSize: 11, fontStyle: 'italic', fontFamily: 'var(--font-body)',
-          color: 'var(--color-text-tertiary)',
-        }}
-      >
-        {note}
-      </div>
-      {isHovered && (
-        <>
-          <button
-            type="button"
-            onClick={() => setIsEditing(true)}
-            title={`Edit ${label}`}
-            aria-label={`Edit ${label}`}
-            style={lineIconButtonStyle}
-          >
-            <Edit2 size={12} />
-          </button>
-          <button
-            type="button"
-            onClick={() => onChange(null)}
-            title={`Remove ${label}`}
-            aria-label={`Remove ${label}`}
-            style={lineIconButtonStyle}
-          >
-            <X size={13} />
-          </button>
-        </>
-      )}
-    </div>
+    <NoteEditor
+      note={note}
+      onChange={onChange}
+      editing={isEditing}
+      onEditingChange={setIsEditing}
+      label={label}
+      heading={heading}
+      placeholder={placeholder}
+      hint={hint}
+      margin="2px 0 4px"
+    />
   )
 }
 
-// ─── GroupNoteEditor ─────────────────────────────────────────────────────────
-// 2026-11-09: the note for a whole patient group, shown inside the dose card
-// right under the dose bands and max dose. Read view: a soft box with a note
+// ─── NoteEditor ──────────────────────────────────────────────────────────────
+// 2026-11-09: the shared note box, used for the group note (inside the dose card,
+// right under the dose bands and max dose) and for the drug note (under the
+// drug's name). Read view: a soft box with a note
 // icon, the text, and edit / remove buttons that are always visible (they used
 // to appear only on hover, which never works on a phone). Edit view: a roomy
 // box that grows with the text, with Remove and Done. Enter or Done saves,
 // Esc closes, and a note left empty is dropped. (The per-drug note keeps the
-// older one-line NoteSlot.)
+// moved to this same box, so both notes look and work the same.)
 
-function GroupNoteEditor({ note, editing, onEditingChange, onChange }) {
+function NoteEditor({ note, editing, onEditingChange, onChange, label, heading, placeholder, hint, margin = '4px 4px 6px' }) {
   const taRef = useRef(null)
   useEffect(() => {
     const el = taRef.current
@@ -1337,7 +1261,7 @@ function GroupNoteEditor({ note, editing, onEditingChange, onChange }) {
   if (!hasNote && !editing) return null
 
   const boxStyle = {
-    margin: '4px 4px 6px',
+    margin,
     padding: '8px 10px',
     borderRadius: 'var(--radius-md)',
     border: '1px solid var(--color-border)',
@@ -1357,7 +1281,7 @@ function GroupNoteEditor({ note, editing, onEditingChange, onChange }) {
   if (editing) {
     return (
       <div style={{ ...boxStyle, borderColor: 'var(--color-accent)', display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <div style={headerStyle}><StickyNote size={13} /> Group note</div>
+        <div style={headerStyle}><StickyNote size={13} /> {heading}</div>
         <textarea
           ref={taRef}
           value={note ?? ''}
@@ -1366,7 +1290,7 @@ function GroupNoteEditor({ note, editing, onEditingChange, onChange }) {
             if (e.key === 'Enter') { e.preventDefault(); finish() }
             if (e.key === 'Escape') { e.preventDefault(); finish() }
           }}
-          placeholder="Applies to every dose band above, e.g. Take with food"
+          placeholder={placeholder}
           dir="auto"
           rows={2}
           autoFocus
@@ -1380,7 +1304,7 @@ function GroupNoteEditor({ note, editing, onEditingChange, onChange }) {
         />
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
           <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
-            Enter to finish
+            {hint ? `${hint} · Enter to finish` : 'Enter to finish'}
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             {hasNote && (
@@ -1418,7 +1342,7 @@ function GroupNoteEditor({ note, editing, onEditingChange, onChange }) {
     <div style={{ ...boxStyle, display: 'flex', alignItems: 'flex-start', gap: 8 }}>
       <StickyNote size={14} style={{ flexShrink: 0, marginTop: 2, color: 'var(--color-text-secondary)' }} />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={headerStyle}>Group note</div>
+        <div style={headerStyle}>{heading}</div>
         <div dir="auto" style={{ fontSize: 13, lineHeight: 1.45, color: 'var(--color-text-primary)', marginTop: 2, wordBreak: 'break-word' }}>
           {note}
         </div>
@@ -1426,8 +1350,8 @@ function GroupNoteEditor({ note, editing, onEditingChange, onChange }) {
       <button
         type="button"
         onClick={() => onEditingChange(true)}
-        title="Edit group note"
-        aria-label="Edit group note"
+        title={`Edit ${label}`}
+        aria-label={`Edit ${label}`}
         style={lineIconButtonStyle}
       >
         <Edit2 size={13} />
@@ -1435,13 +1359,25 @@ function GroupNoteEditor({ note, editing, onEditingChange, onChange }) {
       <button
         type="button"
         onClick={() => onChange(null)}
-        title="Remove group note"
-        aria-label="Remove group note"
+        title={`Remove ${label}`}
+        aria-label={`Remove ${label}`}
         style={lineIconButtonStyle}
       >
         <X size={14} />
       </button>
     </div>
+  )
+}
+
+function GroupNoteEditor(props) {
+  return (
+    <NoteEditor
+      {...props}
+      label="group note"
+      heading="Group note"
+      placeholder="e.g. Take with food"
+      hint="Applies to every dose band above"
+    />
   )
 }
 
@@ -1465,9 +1401,11 @@ function DrugOptionNoteSlot({ note, onChange, editing, onEditingChange, hideTrig
       editing={editing}
       onEditingChange={onEditingChange}
       hideTrigger={hideTrigger}
-      label="note"
+      label="drug note"
+      heading="Drug note"
       triggerLabel="note"
-      placeholder="Drug note (e.g. Preferred for children)"
+      placeholder="e.g. Preferred for children"
+      hint="Shows under this drug's name"
     />
   )
 }
