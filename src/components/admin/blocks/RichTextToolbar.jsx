@@ -6,6 +6,7 @@
  * choice to the selected text of the body box.
  *
  * How a choice is stored (inside the body text, so old blocks keep working):
+ *   bullets    one "- " at the start of each line (shown as a bullet list)
  *   bold       **text**
  *   italic     _text_
  *   underline  <u>text</u>
@@ -24,10 +25,11 @@
  *   { type: 'color',  value: 'red' | ... | null }   (null = back to default)
  *   { type: 'size',   value: 'sm' | 'lg' | null }   (null = normal)
  *   { type: 'clear' }
+ *   { type: 'list' }                                      (bullet list on the selected lines, toggles)
  */
 
 import { useState, useEffect, useRef } from 'react'
-import { Bold, Italic, Underline, Palette, Type, Eraser } from 'lucide-react'
+import { Bold, Italic, Underline, Palette, Type, Eraser, List } from 'lucide-react'
 
 // ─── Choices ───────────────────────────────────────────────────────────────────
 
@@ -46,7 +48,7 @@ export const SIZES = [
   { key: 'lg', label: 'Large',  px: 18 },
 ]
 
-export const EMPTY_ACTIVE = { b: false, i: false, u: false, color: null, size: null }
+export const EMPTY_ACTIVE = { b: false, i: false, u: false, color: null, size: null, list: false }
 
 // ─── Formatting engine ─────────────────────────────────────────────────────────
 
@@ -197,7 +199,55 @@ function applyEdits(value, edits) {
   return out
 }
 
+// ─── Bullet list ───────────────────────────────────────────────────────────────
+// Works on whole lines: the lines touched by the selection (or the cursor's
+// line). Blank lines, headings and ::: card lines are left alone. If every
+// line already is a bullet the bullets come off; otherwise every line becomes
+// a bullet (a numbered line is turned into a bullet).
+const BULLET_RE = /^(\s*)[-*+]\s+/
+
+function listLines(value, start, end) {
+  const lineStart = value.lastIndexOf('\n', start - 1) + 1
+  const last = end > start && value[end - 1] === '\n' ? end - 1 : end
+  let lineEnd = value.indexOf('\n', last)
+  if (lineEnd === -1) lineEnd = value.length
+  const lines = value.slice(lineStart, lineEnd).split('\n')
+  const isTarget = l => {
+    const t = l.trim()
+    return t !== '' && !t.startsWith(':::') && !t.startsWith('#')
+  }
+  return { lineStart, lineEnd, lines, isTarget }
+}
+
+function applyList(value, start, end) {
+  const { lineStart, lineEnd, lines, isTarget } = listLines(value, start, end)
+  const targets = lines.filter(isTarget)
+  if (!targets.length) return null
+  const allBullets = targets.every(l => BULLET_RE.test(l))
+  const next = lines.map(l => {
+    if (!isTarget(l)) return l
+    if (allBullets) return l.replace(BULLET_RE, '$1')
+    return '- ' + l.replace(/^\s*(?:[-*+]|\d+[.)])\s+/, '').trimStart()
+  })
+  const newBlock = next.join('\n')
+  const out = value.slice(0, lineStart) + newBlock + value.slice(lineEnd)
+  if (start === end) {
+    const idx = value.slice(lineStart, start).split('\n').length - 1
+    const diff = next[idx].length - lines[idx].length
+    const caret = Math.max(lineStart, start + diff)
+    return { value: out, selStart: caret, selEnd: caret }
+  }
+  return { value: out, selStart: lineStart, selEnd: lineStart + newBlock.length }
+}
+
+function isListActive(value, start, end) {
+  const { lines, isTarget } = listLines(value, start, end)
+  const targets = lines.filter(isTarget)
+  return targets.length > 0 && targets.every(l => BULLET_RE.test(l))
+}
+
 export function applyFormat(value, start, end, action) {
+  if (action.type === 'list') return applyList(value, start, end)
   const ps = getPieces(value, start, end)
 
   // Nothing selected and no word under the cursor: open an empty pair to type in.
@@ -271,8 +321,9 @@ export function applyFormat(value, start, end, action) {
 }
 
 export function getActiveFormats(value, start, end) {
+  const list = isListActive(value, start, end)
   const ps = getPieces(value, start, end)
-  if (ps.caret || !ps.list.length) return EMPTY_ACTIVE
+  if (ps.caret || !ps.list.length) return { ...EMPTY_ACTIVE, list }
   const perPiece = ps.list.map(([a, b]) => findLayers(value, a, b))
   const every = id => perPiece.every(l => !!firstLayer(l, id))
   const keyOf = (id, re) => {
@@ -285,6 +336,7 @@ export function getActiveFormats(value, start, end) {
     u: every('u'),
     color: keyOf('c', /rt-c-([a-z]+)/),
     size: keyOf('s', /rt-s-([a-z]+)/),
+    list,
   }
 }
 
@@ -402,6 +454,12 @@ export default function RichTextToolbar({ active = EMPTY_ACTIVE, onAction, disab
       </IconButton>
       <IconButton label="Underline (Ctrl+U)" active={active.u} disabled={disabled} onClick={() => pick({ type: 'toggle', id: 'u' })}>
         <Underline size={16} />
+      </IconButton>
+
+      <Divider />
+
+      <IconButton label="Bullet list" active={active.list} disabled={disabled} onClick={() => pick({ type: 'list' })}>
+        <List size={16} />
       </IconButton>
 
       <Divider />

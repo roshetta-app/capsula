@@ -330,7 +330,39 @@ export default function FreeTextPostEditor({ data, onChange, disabled = false })
     })
   }
 
+  // Enter on a bullet line starts the next bullet; Enter on an empty bullet
+  // ends the list (removes that empty bullet).
+  function handleEnterInList(e) {
+    const el = textareaRef.current
+    if (!el || el.selectionStart !== el.selectionEnd) return false
+    const pos = el.selectionStart
+    const v = el.value
+    const lineStart = v.lastIndexOf('\n', pos - 1) + 1
+    const m = v.slice(lineStart, pos).match(/^(\s*)([-*+])\s+(.*)$/)
+    if (!m) return false
+    e.preventDefault()
+    let next, caret
+    if (m[3].trim() === '') {
+      next = v.slice(0, lineStart) + v.slice(pos)
+      caret = lineStart
+    } else {
+      const ins = '\n' + m[1] + '- '
+      next = v.slice(0, pos) + ins + v.slice(pos)
+      caret = pos + ins.length
+    }
+    handleChange(next)
+    requestAnimationFrame(() => {
+      el.focus()
+      el.setSelectionRange(caret, caret)
+      setActive(getActiveFormats(next, caret, caret))
+    })
+    return true
+  }
+
   function handleKeyDown(e) {
+    if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey && !e.nativeEvent?.isComposing) {
+      if (handleEnterInList(e)) return
+    }
     if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return
     const id = { b: 'b', i: 'i', u: 'u' }[e.key.toLowerCase()]
     if (!id) return
