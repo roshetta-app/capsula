@@ -145,24 +145,22 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
   // ── Bubble shape — shared by both variants ────────────────────────────────
   // Full width, always — a note block that borrows the speech-bubble idiom.
   // Icon side follows the text direction (Arabic-leading notes: icon on the right).
-  // MESSAGE-BUBBLE PASS (2026-11-09, v3): an outlined chat bubble. Full width,
-  // level with every other card (no side inset). Near-white fill with a thin
-  // flavour-tinted outline and a soft shadow, a classic tail (a rotated square
-  // with outline on its two outer sides) under the bottom corner on the side
-  // the text reads from, and a solid round avatar-style badge for the icon.
-  const fill = `color-mix(in srgb, ${f.iconColor} 6%, var(--color-surface))`
-  const edge = `color-mix(in srgb, ${f.iconColor} 38%, var(--color-surface))`
+  // MESSAGE-BUBBLE PASS (2026-11-09, v4): iMessage-style bubble. Solid tinted
+  // fill, no outline or shadow, 20px radius on three corners. The fourth corner
+  // (bottom, on the side the text reads from) is square and carries a small
+  // curved tail that sweeps out and down, drawn as a tiny SVG so it takes the
+  // bubble's own fill on any background. Bubble stays full width and level with
+  // the other cards; only the 10px tail pokes into the page margin.
+  const radius = isArabic ? '20px 20px 0px 20px' : '20px 20px 20px 0px'
 
   const bubble = (
-    <div style={{ position: 'relative', paddingBottom: 8 }}>
+    <div style={{ position: 'relative' }}>
       <div style={{
         width: '100%',
         boxSizing: 'border-box',
-        background: fill,
-        border: `1.5px solid ${edge}`,
-        borderRadius: 22,
+        background: f.bg,
+        borderRadius: radius,
         padding: '14px 16px',
-        boxShadow: '0 2px 6px rgba(0,0,0,0.05)',
       }}>
         <div
           style={{
@@ -191,23 +189,23 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
           {textContent}
         </div>
       </div>
-      {/* Tail — rotated square, outlined on its two outer sides only, so it
-          merges into the bubble's fill and breaks its bottom outline */}
-      <div
+      {/* Tail — overlaps the bubble by 2px so there is no seam; pokes 10px out */}
+      <svg
         aria-hidden="true"
+        width="12"
+        height="18"
+        viewBox="0 0 12 18"
         style={{
           position: 'absolute',
-          bottom: 1,
-          [isArabic ? 'right' : 'left']: 26,
-          width: 13,
-          height: 13,
-          background: fill,
-          borderRight: `1.5px solid ${edge}`,
-          borderBottom: `1.5px solid ${edge}`,
-          transform: 'rotate(45deg)',
-          boxSizing: 'border-box',
+          bottom: 0,
+          [isArabic ? 'right' : 'left']: -10,
+          transform: isArabic ? 'scaleX(-1)' : 'none',
+          overflow: 'visible',
+          pointerEvents: 'none',
         }}
-      />
+      >
+        <path d="M12 0 V9 C12 14 7 17 0 18 L12 18 Z" style={{ fill: f.bg }} />
+      </svg>
     </div>
   )
 
