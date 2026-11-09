@@ -103,7 +103,7 @@ function RankedList({ title, rows, color = 'var(--color-accent)' }) {
               <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)', textAlign: 'right' }}>
                 {i + 1}
               </span>
-              <span style={{
+              <span className="cms-wrap-text" style={{
                 fontSize: 13, color: 'var(--color-text-primary)',
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
               }}>

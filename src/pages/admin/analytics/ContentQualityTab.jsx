@@ -343,7 +343,8 @@ function CoverageTable({ rows }) {
   }
 
   return (
-    <div style={{
+    <div className="cms-scroll-x" style={{
+      '--cms-scroll-min': '480px',
       border: '1px solid var(--color-border)',
       borderRadius: 'var(--radius-lg)',
       overflow: 'hidden',
@@ -358,7 +359,7 @@ function CoverageTable({ rows }) {
         Coverage by Specialty
       </div>
 
-      <div className="cms-cols" style={{ '--cols-phone': 'minmax(70px, 1fr) 52px 52px minmax(56px, 1fr)', ...coverageGridStyle, backgroundColor: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)' }}>
+      <div style={{ ...coverageGridStyle, backgroundColor: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)' }}>
         <span style={thStyle}>Specialty</span>
         <span style={{ ...thStyle, textAlign: 'right' }}>Conditions</span>
         <span style={{ ...thStyle, textAlign: 'right' }}>Published</span>
@@ -376,9 +377,7 @@ function CoverageTable({ rows }) {
           return (
             <div
               key={row.specialty}
-              className="cms-cols"
               style={{
-                '--cols-phone': 'minmax(70px, 1fr) 52px 52px minmax(56px, 1fr)',
                 ...coverageGridStyle,
                 borderBottom: '1px solid var(--color-border-subtle)',
                 padding: 'var(--space-3) var(--space-4)',
@@ -467,7 +466,7 @@ function DrugGroupsChart({ rows }) {
           const pct = (row.count / maxCount) * 100
           return (
             <div key={row.category} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-              <div className="cms-label-narrow" style={{
+              <div className="cms-label-narrow cms-wrap-text" style={{
                 width: 140, fontSize: 12,
                 color: 'var(--color-text-secondary)', fontFamily: 'var(--font-body)',
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
@@ -535,7 +534,7 @@ function GapRow({ rank, term, count, maxCount }) {
   const pct = maxCount > 0 ? (count / maxCount) * 100 : 0
   return (
     <div className="cms-cols" style={{
-      '--cols-phone': '24px minmax(0, 1fr) 72px 40px',
+      '--cols-phone': '24px minmax(0, 1fr) 80px 48px',
       display: 'grid',
       gridTemplateColumns: '24px minmax(0,1fr) 120px 48px',
       alignItems: 'center',
@@ -547,7 +546,7 @@ function GapRow({ rank, term, count, maxCount }) {
       <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)', textAlign: 'right' }}>
         {rank}
       </span>
-      <span style={{
+      <span className="cms-wrap-text" style={{
         fontSize: 14, color: 'var(--color-text-primary)',
         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         fontFamily: 'var(--font-mono)',
@@ -627,7 +626,7 @@ function GapSection({ title, rows }) {
       </div>
 
       <div className="cms-cols" style={{
-        '--cols-phone': '24px minmax(0, 1fr) 72px 40px',
+        '--cols-phone': '24px minmax(0, 1fr) 80px 48px',
         display: 'grid',
         gridTemplateColumns: '24px minmax(0,1fr) 120px 48px',
         gap: 'var(--space-3)',
