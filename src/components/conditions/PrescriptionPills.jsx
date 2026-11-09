@@ -31,6 +31,9 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
   // entered: flips one frame after the menu mounts, so the blur and the menu
   // actually animate in (mounting already-open would just snap).
   const [entered, setEntered] = useState(false)
+  // Where the blur starts: just under the sticky page header, so the header
+  // stays sharp. Measured each time the menu opens.
+  const [scrimTop, setScrimTop] = useState(0)
   const containerRef = useRef(null)
   const unmountTimer = useRef(null)
 
@@ -47,6 +50,13 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
       if (unmountTimer.current) clearTimeout(unmountTimer.current)
     }
   }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (open) {
+      const h = document.querySelector('header')
+      setScrimTop(h ? Math.max(0, Math.round(h.getBoundingClientRect().bottom)) : 0)
+    }
+  }, [open])
 
   useEffect(() => {
     if (!open) { setEntered(false); return }
@@ -110,7 +120,10 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
           onClick={() => setOpen(false)}
           style={{
             position: 'fixed',
-            inset: 0,
+            top: scrimTop,
+            left: 0,
+            right: 0,
+            bottom: 0,
             zIndex: 0,
             background: entered
               ? 'color-mix(in srgb, var(--color-bg) 38%, transparent)'
