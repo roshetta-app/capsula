@@ -77,13 +77,14 @@
  *   }
  */
 
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, useContext } from 'react'
 import { ChevronUp, ChevronDown, MoreHorizontal, Plus, Pill, LayoutList, StickyNote, Type, Minus, X, Image as ImageIcon } from 'lucide-react'
 import UnifiedDrugRowEditor, { PromoteAlternativeDialog } from './rows/UnifiedDrugRowEditor'
 import NoteRowEditor         from './rows/NoteRowEditor'
 import FreeTextPostEditor    from './FreeTextPostEditor'
 import ImageGalleryEditor    from './ImageGalleryEditor'
 import BlockDivider          from '../../conditions/BlockDivider'
+import { CollapseAllContext } from '../CollapseAllContext'
 import { DRUG_ROW_TEMPLATE, SECTION_ROW_TEMPLATE, promoteAlternativeToMain } from '../../../constants/prescriptionRowSchema'
 import { nanoid } from 'nanoid'
 import { peekFlatDrug, loadFlatDrug, prefetchFlatDrugs } from '../../../utils/flatDrugCache'
@@ -691,6 +692,19 @@ function RowCard({
   // never saves or discards anything by itself).
   const [unsavedCount, setUnsavedCount] = useState(0)
   const [confirmLeave, setConfirmLeave] = useState(false)
+  // 2026-11-09: "Collapse all" in the page's top bar closes this row. A drug
+  // with patient groups not yet saved to the library stays open, so the
+  // warning about them is never skipped. The first run is skipped so a row
+  // built later is not closed by old presses.
+  const collapseSignal = useContext(CollapseAllContext)
+  const [seenCollapse, setSeenCollapse] = useState(collapseSignal)
+  if (seenCollapse !== collapseSignal) {
+    setSeenCollapse(collapseSignal)
+    if (unsavedCount === 0) {
+      setConfirmLeave(false)
+      setExpanded(false)
+    }
+  }
   const cfg = ROW_TYPE_LABELS[row.row_type] ?? { color: '#9ca3af' }
   const isDrugRow = row.row_type === 'drug'
   const isDivider = row.row_type === 'divider'

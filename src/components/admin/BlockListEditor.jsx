@@ -18,13 +18,14 @@
  *   - SubTabBar is full-width with underline active indicator (matches app tab style).
  */
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useContext } from 'react'
 import { ChevronUp, ChevronDown, Trash2, Plus } from 'lucide-react'
 import ImageGalleryEditor      from './blocks/ImageGalleryEditor'
 import FreeTextPostEditor      from './blocks/FreeTextPostEditor'
 import NoteCalloutEditor       from './blocks/NoteCalloutEditor'
 import BlockDivider            from '../conditions/BlockDivider'
 import PrescriptionSheetEditor from './blocks/PrescriptionSheetEditor'
+import { CollapseAllContext } from './CollapseAllContext'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -168,6 +169,15 @@ function BlockCard({
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded)
   const colors = BLOCK_CHIP_COLORS[block.block_type] ?? FALLBACK_COLORS
+
+  // 2026-11-09: "Collapse all" in the page's top bar closes this card. A card
+  // built later starts level with the counter, so old presses do not close it.
+  const collapseSignal = useContext(CollapseAllContext)
+  const [seenCollapse, setSeenCollapse] = useState(collapseSignal)
+  if (seenCollapse !== collapseSignal) {
+    setSeenCollapse(collapseSignal)
+    setExpanded(false)
+  }
 
   useEffect(() => {
     if (onRegisterExpand) onRegisterExpand(() => setExpanded(true))

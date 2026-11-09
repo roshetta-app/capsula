@@ -22,7 +22,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Plus, AlertTriangle, X, Undo2, Redo2 } from 'lucide-react'
+import { Plus, AlertTriangle, X, Undo2, Redo2, ChevronsDownUp, Smartphone } from 'lucide-react'
 import { useConditionContext } from '../../context/ConditionContext'
 import { useToast } from '../../context/ToastContext'
 import TagInput from '../../components/admin/TagInput'
@@ -44,6 +44,8 @@ import {
 
 import { SectionCard, SectionCardHeader, FieldLabel } from './adminSectionPrimitives'
 import AdminPageHeader from './AdminPageHeader'
+import PhonePreviewModal from './PhonePreviewModal'
+import { CollapseAllContext } from './CollapseAllContext'
 
 // ─── Undo / Redo button ───────────────────────────────────────────────────────
 
@@ -67,6 +69,31 @@ function UndoRedoButton({ label, onClick, disabled, children }) {
       }}
     >
       {children}
+    </button>
+  )
+}
+
+// ─── Top-bar tool button (icon + short label) ─────────────────────────────────
+
+function ToolButton({ label, onClick, children }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={label}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 6,
+        height: 32, padding: '0 10px', whiteSpace: 'nowrap',
+        borderRadius: 'var(--radius-md)',
+        border: '1px solid var(--color-border)',
+        backgroundColor: 'var(--color-surface)',
+        color: 'var(--color-text-secondary)',
+        fontSize: 13, fontWeight: 500, fontFamily: 'var(--font-body)',
+        cursor: 'pointer',
+      }}
+    >
+      {children}
+      {label}
     </button>
   )
 }
@@ -365,6 +392,10 @@ export default function ConditionEditor() {
   const [specialties,          setSpecialties]          = useState([])
   const [specialtiesLoading,   setSpecialtiesLoading]   = useState(true)
   const [newSpecialtyOpen,     setNewSpecialtyOpen]     = useState(false)
+  // 2026-11-09: top-bar tools. collapseSignal goes up by one on every "Collapse
+  // all" press (see CollapseAllContext); previewOpen shows the phone preview.
+  const [collapseSignal, setCollapseSignal] = useState(0)
+  const [previewOpen,    setPreviewOpen]    = useState(false)
   const [taglineOpen,          setTaglineOpen]          = useState(false)
 
   useEffect(() => {
@@ -582,6 +613,8 @@ export default function ConditionEditor() {
       sticky
       actions={
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+          <ToolButton label="Collapse all" onClick={() => setCollapseSignal(n => n + 1)}><ChevronsDownUp size={15} /></ToolButton>
+          <ToolButton label="Phone preview" onClick={() => setPreviewOpen(true)}><Smartphone size={15} /></ToolButton>
           <UndoRedoButton label="Undo" onClick={undo} disabled={!canUndo}><Undo2 size={16} /></UndoRedoButton>
           <UndoRedoButton label="Redo" onClick={redo} disabled={!canRedo}><Redo2 size={16} /></UndoRedoButton>
         {isUnsaved && (
@@ -758,6 +791,7 @@ export default function ConditionEditor() {
         {/* Phase 3.1: same card treatment. BlockListEditor renders flat inside. */}
         <SectionCardHeader>Content Blocks</SectionCardHeader>
         <SectionCard>
+          <CollapseAllContext.Provider value={collapseSignal}>
           <BlockListEditor
             key={restoreCount}
             blocks={blocks}
@@ -767,7 +801,16 @@ export default function ConditionEditor() {
             initialSheetIndex={view.sheet}
             onViewChange={(tab, sheet) => setView(prev => (prev.tab === tab && prev.sheet === sheet ? prev : { tab, sheet }))}
           />
+          </CollapseAllContext.Provider>
         </SectionCard>
+
+      {/* ── Phone preview (what the app shows for what is on screen now) ──── */}
+      <PhonePreviewModal
+        isOpen={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        name={form.name}
+        blocks={blocks}
+      />
 
       {/* ── Inline specialty creator ──────────────────────────────────────── */}
       <NewSpecialtyModal
