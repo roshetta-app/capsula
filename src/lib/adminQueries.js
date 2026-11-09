@@ -803,20 +803,40 @@ export async function fetchGenericsPage({ query = '', category = null, limit = 5
 // title (e.g. "Panadol Extra 500mg 2 FC Tab.", not just "Panadol Extra
 // 500mg"). Still doesn't format the readout text itself; that's
 // DrugCMS.jsx's job.
-export async function searchBrandsForCMS(query, { limit = 50, page = 0 } = {}) {
+export async function searchBrandsForCMS(query, { limit = 50, page = 0, forms = null } = {}) {
   const term = query.trim()
-  if (!term) return { data: [], count: 0, error: null }
 
-  const { data, error, count } = await supabase
+  // 2026-11-10 (CMS drug library, Form filter): 'forms' is { matches, routes } from the
+  // Form chips (the same lists the app's Form / Route filter uses): a brand counts when its
+  // formulation's form is in 'matches' OR its route is in 'routes'. With a form filter on and
+  // no typed text the screen lists every brand of those forms; with neither it stays empty.
+  const formMatches = forms?.matches ?? []
+  const formRoutes  = forms?.routes  ?? []
+  const hasFormFilter = formMatches.length > 0 || formRoutes.length > 0
+  if (!term && !hasFormFilter) return { data: [], count: 0, error: null }
+
+  let q = supabase
     .from('brands')
     .select(`
       id, tradename_clean, manufacturer, pack_size, fill_volume, is_published,
-      formulations (
+      formulations${hasFormFilter ? '!inner' : ''} (
         id, concentration, form, form_modifier, is_published,
         generics ( id, name_en, category, class, ingredients, is_published )
       )
     `, { count: 'exact' })
-    .ilike('tradename_clean', `${term}%`)
+
+  if (term) q = q.ilike('tradename_clean', `${term}%`)
+
+  if (hasFormFilter) {
+    const quote = v => `"${String(v).replace(/"/g, '')}"`
+    const parts = []
+    if (formMatches.length > 0) parts.push(`form.in.(${formMatches.map(quote).join(',')})`)
+    if (formRoutes.length  > 0) parts.push(`route.in.(${formRoutes.map(quote).join(',')})`)
+    q = q.or(parts.join(','), { referencedTable: 'formulations' })
+  }
+
+  const { data, error, count } = await q
+    .order('tradename_clean', { ascending: true })
     .range(page * limit, page * limit + limit - 1)
 
   if (error) return { data: null, count: 0, error }
@@ -848,6 +868,54 @@ export async function searchBrandsForCMS(query, { limit = 50, page = 0 } = {}) {
     })
 
   return { data: mapped, count: count ?? 0, error: null }
+}
+
+// ─── CMS drug library — Class mode and the class pages (2026-11-10) ───────────
+//
+// generics.class and generics.subclass are plain text columns (see the note above
+// fetchClassFamilyPairs). Class mode of the Drug Library builds its class and family
+// cards from one slim list of { class, subclass } rows, one per generic, read page by
+// page so a long list is never cut at the 1000 row limit.
+export async function fetchClassIndexRows() {
+  const pageSize = 1000
+  const rows = []
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from('generics')
+      .select('class, subclass')
+      .not('class', 'is', null)
+      .order('id', { ascending: true })
+      .range(from, from + pageSize - 1)
+    if (error) return { data: null, error }
+    rows.push(...(data ?? []))
+    if (!data || data.length < pageSize) break
+  }
+  return { data: rows, error: null }
+}
+
+// The generics of one class, or of one family (subclass) inside it. Same row shape as
+// fetchGenericsPage so GenericDrugCard can draw them. Published and drafts both.
+export async function fetchGenericsByClass({ className, subclass = null } = {}) {
+  let q = supabase
+    .from('generics')
+    .select(`
+      id, name_en, category, class, subclass,
+      is_published, updated_at, brand_count,
+      formulations ( id )
+    `)
+    .eq('class', className)
+    .order('name_en', { ascending: true })
+    .range(0, 999)
+
+  if (subclass) q = q.eq('subclass', subclass)
+
+  const { data, error } = await q
+  if (error) return { data: null, error }
+
+  return {
+    data: (data ?? []).map(g => ({ ...g, formulationCount: (g.formulations ?? []).length })),
+    error: null,
+  }
 }
 
 // ─── Promote-to-library matching (Phase 2, masterplan §2.5) ──────────────────

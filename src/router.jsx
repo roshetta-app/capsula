@@ -80,6 +80,7 @@ import AdminSummary         from './pages/admin/AdminSummary'
 import DrugCMS              from './pages/admin/DrugCMS'
 import AddDrugFlow          from './pages/admin/AddDrugFlow'
 import DrugEditor           from './pages/admin/DrugEditor'
+import ClassCMS             from './pages/admin/ClassCMS'
 import ConditionsCMS        from './pages/admin/ConditionsCMS'
 import ConditionEditor      from './components/admin/ConditionEditor'
 import SpecialtiesManager   from './pages/admin/SpecialtiesManager'
@@ -210,6 +211,9 @@ export function AdminRoutes() {
         />
         <Route path="/admin/drugs/new"
           element={<AddDrugFlow />}
+        />
+        <Route path="/admin/drugs/class"
+          element={<ClassCMS />}
         />
         <Route path="/admin/drugs/generic/:genericId"
           element={<DrugEditor />}

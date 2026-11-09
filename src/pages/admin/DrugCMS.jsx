@@ -20,6 +20,11 @@
  * of a table row, so Generic and Brand results look alike. Category filter, sort, Live / Draft,
  * edit and delete work as before. The old table column header is gone.
  *
+ * 2026-11-10 (later): third chip, Class: class and family cards built from the generics' class and
+ * subclass text (the app's own search and ClassSearchResults), opening the new /admin/drugs/class page.
+ * The category dropdown moved into the filter icon in the search bar (DrugFilterSheet), which also
+ * holds the new Form filter for Brand mode. Sort uses the same chips as the search modes.
+ *
  * 12.2 (decisions 27-28): added a Generic/Brand mode toggle, styled like the
  * existing Alphabetical/Most Common sort toggle. Generic mode is the table
  * above, completely unchanged. Brand mode searches brands.tradename_clean
@@ -43,9 +48,9 @@
  * identity is always the brand itself.
  */
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Plus, Edit2, Trash2, Search, X, AlertTriangle, Tag, FlaskConical } from 'lucide-react'
+import { Plus, Edit2, Trash2, Search, X, AlertTriangle, Tag, FlaskConical, Layers, ArrowDownAZ, TrendingUp } from 'lucide-react'
 import { useToast } from '../../context/ToastContext'
 import { useCategories } from '../../hooks/useCategories'
 import { useIsDark } from '../../utils/specialtyIcon'
@@ -54,6 +59,11 @@ import SharedDrugCard from '../../components/SharedDrugCard'
 import GenericDrugCard from '../../components/admin/GenericDrugCard'
 import DrugSearchBar from '../../components/drugs/DrugSearchBar'
 import ModeSegmentedControl from '../../components/drugs/home/ModeSegmentedControl'
+import ClearFiltersButton from '../../components/drugs/home/ClearFiltersButton'
+import ClassSearchResults from '../../components/drugs/classes/ClassSearchResults'
+import DrugFilterSheet from '../../components/admin/DrugFilterSheet'
+import { FORM_OPTIONS } from '../../components/drugs/DrugFilterPanel'
+import { buildClassIndex, searchClassIndex } from '../../utils/classSearch'
 import AdminPageHeader from '../../components/admin/AdminPageHeader'
 import {
   fetchGenericsPage,
@@ -61,17 +71,33 @@ import {
   deleteGeneric,
   searchBrandsForCMS,
   toggleBrandPublished,
+  fetchClassIndexRows,
 } from '../../lib/adminQueries'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const PAGE_SIZE = 50
 
-// Same chips as the app's Drugs search, minus Class.
+// Same three chips as the app's Drugs search.
 const SEARCH_MODES = [
   { value: 'brand',   label: 'Brand',   icon: Tag },
   { value: 'generic', label: 'Generic', icon: FlaskConical },
+  { value: 'class',   label: 'Class',   icon: Layers },
 ]
+
+// Sort chips (Generic mode), drawn with the same chip look as the search modes.
+const SORT_OPTIONS = [
+  { value: 'name',   label: 'Alphabetical', icon: ArrowDownAZ },
+  { value: 'common', label: 'Most Common',  icon: TrendingUp },
+]
+
+// The chosen Form chips turned into the raw form / route lists the query needs.
+function formsToFilter(values) {
+  const chosen = FORM_OPTIONS.filter(o => values.includes(o.value))
+  const matches = [...new Set(chosen.flatMap(o => o.matches ?? []))]
+  const routes  = [...new Set(chosen.flatMap(o => o.routes  ?? []))]
+  return { matches, routes }
+}
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
@@ -95,7 +121,9 @@ export default function DrugCMS() {
   // falls through to sort='common' / mode='generic' by default, per request.
   const activeCategory = searchParams.get('category') || null
   const sortBy         = searchParams.get('sort') || 'common' // 'name' | 'common'
-  const mode            = searchParams.get('mode') || 'generic' // 'generic' | 'brand'
+  const mode            = searchParams.get('mode') || 'generic' // 'generic' | 'brand' | 'class'
+  const formsParam      = searchParams.get('forms') || ''
+  const activeForms     = formsParam ? formsParam.split(',').filter(Boolean) : []
   const page            = Number(searchParams.get('page') || '0')
 
   const isDark = useIsDark()
@@ -110,6 +138,10 @@ export default function DrugCMS() {
       return next
     }, { replace: true })
   }
+
+  // Filter pop-up (the icon inside the search bar) and Class mode's list of class / family rows.
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [classRows,  setClassRows]  = useState(null)
 
   const [confirmUnpub, setConfirmUnpub] = useState(null)
   const [confirmDel,   setConfirmDel]   = useState(null)
@@ -149,10 +181,14 @@ export default function DrugCMS() {
     setLoading(true)
     setLoadError(null)
 
+    // Class mode builds its cards from classRows (loaded by its own effect below).
+    if (mode === 'class') { setLoading(false); return }
+
     if (mode === 'brand') {
       const { data, count, error } = await searchBrandsForCMS(debouncedQuery, {
         limit: PAGE_SIZE,
         page,
+        forms: activeForms.length > 0 ? formsToFilter(activeForms) : null,
       })
       setLoading(false)
       if (error) { setLoadError(error.message); return }
@@ -174,7 +210,38 @@ export default function DrugCMS() {
     setTotalCount(count)
   }
 
-  useEffect(() => { load() }, [debouncedQuery, activeCategory, sortBy, mode, page])
+  useEffect(() => { load() }, [debouncedQuery, activeCategory, sortBy, mode, page, formsParam])
+
+  // Class mode: one slim list of { class, subclass } per generic, read when the mode is opened.
+  useEffect(() => {
+    if (mode !== 'class') return
+    let cancelled = false
+    setLoading(true)
+    setLoadError(null)
+    fetchClassIndexRows().then(({ data, error }) => {
+      if (cancelled) return
+      setLoading(false)
+      if (error) { setLoadError(error.message); return }
+      setClassRows(data)
+    })
+    return () => { cancelled = true }
+  }, [mode])
+
+  const classIndex = useMemo(() => (classRows ? buildClassIndex(classRows) : null), [classRows])
+  const classResults = useMemo(() => {
+    if (!classIndex) return { classes: [], subclasses: [] }
+    if (debouncedQuery.trim().length >= 2) return searchClassIndex(classIndex, debouncedQuery)
+    // No search text: browse every class, A to Z (families show once a class is opened).
+    return {
+      classes: [...classIndex.classes].sort((a, b) => a.name.localeCompare(b.name)),
+      subclasses: [],
+    }
+  }, [classIndex, debouncedQuery])
+
+  const hasActiveFilter = mode === 'brand' ? activeForms.length > 0 : mode === 'generic' ? !!activeCategory : false
+  function clearFilters() {
+    updateSearchParams(mode === 'brand' ? { forms: null, page: 0 } : { category: null, page: 0 })
+  }
 
   // ── Publish toggle ──────────────────────────────────────────────────────────
   async function handlePublishToggle(generic) {
@@ -268,8 +335,9 @@ export default function DrugCMS() {
         </button>
       }
     >
-      {/* Search block — the same search bar and Brand / Generic chips as the app's
-          Drugs screen, on the same tinted background. Class mode does not exist here. */}
+      {/* Search block — the app's own search bar and Brand / Generic / Class chips on the same
+          tinted background. The filter icon inside the bar opens the Category filter (Generic
+          mode) or the Form filter (Brand mode); Class mode has no filter. */}
       <div style={{
         backgroundColor: 'var(--color-header-tint)',
         borderRadius:    'var(--radius-lg)',
@@ -279,7 +347,14 @@ export default function DrugCMS() {
         <DrugSearchBar
           value={query}
           onChange={setQuery}
-          placeholder={mode === 'brand' ? 'Search brand names…' : 'Search generic names…'}
+          placeholder={
+            mode === 'brand' ? 'Search brand names…'
+            : mode === 'class' ? 'Search classes and families…'
+            : 'Search generic names…'
+          }
+          onFilter={() => setFilterOpen(true)}
+          filterDisabled={mode === 'class'}
+          hasActiveFilters={hasActiveFilter}
           tall
         />
         <div style={{ marginTop: 'var(--space-3)' }}>
@@ -291,40 +366,26 @@ export default function DrugCMS() {
         </div>
       </div>
 
-      {/* Category filter — generics only; a brand list has no category of its own */}
-      {mode === 'generic' && categories.length > 0 && (
-        <select
-          value={activeCategory ?? ''}
-          onChange={e => updateSearchParams({ category: e.target.value || null, page: 0 })}
-          style={categorySelectStyle}
-        >
-          <option value="">All categories</option>
-          {categories.map(c => (
-            <option key={c.id} value={c.slug}>{c.name_en}</option>
-          ))}
-        </select>
-      )}
-
-      {/* Sort toggle — generics only; "Most Common" counts a generic's
-          brands, which doesn't map onto a list of brands */}
-      {mode === 'generic' && (
-        <div style={sortToggleWrapStyle}>
-          <button
-            onClick={() => updateSearchParams({ sort: 'name', page: 0 })}
-            style={{ ...sortToggleBtnStyle, ...(sortBy === 'name' ? sortToggleBtnActiveStyle : {}) }}
-          >
-            Alphabetical
-          </button>
-          <button
-            onClick={() => updateSearchParams({ sort: 'common', page: 0 })}
-            style={{ ...sortToggleBtnStyle, ...(sortBy === 'common' ? sortToggleBtnActiveStyle : {}) }}
-          >
-            Most Common
-          </button>
+      {hasActiveFilter && (
+        <div style={{ marginBottom: 'var(--space-3)' }}>
+          <ClearFiltersButton onClick={clearFilters} style={{ display: 'block', width: '100%' }} />
         </div>
       )}
 
-      {/* Count */}
+      {/* Sort chips — generics only; "Most Common" counts a generic's brands,
+          which doesn't map onto a list of brands or classes */}
+      {mode === 'generic' && (
+        <div style={{ marginBottom: 'var(--space-3)' }}>
+          <ModeSegmentedControl
+            options={SORT_OPTIONS}
+            mode={sortBy}
+            onChange={v => updateSearchParams({ sort: v, page: 0 })}
+          />
+        </div>
+      )}
+
+      {/* Count (Class mode has its own count line inside its results) */}
+      {mode !== 'class' && (
       <div style={{
         fontSize: 12, color: 'var(--color-text-tertiary)',
         fontFamily: 'var(--font-mono)', marginBottom: 'var(--space-3)',
@@ -336,6 +397,7 @@ export default function DrugCMS() {
             : `Showing ${page * PAGE_SIZE + 1}–${page * PAGE_SIZE + (mode === 'brand' ? brands.length : generics.length)} of ${totalCount}`}
         {query && ` for "${query}"`}
       </div>
+      )}
 
       {/* Load error */}
       {loadError && (
@@ -345,7 +407,24 @@ export default function DrugCMS() {
       {/* Results — Generic mode: the table below, unchanged. Brand mode
           (12.2): a flat SharedDrugCard list, no table header, since a brand
           row isn't a table row. */}
-      {!loading && (mode === 'brand' ? brands.length === 0 : generics.length === 0) ? (
+      {mode === 'class' ? (
+        loading ? (
+          <div style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+            {[1,2,3,4].map(i => <SkeletonRow key={i} height={56} />)}
+          </div>
+        ) : classResults.classes.length === 0 && classResults.subclasses.length === 0 ? (
+          <EmptyState query={query} noun="classes" />
+        ) : (
+          <ClassSearchResults
+            results={classResults}
+            query={query}
+            startExpanded
+            onOpenClass={name => navigate(`/admin/drugs/class?class=${encodeURIComponent(name)}`)}
+            onOpenSubclass={(className, name) =>
+              navigate(`/admin/drugs/class?class=${encodeURIComponent(className)}&family=${encodeURIComponent(name)}`)}
+          />
+        )
+      ) : !loading && (mode === 'brand' ? brands.length === 0 : generics.length === 0) ? (
         <EmptyState query={query} noun={mode === 'brand' ? 'brands' : 'generics'} />
       ) : (
         <div style={{
@@ -354,6 +433,7 @@ export default function DrugCMS() {
           borderRadius: 'var(--radius-lg)',
           overflow: 'hidden',
           boxShadow: 'var(--shadow-card)',
+          padding: '0 var(--space-4)',
         }}>
 
           {loading ? (
@@ -467,7 +547,7 @@ export default function DrugCMS() {
       )}
 
       {/* Pager */}
-      {!loading && totalCount > PAGE_SIZE && (
+      {mode !== 'class' && !loading && totalCount > PAGE_SIZE && (
         <div style={pagerStyle}>
           <button
             onClick={() => updateSearchParams({ page: Math.max(0, page - 1) })}
@@ -492,6 +572,18 @@ export default function DrugCMS() {
           </button>
         </div>
       )}
+
+      {/* Filter pop-up behind the search bar's filter icon */}
+      <DrugFilterSheet
+        isOpen={filterOpen && mode !== 'class'}
+        onClose={() => setFilterOpen(false)}
+        mode={mode}
+        categories={categories}
+        category={activeCategory}
+        onCategory={slug => updateSearchParams({ category: slug, page: 0 })}
+        forms={activeForms}
+        onForms={values => updateSearchParams({ forms: values.join(','), page: 0 })}
+      />
 
       {/* Confirm unpublish */}
       {confirmUnpub && (
@@ -629,32 +721,6 @@ const primaryBtnStyle = {
   cursor: 'pointer',
 }
 
-const sortToggleWrapStyle = {
-  display: 'flex', gap: 'var(--space-2)',
-  marginBottom: 'var(--space-3)',
-}
-
-const sortToggleBtnStyle = {
-  flex: 1,
-  padding: '6px 14px',
-  borderRadius: 'var(--radius-full)',
-  fontSize: 12,
-  fontWeight: 500,
-  fontFamily: 'var(--font-body)',
-  cursor: 'pointer',
-  border: '1.5px solid var(--color-border)',
-  backgroundColor: 'var(--color-surface)',
-  color: 'var(--color-text-secondary)',
-  transition: 'all 0.15s ease',
-}
-
-const sortToggleBtnActiveStyle = {
-  fontWeight: 600,
-  border: '1.5px solid var(--color-accent)',
-  backgroundColor: 'var(--color-accent-solid)',
-  color: '#fff',
-}
-
 const pagerStyle = {
   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-4)',
   marginTop: 'var(--space-4)',
@@ -672,21 +738,5 @@ const pagerBtnStyle = {
 
 const pagerLabelStyle = {
   fontSize: 12, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)',
-}
-
-const categorySelectStyle = {
-  width: '100%',
-  boxSizing: 'border-box',
-  padding: 'var(--space-2) var(--space-3)',
-  fontSize: 14,
-  fontFamily: 'var(--font-body)',
-  backgroundColor: 'var(--color-surface)',
-  border: '1px solid var(--color-border)',
-  borderRadius: 'var(--radius-lg)',
-  color: 'var(--color-text-primary)',
-  outline: 'none',
-  boxShadow: 'var(--shadow-card)',
-  marginBottom: 'var(--space-4)',
-  cursor: 'pointer',
 }
 
