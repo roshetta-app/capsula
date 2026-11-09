@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { ClipboardPlus, Check, ChevronDown } from 'lucide-react'
+import { Check, ChevronDown } from 'lucide-react'
 
 /**
  * PrescriptionPills — selector for choosing between treatment plans.
@@ -9,11 +9,10 @@ import { ClipboardPlus, Check, ChevronDown } from 'lucide-react'
  * unmistakable control, still inline at the top of the tab (not in the
  * header, no chips, no bottom sheet):
  *
- *   TRIGGER — a filled, accent-tinted button with a visible accent outline.
- *     Left: solid accent badge with the clipboard icon. Middle: a small
- *     "Tap to change" caption over the plan name in bold primary
- *     text. Right: a round chevron button. The fill + badge + round chevron
- *     are what make it look tappable instead of like a card.
+ *   TRIGGER — a filled accent button. Left: the plan name in bold white
+ *     text (no icon, no caption — simplified 2026-11-09). Right: a round
+ *     chevron button. The fill + round chevron are what make it look
+ *     tappable instead of like a card.
  *
  *   MENU — a separate floating panel 6px below the trigger (no shared
  *     border trick), with its own elevated shadow. It overlays the page and
@@ -153,8 +152,8 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
           display: 'flex',
           alignItems: 'center',
           gap: 12,
-          minHeight: 56,
-          padding: '8px 10px 8px 10px',
+          minHeight: 52,
+          padding: '8px 10px 8px 18px',
           textAlign: 'left',
           cursor: 'pointer',
           fontFamily: 'var(--font-body)',
@@ -171,31 +170,9 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
           transition: 'background 0.15s ease, border-color 0.15s ease, transform 0.12s ease',
         }}
       >
-        {/* Icon badge */}
-        <span style={{
-          width: 36,
-          height: 36,
-          flexShrink: 0,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          borderRadius: 'var(--radius-md)',
-          background: 'rgba(255,255,255,0.18)',
-          color: '#fff',
-        }}>
-          <ClipboardPlus size={18} strokeWidth={2} aria-hidden="true" />
-        </span>
-
-        {/* Caption + plan name */}
-        <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
-          <span style={{
-            fontSize: 11,
-            fontWeight: 600,
-            letterSpacing: '0.02em',
-            color: 'rgba(255,255,255,0.8)',
-          }}>
-            Tap to change
-          </span>
+        {/* Plan name — the round chevron on the right is the tap cue, so no
+            icon badge or "Tap to change" caption (aria-label still says it). */}
+        <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
           <span
             dir="auto"
             style={{
