@@ -73,7 +73,7 @@ function UndoRedoButton({ label, onClick, disabled, children }) {
 
 // ─── Text input ───────────────────────────────────────────────────────────────
 
-function TextInput({ value, onChange, placeholder, disabled, dir }) {
+function TextInput({ value, onChange, placeholder, disabled, dir, autoFocus }) {
   return (
     <input
       type="text"
@@ -82,6 +82,7 @@ function TextInput({ value, onChange, placeholder, disabled, dir }) {
       placeholder={placeholder}
       disabled={disabled}
       dir={dir}
+      autoFocus={autoFocus}
       style={{
         width: '100%', boxSizing: 'border-box',
         padding: '9px 12px',
@@ -304,6 +305,45 @@ function friendlySaveError(err) {
   return err?.message ?? 'Save failed'
 }
 
+// ─── Switch tile (Published / Needs review) ──────────────────────────────────
+
+function SwitchTile({ label, stateText, checked, onChange, onColor, disabled }) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)',
+      padding: '10px 12px',
+      borderRadius: 'var(--radius-md)',
+      border: '1px solid var(--color-border)',
+      backgroundColor: 'var(--color-bg)',
+    }}>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>{label}</div>
+        <div style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>{stateText}</div>
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        aria-label={label}
+        onClick={() => !disabled && onChange()}
+        disabled={disabled}
+        style={{
+          width: 42, height: 24, borderRadius: 12, border: 'none',
+          backgroundColor: checked ? onColor : 'var(--color-border)',
+          position: 'relative', cursor: disabled ? 'not-allowed' : 'pointer',
+          transition: 'background-color 0.2s', flexShrink: 0,
+        }}
+      >
+        <span style={{
+          position: 'absolute', top: 3, left: checked ? 21 : 3,
+          width: 18, height: 18, borderRadius: '50%', backgroundColor: '#fff',
+          transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+        }} />
+      </button>
+    </div>
+  )
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 const EMPTY_CONDITION = {
@@ -325,6 +365,7 @@ export default function ConditionEditor() {
   const [specialties,          setSpecialties]          = useState([])
   const [specialtiesLoading,   setSpecialtiesLoading]   = useState(true)
   const [newSpecialtyOpen,     setNewSpecialtyOpen]     = useState(false)
+  const [taglineOpen,          setTaglineOpen]          = useState(false)
 
   useEffect(() => {
     fetchSpecialtiesForCMS().then(({ data }) => {
@@ -591,136 +632,124 @@ export default function ConditionEditor() {
         <SectionCardHeader>Identity</SectionCardHeader>
         <SectionCard style={{ marginBottom: 'var(--space-5)' }}>
 
-          <div style={{ marginBottom: 'var(--space-4)' }}>
-            <FieldLabel required>Condition name</FieldLabel>
-            <TextInput
-              value={form.name}
-              onChange={v => patch('name', v)}
-              placeholder="e.g. Peptic Ulcer Disease"
-              disabled={saving}
-            />
-          </div>
+          {/* 2026-11-09 LAYOUT: two columns. Left: name, specialty, tagline (behind a
+              button). Right: tags and the two switches as tidy tiles. The columns
+              stack on a narrow screen. */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+            gap: 'var(--space-5)',
+            alignItems: 'start',
+          }}>
 
-          <div style={{ marginBottom: 'var(--space-4)' }}>
-            <FieldLabel>Card tagline</FieldLabel>
-            <TextInput
-              value={form.card_tagline}
-              onChange={v => patch('card_tagline', v)}
-              placeholder="Short italic subtitle on the card (optional)"
-              disabled={saving}
-            />
-          </div>
+            {/* ── Left column ── */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', minWidth: 0 }}>
+              <div>
+                <FieldLabel required>Condition name</FieldLabel>
+                <TextInput
+                  value={form.name}
+                  onChange={v => patch('name', v)}
+                  placeholder="e.g. Peptic Ulcer Disease"
+                  disabled={saving}
+                />
+              </div>
 
-          <div style={{ marginBottom: 'var(--space-4)' }}>
-            <FieldLabel>Tags</FieldLabel>
-            <TagInput
-              tags={tags}
-              onChange={setTags}
-              placeholder="Type tag, press Enter — or pick from list"
-              disabled={saving}
-              suggestions={allTags}
-            />
-            {/* Phase 3.4: helper text removed — placeholder carries the hint */}
-          </div>
+              {/* Specialty: dropdown + inline "New" button */}
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-1)' }}>
+                  <FieldLabel required>Specialty</FieldLabel>
+                  <button
+                    onClick={() => setNewSpecialtyOpen(true)}
+                    disabled={saving}
+                    title="Create a new specialty"
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 3,
+                      fontSize: 12, fontWeight: 500, color: 'var(--color-accent)',
+                      background: 'none', border: 'none', cursor: saving ? 'default' : 'pointer',
+                      fontFamily: 'var(--font-body)', padding: '2px 0',
+                      opacity: saving ? 0.5 : 1,
+                    }}
+                  >
+                    <Plus size={13} />
+                    New
+                  </button>
+                </div>
+                <Select
+                  value={form.specialty_id}
+                  onChange={v => patch('specialty_id', v)}
+                  options={specialtyOptions}
+                  disabled={saving || specialtiesLoading}
+                />
+              </div>
 
-          {/* Specialty: dropdown + inline "New" button */}
-          <div style={{ marginBottom: 'var(--space-4)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-1)' }}>
-              <FieldLabel required>Specialty</FieldLabel>
-              <button
-                onClick={() => setNewSpecialtyOpen(true)}
-                disabled={saving}
-                title="Create a new specialty"
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 3,
-                  fontSize: 12, fontWeight: 500, color: 'var(--color-accent)',
-                  background: 'none', border: 'none', cursor: saving ? 'default' : 'pointer',
-                  fontFamily: 'var(--font-body)', padding: '2px 0',
-                  opacity: saving ? 0.5 : 1,
-                }}
-              >
-                <Plus size={13} />
-                New
-              </button>
+              {/* Tagline: hidden behind a button until it is wanted (or already filled in). */}
+              {(taglineOpen || form.card_tagline) ? (
+                <div onBlur={() => { if (!form.card_tagline) setTaglineOpen(false) }}>
+                  <FieldLabel>Card tagline</FieldLabel>
+                  <TextInput
+                    value={form.card_tagline}
+                    onChange={v => patch('card_tagline', v)}
+                    placeholder="Short italic subtitle on the card (optional)"
+                    disabled={saving}
+                    autoFocus={taglineOpen && !form.card_tagline}
+                  />
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setTaglineOpen(true)}
+                  disabled={saving}
+                  style={{
+                    alignSelf: 'flex-start',
+                    display: 'flex', alignItems: 'center', gap: 4,
+                    fontSize: 13, fontWeight: 500, color: 'var(--color-accent)',
+                    background: 'none', border: 'none', padding: '2px 0',
+                    cursor: saving ? 'default' : 'pointer',
+                    fontFamily: 'var(--font-body)',
+                    opacity: saving ? 0.5 : 1,
+                  }}
+                >
+                  <Plus size={14} />
+                  Add tagline
+                </button>
+              )}
             </div>
-            <Select
-              value={form.specialty_id}
-              onChange={v => patch('specialty_id', v)}
-              options={specialtyOptions}
-              disabled={saving || specialtiesLoading}
-            />
-          </div>
 
-          {/* Published toggle — matches the switch style used in Formulation Editor */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-            <FieldLabel>Published</FieldLabel>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={form.is_published}
-              onClick={() => !saving && patch('is_published', !form.is_published)}
-              disabled={saving}
-              style={{
-                width: 42, height: 24,
-                borderRadius: 12,
-                border: 'none',
-                backgroundColor: form.is_published ? 'var(--color-accent)' : 'var(--color-border)',
-                position: 'relative', cursor: saving ? 'not-allowed' : 'pointer',
-                transition: 'background-color 0.2s',
-                flexShrink: 0,
-              }}
-            >
-              <span style={{
-                position: 'absolute',
-                top: 3, left: form.is_published ? 21 : 3,
-                width: 18, height: 18,
-                borderRadius: '50%',
-                backgroundColor: '#fff',
-                transition: 'left 0.2s',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-              }} />
-            </button>
-            <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
-              {form.is_published ? 'Visible in app' : 'Draft'}
-            </span>
-          </div>
+            {/* ── Right column ── */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', minWidth: 0 }}>
+              <div>
+                <FieldLabel>Tags</FieldLabel>
+                <TagInput
+                  tags={tags}
+                  onChange={setTags}
+                  placeholder="Type tag, press Enter — or pick from list"
+                  disabled={saving}
+                  suggestions={allTags}
+                />
+              </div>
 
-          {/* Needs Review toggle — F10 Batch B / D32. Same switch style as
-              Published above; flags a condition as incomplete/in-progress
-              without unpublishing it, mirroring the brands table's
-              needs_review column. Feeds the Content Health score in the
-              Analytics dashboard. */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-            <FieldLabel>Needs Review</FieldLabel>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={form.needs_review}
-              onClick={() => !saving && patch('needs_review', !form.needs_review)}
-              disabled={saving}
-              style={{
-                width: 42, height: 24,
-                borderRadius: 12,
-                border: 'none',
-                backgroundColor: form.needs_review ? 'var(--color-warning)' : 'var(--color-border)',
-                position: 'relative', cursor: saving ? 'not-allowed' : 'pointer',
-                transition: 'background-color 0.2s',
-                flexShrink: 0,
-              }}
-            >
-              <span style={{
-                position: 'absolute',
-                top: 3, left: form.needs_review ? 21 : 3,
-                width: 18, height: 18,
-                borderRadius: '50%',
-                backgroundColor: '#fff',
-                transition: 'left 0.2s',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-              }} />
-            </button>
-            <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
-              {form.needs_review ? 'Flagged — counts as incomplete' : 'Complete'}
-            </span>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 'var(--space-3)' }}>
+                <SwitchTile
+                  label="Published"
+                  stateText={form.is_published ? 'Visible in app' : 'Draft'}
+                  checked={form.is_published}
+                  onChange={() => patch('is_published', !form.is_published)}
+                  onColor="var(--color-accent)"
+                  disabled={saving}
+                />
+                {/* Needs Review — F10 Batch B / D32. Flags a condition as
+                    incomplete without unpublishing it; feeds the Content Health
+                    score in the Analytics dashboard. */}
+                <SwitchTile
+                  label="Needs review"
+                  stateText={form.needs_review ? 'Flagged — incomplete' : 'Complete'}
+                  checked={form.needs_review}
+                  onChange={() => patch('needs_review', !form.needs_review)}
+                  onColor="var(--color-warning)"
+                  disabled={saving}
+                />
+              </div>
+            </div>
           </div>
 
         </SectionCard>

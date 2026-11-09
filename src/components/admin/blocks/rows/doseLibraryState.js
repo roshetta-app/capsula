@@ -113,9 +113,11 @@ export function stateActions(state) {
 // keeps doses per drug (per formulation), so each drug has its own entry.
 // Brands of the same formulation count as ONE drug.
 
-// A short name for a drug option, e.g. 'Ceftriaxone 1 g vial'.
-function optionLabel(o) {
-  const name = norm(o?.generic_name) || norm(o?.brand_name) || norm(o?._formulationMeta?.name_en)
+// A short name for a drug option, e.g. 'Rocephin 1 g vial'. The brand name comes
+// first (it is what the doctor recognises); the generic name is only the fallback
+// for a drug that has no brand name.
+export function optionLabel(o) {
+  const name = norm(o?.brand_name) || norm(o?.generic_name) || norm(o?._formulationMeta?.name_en)
   if (!name) return ''
   const extra = [o?._formulationMeta?.concentration, o?._formulationMeta?.form].map(norm).filter(Boolean).join(' ')
   return extra ? `${name} ${extra}` : name

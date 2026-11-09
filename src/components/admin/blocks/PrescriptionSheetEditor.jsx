@@ -72,15 +72,17 @@
  *       | { row_type: "note",    id, text_en, text_ar }
  *       | { row_type: "free_text", id, content }
  *       | { row_type: "divider", id }
+ *       | { row_type: "image", id, title?, images: { url, caption }[] }
  *     >
  *   }
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { ChevronUp, ChevronDown, MoreHorizontal, Plus } from 'lucide-react'
+import { ChevronUp, ChevronDown, MoreHorizontal, Plus, Pill, LayoutList, StickyNote, Type, Minus, Image as ImageIcon } from 'lucide-react'
 import UnifiedDrugRowEditor, { PromoteAlternativeDialog } from './rows/UnifiedDrugRowEditor'
 import NoteRowEditor         from './rows/NoteRowEditor'
 import FreeTextPostEditor    from './FreeTextPostEditor'
+import ImageGalleryEditor    from './ImageGalleryEditor'
 import { DRUG_ROW_TEMPLATE, SECTION_ROW_TEMPLATE, promoteAlternativeToMain } from '../../../constants/prescriptionRowSchema'
 import { nanoid } from 'nanoid'
 import { peekFlatDrug, loadFlatDrug, prefetchFlatDrugs } from '../../../utils/flatDrugCache'
@@ -89,31 +91,35 @@ import { toTitleCase, getDrugTitleSuffix, TITLE_HIDDEN_MODIFIER_TAGS } from '../
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const ROW_TYPE_LABELS = {
-  drug:           { label: 'Drug',           color: '#6366f1' },
-  section:        { label: 'Section',        color: '#10b981' },
-  note:           { label: 'Note',           color: '#f59e0b' },
-  free_text:      { label: 'Text Block',     color: '#1D4ED8' },
-  divider:        { label: 'Divider',        color: '#64748b' },
+  drug:           { label: 'Drug',           color: '#6366f1', Icon: Pill },
+  section:        { label: 'Section',        color: '#10b981', Icon: LayoutList },
+  note:           { label: 'Note',           color: '#f59e0b', Icon: StickyNote },
+  free_text:      { label: 'Text Block',     color: '#1D4ED8', Icon: Type },
+  divider:        { label: 'Divider',        color: '#64748b', Icon: Minus },
+  image:          { label: 'Image',          color: '#7C3AED', Icon: ImageIcon },
 }
 
 // ─── Row type chip ─────────────────────────────────────────────────────────────
+// 2026-11-09: a solid, coloured chip with an icon, so the kind of every row can
+// be told at a glance down the whole list (the old chip was a pale outline).
 
 function RowTypeChip({ rowType }) {
   const cfg = ROW_TYPE_LABELS[rowType] ?? { label: rowType, color: '#9ca3af' }
+  const Icon = cfg.Icon
   return (
     <span style={{
-      display: 'inline-block',
-      padding: '1px 8px',
+      display: 'inline-flex', alignItems: 'center', gap: 4,
+      padding: '2px 8px 2px 6px',
       borderRadius: 99,
       fontSize: 10,
       fontWeight: 700,
       letterSpacing: '0.04em',
       textTransform: 'uppercase',
-      background: cfg.color + '18',
-      color: cfg.color,
-      border: `1px solid ${cfg.color}40`,
+      background: cfg.color,
+      color: '#fff',
       flexShrink: 0,
     }}>
+      {Icon && <Icon size={11} strokeWidth={2.5} />}
       {cfg.label}
     </span>
   )
@@ -211,6 +217,11 @@ function rowSummary(row) {
   if (row.row_type === 'divider') {
     return 'Fading line with a small diamond'
   }
+  if (row.row_type === 'image') {
+    const n = (row.images ?? []).length
+    const count = n === 0 ? 'No images yet' : `${n} image${n !== 1 ? 's' : ''}`
+    return row.title?.trim() ? `${row.title.trim()} · ${count}` : count
+  }
   return ''
 }
 
@@ -307,6 +318,7 @@ const TOP_LEVEL_TYPES = [
   { type: 'note',      label: 'Note',       color: '#f59e0b' },
   { type: 'free_text', label: 'Text Block', color: '#1D4ED8' },
   { type: 'divider',   label: 'Divider',    color: '#64748b' },
+  { type: 'image',     label: 'Image',      color: '#7C3AED' },
 ]
 
 function GapInsertControl({ insertIndex, onInsert, isTouchActive, onTouchActivate, onTouchDismiss, disabled = false }) {
@@ -680,6 +692,7 @@ function RowCard({
   const [confirmLeave, setConfirmLeave] = useState(false)
   const cfg = ROW_TYPE_LABELS[row.row_type] ?? { color: '#9ca3af' }
   const isDrugRow = row.row_type === 'drug'
+  const isDivider = row.row_type === 'divider'
   const hasAlternatives = isDrugRow && (row.alternatives ?? []).length > 0
 
   function handleEditorChange(nextRow) {
@@ -699,6 +712,7 @@ function RowCard({
   return (
     <div style={{
       border: '1px solid var(--color-border)',
+      borderLeft: `5px solid ${cfg.color}`,
       borderRadius: 'var(--radius-md)',
       background: 'var(--color-surface)',
     }}>
@@ -707,9 +721,9 @@ function RowCard({
         onClick={handleExpand}
         style={{
           display: 'flex', alignItems: 'center', gap: 8,
-          padding: '8px 10px',
+          padding: isDivider ? '3px 10px' : '8px 10px',
           cursor: 'pointer',
-          background: cfg.color + '12',
+          background: cfg.color + (isDrugRow ? '1A' : row.row_type === 'section' ? '2E' : isDivider ? '0F' : '1F'),
           borderBottom: expanded ? '1px solid var(--color-border)' : 'none',
           userSelect: 'none',
           // BUG FIX (2026-08-08): the card used to rely on overflow: hidden
@@ -739,8 +753,9 @@ function RowCard({
 
         {/* Summary */}
         <span style={{
-          flex: 1, fontSize: 13,
-          color: 'var(--color-text-primary)',
+          flex: 1, fontSize: isDivider ? 11 : 13,
+          fontWeight: isDrugRow || row.row_type === 'section' ? 600 : 400,
+          color: isDivider ? 'var(--color-text-tertiary)' : 'var(--color-text-primary)',
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}>
           {row.row_type === 'drug' ? <DrugBlockTitle row={row} /> : rowSummary(row)}
@@ -881,6 +896,13 @@ function RowCard({
             <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-body)' }}>
               A fading line with a small diamond. Nothing to set — move it or delete it like any other row.
             </div>
+          )}
+          {row.row_type === 'image' && (
+            <ImageGalleryEditor
+              data={{ title: row.title ?? '', images: row.images ?? [] }}
+              onChange={patch => handleEditorChange({ ...row, ...patch })}
+              disabled={disabled}
+            />
           )}
           {row.row_type === 'free_text' && (
             <FreeTextPostEditor
@@ -1056,6 +1078,7 @@ export default function PrescriptionSheetEditor({ block, onChange, disabled = fa
       note:      { row_type: 'note',      id: nanoid(), text_en: null, text_ar: null },
       free_text: { row_type: 'free_text', id: nanoid(), content: '' },
       divider:   { row_type: 'divider',   id: nanoid() },
+      image:     { row_type: 'image',     id: nanoid(), title: '', images: [] },
     }
     insertRowAt(index, templates[type])
     setActiveTouchGap(null)
@@ -1081,6 +1104,10 @@ export default function PrescriptionSheetEditor({ block, onChange, disabled = fa
 
   function addDivider() {
     addRow({ row_type: 'divider', id: nanoid() })
+  }
+
+  function addImage() {
+    addRow({ row_type: 'image', id: nanoid(), title: '', images: [] })
   }
 
   // Dismiss touch gap when tapping anywhere outside the active gap
@@ -1183,6 +1210,7 @@ export default function PrescriptionSheetEditor({ block, onChange, disabled = fa
         <AddRowButton label="Note"         color="#f59e0b" onClick={addNote} disabled={disabled} />
         <AddRowButton label="Text Block"   color="#1D4ED8" onClick={addFreeText} disabled={disabled} />
         <AddRowButton label="Divider"      color="#64748b" onClick={addDivider} disabled={disabled} />
+        <AddRowButton label="Image"        color="#7C3AED" onClick={addImage} disabled={disabled} />
       </div>
 
       {/* ── Promote-alternative dialog (step 1.11) ─────────────────────────── */}

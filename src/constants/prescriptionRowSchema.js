@@ -37,6 +37,7 @@ export const ROW_TYPES = {
   NOTE: 'note',
   FREE_TEXT: 'free_text',
   DIVIDER: 'divider',
+  IMAGE: 'image',
 };
 
 /**
@@ -1033,3 +1034,16 @@ export function fromDrugOptions(row, groups) {
     alternatives,
   };
 }
+
+/**
+ * Image row — one or more pictures inside a sheet, shown with the same
+ * carousel as an image gallery block. Top level only, never inside a
+ * section. 'title' is optional; each image is { url, caption }. A row with
+ * no images shows nothing on the patient-facing sheet.
+ */
+export const IMAGE_ROW_TEMPLATE = {
+  row_type: ROW_TYPES.IMAGE,
+  id: null,
+  title: '',
+  images: [],
+};

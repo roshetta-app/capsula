@@ -426,7 +426,7 @@ function resolveDosePick(dosesStructured) {
 // the older name row ('fallback') is shown instead, so nothing ever goes blank.
 // The change (pencil) button and the options menu sit on the right of the card.
 
-function LinkedDrugCard({ brandId, onRequestChange, extraAction, fallback, note = null, onNoteChange = null }) {
+function LinkedDrugCard({ brandId, onRequestChange, extraAction, fallback, note = null, onNoteChange = null, bare = false }) {
   const { categories } = useCategories()
   const [noteEditing, setNoteEditing] = useState(false)
   const [drug, setDrug] = useState(() => peekFlatDrug(brandId))
@@ -450,7 +450,9 @@ function LinkedDrugCard({ brandId, onRequestChange, extraAction, fallback, note 
   }
 
   return (
-    <div style={{
+    <div style={bare ? {
+      padding: '0 8px 0 10px',
+    } : {
       border: '1px solid var(--color-border)', borderRadius: 12,
       padding: '0 8px 0 10px', backgroundColor: 'var(--color-surface)',
     }}>
@@ -1395,9 +1397,26 @@ function joinTagStyle(label) {
   }
 }
 
-function OrDivider({ value = 'or', onChange, merged = false, atTopEdge = false }) {
+function OrDivider({ value = 'or', onChange, merged = false, atTopEdge = false, joined = false }) {
   const label = value === 'and' ? 'plus' : value
   const toggle = onChange ? () => onChange(value === 'or' ? 'and' : 'or') : undefined
+  if (joined) {
+    // 2026-11-09: between two drugs that share ONE card: a hairline across the
+    // card with the or / plus chip sitting on it.
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 12px', margin: 0 }}>
+        <div style={{ flex: 1, height: 1, backgroundColor: 'var(--color-border)' }} />
+        <span
+          onClick={toggle}
+          role={onChange ? 'button' : undefined}
+          style={{ ...joinTagStyle(label), flexShrink: 0, cursor: onChange ? 'pointer' : 'default' }}
+        >
+          {label}
+        </span>
+        <div style={{ flex: 1, height: 1, backgroundColor: 'var(--color-border)' }} />
+      </div>
+    )
+  }
   if (merged) {
     // 2026-11-08: the chip sits right on the line where two drug cards touch
     // (or on the top edge of a card that starts a new group), so the cards and
@@ -1605,7 +1624,7 @@ function OptionActionsMenu({
 //   canMoveAbove  — bool: show "Move to group above" option          — PHASE 2.4
 //   canMoveBelow  — bool: show "Move to group below" option          — PHASE 2.4
 
-function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onOptionPick, onMove, canMoveToNew, canMoveAbove, canMoveBelow, groupDose, groupDoseWho, startInManualMode, onManualModeConsumed }) {
+function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onOptionPick, onMove, canMoveToNew, canMoveAbove, canMoveBelow, groupDose, groupDoseWho, startInManualMode, onManualModeConsumed, sharedCard = false }) {
   const [promoteOn, setPromoteOn]             = useState(false)
   const [promoteCategory, setPromoteCategory] = useState('')
   const [promoteDoseWho, setPromoteDoseWho]   = useState('adult')
@@ -2115,6 +2134,7 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onOpti
             )
             return option.brand_id ? (
               <LinkedDrugCard
+                bare={sharedCard}
                 brandId={option.brand_id}
                 onRequestChange={() => setBrandPickerOpen(true)}
                 extraAction={renderNameRowExtras}
@@ -3449,6 +3469,9 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
 
   // ── Derived ────────────────────────────────────────────────────────────
   const totalOptions = groups.reduce((sum, g) => sum + g.options.length, 0)
+  // A group's drugs share one card when at least one of them is a library drug
+  // (a group of only empty / free-text entries keeps its plain look).
+  const sharedCard = g => g.options.some(o => !!(o.brand_id || o.formulation_id))
 
   // BUG FIX (2026-08-08): when the row's one and only option is still
   // completely untouched, DrugOptionRow already renders its own "Add a
@@ -3505,13 +3528,21 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
           {/* ── Stacked drug-name lines ──
               OrDivider inserted before every option after the first within
               a group, so options stacked together read as "this OR this". */}
+          {/* 2026-11-09: all drugs of this patient group sit in ONE card, with the
+              or / plus chip on the hairline between them. */}
+          <div style={sharedCard(group) ? {
+            border: '1px solid var(--color-border)', borderRadius: 12,
+            backgroundColor: 'var(--color-surface)',
+            display: 'flex', flexDirection: 'column',
+          } : { display: 'flex', flexDirection: 'column', gap: 8 }}>
           {group.options.map((option, optIdx) => (
             <div
               key={option.id}
-              style={optIdx > 0 ? { display: 'flex', flexDirection: 'column', gap: 12 } : undefined}
+              style={optIdx > 0 && !sharedCard(group) ? { display: 'flex', flexDirection: 'column', gap: 12 } : undefined}
             >
               {optIdx > 0 && (
                 <OrDivider
+                  joined={sharedCard(group)}
                   value={option.joiner ?? 'or'}
                   onChange={next => updateOption(groupIdx, option.id, { ...option, joiner: next })}
                 />
@@ -3541,9 +3572,11 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
                 groupDoseWho={group.dose_who ?? null}
                 startInManualMode={option.id === manualEntryOptionId}
                 onManualModeConsumed={() => setManualEntryOptionId(null)}
+                sharedCard={sharedCard(group)}
               />
             </div>
           ))}
+          </div>
 
           {confirmRemoveOption?.groupIdx === groupIdx && (
             <ConfirmBar

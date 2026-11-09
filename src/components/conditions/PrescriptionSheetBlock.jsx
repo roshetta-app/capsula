@@ -5,6 +5,7 @@ import { FileText, ChevronRight, Plus } from 'lucide-react'
 import NoteCallout from '../ui/NoteCallout'
 import FreeTextPostBlock from './FreeTextPostBlock'
 import BlockDivider from './BlockDivider'
+import ImageGalleryBlock from './ImageGalleryBlock'
 import { blockGap } from '../../utils/blockSpacing'
 import { toDrugOptions, doseLineInstructionText, doseWhoLabel } from '../../constants/prescriptionRowSchema'
 import { getSheetDrugSuffix, toTitleCase } from '../../utils/drugTitleFormat'
@@ -225,6 +226,17 @@ export default function PrescriptionSheetBlock({ sheet, hasContentAfter = true }
         // No data, no settings — the shared divider look (BlockDivider).
         return <BlockDivider key={row.id ?? key} />
 
+      case 'image':
+        // 2026-11-09: pictures inside a sheet, shown like an image gallery block.
+        // A row with no images renders nothing (and takes no gap, see ROW_KIND).
+        if (!(row.images ?? []).length) return null
+        return (
+          <ImageGalleryBlock
+            key={row.id ?? key}
+            block={{ id: row.id ?? key, blockType: 'image_gallery', data: { title: row.title ?? '', images: row.images } }}
+          />
+        )
+
       default:
         if (process.env.NODE_ENV !== 'production') {
           console.warn(`[PrescriptionSheetBlock] Unrecognized row_type: "${row.row_type}"`)
@@ -256,7 +268,7 @@ export default function PrescriptionSheetBlock({ sheet, hasContentAfter = true }
   // empty text blocks render nothing, so they take no gap either. A divider
   // at the very start or end of the sheet has nothing to divide and is
   // skipped.
-  const ROW_KIND = { drug: 'drug', note: 'note', free_text: 'text', divider: 'divider' }
+  const ROW_KIND = { drug: 'drug', note: 'note', free_text: 'text', divider: 'divider', image: 'gallery' }
   const entries = []
   segments.forEach((segment, segIdx) => {
     const renderItems = () => segment.items.map((row, i) => renderRowItem(row, i, segment.items[i + 1]))
