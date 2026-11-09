@@ -304,6 +304,9 @@ function NotInLibraryTag() {
 // bracket under the chosen population becomes its own line on the row (see
 // buildDoseLinesFromPopulation below), not one flattened sentence.
 
+// 2026-11-09: each patient group is one card showing what picking it adds: the
+// group name, every dose band with its wording, and the max dose. Tap a card to
+// use that group. The list scrolls when there are many groups.
 function PopulationChooser({ populations, onChoose, onSkip }) {
   return (
     <div style={{
@@ -313,32 +316,64 @@ function PopulationChooser({ populations, onChoose, onSkip }) {
       backgroundColor: '#EFF6FF',
       display: 'flex', flexDirection: 'column', gap: 8,
     }}>
-      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-primary)' }}>
-        Which patient group is this dose for?
+      <div>
+        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text-primary)' }}>
+          Which patient group is this dose for?
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 2 }}>
+          Tap a group to add its doses to this sheet.
+        </div>
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 360, overflowY: 'auto' }}>
         {populations.map((population, i) => {
-          const bracketCount = Array.isArray(population.brackets) ? population.brackets.length : 0
+          const bands = (Array.isArray(population.brackets) ? population.brackets : [])
+            .filter(b => b?.instruction?.trim())
+          const max = population.max_dose?.trim()
+          const name = population.population?.trim()
           return (
             <button
-              key={i}
+              key={population.id ?? i}
               type="button"
               onClick={() => onChoose(population)}
               style={{
-                display: 'flex', flexDirection: 'column', alignItems: 'flex-start',
-                padding: '7px 10px', textAlign: 'left',
+                display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 6,
+                padding: '8px 10px', textAlign: 'left',
                 border: '1px solid var(--color-border)',
                 borderRadius: 'var(--radius-md)',
                 background: 'var(--color-surface)', cursor: 'pointer',
                 fontFamily: 'var(--font-body)',
               }}
             >
-              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-accent)' }}>
-                {population.population?.trim() || 'Untitled'}
+              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-accent)', fontStyle: name ? 'normal' : 'italic' }}>
+                {name ? doseWhoLabel(name) : 'Unnamed patient group'}
               </span>
-              <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
-                {bracketCount === 1 ? '1 dose band' : `${bracketCount} dose bands`}
-              </span>
+              {bands.length === 0 && !max && (
+                <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)', fontStyle: 'italic' }}>
+                  No doses written yet
+                </span>
+              )}
+              {bands.map((b, bi) => (
+                <span key={b.id ?? bi} style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  {b.bracket?.trim() && (
+                    <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-secondary)' }}>
+                      {b.bracket.trim()}
+                    </span>
+                  )}
+                  <span dir="auto" style={{ fontSize: 12, color: 'var(--color-text-primary)', lineHeight: 1.4 }}>
+                    {b.instruction.trim()}
+                  </span>
+                  {b.note?.trim() && (
+                    <span dir="auto" style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
+                      {b.note.trim()}
+                    </span>
+                  )}
+                </span>
+              ))}
+              {max && (
+                <span dir="auto" style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)', borderTop: '1px dashed var(--color-border)', paddingTop: 5 }}>
+                  Max: {max}
+                </span>
+              )}
             </button>
           )
         })}
@@ -1714,6 +1749,7 @@ function OptionActionsMenu({
 //   canMoveBelow  — bool: show "Move to group below" option          — PHASE 2.4
 
 function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onOptionPick, onMove, canMoveToNew, canMoveAbove, canMoveBelow, groupDose, groupDoseWho, startInManualMode, onManualModeConsumed, sharedCard = false }) {
+  const { refresh: refreshDrugsAfterPromote } = useDrugContext()
   const [promoteOn, setPromoteOn]             = useState(false)
   const [promoteCategory, setPromoteCategory] = useState('')
   const [promoteDoseWho, setPromoteDoseWho]   = useState('adult')
@@ -2110,6 +2146,9 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onOpti
       }
 
       patch({ generic_id: genericId, formulation_id: formulationId, brand_id: brandId, source_flag: SOURCE_FLAG_VALUE })
+      // 2026-11-09: the drug is now in the library; refresh the app's list so the
+      // drug picker finds it (with its doses) when it is added again this session.
+      Promise.resolve(refreshDrugsAfterPromote()).catch(() => {})
       setPromoteOn(false)
       setPromoteCategory('')
       setPromoteDoseWho('adult')
@@ -2614,15 +2653,31 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
   // drug list, which is what the drug picker (e.g. a drug added in a new block)
   // reads its doses from. Without this, a dose band deleted from the library
   // kept coming back when the same drug was added again. One refresh at a time.
-  const { refresh: refreshDrugList } = useDrugContext()
+  // 2026-11-09: the list is also changed in memory the moment a save or delete
+  // finishes, so adding the same drug again right away already shows the new
+  // doses. The full refresh still runs afterwards as a double-check, and a save
+  // that lands while one is running queues one more refresh (it used to be
+  // skipped, which left the list out of date).
+  const { refresh: refreshDrugList, patchFormulationDoses } = useDrugContext()
   const drugListRefreshing = useRef(false)
-  const rememberLibrary = (formulationId, populations) => {
-    setLibraryDoses(prev => ({ ...prev, [formulationId]: populations }))
-    if (drugListRefreshing.current) return
+  const drugListRefreshQueued = useRef(false)
+  const refreshDrugListOnce = () => {
+    if (drugListRefreshing.current) { drugListRefreshQueued.current = true; return }
     drugListRefreshing.current = true
     Promise.resolve(refreshDrugList())
       .catch(() => {})
-      .finally(() => { drugListRefreshing.current = false })
+      .finally(() => {
+        drugListRefreshing.current = false
+        if (drugListRefreshQueued.current) {
+          drugListRefreshQueued.current = false
+          refreshDrugListOnce()
+        }
+      })
+  }
+  const rememberLibrary = (formulationId, populations) => {
+    setLibraryDoses(prev => ({ ...prev, [formulationId]: populations }))
+    patchFormulationDoses?.(formulationId, populations)
+    refreshDrugListOnce()
   }
   const libraryIdsKey = [...new Set(rawGroups.flatMap(g => (g.options ?? []).map(o => o?.formulation_id)).filter(Boolean))].join('|')
   useEffect(() => {

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { fetchFlatDrugs, fetchMetadataTimestamps, fetchAuditLogSince, fetchAuditCursorNow, fetchFlatDrugsByScope, fetchFlatDrugsByBrandId } from '../lib/queries'
 import { readDrugsCache, writeDrugsCache } from '../utils/cache'
+import { patchDrugDoses } from '../utils/patchDrugDoses'
 import { CACHE_TTL_MS } from '../constants/cache'
 import { logCrash } from '../utils/crashLogger'
 
@@ -293,6 +294,25 @@ export function useDrugs() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  return { drugs, loading, error, progress, refresh: fetchAndCache, start, retry }
+  // 2026-11-09: the CMS calls this right after it saves or deletes a drug's doses
+  // in the library. The doses change in the list at once (and in the saved copy
+  // on the device), so adding the same drug again straight away already shows
+  // them. The saved copy keeps its old version stamp and cursor, so the normal
+  // background check still brings in anything else that changed.
+  const patchFormulationDoses = useCallback((formulationId, populations) => {
+    setDrugs(prev => patchDrugDoses(prev, formulationId, populations))
+    readDrugsCache()
+      .then(cached => {
+        if (!cached?.data) return null
+        return writeDrugsCache(
+          patchDrugDoses(cached.data, formulationId, populations),
+          cached.version,
+          cached.auditCursor ?? null,
+        )
+      })
+      .catch(() => {})
+  }, [])
+
+  return { drugs, loading, error, progress, refresh: fetchAndCache, patchFormulationDoses, start, retry }
 }
 
