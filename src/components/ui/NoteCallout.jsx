@@ -94,7 +94,7 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
         style={{
           margin: 0,
           unicodeBidi: 'plaintext',
-          lineHeight: 1.5,
+          lineHeight: 1.4,
         }}
       >
         {children}
@@ -114,7 +114,7 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
       </ol>
     ),
     li: ({ children }) => (
-      <li dir="auto" style={{ fontSize: 16, lineHeight: 1.55, color: 'var(--color-text-primary)', unicodeBidi: 'plaintext' }}>
+      <li dir="auto" style={{ fontSize: 16, lineHeight: 1.45, color: 'var(--color-text-primary)', unicodeBidi: 'plaintext' }}>
         {children}
       </li>
     ),
@@ -133,7 +133,8 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
         color: 'var(--color-text-primary)',
         display: 'flex',
         flexDirection: 'column',
-        gap: 6,
+        gap: 4,
+        textAlign: 'start',
       }}
     >
       <ReactMarkdown remarkPlugins={[remarkBreaks]} components={components}>
@@ -143,40 +144,42 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
   )
 
   // ── Bubble shape — shared by both variants ────────────────────────────────
-  // Full width, always — a note block that borrows the speech-bubble idiom.
-  // Icon side follows the text direction (Arabic-leading notes: icon on the right).
-  // MESSAGE-BUBBLE PASS (2026-11-09, v4): iMessage-style bubble. Solid tinted
-  // fill, no outline or shadow, 20px radius on three corners. The fourth corner
-  // (bottom, on the side the text reads from) is square and carries a small
-  // curved tail that sweeps out and down, drawn as a tiny SVG so it takes the
-  // bubble's own fill on any background. Bubble stays full width and level with
-  // the other cards; only the 10px tail pokes into the page margin.
+  // Full width, always. Icon side follows the text direction (Arabic: right).
+  // v5 (2026-11-09): iMessage shape + tail kept; the earlier outlined look is
+  // back on top of it — near-white fill tinted 6% with the flavour colour, a
+  // 1.5px outline (flavour 38% over the surface) and a soft shadow. The tail
+  // is drawn with the same fill and outline so bubble and tail read as one
+  // shape. Tighter padding, 32px badge, and badge + text centred against each
+  // other vertically.
   const radius = isArabic ? '20px 20px 0px 20px' : '20px 20px 20px 0px'
+  const fill = `color-mix(in srgb, ${f.iconColor} 6%, var(--color-surface) 94%)`
+  const line = `color-mix(in srgb, ${f.iconColor} 38%, var(--color-surface) 62%)`
 
   const bubble = (
     <div style={{ position: 'relative' }}>
       <div style={{
         width: '100%',
         boxSizing: 'border-box',
-        background: f.bg,
+        background: fill,
+        border: `1.5px solid ${line}`,
+        boxShadow: '0 2px 6px rgba(0,0,0,0.05)',
         borderRadius: radius,
-        padding: '14px 16px',
+        padding: '8px 14px',
       }}>
         <div
           style={{
             display: 'flex',
             flexDirection: isArabic ? 'row-reverse' : 'row',
-            alignItems: 'flex-start',
-            gap: 12,
+            alignItems: 'center',
+            gap: 10,
           }}
         >
           {/* Icon side is controlled ONLY by flexDirection here — no dir
               attribute on this row (dir + row-reverse double-flips in some
-              engines). dir stays on the inner text content, where it is
-              needed for correct bidi shaping. */}
+              engines). dir stays on the inner text content. */}
           <span style={{
-            width: 40,
-            height: 40,
+            width: 32,
+            height: 32,
             flexShrink: 0,
             display: 'flex',
             alignItems: 'center',
@@ -184,12 +187,14 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
             borderRadius: '50%',
             background: f.iconColor,
           }}>
-            <Icon color="#fff" size={22} offset={0} />
+            <Icon color="#fff" size={18} offset={0} />
           </span>
           {textContent}
         </div>
       </div>
-      {/* Tail — overlaps the bubble by 2px so there is no seam; pokes 10px out */}
+      {/* Tail — same fill + outline as the bubble. The strip hides the
+          bubble's own side border where the tail begins; the stroked curve
+          and bottom line carry the outline out to the tip. Pokes 10px out. */}
       <svg
         aria-hidden="true"
         width="12"
@@ -204,7 +209,12 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
           pointerEvents: 'none',
         }}
       >
-        <path d="M12 0 V9 C12 14 7 17 0 18 L12 18 Z" style={{ fill: f.bg }} />
+        <path d="M10.75 8 C10.75 13 6.5 16.4 0.75 17.25 L10.75 17.25 Z" style={{ fill }} />
+        <path d="M10 8 H11.6 V16.5 H10 Z" style={{ fill }} />
+        <path
+          d="M10.75 8 C10.75 13 6.5 16.4 0.75 17.25 L11 17.25"
+          style={{ fill: 'none', stroke: line, strokeWidth: 1.5, strokeLinejoin: 'round', strokeLinecap: 'round' }}
+        />
       </svg>
     </div>
   )
