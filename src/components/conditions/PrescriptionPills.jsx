@@ -11,7 +11,7 @@ import { ClipboardPlus, Check, ChevronDown } from 'lucide-react'
  *
  *   TRIGGER — a filled, accent-tinted button with a visible accent outline.
  *     Left: solid accent badge with the clipboard icon. Middle: a small
- *     "Treatment plan · 1 of 3" caption over the plan name in bold primary
+ *     "Tap to change" caption over the plan name in bold primary
  *     text. Right: a round chevron button. The fill + badge + round chevron
  *     are what make it look tappable instead of like a card.
  *
@@ -99,7 +99,7 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
         onPointerLeave={() => setPressed(false)}
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-label={`Treatment plan: ${selected.label}. Tap to change.`}
+        aria-label={`${selected.label}. Tap to change.`}
         style={{
           width: '100%',
           display: 'flex',
@@ -145,7 +145,7 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
             letterSpacing: '0.02em',
             color: accentText,
           }}>
-            Treatment plan · {safeIndex + 1} of {prescriptions.length}
+            Tap to change
           </span>
           <span
             dir="auto"
@@ -192,7 +192,7 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
       {mounted && (
         <div
           role="listbox"
-          aria-label="Treatment plans"
+          aria-label="Options"
           style={{
             position: 'absolute',
             left: 0,
