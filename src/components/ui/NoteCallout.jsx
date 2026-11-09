@@ -143,41 +143,30 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
   )
 
   // ── Bubble shape — shared by both variants ────────────────────────────────
-  // Full width, always — this isn't a shrink-wrapped chat message, just a
-  // note block that borrows the bubble idiom. What flips with direction is
-  // the squared corner (a true 0° tail cue, not just a tight radius) and
-  // the icon's side: LTR notes square the top-LEFT corner with the icon on
-  // the left; RTL notes square the top-RIGHT corner with the icon on the
-  // right — the tail always points toward the side the text reads FROM.
-  // MESSAGE-BUBBLE PASS (2026-11-09): reads like a chat message. The bubble is
-  // inset 9px on the side the text reads from, and a small tail sticks out of
-  // that top corner into the gap (the corner itself stays square, so tail and
-  // bubble join cleanly). The flavour icon sits in a round badge instead of
-  // floating bare. Soft 18px radius on the other three corners.
-  // CSS order: top-left, top-right, bottom-right, bottom-left.
-  const radius = isArabic
-    ? '18px 0px 18px 18px'   // squared top-right, RTL
-    : '0px 18px 18px 18px'   // squared top-left, LTR
+  // Full width, always — a note block that borrows the speech-bubble idiom.
+  // Icon side follows the text direction (Arabic-leading notes: icon on the right).
+  // MESSAGE-BUBBLE PASS (2026-11-09, v2): a speech bubble with its tail BELOW
+  // the bottom corner on the side the text reads from. The bubble itself stays
+  // full width and level with every other card (no side inset), so the text and
+  // icon line up with the rest of the page. All four corners share one soft
+  // radius; the tail hangs 8px under the bubble.
+  const radius = 18
 
   const bubble = (
-    <div style={{
-      position: 'relative',
-      marginLeft: isArabic ? 0 : 9,
-      marginRight: isArabic ? 9 : 0,
-    }}>
-      {/* Tail */}
+    <div style={{ position: 'relative', paddingBottom: 7 }}>
+      {/* Tail — under the bottom corner, pointing down and outward */}
       <div
         aria-hidden="true"
         style={{
           position: 'absolute',
-          top: 0,
-          [isArabic ? 'right' : 'left']: -9,
-          width: 10,
-          height: 13,
+          bottom: 0,
+          [isArabic ? 'right' : 'left']: 20,
+          width: 14,
+          height: 8,
           background: f.bg,
           clipPath: isArabic
-            ? 'polygon(0 0, 0 100%, 100% 0)'
-            : 'polygon(100% 0, 100% 100%, 0 0)',
+            ? 'polygon(0 0, 100% 0, 100% 100%)'
+            : 'polygon(0 0, 100% 0, 0 100%)',
         }}
       />
       <div style={{
