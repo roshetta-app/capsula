@@ -361,6 +361,18 @@ textarea,
   -webkit-touch-callout: default;
 }
 
+/* CMS pages (see hooks/useCmsSurface.js, which sets the class on <html> only
+   while under /admin): staff need to select and copy text, so selection is
+   turned back on everywhere. Controls that set user-select: none inline
+   (drag handles and the like) keep it. The public app is unaffected. */
+html.cms-surface *,
+html.cms-surface *::before,
+html.cms-surface *::after {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}
+
 /* ─── Hide scrollbars app-wide ───────────────────────────────────────────────
    (hide-scrollbars) — a visible scrollbar reads as "this is a browser tab,"
    not a native app. Hides it everywhere scrolling happens — the page itself
@@ -421,6 +433,11 @@ html {
      and a few non-standard gestures — pan-x pan-y is what actually blocks
      pinch-zoom while still allowing normal scrolling in both directions. */
   touch-action: pan-x pan-y;
+}
+
+/* CMS pages: allow pinch-zoom again (class set by hooks/useCmsSurface.js). */
+html.cms-surface {
+  touch-action: auto;
 }
 
 body {

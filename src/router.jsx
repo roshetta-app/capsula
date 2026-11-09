@@ -52,6 +52,7 @@
 import { Routes, Route, Outlet } from 'react-router-dom'
 import Layout from './components/layout'
 import { BackLabelTracker } from './hooks/useBackLabel'
+import useCmsSurface from './hooks/useCmsSurface'
 
 // ─── Public screens ───────────────────────────────────────────────────────────
 
@@ -188,6 +189,8 @@ export function PublicRoutes() {
 // ─── AdminRoutes — rendered inside the admin provider branch in App.jsx ──────
 
 export function AdminRoutes() {
+  // CMS pages allow text selection, copy and zoom (the public app locks them).
+  useCmsSurface()
   return (
     <Routes>
 
