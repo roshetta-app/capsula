@@ -165,7 +165,7 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
             : accentSolid,
           border: 'none',
           borderRadius: 'var(--radius-lg)',
-          boxShadow: '0 6px 16px color-mix(in srgb, var(--color-accent) 32%, transparent)',
+          boxShadow: '0 5px 14px color-mix(in srgb, var(--color-accent) 20%, transparent)',
           transform: pressed ? 'scale(0.992)' : 'scale(1)',
           transition: 'background 0.15s ease, border-color 0.15s ease, transform 0.12s ease',
         }}

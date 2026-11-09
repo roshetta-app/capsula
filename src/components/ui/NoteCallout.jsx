@@ -160,7 +160,7 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
       position: 'relative',
       // Soft lift + hairline edge. drop-shadow follows the real silhouette,
       // so the tail gets the same shadow as the bubble (no seam).
-      filter: 'drop-shadow(0 1px 3px rgba(16, 24, 40, 0.10)) drop-shadow(0 0 0.5px rgba(16, 24, 40, 0.16))',
+      filter: 'drop-shadow(0 1px 3px rgba(16, 24, 40, 0.05)) drop-shadow(0 0 0.5px rgba(16, 24, 40, 0.08))',
     }}>
       <div style={{
         width: '100%',
