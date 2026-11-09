@@ -10,12 +10,12 @@ export const NOTE_FLAVORS = {
   },
   warning: {
     label: 'Warning',
-    iconColor: 'color-mix(in srgb, var(--color-warning) 85%, var(--color-text-primary) 15%)',
+    iconColor: 'var(--color-warning)',
     bg: 'color-mix(in srgb, var(--color-warning) 13%, var(--color-note-bg) 87%)',
   },
   tip: {
     label: 'Tip',
-    iconColor: 'color-mix(in srgb, var(--color-success) 85%, var(--color-text-primary) 15%)',
+    iconColor: 'var(--color-success)',
     bg: 'color-mix(in srgb, var(--color-success) 8%, var(--color-note-bg) 92%)',
   },
 }

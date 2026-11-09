@@ -141,7 +141,7 @@
      Kept near other surface tokens for easy comparison with Phase 5's
      section card variable (--color-section-bg, added in Phase 5). */
   --color-note-bg:          #F5F4F1;
-  --color-note-info:        #475569;   /* Info note: slate, distinct from blue accent, violet sections, green tip, amber warning */
+  --color-note-info:        #3B5170;   /* Info note: slate, distinct from blue accent, violet sections, green tip, amber warning */
 
   /* Dose text — Phase 9 redesign, refined to slate/ink (option A from
      color review): cool near-black neutral, distinct in weight/tone from
@@ -299,7 +299,7 @@
   /* Note card — dark mode: slightly lifted from the dark surface,
      clearly visible but not bright or alert-colored. */
   --color-note-bg:          #262D3A;
-  --color-note-info:        #94A3B8;   /* Info note slate, dark mode */
+  --color-note-info:        #8FA9CF;   /* Info note slate, dark mode */
 
   /* Dose text — dark mode: light slate, mirrors the light-mode near-black
      ink at the equivalent gray-ramp stop. */

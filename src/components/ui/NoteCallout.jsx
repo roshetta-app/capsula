@@ -152,8 +152,8 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
   // shape. Tighter padding, 32px badge, and badge + text centred against each
   // other vertically.
   const radius = isArabic ? '14px 14px 0px 14px' : '14px 14px 14px 0px'
-  const fill = `color-mix(in srgb, ${f.iconColor} 5%, var(--color-surface) 95%)`
-  const line = `color-mix(in srgb, ${f.iconColor} 45%, var(--color-surface) 55%)`
+  const fill = `color-mix(in srgb, ${f.iconColor} 14%, var(--color-surface) 86%)`
+  const line = `color-mix(in srgb, ${f.iconColor} 75%, var(--color-surface) 25%)`
 
   const bubble = (
     <div style={{ position: 'relative' }}>
@@ -161,7 +161,7 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
         width: '100%',
         boxSizing: 'border-box',
         background: fill,
-        border: `1px solid ${line}`,
+        border: `1.5px solid ${line}`,
         borderRadius: radius,
         padding: '7px 12px',
       }}>
@@ -185,9 +185,9 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
           and bottom line carry the outline out to the tip. Pokes 10px out. */}
       <svg
         aria-hidden="true"
-        width="7"
+        width="7.5"
         height="9"
-        viewBox="0 0 7 9"
+        viewBox="0 0 7.5 9"
         style={{
           position: 'absolute',
           bottom: 0,
@@ -197,11 +197,11 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
           pointerEvents: 'none',
         }}
       >
-        <path d="M5.5 4 C5.5 7 3.5 8.3 0.5 8.5 L5.5 8.5 Z" style={{ fill }} />
-        <path d="M4.9 4 H6.1 V8 H4.9 Z" style={{ fill }} />
+        <path d="M5.75 4 C5.75 7 3.75 8 0.75 8.25 L5.75 8.25 Z" style={{ fill }} />
+        <path d="M4.9 4 H6.6 V7.5 H4.9 Z" style={{ fill }} />
         <path
-          d="M5.5 4 C5.5 7 3.5 8.3 0.5 8.5 L6 8.5"
-          style={{ fill: 'none', stroke: line, strokeWidth: 1, strokeLinejoin: 'round', strokeLinecap: 'round' }}
+          d="M5.75 4 C5.75 7 3.75 8 0.75 8.25 L6.5 8.25"
+          style={{ fill: 'none', stroke: line, strokeWidth: 1.5, strokeLinejoin: 'round', strokeLinecap: 'round' }}
         />
       </svg>
     </div>
