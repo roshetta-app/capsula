@@ -24,7 +24,7 @@
  *   - image_gallery blocks whose data.context === 'rx' (belong to Rx tab per Phase 2)
  *   - image_gallery blocks with empty data.images[] (per 3.1 — zero images = no content)
  *   - free_text_post blocks whose data.context === 'rx' (belong to Rx tab per 2.8)
- *   - free_text_post blocks with empty data.markdown (per 3.2 — empty = no content)
+ *   - free_text_post blocks with no title and empty data.markdown (per 3.2 — empty = no content)
  *
  *   - note_callout blocks with empty text (no content, renders nothing)
  *   - divider blocks whose data.context === 'rx' (belong to Rx tab)
@@ -79,8 +79,8 @@ export function getClinicalDataBlocks(allBlocks) {
       if (b.blockType === 'note_callout' && b.data?.context === 'rx') return false
       // free_text_post with context 'rx' belongs to Rx tab (Section 2.8)
       if (b.blockType === 'free_text_post' && b.data?.context === 'rx') return false
-      // free_text_post with empty markdown has no content (Section 3.2)
-      if (b.blockType === 'free_text_post' && !b.data?.markdown) return false
+      // free_text_post with no title and empty markdown has no content (Section 3.2)
+      if (b.blockType === 'free_text_post' && !b.data?.markdown && !b.data?.title?.trim()) return false
       return true
     })
     .sort((a, b) => a.orderIndex - b.orderIndex)

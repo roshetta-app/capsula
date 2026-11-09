@@ -539,6 +539,43 @@ body {
   unicode-bidi: plaintext;
 }
 
+/* ─── Text block title + formatting choices (toolbar in the CMS text editor) ─── */
+
+/* Separate Title field of a text block: bold line above the body. */
+.dir-prose .dir-title {
+  margin: 0 0 6px;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--color-text-primary);
+  unicode-bidi: plaintext;
+}
+.dir-prose .dir-title:last-child {
+  margin-bottom: 0;
+}
+
+.dir-prose u {
+  text-underline-offset: 2px;
+}
+
+/* Font colors — a fixed set, with a lighter value in dark mode. */
+.dir-prose .rt-c-red    { color: #DC2626; }
+.dir-prose .rt-c-orange { color: #D97706; }
+.dir-prose .rt-c-green  { color: #15803D; }
+.dir-prose .rt-c-blue   { color: #2563EB; }
+.dir-prose .rt-c-purple { color: #7C3AED; }
+.dir-prose .rt-c-gray   { color: #6B7280; }
+.dark .dir-prose .rt-c-red    { color: #F87171; }
+.dark .dir-prose .rt-c-orange { color: #FBBF24; }
+.dark .dir-prose .rt-c-green  { color: #4ADE80; }
+.dark .dir-prose .rt-c-blue   { color: #60A5FA; }
+.dark .dir-prose .rt-c-purple { color: #A78BFA; }
+.dark .dir-prose .rt-c-gray   { color: #9CA3AF; }
+
+/* Font sizes — small and large (normal is just no span). */
+.dir-prose .rt-s-sm { font-size: 12px; }
+.dir-prose .rt-s-lg { font-size: 18px; line-height: 1.4; }
+
 /* ─── Heading hierarchy ───────────────────────────────────────────────────────── */
 
 /* ## → major section header: Diagnosis, Treatment, Investigations, etc. */

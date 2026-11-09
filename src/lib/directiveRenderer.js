@@ -133,3 +133,20 @@ export function renderDirectiveMarkdown(raw) {
 
   return html
 }
+
+function escapeHtml(text) {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+/**
+ * renderTitledMarkdown(title, markdown) → string
+ *
+ * A text block's optional Title (plain text, shown as a bold line) followed
+ * by its body. Either can be empty; both empty gives ''. Used by the app
+ * display and the CMS preview so they always match.
+ */
+export function renderTitledMarkdown(title, markdown) {
+  const t = (title ?? '').trim()
+  const head = t ? `<div class="dir-title">${escapeHtml(t)}</div>` : ''
+  return head + renderDirectiveMarkdown(markdown ?? '')
+}

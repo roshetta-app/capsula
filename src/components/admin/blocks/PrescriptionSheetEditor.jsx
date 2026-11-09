@@ -213,7 +213,8 @@ function rowSummary(row) {
     return row.text_en || row.text || 'Empty note'
   }
   if (row.row_type === 'free_text') {
-    const md = (row.content ?? row.markdown ?? '').replace(/^\s*#+\s*/, '')
+    const raw = row.title?.trim() || (row.content ?? row.markdown ?? '')
+    const md = raw.replace(/<[^>]*>/g, '').replace(/^\s*#+\s*/, '')
     return md.length > 60 ? md.slice(0, 60) + '…' : md || 'Empty text block'
   }
   if (row.row_type === 'divider') {
@@ -946,8 +947,12 @@ function RowCard({
           )}
           {row.row_type === 'free_text' && (
             <FreeTextPostEditor
-              data={{ markdown: row.content ?? row.markdown ?? '' }}
-              onChange={patch => handleEditorChange({ ...row, content: patch.markdown, markdown: patch.markdown })}
+              data={{ title: row.title ?? '', markdown: row.content ?? row.markdown ?? '' }}
+              onChange={patch => handleEditorChange({
+                ...row,
+                ...(patch.markdown !== undefined ? { content: patch.markdown, markdown: patch.markdown } : {}),
+                ...(patch.title !== undefined ? { title: patch.title } : {}),
+              })}
             />
           )}
         </div>

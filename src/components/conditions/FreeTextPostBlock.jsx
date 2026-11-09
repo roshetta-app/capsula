@@ -6,8 +6,10 @@
  * Data shape per Section 3.2:
  *   block.data.markdown: string (may contain markdown syntax, ::: directive cards,
  *   and mixed Arabic/English text)
+ *   block.data.title: optional plain-text title, shown as a bold line above the
+ *   body. Title and body can each be used without the other.
  *
- * Renders nothing if markdown is empty (per 3.2 spec).
+ * Renders nothing if both title and markdown are empty (per 3.2 spec).
  *
  * Heading hierarchy (Phase 4.1) — preserved exactly:
  *   ## → section label: rendered via .dir-prose h2 styles in globals.css
@@ -23,18 +25,19 @@
  *   render failure when markdown content is already present on open.
  */
 
-import { renderDirectiveMarkdown } from '../../lib/directiveRenderer'
+import { renderTitledMarkdown } from '../../lib/directiveRenderer'
 
 export default function FreeTextPostBlock({ block }) {
   const markdown = block?.data?.markdown ?? ''
+  const title = block?.data?.title ?? ''
 
-  if (!markdown.trim()) return null
+  if (!markdown.trim() && !title.trim()) return null
 
   return (
     <div
       dir="auto"
       className="dir-prose"
-      dangerouslySetInnerHTML={{ __html: renderDirectiveMarkdown(markdown) }}
+      dangerouslySetInnerHTML={{ __html: renderTitledMarkdown(title, markdown) }}
     />
   )
 }

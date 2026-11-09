@@ -6,25 +6,35 @@
  * Phase 6:   Added "Copy AI Prompt" button — fetches directive_ai_prompt from
  *            cms_config on mount, copies to clipboard on click.
  *
+ * Title + formatting toolbar pass:
+ *   - Separate optional Title field above the body (plain text, shown bold in the
+ *     app). Title and body can each be used without the other.
+ *   - Formatting toolbar for the body (bold, italic, underline, font color, font
+ *     size, clear formatting) with Ctrl/Cmd+B/I/U shortcuts — see RichTextToolbar.jsx.
+ *   - Split view (box + live preview) is the default.
+ *   - The old 'Title' button (turned a line into a heading) was replaced by the
+ *     Title field; '# ' headings in older text still render as before.
+ *
  * Props:
- *   data     { markdown: string }   — block.data (read-only; patch via onChange)
- *   onChange (dataPatch) => void    — called with { markdown: nextValue }
+ *   data     { title?: string, markdown: string } — block.data (read-only; patch via onChange)
+ *   onChange (dataPatch) => void    — called with { markdown } or { title }
  *   disabled Boolean                — freeze all controls during parent save
  *
  * Features:
  *   - Auto-growing textarea for markdown input
- *   - Live preview panel — renders directive cards + markdown (matches app exactly)
+ *   - Live preview panel — renders title + directive cards + markdown (matches app exactly)
  *   - Toggle between Edit / Preview / Split view
  *   - Character count
  *   - Copy AI Prompt button — one-click clipboard copy of the stored system prompt
  *   - RTL-aware: dir="auto" on both textarea and preview (Arabic/English mixed content)
  *
  * Data shape (Section 3.2 of masterplan):
- *   { "markdown": "string" }
+ *   { "title": "string (optional)", "markdown": "string" }
  */
 
-import { useState, useRef, useEffect } from 'react'
-import { renderDirectiveMarkdown } from '../../../lib/directiveRenderer'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { renderTitledMarkdown } from '../../../lib/directiveRenderer'
+import RichTextToolbar, { applyFormat, getActiveFormats, EMPTY_ACTIVE } from './RichTextToolbar'
 import { supabase } from '../../../lib/supabase'
 import { fetchCmsConfig } from '../../../lib/queries'
 
@@ -112,37 +122,9 @@ function CopyPromptButton({ onCopy, status }) {
   )
 }
 
-// Title button — turns the current line into a big bold title ('# ' at the
-// start of the line) or back into normal text if it already is one.
-function TitleButton({ onClick, disabled }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      title="Make this line a big bold title (tap again to undo)"
-      style={{
-        padding: '4px 10px',
-        fontSize: 11,
-        fontWeight: 700,
-        fontFamily: 'var(--font-body)',
-        borderRadius: 'var(--radius-sm)',
-        border: '1px solid var(--color-border)',
-        cursor: disabled ? 'default' : 'pointer',
-        backgroundColor: 'var(--color-surface)',
-        color: 'var(--color-text-secondary)',
-        whiteSpace: 'nowrap',
-        opacity: disabled ? 0.5 : 1,
-      }}
-    >
-      Title
-    </button>
-  )
-}
-
 // ─── Auto-growing textarea ─────────────────────────────────────────────────────
 
-function AutoTextarea({ value, onChange, disabled, placeholder, textareaRef }) {
+function AutoTextarea({ value, onChange, disabled, placeholder, textareaRef, onKeyDown }) {
   const innerRef = useRef(null)
   const ref = textareaRef ?? innerRef
 
@@ -157,6 +139,7 @@ function AutoTextarea({ value, onChange, disabled, placeholder, textareaRef }) {
       ref={ref}
       value={value}
       onChange={e => onChange(e.target.value)}
+      onKeyDown={onKeyDown}
       disabled={disabled}
       placeholder={placeholder}
       dir="auto"
@@ -185,10 +168,43 @@ function AutoTextarea({ value, onChange, disabled, placeholder, textareaRef }) {
   )
 }
 
+// ─── Title field ───────────────────────────────────────────────────────────────
+
+function TitleField({ value, onChange, disabled }) {
+  return (
+    <input
+      type="text"
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      disabled={disabled}
+      placeholder="Title (optional)"
+      aria-label="Title"
+      dir="auto"
+      style={{
+        width: '100%',
+        fontSize: 15,
+        fontWeight: 700,
+        fontFamily: 'var(--font-body)',
+        color: 'var(--color-text-primary)',
+        backgroundColor: 'var(--color-bg)',
+        border: '1px solid var(--color-border)',
+        borderRadius: 'var(--radius-md)',
+        padding: '8px var(--space-3)',
+        outline: 'none',
+        boxSizing: 'border-box',
+        opacity: disabled ? 0.6 : 1,
+        transition: 'border-color 0.15s',
+      }}
+      onFocus={e => { e.currentTarget.style.borderColor = 'var(--color-accent)' }}
+      onBlur={e => { e.currentTarget.style.borderColor = 'var(--color-border)' }}
+    />
+  )
+}
+
 // ─── Preview panel ─────────────────────────────────────────────────────────────
 
-function PreviewPanel({ markdown }) {
-  if (!markdown?.trim()) {
+function PreviewPanel({ title, markdown }) {
+  if (!markdown?.trim() && !title?.trim()) {
     return (
       <div style={{
         fontSize: 14,
@@ -219,7 +235,7 @@ function PreviewPanel({ markdown }) {
         minHeight: 140,
         overflowY: 'auto',
       }}
-      dangerouslySetInnerHTML={{ __html: renderDirectiveMarkdown(markdown) }}
+      dangerouslySetInnerHTML={{ __html: renderTitledMarkdown(title, markdown) }}
     />
   )
 }
@@ -229,18 +245,36 @@ function PreviewPanel({ markdown }) {
 /**
  * FreeTextPostEditor
  *
- * @param {{ markdown: string }} data
- * @param {Function} onChange   — (dataPatch) => void; receives { markdown: nextValue }
+ * @param {{ title?: string, markdown: string }} data
+ * @param {Function} onChange   — (dataPatch) => void; receives { markdown } or { title }
  * @param {Boolean}  disabled   — freeze controls during parent save
  */
 export default function FreeTextPostEditor({ data, onChange, disabled = false }) {
   const markdown = data?.markdown ?? ''
-  const [mode, setMode]             = useState('Edit')
+  const title = data?.title ?? ''
+  const [mode, setMode]             = useState('Split')
   const [aiPrompt, setAiPrompt]     = useState(null)   // null = not yet fetched
   const [copyStatus, setCopyStatus] = useState('idle') // idle | loading | copied | error
 
   const charCount = markdown.length
   const textareaRef = useRef(null)
+  const [active, setActive] = useState(EMPTY_ACTIVE)
+
+  // Keeps the toolbar's highlighted buttons in step with the selected text.
+  const refreshActive = useCallback(() => {
+    const el = textareaRef.current
+    if (!el || document.activeElement !== el) return
+    const next = getActiveFormats(el.value, el.selectionStart, el.selectionEnd)
+    setActive(prev => (
+      prev.b === next.b && prev.i === next.i && prev.u === next.u &&
+      prev.color === next.color && prev.size === next.size ? prev : next
+    ))
+  }, [])
+
+  useEffect(() => {
+    document.addEventListener('selectionchange', refreshActive)
+    return () => document.removeEventListener('selectionchange', refreshActive)
+  }, [refreshActive])
 
   // Fetch the AI prompt once on mount — cached in state for the session.
   useEffect(() => {
@@ -281,21 +315,27 @@ export default function FreeTextPostEditor({ data, onChange, disabled = false })
     setTimeout(() => setCopyStatus('idle'), 2000)
   }
 
-  // Toggle a big bold title on the line the cursor is on.
-  function handleTitle() {
+  // Applies one toolbar choice to the selected text (or the word at the cursor)
+  // and keeps that text selected so the next choice builds on it.
+  function runFormat(action) {
     const el = textareaRef.current
     if (!el || disabled) return
-    const pos = el.selectionStart ?? markdown.length
-    const lineStart = pos === 0 ? 0 : markdown.lastIndexOf('\n', pos - 1) + 1
-    const existing = (markdown.slice(lineStart).match(/^#{1,6} ?/) ?? [''])[0]
-    const replacement = existing === '# ' ? '' : '# '
-    const next = markdown.slice(0, lineStart) + replacement + markdown.slice(lineStart + existing.length)
-    const newPos = Math.max(lineStart, pos + replacement.length - existing.length)
-    handleChange(next)
+    const res = applyFormat(el.value, el.selectionStart, el.selectionEnd, action)
+    if (!res) return
+    handleChange(res.value)
     requestAnimationFrame(() => {
       el.focus()
-      el.setSelectionRange(newPos, newPos)
+      el.setSelectionRange(res.selStart, res.selEnd)
+      setActive(getActiveFormats(res.value, res.selStart, res.selEnd))
     })
+  }
+
+  function handleKeyDown(e) {
+    if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return
+    const id = { b: 'b', i: 'i', u: 'u' }[e.key.toLowerCase()]
+    if (!id) return
+    e.preventDefault()
+    runFormat({ type: 'toggle', id })
   }
 
   return (
@@ -317,10 +357,17 @@ export default function FreeTextPostEditor({ data, onChange, disabled = false })
           }}>
             {charCount > 0 ? `${charCount.toLocaleString()} chars` : 'Markdown + cards supported'}
           </span>
-          {mode !== 'Preview' && <TitleButton onClick={handleTitle} disabled={disabled} />}
           <CopyPromptButton onCopy={handleCopyPrompt} status={copyStatus} />
         </div>
       </div>
+
+      {/* Title (optional) */}
+      <TitleField value={title} onChange={val => onChange({ title: val })} disabled={disabled} />
+
+      {/* Formatting toolbar for the body */}
+      {mode !== 'Preview' && (
+        <RichTextToolbar active={active} onAction={runFormat} disabled={disabled} />
+      )}
 
       {/* Editor area */}
       {mode === 'Edit' && (
@@ -329,12 +376,13 @@ export default function FreeTextPostEditor({ data, onChange, disabled = false })
           onChange={handleChange}
           disabled={disabled}
           textareaRef={textareaRef}
-          placeholder="Write in markdown… tap Title for a big bold title, use :::warning, :::dose, :::redflags etc. for cards"
+          onKeyDown={handleKeyDown}
+          placeholder="Write here… select text and use the toolbar. Use :::warning, :::dose, :::redflags etc. for cards"
         />
       )}
 
       {mode === 'Preview' && (
-        <PreviewPanel markdown={markdown} />
+        <PreviewPanel title={title} markdown={markdown} />
       )}
 
       {mode === 'Split' && (
@@ -349,9 +397,10 @@ export default function FreeTextPostEditor({ data, onChange, disabled = false })
             onChange={handleChange}
             disabled={disabled}
             textareaRef={textareaRef}
-            placeholder="Write in markdown… tap Title for a big bold title, use :::warning, :::dose, :::redflags etc. for cards"
+            onKeyDown={handleKeyDown}
+            placeholder="Write here… select text and use the toolbar. Use :::warning, :::dose, :::redflags etc. for cards"
           />
-          <PreviewPanel markdown={markdown} />
+          <PreviewPanel title={title} markdown={markdown} />
         </div>
       )}
     </div>

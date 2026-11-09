@@ -213,11 +213,11 @@ export default function PrescriptionSheetBlock({ sheet, hasContentAfter = true }
         // reads with slightly more presence at this small size, matching
         // the rest of the sheet's spacing rhythm instead of standing apart
         // with article-level whitespace.
-        if (!(row.content ?? '').trim()) return null
+        if (!(row.content ?? '').trim() && !(row.title ?? '').trim()) return null
         return (
           <div key={row.id ?? key} className="rx-prose-tight">
             <FreeTextPostBlock
-              block={{ id: row.id ?? key, blockType: 'free_text_post', data: { markdown: row.content ?? '' } }}
+              block={{ id: row.id ?? key, blockType: 'free_text_post', data: { title: row.title ?? '', markdown: row.content ?? '' } }}
             />
           </div>
         )

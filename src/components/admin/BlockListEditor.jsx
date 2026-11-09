@@ -97,7 +97,7 @@ function isRxBlock(block) {
 function defaultData(blockType, context) {
   switch (blockType) {
     case 'image_gallery':      return { images: [], context: context ?? 'clinical' }
-    case 'free_text_post':     return { markdown: '', context: context ?? 'clinical' }
+    case 'free_text_post':     return { title: '', markdown: '', context: context ?? 'clinical' }
     case 'note_callout':       return { text: '', flavor: 'info', context: context ?? 'clinical' }
     case 'divider':            return { context: context ?? 'clinical' }
     case 'prescription_sheet': return { label: 'Standard', rows: [] }
@@ -116,9 +116,10 @@ function getBlockPreview(block) {
       return t.length > 60 ? t.slice(0, 60) + '…' : t
     }
     case 'free_text_post': {
+      const ttl = data?.title?.trim()
       const md = data?.markdown?.trim()
-      if (!md) return 'Empty text post'
-      const plain = md.replace(/[#*_`>\-]/g, '').replace(/\n/g, ' ').trim()
+      if (!ttl && !md) return 'Empty text post'
+      const plain = (ttl || md).replace(/<[^>]*>/g, '').replace(/[#*_`>\-]/g, '').replace(/\n/g, ' ').trim()
       return plain.length > 60 ? plain.slice(0, 60) + '…' : plain || 'Empty text post'
     }
     case 'divider':
