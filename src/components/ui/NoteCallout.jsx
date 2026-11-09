@@ -145,13 +145,13 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
 
   // ── Bubble shape — shared by both variants ────────────────────────────────
   // Full width, always. Icon side follows the text direction (Arabic: right).
-  // v8: beak halved in height with a soft rounded tip (subtle hint, not a point). v7: tail is a small rounded beak flush with the bubble edge (no overhang). v6 simplified: plain flavour-coloured icon (no badge circle), 1px outline, no shadow, 14px radius, small tail, 15px text. v5 (2026-11-09): iMessage shape + tail kept; the earlier outlined look is
+  // v9: rounder modern bubble — 20px corners, smooth curved tail. v8: beak halved in height with a soft rounded tip (subtle hint, not a point). v7: tail is a small rounded beak flush with the bubble edge (no overhang). v6 simplified: plain flavour-coloured icon (no badge circle), 1px outline, no shadow, 14px radius, small tail, 15px text. v5 (2026-11-09): iMessage shape + tail kept; the earlier outlined look is
   // back on top of it — near-white fill tinted 6% with the flavour colour, a
   // 1.5px outline (flavour 38% over the surface) and a soft shadow. The tail
   // is drawn with the same fill and outline so bubble and tail read as one
   // shape. Tighter padding, 32px badge, and badge + text centred against each
   // other vertically.
-  const radius = isArabic ? '14px 14px 0px 14px' : '14px 14px 14px 0px'
+  const radius = isArabic ? '20px 20px 0px 20px' : '20px 20px 20px 0px'
   const fill = `color-mix(in srgb, ${f.iconColor} 14%, var(--color-surface) 86%)`
   const line = `color-mix(in srgb, ${f.iconColor} 75%, var(--color-surface) 25%)`
 
@@ -163,7 +163,7 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
         background: fill,
         border: `1.5px solid ${line}`,
         borderRadius: radius,
-        padding: '7px 12px',
+        padding: '9px 15px',
       }}>
         <div
           style={{
@@ -186,9 +186,9 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
           bottom border where the beak joins, so the outline flows round it. */}
       <svg
         aria-hidden="true"
-        width="10"
-        height="6"
-        viewBox="0 0 10 6"
+        width="14"
+        height="8"
+        viewBox="0 0 14 8"
         style={{
           position: 'absolute',
           top: 'calc(100% - 1.5px)',
@@ -199,11 +199,11 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
         }}
       >
         <path
-          d="M0.75 0 V3.4 Q0.75 5.3 2.4 4.7 Q6 3.4 9 0.75 V0 Z"
+          d="M0.75 0 V4 C0.75 6.3 2.5 7.1 4.2 6.3 C7.2 5 10.6 3.2 13 0.75 V0 Z"
           style={{ fill }}
         />
         <path
-          d="M0.75 0.5 V3.4 Q0.75 5.3 2.4 4.7 Q6 3.4 9 0.75"
+          d="M0.75 0.5 V4 C0.75 6.3 2.5 7.1 4.2 6.3 C7.2 5 10.6 3.2 13 0.75"
           style={{ fill: 'none', stroke: line, strokeWidth: 1.5, strokeLinejoin: 'round', strokeLinecap: 'round' }}
         />
       </svg>
