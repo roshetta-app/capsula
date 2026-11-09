@@ -67,7 +67,8 @@ function TokenPalette({ value, onChange }) {
   return (
     <div>
       <div style={labelText}>Color</div>
-      <div style={{
+      <div className="cms-cols" style={{
+        '--cols-phone': 'repeat(6, minmax(0, 1fr))',
         display:   'grid',
         gridTemplateColumns: 'repeat(7, 1fr)',
         gap:       6,
@@ -217,7 +218,8 @@ function IconPicker({ iconType, iconName, iconUrl, onChangeLucide, onChangeCusto
             placeholder="Search icons…"
             style={{ ...inputStyle, marginBottom: 8 }}
           />
-          <div style={{
+          <div className="cms-cols" style={{
+            '--cols-phone': 'repeat(4, minmax(0, 1fr))',
             display:      'grid',
             gridTemplateColumns: 'repeat(5, 1fr)',
             gap:          4,
@@ -731,7 +733,7 @@ export default function SpecialtiesManager() {
             }}
           >
             {/* Row */}
-            <div style={{
+            <div className="cms-row-wrap" style={{
               display:    'flex',
               alignItems: 'center',
               gap:        8,
@@ -740,6 +742,7 @@ export default function SpecialtiesManager() {
               {/* Drag handle */}
               {!isUncategorized && (
                 <GripVertical
+                  className="cms-hide-phone"
                   size={16}
                   color="var(--color-text-tertiary)"
                   style={{ cursor: 'grab', flexShrink: 0 }}
@@ -816,9 +819,11 @@ export default function SpecialtiesManager() {
                 />
               </button>
 
+              {/* Buttons: up / down, switch, edit, delete (own line on phone) */}
+              <div className="cms-row-actions" style={{ display: 'contents' }}>
               {/* Up / Down */}
               {!isUncategorized && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <div className="cms-updown" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                   <button onClick={() => moveRow(idx, -1)} style={iconBtn} title="Move up">
                     <ChevronUp size={12} />
                   </button>
@@ -862,6 +867,7 @@ export default function SpecialtiesManager() {
                   <Trash2 size={13} />
                 </button>
               )}
+              </div>
             </div>
 
             {/* Expandable conditions list */}

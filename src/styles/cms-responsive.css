@@ -325,4 +325,29 @@ html.cms-surface .cms-only-phone {
     box-shadow: none !important;
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
+
+  /* --- Phase 4: taxonomy list rows ----------------------------------------------
+     .cms-row-wrap    the row may wrap onto a second line.
+     .cms-row-actions the up/down, switch, edit and delete buttons (they sit
+                      directly in the row on desktop through display: contents)
+                      take their own line under the name on phone.
+     .cms-updown      the up and down arrows sit side by side on that line. */
+  html.cms-surface .cms-row-wrap {
+    flex-wrap: wrap !important;
+  }
+  html.cms-surface .cms-row-actions {
+    display: flex !important;
+    flex: 1 1 100%;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 14px;
+    padding-top: 8px;
+    border-top: 1px solid var(--color-border-subtle);
+  }
+  html.cms-surface .cms-row-actions:empty {
+    display: none !important;
+  }
+  html.cms-surface .cms-updown {
+    flex-direction: row !important;
+  }
 }
