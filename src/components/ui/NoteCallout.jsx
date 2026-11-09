@@ -176,7 +176,7 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
           {/* Icon side is controlled ONLY by flexDirection here — no dir
               attribute on this row (dir + row-reverse double-flips in some
               engines). dir stays on the inner text content. */}
-          <Icon color={f.iconColor} size={20} offset={0} />
+          <Icon color={f.iconColor} size={16} offset={0} />
           {textContent}
         </div>
       </div>
@@ -185,22 +185,22 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
           and bottom line carry the outline out to the tip. Pokes 10px out. */}
       <svg
         aria-hidden="true"
-        width="9"
-        height="12"
-        viewBox="0 0 9 12"
+        width="7"
+        height="9"
+        viewBox="0 0 7 9"
         style={{
           position: 'absolute',
           bottom: 0,
-          [isArabic ? 'right' : 'left']: -7,
+          [isArabic ? 'right' : 'left']: -5,
           transform: isArabic ? 'scaleX(-1)' : 'none',
           overflow: 'visible',
           pointerEvents: 'none',
         }}
       >
-        <path d="M7.5 5 C7.5 9 4.5 11 0.5 11.5 L7.5 11.5 Z" style={{ fill }} />
-        <path d="M6.9 5 H8.1 V11 H6.9 Z" style={{ fill }} />
+        <path d="M5.5 4 C5.5 7 3.5 8.3 0.5 8.5 L5.5 8.5 Z" style={{ fill }} />
+        <path d="M4.9 4 H6.1 V8 H4.9 Z" style={{ fill }} />
         <path
-          d="M7.5 5 C7.5 9 4.5 11 0.5 11.5 L8 11.5"
+          d="M5.5 4 C5.5 7 3.5 8.3 0.5 8.5 L6 8.5"
           style={{ fill: 'none', stroke: line, strokeWidth: 1, strokeLinejoin: 'round', strokeLinecap: 'round' }}
         />
       </svg>
