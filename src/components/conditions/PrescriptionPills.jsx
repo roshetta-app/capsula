@@ -152,7 +152,7 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
           display: 'flex',
           alignItems: 'center',
           gap: 12,
-          minHeight: 52,
+          minHeight: 48,
           padding: '8px 10px 8px 18px',
           textAlign: 'left',
           cursor: 'pointer',
@@ -181,7 +181,7 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
               WebkitLineClamp: 2,
               overflow: 'hidden',
               overflowWrap: 'anywhere',
-              fontSize: 16,
+              fontSize: 15,
               lineHeight: 1.25,
               fontWeight: 700,
               letterSpacing: '-0.2px',
@@ -194,8 +194,8 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
 
         {/* Round chevron button */}
         <span style={{
-          width: 32,
-          height: 32,
+          width: 30,
+          height: 30,
           flexShrink: 0,
           display: 'flex',
           alignItems: 'center',

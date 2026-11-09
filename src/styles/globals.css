@@ -547,7 +547,7 @@ body {
 /* Separate Title field of a text block: bold line above the body. */
 .dir-prose .dir-title {
   margin: 0 0 6px;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
   line-height: 1.35;
   color: var(--color-text-primary);

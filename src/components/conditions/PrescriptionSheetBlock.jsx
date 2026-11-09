@@ -42,7 +42,7 @@ const ROW_GAP_STACK = 4
 // Drug name type size and line height. Shared by the name spans and by the
 // right-edge arrow box, so the arrow is always exactly as tall as the first
 // line of the name and sits level with it even when the name wraps.
-const NAME_FONT_SIZE = 17
+const NAME_FONT_SIZE = 16
 const NAME_LINE_HEIGHT = 1.3
 
 /**
@@ -1023,5 +1023,5 @@ function NumberBadge({ index }) {
 const rowWrap = {
   display: 'flex',
   alignItems: 'flex-start',
-  padding: '10px 0',
+  padding: '8px 0',
 }
