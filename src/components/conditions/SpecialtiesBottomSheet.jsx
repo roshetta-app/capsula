@@ -55,6 +55,9 @@
  *   onSelect         (id) => void
  *   onClose          () => void
  *   isOpen           boolean
+ *   zIndex           number  (optional) — layer the sheet sits on. Left out in the app
+ *                    (sheet default); the CMS passes a higher one so the sheet shows
+ *                    above its top bars.
  */
 
 import { LayoutGrid }                   from 'lucide-react'
@@ -69,6 +72,7 @@ export default function SpecialtiesBottomSheet({
   onSelect,
   onClose,
   isOpen,
+  zIndex,
 }) {
   const isDark = useIsDark()
 
@@ -78,7 +82,7 @@ export default function SpecialtiesBottomSheet({
   }
 
   return (
-    <SheetShell isOpen={isOpen} onClose={onClose} ariaLabel="Select specialty" maxHeight="70dvh">
+    <SheetShell isOpen={isOpen} onClose={onClose} ariaLabel="Select specialty" maxHeight="70dvh" {...(zIndex ? { zIndex } : {})}>
       {/* Fixed header — label and the 'All conditions' row. Does not
           scroll; only the specialty list below it does. The drag handle
           itself now lives in SheetShell, above this. */}

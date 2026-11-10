@@ -13,7 +13,9 @@
  *    same typo-tolerant, tiered matching; the app's useConditionSearch hook is not
  *    used because it also writes search analytics, which CMS typing must not),
  *  - the app's ConditionCard (icon, specialty, tagline, highlighted match),
- *  - the app's A–Z letter dividers and the app's "no results" state.
+ *  - the app's A–Z letter dividers and the app's "no results" state,
+ *  - the app's specialty filter (SpecialtySelector + SpecialtiesBottomSheet), fed from
+ *    the CMS specialty list so specialties with no conditions yet still show.
  *  CMS-only controls (publish dot, Draft tag, delete) sit in the card's trailing slot;
  *  tapping a card opens the editor.
  */
@@ -31,6 +33,8 @@ import AdminPageHeader from '../../components/admin/AdminPageHeader'
 import ConditionCard from '../../components/ConditionCard'
 import ConditionsEmptyState from '../../components/conditions/ConditionsEmptyState'
 import AlphabetSectionDivider from '../../components/conditions/AlphabetSectionDivider'
+import SpecialtySelector from '../../components/conditions/SpecialtySelector'
+import SpecialtiesBottomSheet from '../../components/conditions/SpecialtiesBottomSheet'
 import { buildConditionIndex, searchConditions } from '../../utils/searchUtils'
 import { alphabetGroup } from '../../utils/alphabetGroup'
 
@@ -91,7 +95,21 @@ export default function ConditionsCMS() {
       : matched
   }, [conditions, activeSpecialty, query])
 
-  const activeSpecialtyName = specialties.find(sp => sp.id === activeSpecialty)?.name_en ?? ''
+  // CMS specialty rows reshaped into what the app's filter expects.
+  const specialtyOptions = useMemo(() => specialties.map(sp => ({
+    id:         sp.id,
+    name:       sp.name_en,
+    slug:       sp.slug,
+    iconType:   sp.icon_type ?? 'lucide',
+    iconValue:  sp.icon_type === 'custom' ? sp.icon_url : (sp.icon_name ?? 'Stethoscope'),
+    colorToken: sp.color_token ?? null,
+    sortOrder:  sp.sort_order,
+  })), [specialties])
+  const activeSpecialtyObj  = activeSpecialty === 'all'
+    ? null
+    : specialtyOptions.find(sp => sp.id === activeSpecialty) ?? null
+  const activeSpecialtyName = activeSpecialtyObj?.name ?? ''
+  const [sheetOpen, setSheetOpen] = useState(false)
 
   // ─── Delete ────────────────────────────────────────────────────────────────
 
@@ -189,35 +207,15 @@ export default function ConditionsCMS() {
           />
         </div>
 
-        {/* Specialty filter pills */}
+        {/* Specialty filter — the app's selector and bottom sheet */}
         {specialties.length > 0 && (
-          <div style={{
-            display: 'flex', gap: 'var(--space-2)',
-            overflowX: 'auto', paddingBottom: 'var(--space-2)',
-            marginBottom: 'var(--space-4)', scrollbarWidth: 'none',
-          }}>
-            {['all', ...specialties.map(s => s.id)].map(id => {
-              const isActive = activeSpecialty === id
-              const label    = id === 'all' ? 'All' : specialties.find(s => s.id === id)?.name_en
-              return (
-                <button
-                  key={id}
-                  onClick={() => setActiveSpecialty(id)}
-                  style={{
-                    flexShrink: 0, padding: '6px 14px',
-                    borderRadius: 'var(--radius-full)',
-                    fontSize: 13, fontWeight: isActive ? 600 : 400,
-                    fontFamily: 'var(--font-body)', cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                    border: isActive ? '1.5px solid var(--color-accent)' : '1.5px solid var(--color-border)',
-                    backgroundColor: isActive ? 'var(--color-accent)' : 'var(--color-surface)',
-                    color: isActive ? '#ffffff' : 'var(--color-text-secondary)',
-                  }}
-                >
-                  {label}
-                </button>
-              )
-            })}
+          <div style={{ marginBottom: 'var(--space-4)' }}>
+            <SpecialtySelector
+              activeSpecialtyObj={activeSpecialtyObj}
+              onOpen={() => setSheetOpen(true)}
+              onClear={() => setActiveSpecialty('all')}
+              isOpen={sheetOpen}
+            />
           </div>
         )}
 
@@ -264,6 +262,15 @@ export default function ConditionsCMS() {
                 ))}
           </div>
         )}
+
+      <SpecialtiesBottomSheet
+        specialties={specialtyOptions}
+        activeSpecialty={activeSpecialty}
+        onSelect={setActiveSpecialty}
+        onClose={() => setSheetOpen(false)}
+        isOpen={sheetOpen}
+        zIndex={600}
+      />
 
       {/* Delete confirm modal */}
       <ConfirmModal
