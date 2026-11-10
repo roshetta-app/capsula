@@ -75,10 +75,17 @@
  *       | { row_type: "image", id, title?, images: { url, caption }[] }
  *     >
  *   }
+ *
+ * 2026-11-10: select mode for the top-level rows. A Select button turns on a
+ * tick box per row and a bottom bar with Select all, Duplicate, Up, Down,
+ * Copy to, Move to and Delete. Duplicate is also in each row's menu. Copies get
+ * fresh ids and sit right after their originals. Copy to / Move to another
+ * sheet is done by BlockListEditor (it sees every sheet) through the
+ * onTransferRows prop, in one change so Undo brings everything back at once.
  */
 
 import { useState, useCallback, useEffect, useRef, useContext } from 'react'
-import { ChevronUp, ChevronDown, MoreHorizontal, Plus, Pill, LayoutList, StickyNote, Type, Minus, X, Image as ImageIcon } from 'lucide-react'
+import { ChevronUp, ChevronDown, MoreHorizontal, Plus, Pill, LayoutList, StickyNote, Type, Minus, X, Check, Image as ImageIcon } from 'lucide-react'
 import UnifiedDrugRowEditor, { PromoteAlternativeDialog } from './rows/UnifiedDrugRowEditor'
 import NoteRowEditor         from './rows/NoteRowEditor'
 import FreeTextPostEditor    from './FreeTextPostEditor'
@@ -242,6 +249,18 @@ function rowSummary(row) {
 //   list     — the array this hook operates on (rows, or a section's drugs)
 //   onChange — (nextList) => void, called with the full replacement array
 
+// 2026-11-10: a copy of a row with fresh ids (the row, and the drugs inside a
+// section). It starts collapsed, so it opens independently of the original.
+function cloneRowFresh(row) {
+  const copy = JSON.parse(JSON.stringify(row))
+  copy.id = nanoid()
+  copy._isNew = false
+  if (Array.isArray(copy.drugs)) {
+    copy.drugs = copy.drugs.map(d => ({ ...d, id: nanoid(), _isNew: false }))
+  }
+  return copy
+}
+
 function useRowList(list, onChange) {
   // { idx } when open, null when closed
   const [promoteDialog, setPromoteDialog] = useState(null)
@@ -274,6 +293,17 @@ function useRowList(list, onChange) {
     onChange(list.filter((_, i) => i !== idx))
   }
 
+  // 2026-11-10: each copy goes right after its own original.
+  function duplicateRows(indices) {
+    const picked = new Set(indices)
+    const next = []
+    list.forEach((r, i) => {
+      next.push(r)
+      if (picked.has(i)) next.push(cloneRowFresh(r))
+    })
+    onChange(next)
+  }
+
   // Delete request: if it's a drug row with alternatives, show the promote
   // dialog instead of deleting immediately (step 1.11).
   function handleDeleteRequest(idx) {
@@ -302,7 +332,7 @@ function useRowList(list, onChange) {
   }
 
   return {
-    addRow, insertRowAt, updateRow, moveRow, deleteRow,
+    addRow, insertRowAt, updateRow, moveRow, deleteRow, duplicateRows,
     handleDeleteRequest, handlePromote, handleDeleteAll,
     promoteDialog, setPromoteDialog,
   }
@@ -490,7 +520,7 @@ function GapInsertControl({ insertIndex, onInsert, isTouchActive, onTouchActivat
 function SectionRowEditor({ row, onChange, onMoveDrugOut, disabled = false }) {
   const drugs = row.drugs ?? []
   const {
-    insertRowAt, updateRow, moveRow, handleDeleteRequest,
+    insertRowAt, updateRow, moveRow, handleDeleteRequest, duplicateRows,
     promoteDialog, handlePromote, handleDeleteAll, setPromoteDialog,
   } = useRowList(drugs, nextDrugs => onChange({ ...row, drugs: nextDrugs }))
 
@@ -592,6 +622,7 @@ function SectionRowEditor({ row, onChange, onMoveDrugOut, disabled = false }) {
                 onDeleteRequest={handleDeleteRequest}
                 isNested
                 onMoveOut={() => onMoveDrugOut(idx)}
+                onDuplicate={() => duplicateRows([idx])}
                 disabled={disabled}
               />
               {/* Gap after every row (including the last — acts as append) */}
@@ -628,9 +659,13 @@ function RowCard({
   isNested = false, onMoveOut = null,
   sections = [], onMoveIntoSection = null,
   onMoveDrugOutOfSection = null,
+  onDuplicate = null,
+  selectMode = false, selected = false, onToggleSelect = null,
   disabled = false,
 }) {
-  const [expanded, setExpanded] = useState(row._isNew ?? false)
+  const [expandedState, setExpanded] = useState(row._isNew ?? false)
+  // 2026-11-10: while selecting, every row shows closed (tapping it ticks it).
+  const expanded = expandedState && !selectMode
   // 2026-11-08: removing a drug from the sheet now asks first (it used to go
   // instantly). A drug with alternatives keeps its own box instead.
   const [confirmRemoveRow, setConfirmRemoveRow] = useState(false)
@@ -677,11 +712,21 @@ function RowCard({
   // diamond), with its arrows and a one-tap remove. Nothing to open or edit.
   if (isDivider) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 10px' }}>
+      <div
+        onClick={selectMode ? onToggleSelect : undefined}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 10, padding: '4px 10px',
+          cursor: selectMode ? 'pointer' : 'default',
+          borderRadius: 'var(--radius-md)',
+          boxShadow: selected ? '0 0 0 2px var(--color-accent-solid)' : 'none',
+        }}
+      >
+        {selectMode && <SelectBox checked={selected} />}
         <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontWeight: 600, minWidth: 18, textAlign: 'center' }}>
           {idx + 1}
         </span>
         <div style={{ flex: 1, minWidth: 0 }}><BlockDivider /></div>
+        {!selectMode && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
           <button type="button" onClick={() => onMove(idx, -1)} disabled={disabled || idx === 0} title="Move up" style={iconBtn(disabled || idx === 0)}>
             <ChevronUp size={13} />
@@ -693,6 +738,7 @@ function RowCard({
             <X size={13} />
           </button>
         </div>
+        )}
       </div>
     )
   }
@@ -702,10 +748,11 @@ function RowCard({
       border: '1px solid var(--color-border)',
       borderRadius: 'var(--radius-md)',
       background: 'var(--color-surface)',
+      boxShadow: selected ? '0 0 0 2px var(--color-accent-solid)' : 'none',
     }}>
       {/* ── Row header ── */}
       <div
-        onClick={handleExpand}
+        onClick={selectMode ? onToggleSelect : handleExpand}
         style={{
           display: 'flex', alignItems: 'center', gap: 8,
           padding: '8px 10px',
@@ -728,6 +775,8 @@ function RowCard({
           borderBottomRightRadius: expanded ? 0 : 'var(--radius-md)',
         }}
       >
+        {selectMode && <SelectBox checked={selected} />}
+
         {/* Index */}
         <span style={{
           fontSize: 11, color: 'var(--color-text-tertiary)',
@@ -748,7 +797,8 @@ function RowCard({
           {row.row_type === 'drug' ? <DrugBlockTitle row={row} /> : rowSummary(row)}
         </span>
 
-        {/* Move into section… / move out of section / ↑ ↓ 🗑 controls */}
+        {/* Move into section… / move out of section / ↑ ↓ 🗑 controls (hidden while selecting) */}
+        {!selectMode && (
         <div
           style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}
           onClick={e => e.stopPropagation()}
@@ -776,6 +826,7 @@ function RowCard({
           <RowMenu
             disabled={disabled}
             items={[
+              ...(onDuplicate ? [{ label: 'Duplicate', onClick: onDuplicate }] : []),
               ...(isDrugRow && !isNested ? sections.map(sec => ({
                 label: `Move into “${sec.label || 'Untitled section'}”`,
                 onClick: () => onMoveIntoSection(sec.id),
@@ -787,6 +838,7 @@ function RowCard({
             ]}
           />
         </div>
+        )}
       </div>
 
       {confirmLeave && expanded && (
@@ -909,6 +961,37 @@ function RowCard({
 
 // ─── Icon button style helper ──────────────────────────────────────────────────
 
+// 2026-11-10: the tick box shown on each row while selecting.
+function SelectBox({ checked }) {
+  return (
+    <span style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      width: 22, height: 22, flexShrink: 0, boxSizing: 'border-box',
+      border: checked ? '2px solid var(--color-accent-solid)' : '2px solid var(--color-border)',
+      borderRadius: 6,
+      background: checked ? 'var(--color-accent-solid)' : 'transparent',
+      color: '#fff',
+    }}>
+      {checked && <Check size={14} strokeWidth={3} />}
+    </span>
+  )
+}
+
+// A button on the select-mode action bar.
+function barBtn(disabled = false, kind = 'plain') {
+  const danger = kind === 'danger'
+  const primary = kind === 'primary'
+  return {
+    padding: '7px 12px', fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-body)',
+    borderRadius: 'var(--radius-md)',
+    border: primary ? 'none' : `1.5px solid ${danger ? '#ef4444' : 'var(--color-border)'}`,
+    background: primary ? 'var(--color-accent-solid)' : danger ? '#ef444410' : 'transparent',
+    color: primary ? '#fff' : danger ? '#ef4444' : 'var(--color-text-primary)',
+    opacity: disabled ? 0.4 : 1,
+    cursor: disabled ? 'default' : 'pointer',
+  }
+}
+
 // One small ⋯ menu for the rarely used row actions.
 function RowMenu({ items, disabled }) {
   const [open, setOpen] = useState(false)
@@ -1006,7 +1089,11 @@ function AddRowButton({ label, color, onClick, disabled = false }) {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-export default function PrescriptionSheetEditor({ block, onChange, disabled = false }) {
+// otherSheets     — [{ globalIndex, label }] the other sheets that rows can go to
+// onTransferRows  — (targetGlobalIndex, newRows, removeIndices) => void; adds the
+//                   new rows to the end of the target sheet and, for a move, removes
+//                   the rows at removeIndices from this sheet, in one change
+export default function PrescriptionSheetEditor({ block, onChange, disabled = false, otherSheets = [], onTransferRows = null }) {
   const data  = block?.data ?? {}
   const label = data.label ?? ''
   const rows  = data.rows  ?? []
@@ -1019,6 +1106,18 @@ export default function PrescriptionSheetEditor({ block, onChange, disabled = fa
   // null = no gap revealed; number = gap index currently active on touch.
   const [activeTouchGap, setActiveTouchGap] = useState(null)
 
+  // 2026-11-10: select mode. 'selected' holds the positions of ticked rows.
+  const [selectMode,    setSelectMode]    = useState(false)
+  const [selected,      setSelected]      = useState([])
+  const [pickerMode,    setPickerMode]    = useState(null)   // null | 'copy' | 'move'
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [notice,        setNotice]        = useState('')
+
+  // An undo or redo can shorten the list; drop ticks that no longer exist.
+  useEffect(() => {
+    setSelected(sel => (sel.some(i => i >= rows.length) ? sel.filter(i => i < rows.length) : sel))
+  }, [rows.length])
+
   function update(patch) {
     onChange({ label, rows, ...patch })
   }
@@ -1026,9 +1125,93 @@ export default function PrescriptionSheetEditor({ block, onChange, disabled = fa
   // ── Row mutations (shared hook — same logic the section's nested drugs[]
   //    list uses, applied here to the top-level rows array) ───────────────
   const {
-    addRow, insertRowAt, updateRow, moveRow,
+    addRow, insertRowAt, updateRow, moveRow, duplicateRows,
     handleDeleteRequest, promoteDialog, handlePromote, handleDeleteAll, setPromoteDialog,
   } = useRowList(rows, nextRows => update({ rows: nextRows }))
+
+  // ── 2026-11-10: select-mode actions ────────────────────────────────────
+  const selectedSet = new Set(selected)
+  const allSelected = rows.length > 0 && selected.length === rows.length
+  const canMoveUp   = selected.some(i => i > 0 && !selectedSet.has(i - 1))
+  const canMoveDown = selected.some(i => i < rows.length - 1 && !selectedSet.has(i + 1))
+  const canTransfer = !!onTransferRows && otherSheets.length > 0
+  const countText   = n => (n === 1 ? '1 row' : `${n} rows`)
+
+  function resetBars() {
+    setPickerMode(null)
+    setConfirmDelete(false)
+  }
+
+  function exitSelectMode() {
+    setSelectMode(false)
+    setSelected([])
+    setNotice('')
+    resetBars()
+  }
+
+  function toggleSelect(idx) {
+    setNotice('')
+    resetBars()
+    setSelected(sel => (sel.includes(idx) ? sel.filter(i => i !== idx) : [...sel, idx].sort((a, b) => a - b)))
+  }
+
+  function toggleSelectAll() {
+    setNotice('')
+    resetBars()
+    setSelected(allSelected ? [] : rows.map((_, i) => i))
+  }
+
+  // Selected rows shift one place together and keep their order. A row at the
+  // edge stays put, and so does anything it blocks. The ticks stay on, so the
+  // same group can be moved again.
+  function moveSelected(direction) {
+    resetBars()
+    const flags = rows.map((_, i) => selectedSet.has(i))
+    const next  = [...rows]
+    if (direction < 0) {
+      for (let i = 1; i < next.length; i++) {
+        if (flags[i] && !flags[i - 1]) {
+          ;[next[i], next[i - 1]] = [next[i - 1], next[i]]
+          ;[flags[i], flags[i - 1]] = [flags[i - 1], flags[i]]
+        }
+      }
+    } else {
+      for (let i = next.length - 2; i >= 0; i--) {
+        if (flags[i] && !flags[i + 1]) {
+          ;[next[i], next[i + 1]] = [next[i + 1], next[i]]
+          ;[flags[i], flags[i + 1]] = [flags[i + 1], flags[i]]
+        }
+      }
+    }
+    update({ rows: next })
+    setSelected(flags.map((f, i) => (f ? i : -1)).filter(i => i >= 0))
+  }
+
+  function duplicateSelected() {
+    const n = selected.length
+    duplicateRows(selected)
+    setSelected([])
+    resetBars()
+    setNotice(`Duplicated ${countText(n)}.`)
+  }
+
+  function deleteSelected() {
+    const n = selected.length
+    update({ rows: rows.filter((_, i) => !selectedSet.has(i)) })
+    setSelected([])
+    resetBars()
+    setNotice(`Deleted ${countText(n)}.`)
+  }
+
+  function transferSelected(target) {
+    if (!onTransferRows || !pickerMode) return
+    const isMove = pickerMode === 'move'
+    const picked = selected.map(i => rows[i]).filter(Boolean)
+    onTransferRows(target.globalIndex, picked.map(cloneRowFresh), isMove ? selected : [])
+    setNotice(`${isMove ? 'Moved' : 'Copied'} ${countText(picked.length)} to ${target.label}.`)
+    setSelected([])
+    resetBars()
+  }
 
   // ── PHASE 4: move a drug row into / out of a section ───────────────────
   // Crosses list boundaries (top-level rows <-> a section's nested drugs[]),
@@ -1157,15 +1340,35 @@ export default function PrescriptionSheetEditor({ block, onChange, disabled = fa
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column' }}>
+          {/* Select mode switch (2026-11-10) */}
+          {!disabled && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, minHeight: 30 }}>
+              {selectMode ? (
+                <>
+                  <span style={{ flex: 1, fontSize: 13, color: 'var(--color-text-secondary)' }}>
+                    {notice || (selected.length === 0 ? 'Tap rows to select them.' : `${countText(selected.length)} selected`)}
+                  </span>
+                  <button type="button" onClick={exitSelectMode} style={barBtn(false, 'primary')}>Done</button>
+                </>
+              ) : (
+                <>
+                  <span style={{ flex: 1, fontSize: 13, color: 'var(--color-text-secondary)' }}>{notice}</span>
+                  <button type="button" onClick={() => { setNotice(''); setSelectMode(true) }} style={barBtn(false)}>Select</button>
+                </>
+              )}
+            </div>
+          )}
           {/* Gap before the first row */}
-          <GapInsertControl
-            insertIndex={0}
-            onInsert={type => insertAt(0, type)}
-            isTouchActive={activeTouchGap === 0}
-            onTouchActivate={() => setActiveTouchGap(0)}
-            onTouchDismiss={() => setActiveTouchGap(null)}
-            disabled={disabled}
-          />
+          {!selectMode && (
+            <GapInsertControl
+              insertIndex={0}
+              onInsert={type => insertAt(0, type)}
+              isTouchActive={activeTouchGap === 0}
+              onTouchActivate={() => setActiveTouchGap(0)}
+              onTouchDismiss={() => setActiveTouchGap(null)}
+              disabled={disabled}
+            />
+          )}
           {rows.map((row, idx) => (
             <div key={row.id ?? idx}>
               <RowCard
@@ -1178,23 +1381,79 @@ export default function PrescriptionSheetEditor({ block, onChange, disabled = fa
                 sections={sections}
                 onMoveIntoSection={sectionId => moveDrugIntoSection(idx, sectionId)}
                 onMoveDrugOutOfSection={drugIdx => moveDrugOutOfSection(idx, drugIdx)}
+                onDuplicate={() => duplicateRows([idx])}
+                selectMode={selectMode}
+                selected={selectedSet.has(idx)}
+                onToggleSelect={() => toggleSelect(idx)}
                 disabled={disabled}
               />
               {/* Gap after every row (including the last — acts as append) */}
-              <GapInsertControl
-                insertIndex={idx + 1}
-                onInsert={type => insertAt(idx + 1, type)}
-                isTouchActive={activeTouchGap === idx + 1}
-                onTouchActivate={() => setActiveTouchGap(idx + 1)}
-                onTouchDismiss={() => setActiveTouchGap(null)}
-                disabled={disabled}
-              />
+              {!selectMode && (
+                <GapInsertControl
+                  insertIndex={idx + 1}
+                  onInsert={type => insertAt(idx + 1, type)}
+                  isTouchActive={activeTouchGap === idx + 1}
+                  onTouchActivate={() => setActiveTouchGap(idx + 1)}
+                  onTouchDismiss={() => setActiveTouchGap(null)}
+                  disabled={disabled}
+                />
+              )}
+              {selectMode && <div style={{ height: 8 }} />}
             </div>
           ))}
         </div>
       )}
 
+      {/* ── Select-mode action bar (2026-11-10): only while something is ticked ── */}
+      {selectMode && selected.length > 0 && (
+        <div style={{
+          position: 'sticky', bottom: 0, zIndex: 30,
+          padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8,
+          background: 'var(--color-surface)',
+          border: '1px solid var(--color-border)',
+          borderRadius: 'var(--radius-md)',
+          boxShadow: '0 -2px 14px rgba(0,0,0,0.12)',
+        }}>
+          {confirmDelete ? (
+            <>
+              <span style={{ fontSize: 13, color: 'var(--color-text-primary)' }}>
+                Delete {countText(selected.length)} from this sheet? Drugs inside a deleted section go with it. Undo brings them back.
+              </span>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button type="button" onClick={deleteSelected} style={barBtn(false, 'danger')}>Delete</button>
+                <button type="button" onClick={() => setConfirmDelete(false)} style={barBtn(false)}>Cancel</button>
+              </div>
+            </>
+          ) : pickerMode ? (
+            <>
+              <span style={{ fontSize: 13, color: 'var(--color-text-primary)' }}>
+                {pickerMode === 'move' ? 'Move' : 'Copy'} {countText(selected.length)} to:
+              </span>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {otherSheets.map(sheet => (
+                  <button key={sheet.globalIndex} type="button" onClick={() => transferSelected(sheet)} style={barBtn(false, 'primary')}>
+                    {sheet.label}
+                  </button>
+                ))}
+                <button type="button" onClick={() => setPickerMode(null)} style={barBtn(false)}>Cancel</button>
+              </div>
+            </>
+          ) : (
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button type="button" onClick={toggleSelectAll} style={barBtn(false)}>{allSelected ? 'Select none' : 'Select all'}</button>
+              <button type="button" onClick={duplicateSelected} style={barBtn(false)}>Duplicate</button>
+              <button type="button" onClick={() => moveSelected(-1)} disabled={!canMoveUp} style={barBtn(!canMoveUp)}>Up</button>
+              <button type="button" onClick={() => moveSelected(1)} disabled={!canMoveDown} style={barBtn(!canMoveDown)}>Down</button>
+              {canTransfer && <button type="button" onClick={() => setPickerMode('copy')} style={barBtn(false)}>Copy to…</button>}
+              {canTransfer && <button type="button" onClick={() => setPickerMode('move')} style={barBtn(false)}>Move to…</button>}
+              <button type="button" onClick={() => setConfirmDelete(true)} style={barBtn(false, 'danger')}>Delete</button>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ── Add-row buttons (still present — append to end) ──────────────────── */}
+      {!selectMode && (
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <AddRowButton label="Drug"         color="#6366f1" onClick={addDrug} disabled={disabled} />
         <AddRowButton label="Section"      color="#10b981" onClick={addSection} disabled={disabled} />
@@ -1203,6 +1462,7 @@ export default function PrescriptionSheetEditor({ block, onChange, disabled = fa
         <AddRowButton label="Divider"      color="#64748b" onClick={addDivider} disabled={disabled} />
         <AddRowButton label="Image"        color="#7C3AED" onClick={addImage} disabled={disabled} />
       </div>
+      )}
 
       {/* ── Promote-alternative dialog (step 1.11) ─────────────────────────── */}
       {promoteDialog && (

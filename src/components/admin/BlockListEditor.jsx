@@ -519,13 +519,15 @@ function SheetPickerBar({ sheets, activeIndex, onSelect, onAdd, onRemove, disabl
 // wrapping again here created a nested box-inside-a-box (Decision 3 violation).
 // Content renders flat. (2026-11-10: the bottom "Remove sheet" link moved to a trash icon
 // beside the sheet selector, which asks for confirmation first.)
-function ActiveSheetEditor({ block, onPatchData, disabled }) {
+function ActiveSheetEditor({ block, onPatchData, disabled, otherSheets, onTransferRows }) {
   return (
     <div>
       <PrescriptionSheetEditor
         block={block}
         onChange={onPatchData}
         disabled={disabled}
+        otherSheets={otherSheets}
+        onTransferRows={onTransferRows}
       />
     </div>
   )
@@ -741,6 +743,23 @@ export default function BlockListEditor({ blocks = [], onChange, disabled = fals
     onChange(blocks.filter((_, i) => i !== globalIndex))
   }
 
+  // 2026-11-10: copy or move rows from one sheet to the end of another. One
+  // onChange call, so Undo brings back both sheets in one step. removeIndices
+  // are positions in the source sheet; empty for a copy.
+  function transferRows(sourceGlobalIndex, targetGlobalIndex, newRows, removeIndices) {
+    if (sourceGlobalIndex === targetGlobalIndex || newRows.length === 0) return
+    const drop = new Set(removeIndices)
+    onChange(blocks.map((b, i) => {
+      if (i === targetGlobalIndex) {
+        return { ...b, data: { ...b.data, rows: [...(b.data?.rows ?? []), ...newRows] } }
+      }
+      if (i === sourceGlobalIndex && drop.size > 0) {
+        return { ...b, data: { ...b.data, rows: (b.data?.rows ?? []).filter((_, j) => !drop.has(j)) } }
+      }
+      return b
+    }))
+  }
+
   function swapBlocks(indexA, indexB) {
     if (indexA < 0 || indexB >= blocks.length) return
     const next = [...blocks]
@@ -838,9 +857,18 @@ export default function BlockListEditor({ blocks = [], onChange, disabled = fals
               <EmptyState activeTab="rx-sheets" />
             ) : (
               <ActiveSheetEditor
+                key={activeSheetItem.globalIndex}
                 block={activeSheetItem.block}
                 onPatchData={(patch) => patchBlockData(activeSheetItem.globalIndex, patch)}
                 disabled={disabled}
+                otherSheets={sheetItems
+                  .map((item, i) => ({
+                    globalIndex: item.globalIndex,
+                    label: item.block.data?.label?.trim() || `Sheet ${i + 1}`,
+                  }))
+                  .filter(item => item.globalIndex !== activeSheetItem.globalIndex)}
+                onTransferRows={(targetGlobalIndex, newRows, removeIndices) =>
+                  transferRows(activeSheetItem.globalIndex, targetGlobalIndex, newRows, removeIndices)}
               />
             )}
           </div>
