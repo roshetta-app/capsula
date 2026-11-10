@@ -1693,9 +1693,14 @@ function AddDrugControls({ onPickBrand, onPickFormulation, onAddManual, disabled
 // drug goes into THIS group with that join word, so it shares the group's dose.
 // No menu and no positioned wrappers, so nothing here can paint on top of the
 // per-drug "..." menu. onAdd(joiner).
-function GroupAddButtons({ onAdd }) {
+function GroupAddButtons({ onAdd, inCard = false }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '2px 0' }}>
+    <div style={{
+      display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8,
+      ...(inCard
+        ? { padding: 10, borderTop: '1px solid var(--color-border)' }
+        : { padding: '2px 0' }),
+    }}>
       {[['or', 'or'], ['and', 'plus']].map(([value, label]) => (
         <button
           key={value}
@@ -1703,8 +1708,8 @@ function GroupAddButtons({ onAdd }) {
           onClick={() => onAdd(value)}
           style={{
             ...joinTagStyle(label),
-            display: 'inline-flex', alignItems: 'center', gap: 4,
-            padding: '6px 12px', fontSize: 13, fontWeight: 600,
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+            width: '100%', padding: '8px 12px', fontSize: 13, fontWeight: 600,
             borderRadius: 99, cursor: 'pointer', fontFamily: 'var(--font-body)',
           }}
         >
@@ -4090,6 +4095,9 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
               />
             </div>
           ))}
+          {sharedCard(group) && groupHasDoseArea(group) && (
+            <GroupAddButtons inCard onAdd={joiner => handleGroupAdd(groupIdx, joiner, 'brand')} />
+          )}
           </div>
 
           {confirmRemoveOption?.groupIdx === groupIdx && (
@@ -4101,7 +4109,7 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
           )}
 
           {/* 2026-11-10: add a drug straight into this group (shares its dose). */}
-          {groupHasDoseArea(group) && (
+          {groupHasDoseArea(group) && !sharedCard(group) && (
             <GroupAddButtons onAdd={joiner => handleGroupAdd(groupIdx, joiner, 'brand')} />
           )}
 
