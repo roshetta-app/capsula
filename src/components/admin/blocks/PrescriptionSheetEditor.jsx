@@ -90,6 +90,7 @@
  */
 
 import { useState, useCallback, useEffect, useRef, useContext } from 'react'
+import { createPortal } from 'react-dom'
 import { ChevronUp, ChevronDown, MoreHorizontal, Plus, Pill, LayoutList, StickyNote, Type, Minus, X, Check, Copy, Trash2, ArrowUpDown, ArrowUp, ArrowDown, ChevronsUp, ChevronsDown, Send, Image as ImageIcon } from 'lucide-react'
 import UnifiedDrugRowEditor, { PromoteAlternativeDialog } from './rows/UnifiedDrugRowEditor'
 import NoteRowEditor         from './rows/NoteRowEditor'
@@ -689,6 +690,8 @@ function RowCard({
   // 2026-11-08: removing a drug from the sheet now asks first (it used to go
   // instantly). A drug with alternatives keeps its own box instead.
   const [confirmRemoveRow, setConfirmRemoveRow] = useState(false)
+  // 2026-11-10: the bottom sheet that lists the sections a drug can move into.
+  const [sectionSheetOpen, setSectionSheetOpen] = useState(false)
   // 2026-11-08: the drug editor reports how many of its patient groups are not
   // saved to the library; closing the row then asks first (it only asks, it
   // never saves or discards anything by itself).
@@ -857,10 +860,9 @@ function RowCard({
             disabled={disabled}
             items={[
               ...(onDuplicate ? [{ label: 'Duplicate', onClick: onDuplicate }] : []),
-              ...(isDrugRow && !isNested ? sections.map(sec => ({
-                label: `Move into “${sec.label || 'Untitled section'}”`,
-                onClick: () => onMoveIntoSection(sec.id),
-              })) : []),
+              ...(isDrugRow && !isNested && sections.length > 0
+                ? [{ label: 'Move into section…', onClick: () => setSectionSheetOpen(true) }]
+                : []),
               ...(isDrugRow && isNested ? [{ label: 'Move out of section', onClick: onMoveOut }] : []),
               isDrugRow
                 ? { label: 'Remove drug from sheet', danger: true, onClick: () => (hasAlternatives ? onDeleteRequest(idx) : setConfirmRemoveRow(true)) }
@@ -870,6 +872,14 @@ function RowCard({
         </div>
         )}
       </div>
+
+      {sectionSheetOpen && (
+        <SectionPickerSheet
+          sections={sections}
+          onPick={sectionId => { setSectionSheetOpen(false); onMoveIntoSection(sectionId) }}
+          onClose={() => setSectionSheetOpen(false)}
+        />
+      )}
 
       {confirmLeave && expanded && (
         <div style={{
@@ -990,6 +1000,71 @@ function RowCard({
 }
 
 // ─── Icon button style helper ──────────────────────────────────────────────────
+
+// 2026-11-10: bottom sheet that lists the sheet's sections; tap one to move the
+// drug into it. Shown in a portal so it sits over the whole page on a phone.
+function SectionPickerSheet({ sections, onPick, onClose }) {
+  return createPortal(
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 1000,
+        background: 'rgba(0,0,0,0.45)',
+        display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+      }}
+    >
+      <div
+        role="dialog"
+        aria-label="Move into section"
+        onClick={e => e.stopPropagation()}
+        style={{
+          width: '100%', maxWidth: 560, maxHeight: '75vh',
+          display: 'flex', flexDirection: 'column',
+          background: 'var(--color-surface)',
+          borderRadius: '16px 16px 0 0',
+          boxShadow: '0 -6px 24px rgba(0,0,0,0.25)',
+          paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+        }}
+      >
+        <div style={{ padding: '14px 16px 8px', fontSize: 15, fontWeight: 700, color: 'var(--color-text-primary)', fontFamily: 'var(--font-body)' }}>
+          Move into section
+        </div>
+        <div style={{ overflowY: 'auto', padding: '0 10px 6px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {sections.map(sec => (
+            <button
+              key={sec.id}
+              type="button"
+              onClick={() => onPick(sec.id)}
+              dir="auto"
+              style={{
+                width: '100%', textAlign: 'start', padding: '13px 14px', minHeight: 48,
+                border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)',
+                background: 'transparent', color: 'var(--color-text-primary)',
+                fontSize: 14, fontWeight: 600, fontFamily: 'var(--font-body)', cursor: 'pointer',
+              }}
+            >
+              {sec.label || 'Untitled section'}
+            </button>
+          ))}
+        </div>
+        <div style={{ padding: '6px 10px 12px' }}>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              width: '100%', minHeight: 46, border: 'none', borderRadius: 'var(--radius-md)',
+              background: 'var(--color-border)', color: 'var(--color-text-primary)',
+              fontSize: 14, fontWeight: 600, fontFamily: 'var(--font-body)', cursor: 'pointer',
+            }}
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  )
+}
 
 // 2026-11-10: the tick box shown on each row while selecting.
 function SelectBox({ checked }) {
