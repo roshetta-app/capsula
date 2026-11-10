@@ -117,7 +117,9 @@ import { ListFilter }                                from 'lucide-react'
 import { SpecialtyIcon, useIsDark }                  from '../../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN, tintedBg, hexToRgb } from '../../utils/specialtyTokens'
 
-export default function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear, isOpen }) {
+// idleLabel (optional): text shown when no specialty is chosen. The app leaves it out
+// ('All Specialties'); the condition editor passes 'Select specialty'.
+export default function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear, isOpen, idleLabel = 'All Specialties' }) {
   const isDark   = useIsDark()
   const [pressed, setPressed] = useState(false)
   const tokenKey = activeSpecialtyObj?.colorToken ?? FALLBACK_TOKEN
@@ -229,7 +231,7 @@ export default function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear,
           letterSpacing: '-0.2px',
           transition:    'color 0.2s ease',
         }}>
-          {isActive ? activeSpecialtyObj.name : 'All Specialties'}
+          {isActive ? activeSpecialtyObj.name : idleLabel}
         </span>
 
         {/* Down arrow */}

@@ -45,6 +45,9 @@ import {
 import { SectionCard, SectionCardHeader, FieldLabel } from './adminSectionPrimitives'
 import AdminPageHeader from './AdminPageHeader'
 import PhonePreviewModal from './PhonePreviewModal'
+import ConfirmModal from './ConfirmModal'
+import SpecialtySelector from '../conditions/SpecialtySelector'
+import SpecialtiesBottomSheet from '../conditions/SpecialtiesBottomSheet'
 import { CollapseAllContext } from './CollapseAllContext'
 import { setPageTitle } from '../../utils/pageTitle'
 
@@ -124,34 +127,6 @@ function TextInput({ value, onChange, placeholder, disabled, dir, autoFocus }) {
         opacity: disabled ? 0.6 : 1,
       }}
     />
-  )
-}
-
-// ─── Select ──────────────────────────────────────────────────────────────────
-
-function Select({ value, onChange, options, disabled }) {
-  return (
-    <select
-      value={value}
-      onChange={e => onChange(e.target.value)}
-      disabled={disabled}
-      style={{
-        width: '100%', boxSizing: 'border-box',
-        padding: '9px 12px',
-        border: '1.5px solid var(--color-border)',
-        borderRadius: 'var(--radius-md)',
-        fontSize: 14, fontFamily: 'var(--font-body)',
-        backgroundColor: 'var(--color-surface)',
-        color: 'var(--color-text-primary)',
-        outline: 'none', cursor: disabled ? 'default' : 'pointer',
-        opacity: disabled ? 0.6 : 1,
-        appearance: 'auto',
-      }}
-    >
-      {options.map(o => (
-        <option key={o.value} value={o.value}>{o.label}</option>
-      ))}
-    </select>
   )
 }
 
@@ -394,6 +369,8 @@ export default function ConditionEditor() {
   const [specialties,          setSpecialties]          = useState([])
   const [specialtiesLoading,   setSpecialtiesLoading]   = useState(true)
   const [newSpecialtyOpen,     setNewSpecialtyOpen]     = useState(false)
+  const [specialtySheetOpen,   setSpecialtySheetOpen]   = useState(false)
+  const [removeSpecialtyAsk,   setRemoveSpecialtyAsk]   = useState(false)
   // 2026-11-09: top-bar tools. collapseSignal goes up by one on every "Collapse
   // all" press (see CollapseAllContext); previewOpen shows the phone preview.
   const [collapseSignal, setCollapseSignal] = useState(0)
@@ -588,12 +565,22 @@ export default function ConditionEditor() {
   }
 
   // ─── Specialty options ─────────────────────────────────────────────────────
-  // FIX: use name_en (correct field from fetchSpecialtiesForCMS) not name
+  // The CMS specialty rows reshaped for the app's selector and bottom sheet.
+  // A specialty just created in the mini-modal has no icon/colour fields yet,
+  // so it gets the default stethoscope until it is edited in Specialties.
 
-  const specialtyOptions = [
-    { value: '', label: specialtiesLoading ? 'Loading…' : 'Select specialty…' },
-    ...specialties.map(s => ({ value: s.id, label: s.name_en })),
-  ]
+  const specialtyOptions = specialties.map(s => ({
+    id:         s.id,
+    name:       s.name_en,
+    slug:       s.slug,
+    iconType:   s.icon_type ?? 'lucide',
+    iconValue:  s.icon_type === 'custom' ? s.icon_url : (s.icon_name ?? 'Stethoscope'),
+    colorToken: s.color_token ?? null,
+    sortOrder:  s.sort_order,
+  }))
+  const chosenSpecialty = form.specialty_id
+    ? specialtyOptions.find(s => s.id === form.specialty_id) ?? null
+    : null
 
   // The condition name shows in the phone top bar instead of "Conditions".
   useEffect(() => setPageTitle(form.name), [form.name])
@@ -705,32 +692,21 @@ export default function ConditionEditor() {
                 />
               </div>
 
-              {/* Specialty: dropdown + inline "New" button */}
+              {/* Specialty: the app's selector + bottom sheet. "New specialty" is
+                  inside the sheet; clearing the choice asks first. */}
               <div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-1)' }}>
+                <div style={{ marginBottom: 'var(--space-1)' }}>
                   <FieldLabel required>Specialty</FieldLabel>
-                  <button
-                    onClick={() => setNewSpecialtyOpen(true)}
-                    disabled={saving}
-                    title="Create a new specialty"
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 3,
-                      fontSize: 12, fontWeight: 500, color: 'var(--color-accent)',
-                      background: 'none', border: 'none', cursor: saving ? 'default' : 'pointer',
-                      fontFamily: 'var(--font-body)', padding: '2px 0',
-                      opacity: saving ? 0.5 : 1,
-                    }}
-                  >
-                    <Plus size={13} />
-                    New
-                  </button>
                 </div>
-                <Select
-                  value={form.specialty_id}
-                  onChange={v => patch('specialty_id', v)}
-                  options={specialtyOptions}
-                  disabled={saving || specialtiesLoading}
-                />
+                <div style={{ opacity: saving || specialtiesLoading ? 0.6 : 1, pointerEvents: saving || specialtiesLoading ? 'none' : 'auto' }}>
+                  <SpecialtySelector
+                    activeSpecialtyObj={chosenSpecialty}
+                    idleLabel={specialtiesLoading ? 'Loading…' : 'Select specialty'}
+                    onOpen={() => setSpecialtySheetOpen(true)}
+                    onClear={() => setRemoveSpecialtyAsk(true)}
+                    isOpen={specialtySheetOpen}
+                  />
+                </div>
               </div>
 
               {/* Tagline: hidden behind a button until it is wanted (or already filled in). */}
@@ -828,6 +804,29 @@ export default function ConditionEditor() {
         onClose={() => setPreviewOpen(false)}
         name={form.name}
         blocks={blocks}
+      />
+
+      <SpecialtiesBottomSheet
+        specialties={specialtyOptions}
+        activeSpecialty={form.specialty_id || ''}
+        onSelect={id => patch('specialty_id', id)}
+        onClose={() => setSpecialtySheetOpen(false)}
+        isOpen={specialtySheetOpen}
+        allowAll={false}
+        onAdd={() => setNewSpecialtyOpen(true)}
+        zIndex={600}
+      />
+
+      <ConfirmModal
+        isOpen={removeSpecialtyAsk}
+        onClose={() => setRemoveSpecialtyAsk(false)}
+        onConfirm={() => { patch('specialty_id', ''); setRemoveSpecialtyAsk(false) }}
+        title="Remove specialty?"
+        message={chosenSpecialty
+          ? `"${form.name.trim() || 'This condition'}" will have no specialty. It cannot be saved until you pick one.`
+          : ''}
+        confirmLabel="Remove"
+        confirmVariant="danger"
       />
 
       {/* ── Inline specialty creator ──────────────────────────────────────── */}

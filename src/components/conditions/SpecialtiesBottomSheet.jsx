@@ -55,12 +55,16 @@
  *   onSelect         (id) => void
  *   onClose          () => void
  *   isOpen           boolean
+ *   allowAll         boolean (optional, default true) — false hides the 'All conditions'
+ *                    row (the condition editor picks one specialty, never 'all').
+ *   onAdd            () => void (optional) — when given, a 'New specialty' row is shown
+ *                    and tapping it closes the sheet and calls onAdd. Not used by the app.
  *   zIndex           number  (optional) — layer the sheet sits on. Left out in the app
  *                    (sheet default); the CMS passes a higher one so the sheet shows
  *                    above its top bars.
  */
 
-import { LayoutGrid }                   from 'lucide-react'
+import { LayoutGrid, Plus }             from 'lucide-react'
 import { SpecialtyIcon, useIsDark }     from '../../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN } from '../../utils/specialtyTokens'
 import SheetShell                       from '../ui/SheetShell'
@@ -73,6 +77,8 @@ export default function SpecialtiesBottomSheet({
   onClose,
   isOpen,
   zIndex,
+  allowAll = true,
+  onAdd,
 }) {
   const isDark = useIsDark()
 
@@ -117,6 +123,7 @@ export default function SpecialtiesBottomSheet({
             row below it. No divider — divider style removed sheet-wide;
             the icon/weight/size difference plus the margin below it is
             what separates it from the list. */}
+        {allowAll && (
         <button
           onClick={() => handleSelect('all')}
           style={{
@@ -149,6 +156,35 @@ export default function SpecialtiesBottomSheet({
           />
           All conditions
         </button>
+        )}
+
+        {onAdd && (
+          <button
+            onClick={() => { onClose(); onAdd() }}
+            style={{
+              width:                   '100%',
+              display:                 'flex',
+              alignItems:              'center',
+              gap:                     'var(--space-3)',
+              textAlign:               'left',
+              padding:                 '12px 14px',
+              marginBottom:            'var(--space-2)',
+              borderRadius:            'var(--radius-md)',
+              background:              'none',
+              border:                  '1.5px dashed var(--color-border)',
+              fontSize:                15,
+              fontFamily:              'var(--font-body)',
+              fontWeight:              600,
+              color:                   'var(--color-accent)',
+              cursor:                  'pointer',
+              WebkitTapHighlightColor: 'transparent',
+              outline:                 'none',
+            }}
+          >
+            <Plus size={18} />
+            New specialty
+          </button>
+        )}
       </div>
 
       {/* Scrollable specialty list — one row per specialty, in the order
