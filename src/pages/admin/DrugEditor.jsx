@@ -7,6 +7,7 @@
  * Layout:
  *   ┌─ Header: Drug Library › {genericName}  [Save Generic] ─────────────────┐
  *   │                                                                          │
+ *   │  Identity               (always open, own Save)                         │
  *   │  ▾ Generic info          (collapsible, open by default)                 │
  *   │                                                                          │
  *   │  ▾ 500mg · Capsule · Oral          [● Live]  [Save]  [✕]               │
@@ -403,6 +404,22 @@ export default function DrugEditor() {
         <ErrorBanner message={globalError} onDismiss={() => setGlobalError(null)} />
       )}
 
+      {/* ── Identity — always open, outside the collapsible Generic info ──── */}
+      <GenericEditor
+        part="identity"
+        generic={generic}
+        onChange={patch => setGeneric(g => ({ ...g, ...patch }))}
+        disabled={savingGeneric}
+      />
+      <div style={{ margin: 'var(--space-3) 0 var(--space-5)' }}>
+        <SaveRow
+          onSave={saveGeneric}
+          saving={savingGeneric}
+          saved={savedGeneric}
+          valid={genericValid}
+        />
+      </div>
+
       {/* ── Generic section ────────────────────────────────────────────────── */}
       <SectionCard
         title="Generic info"
@@ -420,6 +437,7 @@ export default function DrugEditor() {
         }
       >
         <GenericEditor
+          part="rest"
           generic={generic}
           onChange={patch => setGeneric(g => ({ ...g, ...patch }))}
           disabled={savingGeneric}

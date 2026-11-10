@@ -9,6 +9,8 @@
  *   generic   object  — the current generic state
  *   onChange  (patch: Partial<generic>) => void
  *   disabled  boolean
+ *   part      'all' (default) | 'identity' (only the Identity card) | 'rest' (everything but Identity)
+ *             — the drug editor shows Identity always open, outside the collapsible Generic info.
  *
  * Style pass (decision 4.18, step 3.3): switched from local Section/Field
  * primitives to the shared SectionCard/SectionCardHeader/FieldLabel from
@@ -42,7 +44,7 @@ const BREASTFEEDING_OPTIONS = ['L1', 'L2', 'L3', 'L4', 'L5']
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function GenericEditor({ generic = {}, onChange, disabled = false }) {
+export default function GenericEditor({ generic = {}, onChange, disabled = false, part = 'all' }) {
 
   const [categories, setCategories] = useState([])
   const [knownSources, setKnownSources] = useState([])
@@ -178,6 +180,7 @@ export default function GenericEditor({ generic = {}, onChange, disabled = false
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
 
       {/* ── IDENTITY (Generic Overview) ── */}
+      {part !== 'rest' && (
       <SectionCard>
         <SectionCardHeader>Identity</SectionCardHeader>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
@@ -244,7 +247,9 @@ export default function GenericEditor({ generic = {}, onChange, disabled = false
 
         </div>
       </SectionCard>
+      )}
 
+      {part !== 'identity' && (<>
       {/* ── MECHANISM & USES (Generic Overview + Uses) ── */}
       <SectionCard>
         <SectionCardHeader>Mechanism & Uses</SectionCardHeader>
@@ -635,6 +640,7 @@ export default function GenericEditor({ generic = {}, onChange, disabled = false
           )}
         </div>
       </SectionCard>
+      </>)}
 
     </div>
   )
