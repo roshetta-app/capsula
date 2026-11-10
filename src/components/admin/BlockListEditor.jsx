@@ -874,42 +874,44 @@ export default function BlockListEditor({ blocks = [], onChange, disabled = fals
             )}
           </div>
 
-          {/* ── Decision 5: Rx-level blocks section divider ──────────────── */}
-          {otherRxItems.length > 0 && (
-            <div style={{ marginTop: 'var(--space-6)' }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 'var(--space-3)',
-                marginBottom: 'var(--space-4)',
-              }}>
-                <span style={{
-                  fontSize: 12,
-                  fontWeight: 700,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.08em',
-                  color: 'var(--color-text-secondary)',
-                  whiteSpace: 'nowrap',
-                  flexShrink: 0,
-                }}>
-                  Rx-level blocks
-                </span>
-                <div style={{
-                  flex: 1,
-                  height: 1,
-                  backgroundColor: 'var(--color-border)',
-                }} />
-                <span className="cms-hide-phone" style={{
-                  fontSize: 11,
-                  color: 'var(--color-text-tertiary)',
-                  fontFamily: 'var(--font-body)',
-                  whiteSpace: 'nowrap',
-                  flexShrink: 0,
-                }}>
-                  shown below all sheets in app
-                </span>
-              </div>
+          {/* ── Separator between the sheet area and the Rx-level blocks.
+              Always shown, in every state (no sheets, empty sheet, no
+              Rx-level blocks yet, many blocks), full width, using the same
+              divider the app uses. ── */}
+          <div style={{ marginTop: 'var(--space-8)', marginBottom: 'var(--space-5)', width: '100%' }}>
+            <BlockDivider />
+          </div>
 
+          <div>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--space-3)',
+              marginBottom: 'var(--space-4)',
+            }}>
+              <span style={{
+                fontSize: 12,
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: '0.08em',
+                color: 'var(--color-text-secondary)',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+              }}>
+                Rx-level blocks
+              </span>
+              <span style={{
+                fontSize: 11,
+                color: 'var(--color-text-tertiary)',
+                fontFamily: 'var(--font-body)',
+                flex: 1,
+                minWidth: 0,
+              }}>
+                shown below all sheets in app
+              </span>
+            </div>
+
+            {otherRxItems.length > 0 ? (
               <BlockCardList
                 items={otherRxItems}
                 disabled={disabled}
@@ -924,8 +926,10 @@ export default function BlockListEditor({ blocks = [], onChange, disabled = fals
                 onDelete={deleteBlock}
                 renderEditor={renderEditor}
               />
-            </div>
-          )}
+            ) : (
+              <EmptyState activeTab="rx" />
+            )}
+          </div>
 
           {/* Add Block button — sheets added via picker above */}
           <div style={{ marginTop: 'var(--space-3)' }}>
