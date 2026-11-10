@@ -648,15 +648,15 @@ export default function ConditionEditor() {
         )}
         <button
           onClick={handleSave}
-          disabled={!isValid() || saving}
+          disabled={!isUnsaved || !isValid() || saving}
           className="cms-push-right"
           style={{
             padding: '7px 18px', borderRadius: 'var(--radius-md)',
-            fontSize: 13, fontWeight: 600, cursor: !isValid() || saving ? 'default' : 'pointer',
+            fontSize: 13, fontWeight: 600, cursor: !isUnsaved || !isValid() || saving ? 'default' : 'pointer',
             border: 'none',
             backgroundColor: 'var(--color-accent-solid)',
             color: '#fff', fontFamily: 'var(--font-body)',
-            opacity: !isValid() || saving ? 0.6 : 1,
+            opacity: !isUnsaved || !isValid() || saving ? 0.6 : 1,
             display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
           }}
         >
