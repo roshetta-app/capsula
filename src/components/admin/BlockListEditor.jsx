@@ -611,6 +611,30 @@ function AddBlockButton({ activeTab, onAdd, disabled, options: optionsOverride }
   )
 }
 
+// ─── Zigzag separator ─────────────────────────────────────────────────────────
+// The same low-opacity accent zigzag the app draws after the last sheet row
+// (PrescriptionSheetBlock), stretched to the full width by repeating its shape.
+function ZigzagSeparator() {
+  return (
+    <svg width="100%" height="8" aria-hidden="true" role="separator" style={{ display: 'block' }}>
+      <defs>
+        <pattern id="rx-zigzag" width="10" height="8" patternUnits="userSpaceOnUse">
+          <polyline
+            points="0,4 2.5,1 7.5,7 10,4"
+            stroke="var(--color-accent)"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            opacity="0.3"
+            fill="none"
+          />
+        </pattern>
+      </defs>
+      <rect width="100%" height="8" fill="url(#rx-zigzag)" />
+    </svg>
+  )
+}
+
 // ─── Empty state ──────────────────────────────────────────────────────────────
 
 function EmptyState({ activeTab }) {
@@ -877,9 +901,9 @@ export default function BlockListEditor({ blocks = [], onChange, disabled = fals
           {/* ── Separator between the sheet area and the Rx-level blocks.
               Always shown, in every state (no sheets, empty sheet, no
               Rx-level blocks yet, many blocks), full width, using the same
-              divider the app uses. ── */}
+              zigzag the app uses. ── */}
           <div style={{ marginTop: 'var(--space-8)', marginBottom: 'var(--space-5)', width: '100%' }}>
-            <BlockDivider />
+            <ZigzagSeparator />
           </div>
 
           <div>
