@@ -90,6 +90,7 @@
  */
 
 import { useState, useCallback, useEffect, useRef, useContext } from 'react'
+import { useRememberedState } from '../../../hooks/useRememberedState'
 import { createPortal } from 'react-dom'
 import { ChevronUp, ChevronDown, MoreHorizontal, Plus, Pill, LayoutList, StickyNote, Type, Minus, X, Check, Copy, Trash2, ArrowUpDown, ArrowUp, ArrowDown, ChevronsUp, ChevronsDown, Send, Image as ImageIcon } from 'lucide-react'
 import UnifiedDrugRowEditor, { PromoteAlternativeDialog } from './rows/UnifiedDrugRowEditor'
@@ -705,7 +706,7 @@ function RowCard({
   selectMode = false, selected = false, onToggleSelect = null,
   disabled = false,
 }) {
-  const [expandedState, setExpanded] = useState(row._isNew ?? false)
+  const [expandedState, setExpanded] = useRememberedState(row?.id ? `row:${row.id}` : null, row._isNew ?? false)
   // 2026-11-10: while selecting, every row shows closed (tapping it ticks it).
   const expanded = expandedState && !selectMode
   // 2026-11-08: removing a drug from the sheet now asks first (it used to go

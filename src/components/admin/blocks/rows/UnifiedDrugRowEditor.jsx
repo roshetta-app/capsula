@@ -172,6 +172,7 @@
 
 import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { useRememberedState } from '../../../../hooks/useRememberedState'
 import { Plus, X, Library, RotateCcw, Edit2, Check, ChevronDown, MoreHorizontal, StickyNote } from 'lucide-react'
 import DrugPickerModal from '../../DrugPickerModal'
 import { useDrugContext } from '../../../../context/DrugContext'
@@ -2793,7 +2794,7 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
   // so the external DRUG_ROW_TEMPLATE shape is preserved unchanged.
   const [rawGroups, setRawGroups] = useState(() => toDrugOptions(row))
   // Which population is open in each drug card (group_id -> position, 0 = first).
-  const [activePops, setActivePops] = useState({})
+  const [activePops, setActivePops] = useRememberedState(row?.id ? `pops:${row.id}` : null, {})
   const activeIndexFor = g => Math.min(activePops[g.group_id] ?? 0, (g.extra_populations ?? []).length)
   // Everything below reads and writes 'groups' as the open population's view of
   // each card (see projectGroup); emitGroups folds the changes back in.
@@ -2989,6 +2990,7 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
   const [chipPanelGroupIdx, setChipPanelGroupIdx] = useState(null)
   const [newGroupForm, setNewGroupForm] = useState(null) // { groupIdx, name, show, replace } | null
   const [moreAddOpenIdx, setMoreAddOpenIdx] = useState(null)
+  const [libPickIdx, setLibPickIdx] = useState(null) // groupIdx whose "From library" list is open
   const [groupNoteEditIdx, setGroupNoteEditIdx] = useState(null) // which group's note box is being typed in (opened from the dose menu)
   const doseMenuRef = useRef(null)
   const doseAnchorRef = useRef(null)
@@ -3041,25 +3043,31 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
   // step: named, optionally shown in the app, and optionally taking the place of
   // the group that is open now (its doses leave this sheet; the library keeps
   // its own copy).
-  function createPopulation(groupIdx, { name, show, replace }) {
+  function createPopulation(groupIdx, { name, show, replace, library = null }) {
     const g = rawGroups[groupIdx]
     const extras = g.extra_populations ?? []
     const pi = activeIndexFor(g)
     const who = name?.trim() || null
-    const blankExtra = () => ({
+    // From the library: the new group starts with that library group's name and
+    // doses (linked back to it). Otherwise it starts blank with the typed name.
+    const fields = library
+      ? buildDoseLinesFromPopulation(library)
+      : { dose: null, dose_who: who, dose_lines: [], dose_max: null, dose_max_population_id: null, dose_library_base: null }
+    const newExtra = () => ({
       id: `popx-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-      dose_who: who, dose_lines: [], dose_max: null, dose_max_population_id: null, dose_library_base: null,
+      dose_who: fields.dose_who, dose_lines: fields.dose_lines, dose_max: fields.dose_max,
+      dose_max_population_id: fields.dose_max_population_id, dose_library_base: fields.dose_library_base,
     })
     let nextG
     let position
     if (replace) {
       position = pi
       nextG = pi === 0
-        ? { ...g, dose: null, dose_who: who, dose_lines: [], dose_max: null, dose_max_population_id: null, dose_library_base: null }
-        : { ...g, extra_populations: extras.map((e, i) => (i === pi - 1 ? blankExtra() : e)) }
+        ? { ...g, ...fields }
+        : { ...g, extra_populations: extras.map((e, i) => (i === pi - 1 ? newExtra() : e)) }
     } else {
       position = extras.length + 1
-      nextG = { ...g, extra_populations: [...extras, blankExtra()] }
+      nextG = { ...g, extra_populations: [...extras, newExtra()] }
     }
     nextG = { ...nextG, shown_population: show ? position : (g.shown_population ?? 0) }
     const nextRaw = rawGroups.map((x, i) => (i === groupIdx ? nextG : x))
@@ -4109,6 +4117,7 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
             const targetName = multi && targetRow ? targetRow.label : ''
             const clearChosen = () => setChosenDrug(cur => (cur?.groupIdx === groupIdx ? null : cur))
             const showTabs = true
+            const libGroups = Array.isArray(libPops) ? libPops.filter(pp => (pp.brackets ?? []).length > 0 || pp.max_dose?.trim?.()) : []
             const nearDuplicates = findNearDuplicateBands(group.dose_lines)
             const menuCaption = { padding: '6px 12px 2px', fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-body)' }
             return (
@@ -4182,12 +4191,42 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
                               </button>
                             )
                           )}
+                          {libGroups.length > 0 && (
+                            <button type="button" style={doseSecondaryButtonStyle}
+                              onClick={() => setLibPickIdx(cur => (cur === groupIdx ? null : groupIdx))}>
+                              <Library size={13} /> From library
+                            </button>
+                          )}
                           {many && (
                             <button type="button" style={{ ...doseSecondaryButtonStyle, color: '#ef4444' }}
                               onClick={() => { setChipPanelGroupIdx(null); setConfirmRemovePop(groupIdx) }}>
                               <X size={13} /> Remove
                             </button>
                           )}
+                        </div>
+                      )}
+
+                      {chipPanelGroupIdx === groupIdx && libPickIdx === groupIdx && libGroups.length > 0 && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '10px 12px', borderRadius: 10, border: '1px solid var(--color-border)', background: 'var(--color-bg)' }}>
+                          <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
+                            Switch this patient group to one saved in the library. Its doses are replaced.
+                          </span>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                            {libGroups.map((pop, pi) => (
+                              <button
+                                key={pop.id ?? pi}
+                                type="button"
+                                style={{ ...doseSecondaryButtonStyle, fontWeight: 700 }}
+                                onClick={() => {
+                                  setLibPickIdx(null)
+                                  setChipPanelGroupIdx(null)
+                                  applyDoseToGroup(groupIdx, buildDoseLinesFromPopulation(pop))
+                                }}
+                              >
+                                {pop.population ? doseWhoLabel(pop.population) : `Library group ${pi + 1}`}
+                              </button>
+                            ))}
+                          </div>
                         </div>
                       )}
 
@@ -4213,6 +4252,23 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
                               autoFocus
                               style={{ ...doseFieldInputStyle, width: '100%', boxSizing: 'border-box' }}
                             />
+                            {libGroups.length > 0 && (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>Or add one saved in the library:</span>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                                  {libGroups.map((pop, pi) => (
+                                    <button
+                                      key={pop.id ?? pi}
+                                      type="button"
+                                      style={{ ...doseSecondaryButtonStyle, fontWeight: 700 }}
+                                      onClick={() => createPopulation(groupIdx, { name: null, show: f.show, replace: f.replace, library: pop })}
+                                    >
+                                      <Library size={12} /> {pop.population ? doseWhoLabel(pop.population) : `Library group ${pi + 1}`}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                             <label style={checkRow}>
                               <input type="checkbox" checked={f.show} onChange={e => setNewGroupForm({ ...f, show: e.target.checked })} />
                               Show this one in the app
@@ -4352,19 +4408,19 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
                       const moreOpen = moreAddOpenIdx === groupIdx && (maxAvailable || noteAvailable)
                       return (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '6px 0 8px' }}>
-                          <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
+                          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                             {!emptyDose && (
                               <button
                                 type="button"
                                 onClick={() => addBracket(groupIdx)}
                                 style={{
-                                  flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                                  padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
-                                  border: '1.5px dashed var(--color-accent)', background: 'none',
-                                  color: 'var(--color-accent)', fontSize: 14, fontWeight: 700, fontFamily: 'var(--font-body)',
+                                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                                  padding: '6px 10px', borderRadius: 8, cursor: 'pointer',
+                                  border: '1px dashed var(--color-accent)', background: 'none',
+                                  color: 'var(--color-accent)', fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-body)',
                                 }}
                               >
-                                <Plus size={15} /> Dose band
+                                <Plus size={13} /> Dose band
                               </button>
                             )}
                             {(maxAvailable || noteAvailable) && (
@@ -4374,13 +4430,13 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
                                 aria-expanded={moreOpen}
                                 style={{
                                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-                                  padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
+                                  padding: '6px 10px', borderRadius: 8, cursor: 'pointer',
                                   border: '1px solid var(--color-border)',
                                   background: moreOpen ? 'var(--color-bg)' : 'none',
-                                  color: 'var(--color-text-secondary)', fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-body)',
+                                  color: 'var(--color-text-secondary)', fontSize: 12, fontWeight: 600, fontFamily: 'var(--font-body)',
                                 }}
                               >
-                                <Plus size={14} /> More
+                                <Plus size={13} /> More
                               </button>
                             )}
                           </div>

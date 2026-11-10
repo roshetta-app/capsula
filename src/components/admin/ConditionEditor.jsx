@@ -20,7 +20,8 @@
  *    not in this file.
  */
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Plus, AlertTriangle, X, Undo2, Redo2, ChevronsDownUp, Smartphone } from 'lucide-react'
 import { useConditionContext } from '../../context/ConditionContext'
@@ -28,6 +29,7 @@ import { useToast } from '../../context/ToastContext'
 import TagInput from '../../components/admin/TagInput'
 import BlockListEditor from '../../components/admin/BlockListEditor'
 import { usePageUndoRedo } from '../../hooks/usePageUndoRedo'
+import { clearRememberedState } from '../../hooks/useRememberedState'
 import { useDirtyState } from '../../hooks/useDirtyState'
 import { useLeaveWarning } from '../../hooks/useLeaveWarning'
 import {
@@ -309,6 +311,45 @@ function friendlySaveError(err) {
   return err?.message ?? 'Save failed'
 }
 
+// ─── SaveFreeze ───────────────────────────────────────────────────────────────
+// 2026-11-10: while a save runs, the whole page is frozen: no taps, no typing,
+// no scrolling, no keyboard focus. A clear layer covers the screen and the
+// page underneath is switched off ("inert"). Both go away the moment the save
+// ends, whether it worked or failed.
+function SaveFreeze() {
+  useEffect(() => {
+    const root = document.getElementById('root')
+    if (root) root.inert = true
+    document.activeElement?.blur?.()
+    return () => { if (root) root.inert = false }
+  }, [])
+
+  return createPortal(
+    <div
+      role="status"
+      aria-live="polite"
+      style={{
+        position: 'fixed', inset: 0, zIndex: 5000,
+        touchAction: 'none', cursor: 'progress',
+        background: 'rgba(255,255,255,0.35)',
+        display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+        paddingTop: 96,
+      }}
+      onTouchMove={e => e.preventDefault()}
+      onWheel={e => e.preventDefault()}
+    >
+      <div style={{
+        padding: '8px 18px', borderRadius: 99,
+        background: 'var(--color-text-primary, #111)', color: '#fff',
+        fontSize: 13, fontWeight: 600,
+      }}>
+        Saving…
+      </div>
+    </div>,
+    document.body
+  )
+}
+
 // ─── Switch tile (Published / Needs review) ──────────────────────────────────
 
 function SwitchTile({ label, stateText, checked, onChange, onColor, disabled }) {
@@ -410,12 +451,54 @@ export default function ConditionEditor() {
   const [restoreCount, setRestoreCount] = useState(0)
   const [view, setView] = useState({ tab: 'rx', sheet: 0 })
 
+  // 2026-11-10: undo and redo rebuild the content area, which used to jump the
+  // page and close everything. The open blocks, rows and patient group tabs are
+  // now remembered (see useRememberedState), and the scroll position of the
+  // page (and of any scrolling panel around the content) is put back here.
+  const contentRef = useRef(null)
+  const savedScrollRef = useRef(null)
+
+  function scrollersAround(el) {
+    const found = []
+    let node = el
+    while (node && node !== document.body) {
+      const oy = getComputedStyle(node).overflowY
+      if ((oy === 'auto' || oy === 'scroll' || oy === 'overlay') && node.scrollHeight > node.clientHeight) found.push(node)
+      node = node.parentElement
+    }
+    return found
+  }
+
   function restorePage(page) {
+    savedScrollRef.current = {
+      win: window.scrollY,
+      els: scrollersAround(contentRef.current).map(el => [el, el.scrollTop]),
+    }
     setForm(page.form)
     setBlocks(page.blocks)
     setTags(page.tags)
     setRestoreCount(c => c + 1)
   }
+
+  useLayoutEffect(() => {
+    const saved = savedScrollRef.current
+    if (!saved) return undefined
+    const apply = () => {
+      window.scrollTo(0, saved.win)
+      saved.els.forEach(([el, top]) => { el.scrollTop = top })
+    }
+    apply()
+    const raf = requestAnimationFrame(apply)
+    const t1 = setTimeout(apply, 80)
+    const t2 = setTimeout(() => { apply(); savedScrollRef.current = null }, 300)
+    return () => { cancelAnimationFrame(raf); clearTimeout(t1); clearTimeout(t2) }
+  }, [restoreCount])
+
+  // A fresh visit to the editor starts with everything closed.
+  useEffect(() => {
+    clearRememberedState()
+    return clearRememberedState
+  }, [id])
 
   const { canUndo, canRedo, undo, redo } = usePageUndoRedo({
     form, blocks, tags,
@@ -786,6 +869,7 @@ export default function ConditionEditor() {
         <SectionCardHeader>Content Blocks</SectionCardHeader>
         <SectionCard>
           <CollapseAllContext.Provider value={collapseSignal}>
+          <div ref={contentRef}>
           <BlockListEditor
             key={restoreCount}
             blocks={blocks}
@@ -795,8 +879,11 @@ export default function ConditionEditor() {
             initialSheetIndex={view.sheet}
             onViewChange={(tab, sheet) => setView(prev => (prev.tab === tab && prev.sheet === sheet ? prev : { tab, sheet }))}
           />
+          </div>
           </CollapseAllContext.Provider>
         </SectionCard>
+
+      {saving && <SaveFreeze />}
 
       {/* ── Phone preview (what the app shows for what is on screen now) ──── */}
       <PhonePreviewModal

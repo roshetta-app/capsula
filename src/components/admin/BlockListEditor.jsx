@@ -19,6 +19,7 @@
  */
 
 import { useState, useRef, useEffect, useContext } from 'react'
+import { useRememberedState } from '../../hooks/useRememberedState'
 import { ChevronUp, ChevronDown, Trash2, Plus } from 'lucide-react'
 import ImageGalleryEditor      from './blocks/ImageGalleryEditor'
 import FreeTextPostEditor      from './blocks/FreeTextPostEditor'
@@ -170,7 +171,7 @@ function BlockCard({
   block, index, total, onMoveUp, onMoveDown, onDelete, disabled,
   defaultExpanded = false, domRef, onRegisterExpand, children,
 }) {
-  const [expanded, setExpanded] = useState(defaultExpanded)
+  const [expanded, setExpanded] = useRememberedState(block?.id ? `block:${block.id}` : null, defaultExpanded)
   const colors = BLOCK_CHIP_COLORS[block.block_type] ?? FALLBACK_COLORS
 
   // 2026-11-09: "Collapse all" in the page's top bar closes this card. A card
