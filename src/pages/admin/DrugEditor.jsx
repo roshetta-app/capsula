@@ -8,7 +8,7 @@
  *   ┌─ Header: Drug Library › {genericName}  [Save Generic] ─────────────────┐
  *   │                                                                          │
  *   │  Identity               (always open, own Save)                         │
- *   │  ▾ Generic info          (collapsible, open by default)                 │
+ *   │  ▸ Generic info          (collapsible, closed by default)               │
  *   │                                                                          │
  *   │  ▾ 500mg · Capsule · Oral          [● Live]  [Save]  [✕]               │
  *   │      FormulationEditor + BrandEditor inline                              │
@@ -92,7 +92,7 @@ export default function DrugEditor() {
   const [formulations,  setFormulations]  = useState([])  // each has .brands[]
 
   // ── UI ──────────────────────────────────────────────────────────────────────
-  const [genericOpen,   setGenericOpen]   = useState(true)
+  const [genericOpen,   setGenericOpen]   = useState(false) // collapsed on every visit
   const [openFormId,    setOpenFormId]    = useState(null)  // which formulation is expanded
   const [savingGeneric, setSavingGeneric] = useState(false)
   const [savedGeneric,  setSavedGeneric]  = useState(false)
@@ -166,6 +166,10 @@ export default function DrugEditor() {
   }, [genericId])
 
   useEffect(() => { load() }, [load])
+
+  // Every drug opens with Generic info and all formulations collapsed (a deep link from the
+  // drug list still opens its own formulation, below). Saving does not re-run this.
+  useEffect(() => { setGenericOpen(false); setOpenFormId(null) }, [genericId])
 
   // ── Deep link — auto-open the target formulation (12.4) ──────────────────────
   // Runs once: fires as soon as the target formulation id shows up in the
