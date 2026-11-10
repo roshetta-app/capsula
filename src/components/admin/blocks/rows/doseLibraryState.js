@@ -100,11 +100,12 @@ export const STATE_WORDS = {
   differs: 'Differs from library',
 }
 
-// Which buttons a state offers.
+// Which buttons a state offers. 'You changed this' offers both: save my version,
+// or go back to the library version (throws away my change).
 export function stateActions(state) {
   return {
     save: state === 'new' || state === 'you_changed' || state === 'both' || state === 'differs',
-    useLibrary: state === 'library_newer' || state === 'both' || state === 'differs',
+    useLibrary: state === 'library_newer' || state === 'both' || state === 'differs' || state === 'you_changed',
   }
 }
 

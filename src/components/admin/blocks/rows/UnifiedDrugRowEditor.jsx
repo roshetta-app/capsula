@@ -1570,18 +1570,31 @@ function FloatingMenu({ anchorRef, onClose, align = 'right', minWidth = 170, inn
   const nodeRef = useRef(null)
   const [pos, setPos] = useState(null)
 
+  // 2026-11-10 FIX: a button whose anchor is only marked while its menu is open
+  // (the dose card's three dots) is not marked yet at this first moment, so the
+  // menu stayed hidden for ever. If the anchor is missing, try again on the next
+  // frame, once it is marked.
   useLayoutEffect(() => {
-    const a = anchorRef.current
-    const m = nodeRef.current
-    if (!a || !m) return
-    const ar = a.getBoundingClientRect()
-    const mw = m.offsetWidth
-    const mh = m.offsetHeight
-    let left = align === 'right' ? ar.right - mw : ar.left
-    left = Math.max(8, Math.min(left, window.innerWidth - mw - 8))
-    let top = ar.bottom + 4
-    if (top + mh > window.innerHeight - 8 && ar.top - mh - 4 > 8) top = ar.top - mh - 4
-    setPos({ left, top })
+    let frame = 0
+    let tries = 0
+    function place() {
+      const a = anchorRef.current
+      const m = nodeRef.current
+      if (!a || !m) {
+        if (tries++ < 10) frame = requestAnimationFrame(place)
+        return
+      }
+      const ar = a.getBoundingClientRect()
+      const mw = m.offsetWidth
+      const mh = m.offsetHeight
+      let left = align === 'right' ? ar.right - mw : ar.left
+      left = Math.max(8, Math.min(left, window.innerWidth - mw - 8))
+      let top = ar.bottom + 4
+      if (top + mh > window.innerHeight - 8 && ar.top - mh - 4 > 8) top = ar.top - mh - 4
+      setPos({ left, top })
+    }
+    place()
+    return () => cancelAnimationFrame(frame)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
