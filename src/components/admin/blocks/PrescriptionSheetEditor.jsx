@@ -109,7 +109,7 @@ const ROW_TYPE_LABELS = {
   drug:           { label: 'Drug',           color: '#6366f1', Icon: Pill },
   section:        { label: 'Section',        color: '#10b981', Icon: LayoutList },
   note:           { label: 'Note',           color: '#f59e0b', Icon: StickyNote },
-  free_text:      { label: 'Text Block',     color: '#1D4ED8', Icon: Type },
+  free_text:      { label: 'Text Block',     color: '#DB2777', Icon: Type },
   divider:        { label: 'Divider',        color: '#64748b', Icon: Minus },
   image:          { label: 'Image',          color: '#7C3AED', Icon: ImageIcon },
 }
@@ -360,14 +360,14 @@ const TOP_LEVEL_TYPES = [
   { type: 'drug',      label: 'Drug',       color: '#6366f1' },
   { type: 'section',   label: 'Section',    color: '#10b981' },
   { type: 'note',      label: 'Note',       color: '#f59e0b' },
-  { type: 'free_text', label: 'Text Block', color: '#1D4ED8' },
+  { type: 'free_text', label: 'Text Block', color: '#DB2777' },
   { type: 'divider',   label: 'Divider',    color: '#64748b' },
   { type: 'image',     label: 'Image',      color: '#7C3AED' },
 ]
 
 const SECTION_TYPES = [
   { type: 'drug',      label: 'Drug',       color: '#6366f1' },
-  { type: 'free_text', label: 'Text Block', color: '#1D4ED8' },
+  { type: 'free_text', label: 'Text Block', color: '#DB2777' },
 ]
 
 function GapInsertControl({ insertIndex, onInsert, isTouchActive, onTouchActivate, onTouchDismiss, disabled = false, types = TOP_LEVEL_TYPES }) {
@@ -1696,7 +1696,7 @@ export default function PrescriptionSheetEditor({ block, onChange, disabled = fa
         <AddRowButton label="Drug"         color="#6366f1" onClick={addDrug} disabled={disabled} />
         <AddRowButton label="Section"      color="#10b981" onClick={addSection} disabled={disabled} />
         <AddRowButton label="Note"         color="#f59e0b" onClick={addNote} disabled={disabled} />
-        <AddRowButton label="Text Block"   color="#1D4ED8" onClick={addFreeText} disabled={disabled} />
+        <AddRowButton label="Text Block"   color="#DB2777" onClick={addFreeText} disabled={disabled} />
         <AddRowButton label="Divider"      color="#64748b" onClick={addDivider} disabled={disabled} />
         <AddRowButton label="Image"        color="#7C3AED" onClick={addImage} disabled={disabled} />
       </div>
