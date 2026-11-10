@@ -212,6 +212,19 @@ function DrugBlockTitle({ row }) {
 
 // ─── Row summary (one-line collapsed view) ─────────────────────────────────────
 
+// Plain words only for the one-line header: no **, #, bullets, ::: card lines or tags.
+function plainTextOf(raw) {
+  return String(raw ?? '')
+    .replace(/^\s*:::\w*.*$/gm, ' ')
+    .replace(/<[^>]*>/g, '')
+    .replace(/^\s*#{1,6}\s*/gm, '')
+    .replace(/^\s*(?:[-*+]|\d+\.)\s+/gm, '')
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/(\*\*|__|~~|\*|`)/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 function rowSummary(row) {
   if (row.row_type === 'drug') {
     const name = row.brand_name || row.generic_name || ''
@@ -233,7 +246,7 @@ function rowSummary(row) {
   }
   if (row.row_type === 'free_text') {
     const raw = row.title?.trim() || (row.content ?? row.markdown ?? '')
-    const md = raw.replace(/<[^>]*>/g, '').replace(/^\s*#+\s*/, '')
+    const md = plainTextOf(raw)
     return md.length > 60 ? md.slice(0, 60) + '…' : md || 'Empty text block'
   }
   if (row.row_type === 'divider') {

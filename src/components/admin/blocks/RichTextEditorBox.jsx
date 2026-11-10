@@ -190,7 +190,8 @@ function CardMenu({ onPick, disabled }) {
         <div
           onMouseDown={e => e.preventDefault()}
           style={{
-            position: 'absolute', top: 36, right: 0, zIndex: 50, minWidth: 170,
+            position: 'absolute', top: 36, left: 0, zIndex: 50, minWidth: 170, maxWidth: 'min(240px, calc(100vw - 48px))',
+            maxHeight: '55vh', overflowY: 'auto',
             background: 'var(--color-surface, #fff)', border: '1px solid var(--color-border)',
             borderRadius: 'var(--radius-md)', boxShadow: '0 8px 24px rgba(0,0,0,0.15)', padding: 4,
           }}
