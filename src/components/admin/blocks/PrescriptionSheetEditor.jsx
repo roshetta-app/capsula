@@ -733,12 +733,16 @@ function RowCard({
         <div style={{ flex: 1, minWidth: 0 }}><BlockDivider /></div>
         {!selectMode && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-          <button type="button" onClick={() => onMove(idx, -1)} disabled={disabled || idx === 0} title="Move up" style={iconBtn(disabled || idx === 0)}>
-            <ChevronUp size={13} />
-          </button>
-          <button type="button" onClick={() => onMove(idx, 1)} disabled={disabled || idx === total - 1} title="Move down" style={iconBtn(disabled || idx === total - 1)}>
-            <ChevronDown size={13} />
-          </button>
+          {isNested && (
+            <>
+              <button type="button" onClick={() => onMove(idx, -1)} disabled={disabled || idx === 0} title="Move up" style={iconBtn(disabled || idx === 0)}>
+                <ChevronUp size={13} />
+              </button>
+              <button type="button" onClick={() => onMove(idx, 1)} disabled={disabled || idx === total - 1} title="Move down" style={iconBtn(disabled || idx === total - 1)}>
+                <ChevronDown size={13} />
+              </button>
+            </>
+          )}
           <button type="button" onClick={() => onDeleteRequest(idx)} disabled={disabled} title="Remove divider" aria-label="Remove divider" style={iconBtn(disabled)}>
             <X size={13} />
           </button>
@@ -810,24 +814,30 @@ function RowCard({
         >
           {/* 2026-11-08 CALMER: moving into / out of a section and removing the
               row now live in one menu; only the two arrows stay on the bar. */}
-          <button
-            type="button"
-            onClick={() => onMove(idx, -1)}
-            disabled={disabled || idx === 0}
-            title="Move up"
-            style={iconBtn(disabled || idx === 0)}
-          >
-            <ChevronUp size={13} />
-          </button>
-          <button
-            type="button"
-            onClick={() => onMove(idx, 1)}
-            disabled={disabled || idx === total - 1}
-            title="Move down"
-            style={iconBtn(disabled || idx === total - 1)}
-          >
-            <ChevronDown size={13} />
-          </button>
+          {/* 2026-11-10: top-level rows are reordered with Select, then Move.
+              The arrows stay only on drugs inside a section. */}
+          {isNested && (
+            <>
+              <button
+                type="button"
+                onClick={() => onMove(idx, -1)}
+                disabled={disabled || idx === 0}
+                title="Move up"
+                style={iconBtn(disabled || idx === 0)}
+              >
+                <ChevronUp size={13} />
+              </button>
+              <button
+                type="button"
+                onClick={() => onMove(idx, 1)}
+                disabled={disabled || idx === total - 1}
+                title="Move down"
+                style={iconBtn(disabled || idx === total - 1)}
+              >
+                <ChevronDown size={13} />
+              </button>
+            </>
+          )}
           <RowMenu
             disabled={disabled}
             items={[
