@@ -919,6 +919,32 @@ async function fetchPagesInBatches(table, select, pageCount, onPageDone) {
   return rows
 }
 
+// A tiny "has the drug list changed?" check for the Drug Library's saved copy: the shared
+// drugs_updated_at stamp (bumped by every CMS edit) plus the two row counts (which also catch
+// rows added or removed outside the CMS). Three small requests, no rows downloaded.
+export async function fetchCmsIndexStamp() {
+  try {
+    const [meta, brands, generics] = await Promise.all([
+      supabase.from('app_metadata').select('drugs_updated_at').eq('id', 1).maybeSingle(),
+      supabase.from('brands').select('id', { count: 'exact', head: true }),
+      supabase.from('generics').select('id', { count: 'exact', head: true }),
+    ])
+    if (meta.error) throw meta.error
+    if (brands.error) throw brands.error
+    if (generics.error) throw generics.error
+    return {
+      data: {
+        updated:  meta.data?.drugs_updated_at ?? null,
+        brands:   brands.count ?? 0,
+        generics: generics.count ?? 0,
+      },
+      error: null,
+    }
+  } catch (error) {
+    return { data: null, error }
+  }
+}
+
 export async function fetchCmsDrugIndex(onProgress) {
   try {
     const [{ count: brandCount, error: e1 }, { count: genericCount, error: e2 }] = await Promise.all([
