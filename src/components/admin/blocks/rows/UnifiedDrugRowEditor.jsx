@@ -1102,24 +1102,24 @@ function unprojectGroup(g) {
   }
 }
 
-// One row of chips: one chip per patient group, the open one highlighted. Tap a
-// chip to switch to it. Adding another patient group is the '+ Patient group'
-// link under the dose bands. Everything else about a
-// patient group (rename, show in the app, clear, remove, delete from the
-// library) lives in that group's one ⋯ menu in the dose card; the rename box
-// itself shows here, in place of the open chip, while renaming.
-function PopulationTabs({ whos, activeIdx, shownIdx = 0, renaming = false, onRenameEnd, onSelect, onRename }) {
+// One row of chips: one chip per patient group, the open one highlighted, and a
+// "+" chip at the end that starts a new patient group. The name of the open
+// group is always visible here, even when there is only one. Tap the open chip
+// for its actions (rename, show in the app, remove); tap another chip to switch
+// to it. A \u2713 marks the group the app shows. The rename box shows here, in
+// place of the open chip, while renaming.
+function PopulationTabs({ whos, activeIdx, shownIdx = 0, renaming = false, panelOpen = false, addOpen = false, onRenameEnd, onSelect, onRename, onActiveTap, onAddTap }) {
   const many = whos.length > 1
   const chipBase = {
     display: 'inline-flex', alignItems: 'center', gap: 6,
-    padding: '5px 12px', borderRadius: 99,
+    padding: '6px 12px', borderRadius: 99,
     fontSize: 13, fontWeight: 700, fontFamily: 'var(--font-body)', cursor: 'pointer',
   }
 
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
       {whos.map((who, i) => {
-        const text = who ? doseWhoLabel(who) : (many ? `Patient group ${i + 1}` : 'Patient group')
+        const text = who ? doseWhoLabel(who) : (many ? `Patient group ${i + 1}` : 'Name this group')
         if (i === activeIdx && renaming) {
           return (
             <input
@@ -1137,20 +1137,25 @@ function PopulationTabs({ whos, activeIdx, shownIdx = 0, renaming = false, onRen
           )
         }
         if (i === activeIdx) {
-          const quiet = !many && !who
           return (
-            <span
+            <button
               key={i}
+              type="button"
+              onClick={onActiveTap}
+              aria-expanded={panelOpen}
+              title="Rename, show in the app, or remove this patient group"
               style={{
-                ...chipBase, cursor: 'default',
-                color: quiet ? 'var(--color-text-secondary)' : 'var(--color-accent)',
-                background: quiet ? 'none' : 'var(--color-accent-light)',
+                ...chipBase,
+                border: '1px solid var(--color-accent)',
+                color: 'var(--color-accent)',
+                background: 'var(--color-accent-light)',
                 fontStyle: who ? 'normal' : 'italic',
               }}
             >
               {i === shownIdx && many && <Check size={12} aria-label="Shown in app" />}
               {text}
-            </span>
+              <ChevronDown size={12} style={{ transform: panelOpen ? 'rotate(180deg)' : 'none' }} />
+            </button>
           )
         }
         return (
@@ -1169,6 +1174,20 @@ function PopulationTabs({ whos, activeIdx, shownIdx = 0, renaming = false, onRen
           </button>
         )
       })}
+      <button
+        type="button"
+        onClick={onAddTap}
+        aria-label="Add a patient group"
+        aria-expanded={addOpen}
+        style={{
+          ...chipBase, padding: '6px 10px',
+          border: '1px dashed var(--color-accent)',
+          background: addOpen ? 'var(--color-accent-light)' : 'none',
+          color: 'var(--color-accent)',
+        }}
+      >
+        <Plus size={14} />
+      </button>
     </div>
   )
 }
@@ -2907,6 +2926,12 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
   // pattern. Only one group's menu can be open at a time.
   const [doseMenuOpenGroupIdx, setDoseMenuOpenGroupIdx] = useState(null)
   const [renamingGroupIdx, setRenamingGroupIdx] = useState(null) // groupIdx | null — the rename box is open
+  // 2026-11-10: the open chip's action row, the new-patient-group form, and the
+  // inline "more" row (Max dose / Group note) under the Dose band button. Each
+  // holds a groupIdx (the form also holds its fields) or null.
+  const [chipPanelGroupIdx, setChipPanelGroupIdx] = useState(null)
+  const [newGroupForm, setNewGroupForm] = useState(null) // { groupIdx, name, show, replace } | null
+  const [moreAddOpenIdx, setMoreAddOpenIdx] = useState(null)
   const [groupNoteEditIdx, setGroupNoteEditIdx] = useState(null) // which group's note box is being typed in (opened from the dose menu)
   const doseMenuRef = useRef(null)
   useEffect(() => {
@@ -2951,6 +2976,41 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
     onChange(fromDrugOptions(row, nextRaw))
     setActivePops(prev => ({ ...prev, [g.group_id]: extras.length }))
     setOpenEditorId(null)
+  }
+
+  // 2026-11-10: makes a new, blank patient group from the "+" chip form in one
+  // step: named, optionally shown in the app, and optionally taking the place of
+  // the group that is open now (its doses leave this sheet; the library keeps
+  // its own copy).
+  function createPopulation(groupIdx, { name, show, replace }) {
+    const g = rawGroups[groupIdx]
+    const extras = g.extra_populations ?? []
+    const pi = activeIndexFor(g)
+    const who = name?.trim() || null
+    const blankExtra = () => ({
+      id: `popx-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      dose_who: who, dose_lines: [], dose_max: null, dose_max_population_id: null, dose_library_base: null,
+    })
+    let nextG
+    let position
+    if (replace) {
+      position = pi
+      nextG = pi === 0
+        ? { ...g, dose: null, dose_who: who, dose_lines: [], dose_max: null, dose_max_population_id: null, dose_library_base: null }
+        : { ...g, extra_populations: extras.map((e, i) => (i === pi - 1 ? blankExtra() : e)) }
+    } else {
+      position = extras.length + 1
+      nextG = { ...g, extra_populations: [...extras, blankExtra()] }
+    }
+    nextG = { ...nextG, shown_population: show ? position : (g.shown_population ?? 0) }
+    const nextRaw = rawGroups.map((x, i) => (i === groupIdx ? nextG : x))
+    setRawGroups(nextRaw)
+    onChange(fromDrugOptions(row, nextRaw))
+    setActivePops(prev => ({ ...prev, [g.group_id]: position }))
+    setOpenEditorId(null)
+    setEmptyPopWarnIdx(null)
+    setNewGroupForm(null)
+    setChipPanelGroupIdx(null)
   }
 
   function selectPopulation(groupIdx, position) {
@@ -3989,7 +4049,7 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
             const targetRow = drugRows.find(r => r.formulationId === targetFid)
             const targetName = multi && targetRow ? targetRow.label : ''
             const clearChosen = () => setChosenDrug(cur => (cur?.groupIdx === groupIdx ? null : cur))
-            const showTabs = many || !!rg.dose_who?.trim() || renamingGroupIdx === groupIdx
+            const showTabs = true
             const nearDuplicates = findNearDuplicateBands(group.dose_lines)
             const menuCaption = { padding: '6px 12px 2px', fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-body)' }
             return (
@@ -4026,16 +4086,101 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
                   border: '1px solid var(--color-border)', borderRadius: 12,
                 }}>
                   {showTabs && (
-                    <div style={{ padding: '8px 10px', borderBottom: '1px solid var(--color-border)' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '8px 10px', borderBottom: '1px solid var(--color-border)' }}>
                       <PopulationTabs
                         whos={[rg.dose_who ?? null, ...(rg.extra_populations ?? []).map(e => e.dose_who ?? null)]}
                         activeIdx={activeIdx}
                         shownIdx={shownIdx}
                         renaming={renamingGroupIdx === groupIdx}
+                        panelOpen={chipPanelGroupIdx === groupIdx}
+                        addOpen={newGroupForm?.groupIdx === groupIdx}
                         onRenameEnd={() => setRenamingGroupIdx(null)}
-                        onSelect={position => { setRenamingGroupIdx(null); selectPopulation(groupIdx, position) }}
+                        onSelect={position => { setRenamingGroupIdx(null); setChipPanelGroupIdx(null); selectPopulation(groupIdx, position) }}
                         onRename={val => updateGroupDoseWho(groupIdx, val)}
+                        onActiveTap={() => { setNewGroupForm(null); setChipPanelGroupIdx(cur => (cur === groupIdx ? null : groupIdx)) }}
+                        onAddTap={() => {
+                          setChipPanelGroupIdx(null)
+                          setRenamingGroupIdx(null)
+                          setNewGroupForm(cur => (cur?.groupIdx === groupIdx ? null : { groupIdx, name: '', show: true, replace: false }))
+                        }}
                       />
+
+                      {chipPanelGroupIdx === groupIdx && renamingGroupIdx !== groupIdx && (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                          <button type="button" style={doseSecondaryButtonStyle}
+                            onClick={() => { setChipPanelGroupIdx(null); setRenamingGroupIdx(groupIdx) }}>
+                            <Edit2 size={13} /> Rename
+                          </button>
+                          {many && (
+                            activeIdx === shownIdx ? (
+                              <span style={{ ...doseSecondaryButtonStyle, cursor: 'default', opacity: 0.7 }}>
+                                <Check size={13} /> Shown in app
+                              </span>
+                            ) : (
+                              <button type="button" style={doseSecondaryButtonStyle}
+                                onClick={() => { setChipPanelGroupIdx(null); setShownPopulation(groupIdx, activeIdx) }}>
+                                <Check size={13} /> Show in app
+                              </button>
+                            )
+                          )}
+                          {many && (
+                            <button type="button" style={{ ...doseSecondaryButtonStyle, color: '#ef4444' }}
+                              onClick={() => { setChipPanelGroupIdx(null); setConfirmRemovePop(groupIdx) }}>
+                              <X size={13} /> Remove
+                            </button>
+                          )}
+                        </div>
+                      )}
+
+                      {newGroupForm?.groupIdx === groupIdx && (() => {
+                        const f = newGroupForm
+                        const currentName = rg.dose_who?.trim() ? doseWhoLabel(rg.dose_who) : null
+                        const canCreate = !!f.name.trim()
+                        const checkRow = { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--color-text-primary)', cursor: 'pointer' }
+                        return (
+                          <div style={{
+                            display: 'flex', flexDirection: 'column', gap: 10,
+                            padding: '10px 12px', borderRadius: 10,
+                            border: '1px solid var(--color-accent)', background: 'var(--color-bg)',
+                          }}>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text-primary)' }}>New patient group</span>
+                            <input
+                              type="text"
+                              value={f.name}
+                              onChange={e => setNewGroupForm({ ...f, name: e.target.value })}
+                              onKeyDown={e => { if (e.key === 'Enter' && canCreate) createPopulation(groupIdx, f) }}
+                              placeholder="Name, e.g. Children"
+                              dir="auto"
+                              autoFocus
+                              style={{ ...doseFieldInputStyle, width: '100%', boxSizing: 'border-box' }}
+                            />
+                            <label style={checkRow}>
+                              <input type="checkbox" checked={f.show} onChange={e => setNewGroupForm({ ...f, show: e.target.checked })} />
+                              Show this one in the app
+                            </label>
+                            <label style={checkRow}>
+                              <input type="checkbox" checked={f.replace} onChange={e => setNewGroupForm({ ...f, replace: e.target.checked })} />
+                              Replace {currentName ? `“${currentName}”` : 'the current group'}
+                            </label>
+                            {f.replace && (
+                              <span style={{ fontSize: 12, color: '#B45309' }}>
+                                Its doses are removed from this sheet. The library keeps its own copy.
+                              </span>
+                            )}
+                            <div style={{ display: 'flex', gap: 8 }}>
+                              <button
+                                type="button"
+                                disabled={!canCreate}
+                                onClick={() => createPopulation(groupIdx, f)}
+                                style={{ ...dosePrimaryButtonStyle, opacity: canCreate ? 1 : 0.5 }}
+                              >
+                                Create
+                              </button>
+                              <button type="button" onClick={() => setNewGroupForm(null)} style={doseSecondaryButtonStyle}>Cancel</button>
+                            </div>
+                          </div>
+                        )
+                      })()}
                     </div>
                   )}
 
@@ -4139,30 +4284,66 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
                       onChange={value => updateGroupNote(groupIdx, value)}
                     />
 
-                    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 4, padding: '2px 0 4px' }}>
-                      {!emptyDose && (
-                        <button type="button" onClick={() => addBracket(groupIdx)} style={doseAddLinkStyle}>
-                          <Plus size={14} />
-                          Dose band
-                        </button>
-                      )}
-                      {!emptyDose && !group.dose_max?.trim() && openEditorId !== `max-${groupIdx}` && (
-                        <button type="button" onClick={() => setOpenEditorId(`max-${groupIdx}`)} style={doseAddLinkStyle}>
-                          <Plus size={14} />
-                          Max dose
-                        </button>
-                      )}
-                      {!group.note?.trim() && groupNoteEditIdx !== groupIdx && (
-                        <button type="button" onClick={() => setGroupNoteEditIdx(groupIdx)} style={doseAddLinkStyle}>
-                          <Plus size={14} />
-                          Note
-                        </button>
-                      )}
-                      <button type="button" onClick={() => addPopulation(groupIdx)} style={doseAddLinkStyle}>
-                        <Plus size={14} />
-                        Patient group
-                      </button>
-                    </div>
+                    {(() => {
+                      // 2026-11-10: one clear Dose band button; Max dose and Group note
+                      // sit behind a small "More" button that opens a row right here
+                      // (not a floating menu, so nothing can cover it).
+                      const maxAvailable = !emptyDose && !group.dose_max?.trim() && openEditorId !== `max-${groupIdx}`
+                      const noteAvailable = !group.note?.trim() && groupNoteEditIdx !== groupIdx
+                      const moreOpen = moreAddOpenIdx === groupIdx && (maxAvailable || noteAvailable)
+                      return (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '6px 0 8px' }}>
+                          <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
+                            {!emptyDose && (
+                              <button
+                                type="button"
+                                onClick={() => addBracket(groupIdx)}
+                                style={{
+                                  flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                                  padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
+                                  border: '1.5px dashed var(--color-accent)', background: 'none',
+                                  color: 'var(--color-accent)', fontSize: 14, fontWeight: 700, fontFamily: 'var(--font-body)',
+                                }}
+                              >
+                                <Plus size={15} /> Dose band
+                              </button>
+                            )}
+                            {(maxAvailable || noteAvailable) && (
+                              <button
+                                type="button"
+                                onClick={() => setMoreAddOpenIdx(cur => (cur === groupIdx ? null : groupIdx))}
+                                aria-expanded={moreOpen}
+                                style={{
+                                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+                                  padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
+                                  border: '1px solid var(--color-border)',
+                                  background: moreOpen ? 'var(--color-bg)' : 'none',
+                                  color: 'var(--color-text-secondary)', fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-body)',
+                                }}
+                              >
+                                <Plus size={14} /> More
+                              </button>
+                            )}
+                          </div>
+                          {moreOpen && (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                              {maxAvailable && (
+                                <button type="button" style={doseSecondaryButtonStyle}
+                                  onClick={() => { setMoreAddOpenIdx(null); setOpenEditorId(`max-${groupIdx}`) }}>
+                                  <Plus size={13} /> Max dose
+                                </button>
+                              )}
+                              {noteAvailable && (
+                                <button type="button" style={doseSecondaryButtonStyle}
+                                  onClick={() => { setMoreAddOpenIdx(null); setGroupNoteEditIdx(groupIdx) }}>
+                                  <Plus size={13} /> Group note
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })()}
                   </div>
 
                   {(emptyPopWarnIdx === groupIdx || confirmSaveGroup === groupIdx || confirmRestoreGroup === groupIdx
@@ -4412,22 +4593,6 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
                       </button>
                       {doseMenuOpenGroupIdx === groupIdx && (
                         <div ref={el => { doseMenuRef.current = el; fitMenuToScreen(el) }} style={{ ...addDrugDropdownStyle, minWidth: 210, maxWidth: 'calc(100vw - 16px)' }}>
-                          <button type="button" style={addDrugDropdownItemStyle}
-                            onClick={() => { setDoseMenuOpenGroupIdx(null); setRenamingGroupIdx(groupIdx) }}>
-                            {rg.dose_who ? 'Rename' : 'Name this patient group'}
-                          </button>
-                          {many && activeIdx !== shownIdx && (
-                            <button type="button" style={addDrugDropdownItemStyle}
-                              onClick={() => { setDoseMenuOpenGroupIdx(null); setShownPopulation(groupIdx, activeIdx) }}>
-                              Show this one in the app
-                            </button>
-                          )}
-                          {!group.note?.trim() && (
-                            <button type="button" style={addDrugDropdownItemStyle}
-                              onClick={() => { setDoseMenuOpenGroupIdx(null); setGroupNoteEditIdx(groupIdx) }}>
-                              Add group note
-                            </button>
-                          )}
                           <button type="button" style={{ ...addDrugDropdownItemStyle, color: '#ef4444' }}
                             onClick={() => { setDoseMenuOpenGroupIdx(null); setConfirmClearGroup(groupIdx) }}>
                             Clear all doses
