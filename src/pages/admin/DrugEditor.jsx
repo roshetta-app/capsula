@@ -5,15 +5,15 @@
  * and each formulation's brands — no more bouncing between 3 separate screens.
  *
  * Layout:
- *   ┌─ Header: Drug Library › {genericName}  [Save Generic] ─────────────────┐
+ *   ┌─ Sticky bar: {genericName}  [Collapse all] [Undo] [Redo] [Save] ────────┐
  *   │                                                                          │
  *   │  Identity               (always open)                                   │
  *   │  ▸ Generic info          (collapsible, closed by default)               │
  *   │                                                                          │
- *   │  ▾ 500mg · Capsule · Oral          [● Live]  [Save]  [✕]               │
+ *   │  ▾ 500mg · Capsule · Oral          [● Live]  [⋯]                       │
  *   │      FormulationEditor + BrandEditor inline                              │
  *   │                                                                          │
- *   │  ▾ 250mg/5ml · Syrup · Oral        [○ Draft] [Save]  [✕]               │
+ *   │  ▾ 250mg/5ml · Syrup · Oral        [○ Draft] [⋯]                       │
  *   │      ...                                                                 │
  *   │                                                                          │
  *   │  [+ Add Formulation]                                                     │
@@ -36,7 +36,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo, Fragment } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { Plus, Save, Trash2, AlertTriangle, Check, ChevronDown, ChevronRight, Eye, EyeOff, Undo2, Redo2, ChevronsDownUp } from 'lucide-react'
+import { Plus, Trash2, AlertTriangle, ChevronDown, ChevronRight, Eye, EyeOff, Undo2, Redo2, ChevronsDownUp } from 'lucide-react'
 import { useToast } from '../../context/ToastContext'
 import { useDrugContext } from '../../context/DrugContext'
 import GenericEditor from '../../components/admin/GenericEditor'
@@ -125,9 +125,8 @@ export default function DrugEditor() {
   const [genericOpen,   setGenericOpen]   = useState(false) // collapsed on every visit
   const [openFormId,    setOpenFormId]    = useState(null)  // which formulation is expanded
   const [savingGeneric, setSavingGeneric] = useState(false)
-  const [savedGeneric,  setSavedGeneric]  = useState(false)
+  const [savingAll,     setSavingAll]     = useState(false) // the toolbar Save is running
   const [savingFormId,  setSavingFormId]  = useState(null)
-  const [savedFormId,   setSavedFormId]   = useState(null)
   const [confirmDel,    setConfirmDel]    = useState(null)  // formulation to delete
   const [deleting,      setDeleting]      = useState(false)
   const [globalError,   setGlobalError]   = useState(null)
@@ -153,7 +152,7 @@ export default function DrugEditor() {
   const { canUndo, canRedo, undo, redo } = useSnapshotUndoRedo({
     snapshot,
     ready: !loading && generic !== null,
-    disabled: savingGeneric || savingFormId !== null || addingForm || deleting,
+    disabled: savingAll || savingGeneric || savingFormId !== null || addingForm || deleting,
     resetKey: writtenCount,
     onRestore: restorePage,
   })
@@ -253,7 +252,9 @@ export default function DrugEditor() {
   }, [openFormId, targetFormulationId])
 
   // ── Save generic ────────────────────────────────────────────────────────────
-  async function saveGeneric() {
+  // batch = called by the toolbar Save: no toast, no list refresh (saveAll does those once).
+  // Returns true when saved.
+  async function saveGeneric({ batch = false } = {}) {
     const savedSnap = snapGeneric(generic)
     setSavingGeneric(true)
     setGlobalError(null)
@@ -282,14 +283,14 @@ export default function DrugEditor() {
       textbook_dose_notes:  generic.textbook_dose_notes?.trim() || null,
     })
     setSavingGeneric(false)
-    if (error) { setGlobalError(`Generic: ${error.message}`); return }
+    if (error) { setGlobalError(`Generic: ${error.message}`); return false }
     baseGeneric.current = savedSnap
     markWritten()
-    setSavedGeneric(true)
-    setTimeout(() => setSavedGeneric(false), 2500)
+    if (batch) return true
     await touchAppMetadata('drugs_updated_at')
     await refresh()
     toast.success('Generic saved')
+    return true
   }
 
   // Brands of a formulation as they were when loaded / last saved, by id (for the Arabic-name check).
@@ -301,7 +302,8 @@ export default function DrugEditor() {
   }
 
   // ── Save formulation ────────────────────────────────────────────────────────
-  async function saveFormulation(f) {
+  // batch = called by the toolbar Save (see saveGeneric). Returns true when saved.
+  async function saveFormulation(f, { batch = false } = {}) {
     setSavingFormId(f.id)
     setGlobalError(null)
 
@@ -322,7 +324,7 @@ export default function DrugEditor() {
       default_dose_override: f.default_dose_override || null,
       is_published:         f.is_published ?? true,
     })
-    if (fErr) { setGlobalError(`Formulation: ${fErr.message}`); setSavingFormId(null); return }
+    if (fErr) { setGlobalError(`Formulation: ${fErr.message}`); setSavingFormId(null); return false }
 
     // 2. Sync brands: upsert existing, insert new, delete marked
     try {
@@ -367,7 +369,7 @@ export default function DrugEditor() {
     } catch (err) {
       setGlobalError(err.message)
       setSavingFormId(null)
-      return
+      return false
     }
 
     // Re-read only THIS formulation (to pick up new brand ids). The rest of the page, including
@@ -383,10 +385,10 @@ export default function DrugEditor() {
     }
     markWritten()
     setSavingFormId(null)
-    setSavedFormId(f.id)
-    setTimeout(() => setSavedFormId(null), 2500)
+    if (batch) return true
     await refresh()
     toast.success('Formulation saved')
+    return true
   }
 
   // ── Add formulation ─────────────────────────────────────────────────────────
@@ -491,6 +493,46 @@ export default function DrugEditor() {
   const genericDirty = !!generic && baseGeneric.current !== null && snapGeneric(generic) !== baseGeneric.current
   const isFormDirty  = f => baseForms.current[f.id] !== undefined && snapForm(f) !== baseForms.current[f.id]
   const anyDirty     = genericDirty || formulations.some(isFormDirty)
+  const dirtyCount   = (genericDirty ? 1 : 0) + formulations.filter(isFormDirty).length
+  const genericValid = generic?.ingredients?.length > 0 && !!generic?.category
+
+  // ── Save everything (the toolbar Save) ───────────────────────────────────────
+  // Saves the generic and every formulation with unsaved changes, one after the other, and stops
+  // at the first problem (the card that has it is opened). The drug list is refreshed once at the end.
+  async function saveAll() {
+    if (savingAll || !anyDirty) return
+    const dirtyForms = formulations.filter(isFormDirty)
+
+    // Check everything first, so nothing is half saved because of a missing field.
+    if (genericDirty && !genericValid) {
+      setGlobalError('Generic: add at least one ingredient and pick a category, then Save.')
+      return
+    }
+    const bad = dirtyForms.find(f => !(f.form && f.route))
+    if (bad) {
+      setGlobalError(`Formulation "${bad.concentration || 'No strength'}": pick a form and a route, then Save.`)
+      setOpenFormId(bad.id)
+      return
+    }
+
+    setSavingAll(true)
+    setGlobalError(null)
+    let saved = 0
+    let failed = false
+    if (genericDirty) {
+      if (await saveGeneric({ batch: true })) saved += 1; else failed = true
+    }
+    for (const f of dirtyForms) {
+      if (failed) break
+      if (await saveFormulation(f, { batch: true })) saved += 1; else { failed = true; setOpenFormId(f.id) }
+    }
+    if (saved > 0) {
+      if (genericDirty) await touchAppMetadata('drugs_updated_at')
+      await refresh()
+    }
+    setSavingAll(false)
+    if (!failed && saved > 0) toast.success(saved === 1 ? 'Saved' : `Saved ${saved} changes`)
+  }
 
   // A refresh or closing the tab asks first when something is unsaved.
   useEffect(() => {
@@ -514,8 +556,6 @@ export default function DrugEditor() {
     </AdminPageHeader>
   )
 
-  const genericValid = generic?.ingredients?.length > 0 && generic?.category
-
   return (
     <AdminPageHeader
       title={generic?.name_en ?? 'Drug'}
@@ -525,6 +565,43 @@ export default function DrugEditor() {
           <ToolButton label="Collapse all" onClick={collapseAll}><ChevronsDownUp size={15} /></ToolButton>
           <UndoRedoButton label="Undo" onClick={undo} disabled={!canUndo}><Undo2 size={16} /></UndoRedoButton>
           <UndoRedoButton label="Redo" onClick={redo} disabled={!canRedo}><Redo2 size={16} /></UndoRedoButton>
+          {anyDirty && (
+            <span
+              role="status"
+              aria-label="Unsaved changes"
+              className="cms-only-phone"
+              style={{ flexShrink: 0, width: 8, height: 8, borderRadius: '50%', backgroundColor: 'var(--color-warning)' }}
+            />
+          )}
+          {anyDirty && (
+            <span
+              role="status"
+              className="cms-hide-phone"
+              style={{
+                fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap',
+                color: 'var(--color-warning)', fontFamily: 'var(--font-body)', padding: '0 var(--space-1)',
+              }}
+            >
+              {dirtyCount === 1 ? 'Unsaved changes' : `${dirtyCount} unsaved`}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={saveAll}
+            disabled={!anyDirty || savingAll}
+            className="cms-push-right"
+            style={{
+              padding: '7px 18px', borderRadius: 'var(--radius-md)',
+              fontSize: 13, fontWeight: 600, border: 'none',
+              cursor: !anyDirty || savingAll ? 'default' : 'pointer',
+              backgroundColor: 'var(--color-accent-solid)', color: '#fff',
+              fontFamily: 'var(--font-body)',
+              opacity: !anyDirty || savingAll ? 0.6 : 1,
+              display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
+            }}
+          >
+            {savingAll ? 'Saving…' : 'Save'}
+          </button>
         </div>
       }
     >
@@ -539,7 +616,7 @@ export default function DrugEditor() {
         part="identity"
         generic={generic}
         onChange={patch => setGeneric(g => ({ ...g, ...patch }))}
-        disabled={savingGeneric}
+        disabled={savingGeneric || savingAll}
       />
       <div style={{ height: 'var(--space-5)' }} />
 
@@ -556,7 +633,7 @@ export default function DrugEditor() {
           part="rest"
           generic={generic}
           onChange={patch => setGeneric(g => ({ ...g, ...patch }))}
-          disabled={savingGeneric}
+          disabled={savingGeneric || savingAll}
         />
       </SectionCard>
 
@@ -661,7 +738,6 @@ export default function DrugEditor() {
         {(formFilter ? formulations.filter(f => f.form === formFilter) : formulations).map(f => {
           const isOpen    = openFormId === f.id
           const isSaving  = savingFormId === f.id
-          const isSaved   = savedFormId === f.id
           const visibleBrands = f.brands.filter(b => !b._deleted)
           const formValid = f.form && f.route
           const brandCount = visibleBrands.length
@@ -710,14 +786,6 @@ export default function DrugEditor() {
                     ]}
                   />
                 }
-                saveSlot={
-                  <SaveRow
-                    onSave={() => saveFormulation(f)}
-                    saving={isSaving}
-                    saved={isSaved}
-                    valid={formValid}
-                  />
-                }
               >
                 {/* Formulation fields */}
                 <FormulationEditor
@@ -740,7 +808,7 @@ export default function DrugEditor() {
                   }}
                   ingredients={generic?.ingredients ?? []}
                   onChange={patch => patchFormulation(f.id, patch)}
-                  disabled={isSaving}
+                  disabled={isSaving || savingAll}
                 />
 
                 {/* Brand divider */}
@@ -772,7 +840,7 @@ export default function DrugEditor() {
                     onDelete={brandId => markBrandDeleted(f.id, brandId)}
                     category={generic?.category ?? null}
                     ingredients={generic?.ingredients ?? []}
-                    disabled={isSaving}
+                    disabled={isSaving || savingAll}
                     onInstantSave={markWritten}
                     highlightBrandId={f.id === targetFormulationId ? targetBrandId : null}
                   />
@@ -807,29 +875,6 @@ export default function DrugEditor() {
       </div>
 
       </Fragment>
-
-      {/* One Save for the generic (Identity + Generic info). It appears only when something is
-          unsaved, and floats so it is reachable from anywhere on the page. */}
-      {genericDirty && (
-        <>
-          <div style={{ height: 72 }} />
-          <div style={{
-            position: 'fixed', left: 0, right: 0, zIndex: 50, pointerEvents: 'none',
-            bottom: 'calc(12px + env(safe-area-inset-bottom, 0px))',
-            display: 'flex', justifyContent: 'center',
-          }}>
-            <div style={{
-              pointerEvents: 'auto', display: 'flex', alignItems: 'center', gap: 12,
-              padding: '8px 10px 8px 16px', borderRadius: 999,
-              backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)',
-              boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
-            }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: '#92400E' }}>Unsaved changes</span>
-              <SaveRow onSave={saveGeneric} saving={savingGeneric} saved={savedGeneric} valid={genericValid} />
-            </div>
-          </div>
-        </>
-      )}
 
       {/* Confirm delete formulation */}
       {confirmDel && (
@@ -932,36 +977,6 @@ function SectionCard({ title, subtitle, dim = false, dirty = false, badge, badge
           )}
         </div>
       )}
-    </div>
-  )
-}
-
-// ─── SaveRow ──────────────────────────────────────────────────────────────────
-
-function SaveRow({ onSave, saving, saved, valid }) {
-  return (
-    <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 'var(--space-3)' }}>
-      {saved && (
-        <span style={{ fontSize: 13, color: 'var(--color-instock)', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 4 }}>
-          <Check size={13} /> Saved
-        </span>
-      )}
-      <button
-        onClick={onSave}
-        disabled={!valid || saving}
-        style={{
-          display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
-          padding: 'var(--space-2) var(--space-4)',
-          borderRadius: 'var(--radius-sm)', border: 'none',
-          backgroundColor: (!valid || saving) ? 'var(--color-border)' : 'var(--color-accent)',
-          color: (!valid || saving) ? 'var(--color-text-tertiary)' : '#fff',
-          fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-body)',
-          cursor: (!valid || saving) ? 'not-allowed' : 'pointer',
-        }}
-      >
-        <Save size={13} />
-        {saving ? 'Saving…' : 'Save'}
-      </button>
     </div>
   )
 }
