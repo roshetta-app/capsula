@@ -221,7 +221,7 @@ function DoseBand({
           }}>{number}</span>
           <span dir="auto" style={{ flex: 1, minWidth: 0, display: 'block', fontSize: 14, color: 'var(--color-text-primary)' }}>
             {empty ? (
-              <span style={{ fontStyle: 'italic', color: 'var(--color-text-tertiary)' }}>Empty dose band, tap to fill in</span>
+              <span style={{ fontStyle: 'italic', color: 'var(--color-text-tertiary)' }}>Empty, tap to fill in</span>
             ) : (
               <>
                 {band.bracket && <span style={{ fontWeight: 700 }}>{band.bracket}{': '}</span>}
@@ -239,7 +239,7 @@ function DoseBand({
       )}
       {duplicateOf && !empty && (
         <span style={{ padding: '0 6px 8px 38px', fontSize: 12, color: '#B45309', fontFamily: 'var(--font-body)' }}>
-          Looks the same as dose band {duplicateOf}. Remove one if it is a repeat.
+          Same as dose band {duplicateOf}.
         </span>
       )}
     </div>
@@ -389,31 +389,29 @@ export default function DoseRowList({ doses = [], onChange, disabled = false }) 
           )
         })}
         {!disabled && (
-          <button type="button" onClick={addPopulation} style={addLink}><Plus size={14} /> Patient group</button>
+          <button type="button" onClick={addPopulation} style={addLink}><Plus size={14} /> Group</button>
         )}
       </div>
 
       {doses.length === 0 && (
         <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)' }}>
-          No practical doses yet. Add a patient group to start.
+          No doses yet.
         </div>
       )}
 
       {current && (
         <>
           {/* Group name, and remove group */}
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 0 }}>
-              <span style={fieldLabel}>Patient group</span>
-              <input
-                type="text" value={current.population ?? ''} disabled={disabled} dir="auto"
-                onChange={e => { updatePopulation(currentIndex, 'population', e.target.value); setAddBlockedWarning(false) }}
-                placeholder="e.g. Adults (optional)" style={fieldInput}
-              />
-            </label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input
+              type="text" value={current.population ?? ''} disabled={disabled} dir="auto"
+              aria-label="Patient group name"
+              onChange={e => { updatePopulation(currentIndex, 'population', e.target.value); setAddBlockedWarning(false) }}
+              placeholder="Group name, e.g. Adults" style={{ ...fieldInput, flex: 1, minWidth: 0 }}
+            />
             {!disabled && (
               <button type="button" onClick={() => setPendingRemoveIndex(currentIndex)} style={{ ...dangerBtn, marginLeft: 0 }}>
-                <X size={13} /> Remove group
+                <X size={13} /> Remove
               </button>
             )}
           </div>
@@ -424,7 +422,10 @@ export default function DoseRowList({ doses = [], onChange, disabled = false }) 
           )}
 
           {/* Dose bands */}
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <div style={{
+            display: bands.length === 0 && !hasMax && openId !== 'max' ? 'none' : 'flex', flexDirection: 'column', padding: '2px 8px',
+            border: '1px solid var(--color-border)', borderRadius: 10, backgroundColor: 'var(--color-surface)',
+          }}>
             {bands.map((b, bi) => (
               <DoseBand
                 key={b.id ?? bi} band={b} index={bi} count={bands.length} disabled={disabled}
@@ -435,11 +436,13 @@ export default function DoseRowList({ doses = [], onChange, disabled = false }) 
                 onMove={dir => moveBracket(currentIndex, bi, dir)}
               />
             ))}
-            <MaxDoseRow
-              value={current.max_dose} disabled={disabled}
-              isOpen={openId === 'max'} onOpen={() => setOpenId('max')} onClose={() => setOpenId(null)}
-              onChange={v => updatePopulation(currentIndex, 'max_dose', v)}
-            />
+            <div style={{ borderTop: bands.length > 0 && (hasMax || openId === 'max') ? '1px solid var(--color-border)' : 'none' }}>
+              <MaxDoseRow
+                value={current.max_dose} disabled={disabled}
+                isOpen={openId === 'max'} onOpen={() => setOpenId('max')} onClose={() => setOpenId(null)}
+                onChange={v => updatePopulation(currentIndex, 'max_dose', v)}
+              />
+            </div>
           </div>
 
           {!disabled && (

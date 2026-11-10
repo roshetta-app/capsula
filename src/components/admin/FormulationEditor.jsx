@@ -1,9 +1,7 @@
-import { useState } from 'react'
-import { AlertTriangle, Pencil } from 'lucide-react'
+import { AlertTriangle } from 'lucide-react'
 import { DRUG_FORMS, DRUG_ROUTES, INJECTION_ROUTE_DETAILS } from '../../config/forms'
 import DoseRowList from './DoseRowList'
 import TagInput from './TagInput'
-import Modal from './Modal'
 
 /**
  * FormulationEditor — edit fields on a formulation row.
@@ -18,6 +16,9 @@ import Modal from './Modal'
  *   Modifier/Device Type now live inside a "Formulation Details" section,
  *   collapsed by default — Practical Doses and Published stay outside it,
  *   always visible.
+ * 2026-11-10 — the details are now an always-open "Identity" card (no pop-up), with the
+ *   concentration shown in its header; Practical Doses sits in its own card with no hint
+ *   text; Published is a slim row. Fields and saved data are unchanged.
  * DrugCMS fix — strength is now always shown as one Value/Unit/Basis row
  *   PER INGREDIENT (strength_structured.ingredients), for single-ingredient
  *   and combo formulations alike — replacing the old split where singles got
@@ -72,53 +73,16 @@ export default function FormulationEditor({ formulation, ingredients = [], onCha
     onChange(patch)
   }
 
-  const [detailsOpen, setDetailsOpen] = useState(false)
+  const published = formulation.is_published ?? true
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
 
-      {/* Formulation Details — collapsed by default. Wraps everything that
-          used to render flat above Practical Doses (strength, concentration,
-          form/route, route details, form modifier/device type) — visual
-          cleanup only, no field behavior changed. Mirrors the same
-          chevron-toggle pattern already used one level up, for the
-          formulation card itself. */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
-        padding: 'var(--space-3)', border: '1px solid var(--color-border)',
-        borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-bg)',
-      }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ ...labelStyle, marginBottom: 2 }}>Formulation details</div>
-          <div style={{
-            fontSize: 13, color: 'var(--color-text-secondary)',
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          }}>
-            {[formulation.concentration, formulation.form, formulation.route].filter(Boolean).join(' · ') || 'Nothing set yet'}
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={() => setDetailsOpen(true)}
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0,
-            padding: '7px 12px', borderRadius: 'var(--radius-md)',
-            border: '1px solid var(--color-border)', backgroundColor: 'var(--color-surface)',
-            color: 'var(--color-text-primary)', fontSize: 13, fontWeight: 600,
-            fontFamily: 'var(--font-body)', cursor: 'pointer',
-          }}
-        >
-          <Pencil size={13} /> Edit
-        </button>
-      </div>
+      {/* Identity — always open: strength, form, route, modifier, device. The derived
+          concentration sits in the header (it is built from the strength rows). */}
+      <Card title="Identity" aside={formulation.concentration}>
 
-      {/* Pop-up on a computer, bottom sheet on a phone (Modal does both). Fields change the
-          formulation live, so Done only closes it. */}
-      <Modal isOpen={detailsOpen} onClose={() => setDetailsOpen(false)} title="Formulation details" size="lg">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-
-      {/* Strength — one Value/Unit/Basis row per ingredient */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+        {/* Strength — one Value/Unit/Basis row per ingredient */}
         {rows.map((row, idx) => {
           const matched = isMatchedIngredient(row.ingredient, ingredients)
           return (
@@ -140,33 +104,33 @@ export default function FormulationEditor({ formulation, ingredients = [], onCha
                   Doesn't match this generic's ingredient list
                 </div>
               )}
-              <div className="cms-stack" style={{ display: 'flex', gap: 'var(--space-3)' }}>
-                <Field label="Strength Value" style={{ flex: 1 }}>
+              <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                <Field label="Strength" style={{ flex: 1, minWidth: 0 }}>
                   <input
                     type="text"
                     value={row.value ?? ''}
                     onChange={e => setIngredient(idx, 'value', e.target.value || null)}
-                    placeholder="e.g. 250"
+                    placeholder="250"
                     disabled={disabled}
                     style={inputStyle}
                   />
                 </Field>
-                <Field label="Strength Unit" style={{ flex: 1 }}>
+                <Field label="Unit" style={{ flex: 1, minWidth: 0 }}>
                   <input
                     type="text"
                     value={row.unit ?? ''}
                     onChange={e => setIngredient(idx, 'unit', e.target.value || null)}
-                    placeholder="e.g. mg"
+                    placeholder="mg"
                     disabled={disabled}
                     style={inputStyle}
                   />
                 </Field>
-                <Field label="Strength Basis" style={{ flex: 1 }}>
+                <Field label="Basis" style={{ flex: 1, minWidth: 0 }}>
                   <input
                     type="text"
                     value={row.basis ?? ''}
                     onChange={e => setIngredient(idx, 'basis', e.target.value || null)}
-                    placeholder="e.g. per_5ml"
+                    placeholder="per_5ml"
                     disabled={disabled}
                     style={inputStyle}
                   />
@@ -175,170 +139,164 @@ export default function FormulationEditor({ formulation, ingredients = [], onCha
             </div>
           )
         })}
-      </div>
 
-      {/* Concentration — built automatically from the ingredient rows above */}
-      <Field label="Concentration" hint="Built automatically from the strength fields above — not editable directly">
-        <input
-          type="text"
-          value={formulation.concentration ?? ''}
-          disabled
-          style={{ ...inputStyle, backgroundColor: 'var(--color-bg)', color: 'var(--color-text-tertiary)', cursor: 'not-allowed' }}
-        />
-      </Field>
+        {/* Form + Route */}
+        <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+          <Field label="Form" required style={{ flex: 1, minWidth: 0 }}>
+            <select
+              value={formulation.form ?? ''}
+              onChange={e => set('form', e.target.value)}
+              disabled={disabled}
+              required
+              style={inputStyle}
+            >
+              <option value="" disabled>Select…</option>
+              {DRUG_FORMS.map(f => (
+                <option key={f.value} value={f.value}>{f.label}</option>
+              ))}
+            </select>
+          </Field>
 
-      {/* Form + Route row */}
-      <div className="cms-stack" style={{ display: 'flex', gap: 'var(--space-3)' }}>
-        <Field label="Form" required style={{ flex: 1 }}>
-          <select
-            value={formulation.form ?? ''}
-            onChange={e => set('form', e.target.value)}
-            disabled={disabled}
-            required
-            style={inputStyle}
-          >
-            <option value="" disabled>Select form…</option>
-            {DRUG_FORMS.map(f => (
-              <option key={f.value} value={f.value}>{f.label}</option>
-            ))}
-          </select>
-        </Field>
+          <Field label="Route" required style={{ flex: 1, minWidth: 0 }}>
+            <select
+              value={formulation.route ?? ''}
+              onChange={e => set('route', e.target.value)}
+              disabled={disabled}
+              required
+              style={inputStyle}
+            >
+              <option value="" disabled>Select…</option>
+              {DRUG_ROUTES.map(r => (
+                <option key={r.value} value={r.value}>{r.label}</option>
+              ))}
+            </select>
+          </Field>
+        </div>
 
-        <Field label="Route" required style={{ flex: 1 }}>
-          <select
-            value={formulation.route ?? ''}
-            onChange={e => set('route', e.target.value)}
-            disabled={disabled}
-            required
-            style={inputStyle}
-          >
-            <option value="" disabled>Select route…</option>
-            {DRUG_ROUTES.map(r => (
-              <option key={r.value} value={r.value}>{r.label}</option>
-            ))}
-          </select>
-        </Field>
-      </div>
-
-      {/* Route Details — only when Route = Injection */}
-      {formulation.route === 'injection' && (
-        <Field label="Route Details" hint="Select all that apply">
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
-            {INJECTION_ROUTE_DETAILS.map(opt => {
-              const checked = (formulation.route_details ?? []).includes(opt.value)
-              return (
-                <label
-                  key={opt.value}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 6,
-                    fontSize: 13, fontFamily: 'var(--font-body)',
-                    color: 'var(--color-text-primary)',
-                    cursor: disabled ? 'not-allowed' : 'pointer',
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    disabled={disabled}
-                    onChange={() => {
-                      const current = formulation.route_details ?? []
-                      const next = checked
-                        ? current.filter(v => v !== opt.value)
-                        : [...current, opt.value]
-                      set('route_details', next)
+        {/* Route Details — only when Route = Injection */}
+        {formulation.route === 'injection' && (
+          <Field label="Route details">
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
+              {INJECTION_ROUTE_DETAILS.map(opt => {
+                const checked = (formulation.route_details ?? []).includes(opt.value)
+                return (
+                  <label
+                    key={opt.value}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      fontSize: 13, fontFamily: 'var(--font-body)',
+                      color: 'var(--color-text-primary)',
+                      cursor: disabled ? 'not-allowed' : 'pointer',
                     }}
-                  />
-                  {opt.label}
-                </label>
-              )
-            })}
-          </div>
-        </Field>
-      )}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      disabled={disabled}
+                      onChange={() => {
+                        const current = formulation.route_details ?? []
+                        const next = checked
+                          ? current.filter(v => v !== opt.value)
+                          : [...current, opt.value]
+                        set('route_details', next)
+                      }}
+                    />
+                    {opt.label}
+                  </label>
+                )
+              })}
+            </div>
+          </Field>
+        )}
 
-      {/* Form Modifier + Device Type row */}
-      <div className="cms-stack" style={{ display: 'flex', gap: 'var(--space-3)' }}>
-        <Field label="Form Modifier" hint="e.g. chewable, extended-release" style={{ flex: 1 }}>
-          <TagInput
-            tags={formulation.form_modifier ?? []}
-            onChange={tags => set('form_modifier', tags)}
-            placeholder="Type and press Enter…"
-            disabled={disabled}
-          />
-        </Field>
+        {/* Form modifier + Device type */}
+        <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+          <Field label="Modifier" style={{ flex: 1, minWidth: 0 }}>
+            <TagInput
+              tags={formulation.form_modifier ?? []}
+              onChange={tags => set('form_modifier', tags)}
+              placeholder="e.g. chewable"
+              disabled={disabled}
+            />
+          </Field>
 
-        <Field label="Device Type" hint="e.g. inhaler, pen, patch" style={{ flex: 1 }}>
-          <input
-            type="text"
-            value={formulation.device_type ?? ''}
-            onChange={e => set('device_type', e.target.value || null)}
-            placeholder="e.g. inhaler"
-            disabled={disabled}
-            style={inputStyle}
-          />
-        </Field>
-      </div>
-        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-          <button
-            type="button"
-            onClick={() => setDetailsOpen(false)}
-            style={{
-              height: 36, padding: '0 18px', borderRadius: 'var(--radius-md)', border: 'none',
-              backgroundColor: 'var(--color-accent)', color: '#fff', fontFamily: 'var(--font-body)',
-              fontSize: 14, fontWeight: 600, cursor: 'pointer',
-            }}
-          >
-            Done
-          </button>
+          <Field label="Device" style={{ flex: 1, minWidth: 0 }}>
+            <input
+              type="text"
+              value={formulation.device_type ?? ''}
+              onChange={e => set('device_type', e.target.value || null)}
+              placeholder="e.g. inhaler"
+              disabled={disabled}
+              style={inputStyle}
+            />
+          </Field>
         </div>
-        </div>
-      </Modal>
+      </Card>
 
       {/* Practical doses */}
-      <Field label="Practical doses" hint="Patient-friendly doses shown for this formulation">
+      <Card title="Practical doses">
         <DoseRowList
           doses={formulation.doses ?? []}
           onChange={doses => set('doses', doses)}
           disabled={disabled}
         />
-      </Field>
+      </Card>
 
-      {/* Published toggle */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-        <label style={{ ...labelStyle, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-          Published
-        </label>
+      {/* Published */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)',
+        padding: 'var(--space-3) var(--space-4)', border: '1px solid var(--color-border)',
+        borderRadius: 'var(--radius-lg)', backgroundColor: 'var(--color-bg)',
+      }}>
+        <span style={labelStyle}>Published</span>
         <button
           type="button"
           role="switch"
-          aria-checked={formulation.is_published ?? true}
-          onClick={() => !disabled && set('is_published', !(formulation.is_published ?? true))}
+          aria-checked={published}
+          aria-label="Published"
+          onClick={() => !disabled && set('is_published', !published)}
           disabled={disabled}
           style={{
-            width: 42, height: 24,
-            borderRadius: 12,
-            border: 'none',
-            backgroundColor: (formulation.is_published ?? true) ? 'var(--color-accent)' : 'var(--color-border)',
+            width: 42, height: 24, borderRadius: 12, border: 'none',
+            backgroundColor: published ? 'var(--color-accent)' : 'var(--color-border)',
             position: 'relative', cursor: disabled ? 'not-allowed' : 'pointer',
-            transition: 'background-color 0.2s',
-            flexShrink: 0,
+            transition: 'background-color 0.2s', flexShrink: 0,
           }}
         >
           <span style={{
-            position: 'absolute',
-            top: 3, left: (formulation.is_published ?? true) ? 21 : 3,
-            width: 18, height: 18,
-            borderRadius: '50%',
-            backgroundColor: '#fff',
-            transition: 'left 0.2s',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+            position: 'absolute', top: 3, left: published ? 21 : 3,
+            width: 18, height: 18, borderRadius: '50%', backgroundColor: '#fff',
+            transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
           }} />
         </button>
-        <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
-          {(formulation.is_published ?? true) ? 'Visible in app' : 'Hidden (draft)'}
-        </span>
       </div>
 
+    </div>
+  )
+}
+
+// ─── Card ───────────────────────────────────────────────────────────────────
+// One look for every block in the formulation editor: a title row and the content.
+
+function Card({ title, aside, children }) {
+  return (
+    <div style={{
+      border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)',
+      backgroundColor: 'var(--color-bg)', padding: 'var(--space-4)',
+      display: 'flex', flexDirection: 'column', gap: 'var(--space-3)',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 'var(--space-3)' }}>
+        <span style={labelStyle}>{title}</span>
+        {aside && (
+          <span style={{
+            fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0,
+          }}>
+            {aside}
+          </span>
+        )}
+      </div>
+      {children}
     </div>
   )
 }
