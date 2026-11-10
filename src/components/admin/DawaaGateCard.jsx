@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faPlug } from '@fortawesome/free-solid-svg-icons'
-import { getDawaagateStatus, setDawaagateFallback } from '../../lib/adminQueries'
+import { getDawaagateStatus, setDawaagateFallback, getR2PicturesStatus, setR2Pictures } from '../../lib/adminQueries'
 import { useToast } from '../../context/ToastContext'
 import ConfirmModal from './ConfirmModal'
 
@@ -13,6 +13,11 @@ import ConfirmModal from './ConfirmModal'
  * or off by hand. Loads its own data, so a failure here never touches the
  * three stat cards beside it. Only admins can read or switch: the database
  * functions refuse everyone else.
+ *
+ * 2026-11-10 (S15r, Omar): a second control for the picture copies on Cloudflare
+ * R2. "R2 pictures: ON" means the app shows pictures from our own copy; OFF
+ * sends them back to DawaaGate. It loads and saves on its own, so a failure
+ * there never touches the DawaaGate status above it.
  */
 
 const STATUS_LABEL = {
@@ -42,6 +47,10 @@ export default function DawaaGateCard() {
   const [error, setError]         = useState(null)
   const [saving, setSaving]       = useState(false)
   const [confirmOpen, setConfirm] = useState(false)
+  const [r2, setR2]               = useState(null)   // 'on' | 'off' | null (not loaded)
+  const [r2Error, setR2Error]     = useState(null)
+  const [r2Saving, setR2Saving]   = useState(false)
+  const [r2Confirm, setR2Confirm] = useState(false)
 
   const load = useCallback(async () => {
     const { data, error: err } = await getDawaagateStatus()
@@ -58,6 +67,31 @@ export default function DawaaGateCard() {
     })
     return () => { cancelled = true }
   }, [])
+
+  const loadR2 = useCallback(async () => {
+    const { data, error: err } = await getR2PicturesStatus()
+    if (err) { setR2Error(err); setR2(null) } else { setR2Error(null); setR2(data) }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    getR2PicturesStatus().then(({ data, error: err }) => {
+      if (cancelled) return
+      if (err) { setR2Error(err); setR2(null) } else { setR2Error(null); setR2(data) }
+    })
+    return () => { cancelled = true }
+  }, [])
+
+  const r2On = r2 === 'on'
+
+  async function applyR2Switch() {
+    setR2Saving(true)
+    const { error: err } = await setR2Pictures(!r2On)
+    setR2Saving(false)
+    if (err) { toast.error(err.message ?? 'Could not change the picture switch.'); return }
+    toast.success(r2On ? 'R2 pictures turned off' : 'R2 pictures turned on')
+    loadR2()
+  }
 
   const handOn  = info?.force_fallback === 'on'
   const status  = STATUS_LABEL[info?.status] ?? { text: info?.status ?? '—', color: 'var(--color-text-tertiary)' }
@@ -152,14 +186,70 @@ export default function DawaaGateCard() {
         </div>
       )}
 
+      <div style={{
+        marginTop: 'var(--space-4)',
+        paddingTop: 'var(--space-3)',
+        borderTop: '1px solid var(--color-border)',
+        fontSize: 13,
+        lineHeight: 1.6,
+        color: 'var(--color-text-secondary)',
+      }}>
+        <div style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>
+          Our own picture copies (R2):{' '}
+          <span style={{ color: r2Error || r2 === null ? 'var(--color-text-tertiary)' : r2On ? 'var(--color-success, #16a34a)' : 'var(--color-warning, #d97706)' }}>
+            {r2Error ? 'Unavailable' : r2 === null ? '—' : r2On ? 'ON' : 'OFF'}
+          </span>
+        </div>
+        <div>
+          {r2Error
+            ? `Couldn't load the picture switch — ${r2Error.message ?? 'please try refreshing.'}`
+            : r2On
+              ? 'Pictures load from our own copy. Turn this off if the copy ever has a problem: pictures then load from DawaaGate again.'
+              : 'Pictures load from DawaaGate. Turn this on to use our own copy again.'}
+        </div>
+        {r2 !== null && !r2Error && (
+          <button
+            type="button"
+            disabled={r2Saving}
+            onClick={() => setR2Confirm(true)}
+            style={{
+              marginTop: 'var(--space-2)',
+              padding: '8px 14px',
+              fontSize: 14,
+              fontWeight: 600,
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--color-border)',
+              backgroundColor: r2On ? 'var(--color-error, #ef4444)' : 'var(--color-surface)',
+              color: r2On ? '#fff' : 'var(--color-text-primary)',
+              cursor: r2Saving ? 'default' : 'pointer',
+              opacity: r2Saving ? 0.6 : 1,
+            }}
+          >
+            {r2On ? 'Turn R2 pictures off' : 'Turn R2 pictures on'}
+          </button>
+        )}
+      </div>
+
+      <ConfirmModal
+        isOpen={r2Confirm}
+        onClose={() => setR2Confirm(false)}
+        onConfirm={applyR2Switch}
+        title={r2On ? 'Turn R2 pictures off?' : 'Turn R2 pictures on?'}
+        message={r2On
+          ? 'The app goes back to loading pictures from DawaaGate, unless the fallback above is on.'
+          : 'The app loads pictures from our own copy again, for every drug that has one.'}
+        confirmLabel={r2On ? 'Turn off' : 'Turn on'}
+        confirmVariant={r2On ? 'danger' : 'primary'}
+      />
+
       <ConfirmModal
         isOpen={confirmOpen}
         onClose={() => setConfirm(false)}
         onConfirm={applySwitch}
         title={handOn ? 'Turn the fallback off?' : 'Turn the fallback on?'}
         message={handOn
-          ? 'The app goes back to showing DawaaGate pictures and price pages, unless DawaaGate itself is down.'
-          : 'The app stops showing DawaaGate pictures right away, and the price icon opens a web search instead of the DawaaGate page.'}
+          ? 'The app goes back to showing pictures and DawaaGate price pages, unless DawaaGate itself is down.'
+          : 'The app stops showing pictures right away (DawaaGate and our own copy), and the price icon opens a web search instead of the DawaaGate page.'}
         confirmLabel={handOn ? 'Turn off' : 'Turn on'}
         confirmVariant={handOn ? 'primary' : 'danger'}
       />

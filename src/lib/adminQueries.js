@@ -40,6 +40,7 @@
  *           insertClassKeyword, updateClassKeyword, toggleClassKeywordActive,
  *           deleteClassKeyword (new)
  *   S15s Part B — getDawaagateStatus, setDawaagateFallback (new)
+ *   S15r R2 switch — getR2PicturesStatus, setR2Pictures (new, 2026-11-10)
  */
 
 import { supabase }  from './supabase'
@@ -1999,5 +2000,25 @@ export async function getDawaagateStatus() {
  */
 export async function setDawaagateFallback(on) {
   const { data, error } = await supabase.rpc('admin_set_dawaagate_fallback', { p_on: on })
+  return { data: data ?? null, error }
+}
+
+/**
+ * Whether the app shows pictures from our own copy on Cloudflare R2.
+ * Returns data = 'on' or 'off'. The database function refuses non-admins.
+ */
+export async function getR2PicturesStatus() {
+  const { data, error } = await supabase.rpc('admin_r2_pictures_status')
+  return { data: data ?? null, error }
+}
+
+/**
+ * Turn the R2 picture copies on or off. Off = pictures load from DawaaGate
+ * again. The database function checks admin and writes its own history row.
+ *
+ * @param {boolean} on
+ */
+export async function setR2Pictures(on) {
+  const { data, error } = await supabase.rpc('admin_set_r2_pictures', { p_on: on })
   return { data: data ?? null, error }
 }
