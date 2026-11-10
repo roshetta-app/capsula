@@ -645,6 +645,21 @@ function SectionRowEditor({ row, onChange, onMoveDrugOut, disabled = false }) {
         </div>
       )}
 
+      {/* ── Add buttons at the bottom of the section (2026-11-10), same as the
+          main editor, so a drug or text block can be added with one tap on a
+          phone. They append; the inline plus buttons still insert in between. ── */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        {SECTION_TYPES.map(t => (
+          <AddRowButton
+            key={t.type}
+            label={t.label}
+            color={t.color}
+            onClick={() => addItemAt(drugs.length, t.type)}
+            disabled={disabled}
+          />
+        ))}
+      </div>
+
       {/* ── Promote-alternative dialog, scoped to this section's drugs ── */}
       {promoteDialog && (
         <PromoteAlternativeDialog
