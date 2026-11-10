@@ -645,40 +645,90 @@ const CHANGE_TAGS = {
   name:    { word: 'Changed', bg: '#FEF3C7', fg: '#B45309' },
 }
 
-function ChangeSide({ caption, tone, value }) {
-  const isBand = value && typeof value === 'object'
-  const text = isBand ? value.text : value
-  const title = isBand ? value.title : ''
-  const bad = tone === 'old'
+// 2026-11-10 REDESIGN: the confirmation used to stack a red "before" box over a
+// green "after" box for every change, so a one-word difference had to be found
+// by reading both. Now each change is ONE line of wording with the difference
+// marked right inside it: words that go away are red with a line through them,
+// words that arrive are green. A small key at the top says what red and green
+// mean for this action, and only the parts that actually differ are listed.
+
+// Splits both texts into words and marks which words are kept, removed or new.
+function diffWords(fromText, toText) {
+  const a = String(fromText ?? '').split(/\s+/).filter(Boolean)
+  const b = String(toText ?? '').split(/\s+/).filter(Boolean)
+  const m = a.length, n = b.length
+  const lcs = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0))
+  for (let i = m - 1; i >= 0; i--) {
+    for (let j = n - 1; j >= 0; j--) {
+      lcs[i][j] = a[i] === b[j] ? lcs[i + 1][j + 1] + 1 : Math.max(lcs[i + 1][j], lcs[i][j + 1])
+    }
+  }
+  const out = []
+  let i = 0, j = 0
+  while (i < m && j < n) {
+    if (a[i] === b[j]) { out.push({ type: 'same', text: a[i] }); i++; j++ }
+    else if (lcs[i + 1][j] >= lcs[i][j + 1]) { out.push({ type: 'del', text: a[i] }); i++ }
+    else { out.push({ type: 'add', text: b[j] }); j++ }
+  }
+  while (i < m) { out.push({ type: 'del', text: a[i++] }) }
+  while (j < n) { out.push({ type: 'add', text: b[j++] }) }
+  return out
+}
+
+const DIFF_DEL = { background: '#FEE2E2', color: '#B91C1C', textDecoration: 'line-through', borderRadius: 4, padding: '0 3px' }
+const DIFF_ADD = { background: '#DCFCE7', color: '#15803D', fontWeight: 700, borderRadius: 4, padding: '0 3px' }
+
+function InlineDiff({ from, to }) {
+  const parts = diffWords(from, to)
+  if (parts.length === 0) {
+    return <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', fontStyle: 'italic' }}>nothing</div>
+  }
   return (
-    <div style={{
-      padding: '6px 10px', borderRadius: 8,
-      backgroundColor: bad ? '#FEF2F2' : '#F0FDF4',
-      border: `1px solid ${bad ? '#FECACA' : '#BBF7D0'}`,
-    }}>
-      <div style={{ fontSize: 11, fontWeight: 700, color: bad ? '#B91C1C' : '#15803D', fontFamily: 'var(--font-body)' }}>{caption}</div>
-      {value == null || (!title && !text)
-        ? <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', fontStyle: 'italic' }}>nothing</div>
-        : (
-          <div dir="auto" style={{ fontSize: 13, color: 'var(--color-text-primary)', fontFamily: 'var(--font-body)' }}>
-            {title && <strong>{title}{text ? ': ' : ''}</strong>}{text}
-          </div>
-        )}
+    <div dir="auto" style={{ fontSize: 14, lineHeight: 1.8, color: 'var(--color-text-primary)', fontFamily: 'var(--font-body)' }}>
+      {parts.map((p, i) => (
+        <span key={i}>
+          {p.type === 'same' ? p.text : <span style={p.type === 'del' ? DIFF_DEL : DIFF_ADD}>{p.text}</span>}
+          {' '}
+        </span>
+      ))}
+    </div>
+  )
+}
+
+function DiffField({ label, from, to, muted = false }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-body)', letterSpacing: 0.2 }}>
+        {label}
+      </span>
+      {muted
+        ? <div dir="auto" style={{ fontSize: 13, color: 'var(--color-text-secondary)', lineHeight: 1.6 }}>{to || from}</div>
+        : <InlineDiff from={from} to={to} />}
     </div>
   )
 }
 
 function ChangeConfirm({ title, group, fromCaption, toCaption, changes, notes = [], confirmLabel, onConfirm, onCancel }) {
+  const stripe = { changed: '#F59E0B', max: '#F59E0B', name: '#F59E0B', added: '#22C55E', removed: '#EF4444' }
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', gap: 10,
-      padding: '12px', borderRadius: 10,
+      padding: '12px', borderRadius: 12,
       border: '1px solid var(--color-accent)', backgroundColor: '#EFF6FF',
     }}>
       <div>
-        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-text-primary)', fontFamily: 'var(--font-body)' }}>{title}</div>
-        <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', fontFamily: 'var(--font-body)' }}>{group}</div>
+        <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text-primary)', fontFamily: 'var(--font-body)' }}>{title}</div>
+        <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', fontFamily: 'var(--font-body)' }}>
+          {group}{changes.length > 0 ? ` · ${changes.length} change${changes.length > 1 ? 's' : ''}` : ''}
+        </div>
       </div>
+
+      {changes.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, fontSize: 12, fontFamily: 'var(--font-body)', color: 'var(--color-text-secondary)' }}>
+          <span><span style={{ ...DIFF_DEL, fontWeight: 600 }}>red</span> {fromCaption.toLowerCase()}</span>
+          <span><span style={{ ...DIFF_ADD }}>green</span> {toCaption.toLowerCase()}</span>
+        </div>
+      )}
 
       {changes.length === 0 ? (
         <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>No dose bands change.</div>
@@ -686,21 +736,37 @@ function ChangeConfirm({ title, group, fromCaption, toCaption, changes, notes = 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {changes.map((c, i) => {
             const tag = CHANGE_TAGS[c.kind]
+            const isBand = c.kind === 'changed' || c.kind === 'added' || c.kind === 'removed'
+            const fromBand = c.from && typeof c.from === 'object' ? c.from : { title: '', text: c.from ?? '' }
+            const toBand = c.to && typeof c.to === 'object' ? c.to : { title: '', text: c.to ?? '' }
+            const titleDiffers = (fromBand.title ?? '') !== (toBand.title ?? '')
+            const textDiffers = (fromBand.text ?? '') !== (toBand.text ?? '')
             return (
               <div key={i} style={{
-                display: 'flex', flexDirection: 'column', gap: 6,
-                padding: 8, borderRadius: 10, backgroundColor: 'var(--color-surface)',
-                border: '1px solid var(--color-border)',
+                display: 'flex', flexDirection: 'column', gap: 8,
+                padding: '10px 10px 10px 12px', borderRadius: 10, backgroundColor: 'var(--color-surface)',
+                border: '1px solid var(--color-border)', borderLeft: `4px solid ${stripe[c.kind]}`,
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   <span style={{
                     padding: '1px 8px', borderRadius: 99, fontSize: 11, fontWeight: 700,
                     backgroundColor: tag.bg, color: tag.fg, fontFamily: 'var(--font-body)',
                   }}>{tag.word}</span>
-                  {c.label && <span dir="auto" style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>{c.label}</span>}
+                  {c.label && <span dir="auto" style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text-primary)' }}>{c.label}</span>}
                 </div>
-                {c.kind !== 'added' && <ChangeSide caption={fromCaption} tone="old" value={c.from} />}
-                {c.kind !== 'removed' && <ChangeSide caption={toCaption} tone="new" value={c.to} />}
+
+                {isBand ? (
+                  <>
+                    {(titleDiffers || c.kind !== 'changed') && (toBand.title || fromBand.title) && (
+                      <DiffField label="Band name" from={fromBand.title} to={toBand.title} />
+                    )}
+                    {c.kind === 'changed' && !textDiffers
+                      ? <DiffField label="Wording (same)" from={fromBand.text} to={toBand.text} muted />
+                      : <DiffField label="Wording" from={fromBand.text} to={toBand.text} />}
+                  </>
+                ) : (
+                  <DiffField label={c.label} from={fromBand.text} to={toBand.text} />
+                )}
               </div>
             )
           })}
@@ -4555,7 +4621,7 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
                             toCaption="After saving"
                             changes={changes}
                             notes={notes}
-                            confirmLabel="Save"
+                            confirmLabel="Save to library"
                             onConfirm={() => { setConfirmSaveGroup(null); saveDoseToLibrary(groupIdx) }}
                             onCancel={() => setConfirmSaveGroup(null)}
                           />
