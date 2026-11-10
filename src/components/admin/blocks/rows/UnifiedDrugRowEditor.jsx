@@ -1533,58 +1533,28 @@ function AddDrugControls({ onPickBrand, onPickFormulation, onAddManual, disabled
 }
 
 // ─── GroupAddButtons ─────────────────────────────────────────────────────────
-// 2026-11-10: "+ or" and "+ plus" under every dose group. Tapping one opens a
-// small menu (brand / formulation / typed drug); the chosen drug goes straight
-// into THIS group with that join word, so it shares the group's dose. No more
-// adding a drug and then moving it up. onAdd(joiner, kind).
+// 2026-11-10: "+ or" and "+ plus" under every dose group. Tapping one opens the
+// brand picker straight away (like the normal "Add a drug" button); the chosen
+// drug goes into THIS group with that join word, so it shares the group's dose.
+// No menu and no positioned wrappers, so nothing here can paint on top of the
+// per-drug "..." menu. onAdd(joiner).
 function GroupAddButtons({ onAdd }) {
-  const [openFor, setOpenFor] = useState(null) // 'or' | 'and' | null
-  const wrapRef = useRef(null)
-  useEffect(() => {
-    function handlePointerDown(e) {
-      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpenFor(null)
-    }
-    document.addEventListener('pointerdown', handlePointerDown)
-    return () => document.removeEventListener('pointerdown', handlePointerDown)
-  }, [])
-
-  const items = [
-    { kind: 'brand',       label: 'Pick a brand' },
-    { kind: 'formulation', label: 'Pick a formulation' },
-    { kind: 'manual',      label: 'Type a new drug' },
-  ]
-
   return (
-    <div ref={wrapRef} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '2px 0' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '2px 0' }}>
       {[['or', 'or'], ['and', 'plus']].map(([value, label]) => (
-        <div key={value} style={{ position: 'relative' }}>
-          <button
-            type="button"
-            onClick={() => setOpenFor(cur => (cur === value ? null : value))}
-            style={{
-              ...joinTagStyle(label),
-              display: 'inline-flex', alignItems: 'center', gap: 4,
-              padding: '6px 12px', fontSize: 13, fontWeight: 600,
-              borderRadius: 99, cursor: 'pointer', fontFamily: 'var(--font-body)',
-            }}
-          >
-            <Plus size={12} /> {label}
-          </button>
-          {openFor === value && (
-            <div ref={fitMenuToScreen} style={{ ...addDrugDropdownStyle, maxWidth: 'calc(100vw - 16px)' }}>
-              {items.map(it => (
-                <button
-                  key={it.kind}
-                  type="button"
-                  onClick={() => { setOpenFor(null); onAdd(value, it.kind) }}
-                  style={addDrugDropdownItemStyle}
-                >
-                  {it.label}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        <button
+          key={value}
+          type="button"
+          onClick={() => onAdd(value)}
+          style={{
+            ...joinTagStyle(label),
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+            padding: '6px 12px', fontSize: 13, fontWeight: 600,
+            borderRadius: 99, cursor: 'pointer', fontFamily: 'var(--font-body)',
+          }}
+        >
+          <Plus size={12} /> {label}
+        </button>
       ))}
     </div>
   )
@@ -3926,7 +3896,7 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
 
           {/* 2026-11-10: add a drug straight into this group (shares its dose). */}
           {groupHasDoseArea(group) && (
-            <GroupAddButtons onAdd={(joiner, kind) => handleGroupAdd(groupIdx, joiner, kind)} />
+            <GroupAddButtons onAdd={joiner => handleGroupAdd(groupIdx, joiner, 'brand')} />
           )}
 
           {pendingDoseAsk?.groupIdx === groupIdx && (
