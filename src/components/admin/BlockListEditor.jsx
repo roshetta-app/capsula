@@ -431,9 +431,12 @@ function SubTabBar({ active, onChange }) {
 // ─── SheetPickerBar ───────────────────────────────────────────────────────────
 
 // The app's treatment-plan selector (PrescriptionPills), with an "Add sheet" row in its
-// menu. Shown even for a single sheet so there is always a way to add another.
+// menu, and a trash icon beside it that removes the open sheet (after a confirmation).
+// Shown even for a single sheet so there is always a way to add another.
 // With no sheets yet there is nothing to select, so only the Add button shows.
-function SheetPickerBar({ sheets, activeIndex, onSelect, onAdd, disabled }) {
+function SheetPickerBar({ sheets, activeIndex, onSelect, onAdd, onRemove, disabled }) {
+  const [confirmOpen, setConfirmOpen] = useState(false)
+
   if (sheets.length === 0) {
     return (
       <div style={{ marginBottom: 'var(--space-4)' }}>
@@ -458,76 +461,71 @@ function SheetPickerBar({ sheets, activeIndex, onSelect, onAdd, disabled }) {
     )
   }
 
+  const activeItem  = sheets[activeIndex] ?? sheets[0]
+  const activeLabel = activeItem?.block.data?.label?.trim() || `Sheet ${activeIndex + 1}`
+
   return (
-    <div style={disabled ? { opacity: 0.6, pointerEvents: 'none' } : undefined}>
-      <PrescriptionPills
-        prescriptions={sheets.map((item, i) => ({
-          id:    item.block.id ?? `new-${item.globalIndex}`,
-          label: item.block.data?.label || `Sheet ${i + 1}`,
-        }))}
-        activeIndex={activeIndex}
-        onSelect={onSelect}
-        onAdd={onAdd}
-        addLabel="Add sheet"
-      />
-    </div>
-  )
-}
-
-// ─── Decision 6: ActiveSheetEditor — "Remove sheet" at bottom, no left border ──
-
-// Bug 2 fix: outer border div removed. BlockListEditor renders inside
-// ConditionEditor's SectionCard which already provides the card border —
-// wrapping again here created a nested box-inside-a-box (Decision 3 violation).
-// Content and "Remove sheet" button now render flat with only a top separator.
-function ActiveSheetEditor({ block, onPatchData, onDelete, disabled }) {
-  const [confirmOpen, setConfirmOpen] = useState(false)
-  return (
-    <div>
-      <PrescriptionSheetEditor
-        block={block}
-        onChange={onPatchData}
-        disabled={disabled}
-      />
-
-      {/* Decision 6: destructive action at the bottom, text-style danger link */}
+    <>
       <div style={{
-        paddingTop: 'var(--space-3)',
-        marginTop: 'var(--space-3)',
-        borderTop: '1px solid var(--color-border)',
-        display: 'flex',
-        justifyContent: 'flex-end',
+        display: 'flex', alignItems: 'flex-start', gap: 'var(--space-2)',
+        ...(disabled ? { opacity: 0.6, pointerEvents: 'none' } : {}),
       }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <PrescriptionPills
+            prescriptions={sheets.map((item, i) => ({
+              id:    item.block.id ?? `new-${item.globalIndex}`,
+              label: item.block.data?.label || `Sheet ${i + 1}`,
+            }))}
+            activeIndex={activeIndex}
+            onSelect={onSelect}
+            onAdd={onAdd}
+            addLabel="Add sheet"
+          />
+        </div>
         <button
+          type="button"
           onClick={() => setConfirmOpen(true)}
-          disabled={disabled}
-          aria-label="Remove this sheet"
+          aria-label={`Remove sheet ${activeLabel}`}
+          title="Remove this sheet"
           style={{
-            fontSize: 12,
-            fontFamily: 'var(--font-body)',
-            fontWeight: 500,
-            color: disabled ? '#9CA3AF' : '#DC2626',
-            backgroundColor: 'transparent',
-            border: 'none',
-            padding: '2px 0',
-            cursor: disabled ? 'default' : 'pointer',
-            textDecoration: 'underline',
-            textDecorationColor: disabled ? '#D1D5DB' : '#FECACA',
-            opacity: disabled ? 0.5 : 1,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            flexShrink: 0, width: 48, height: 48,
+            borderRadius: 'var(--radius-lg)',
+            border: '1px solid #FECACA', backgroundColor: '#FEF2F2', color: '#DC2626',
+            cursor: 'pointer', WebkitTapHighlightColor: 'transparent',
           }}
         >
-          Remove sheet
+          <Trash2 size={18} />
         </button>
       </div>
 
       <ConfirmModal
         isOpen={confirmOpen}
         onClose={() => setConfirmOpen(false)}
-        onConfirm={() => { setConfirmOpen(false); onDelete() }}
+        onConfirm={() => { setConfirmOpen(false); onRemove() }}
         title="Remove sheet?"
-        message={`"${block.data?.label?.trim() || 'This sheet'}" and everything in it will be removed from this condition.`}
+        message={`"${activeLabel}" and everything in it will be removed from this condition.`}
         confirmLabel="Remove"
         confirmVariant="danger"
+      />
+    </>
+  )
+}
+
+// ─── ActiveSheetEditor — no left border; "Remove sheet" is the trash icon in SheetPickerBar ──
+
+// Bug 2 fix: outer border div removed. BlockListEditor renders inside
+// ConditionEditor's SectionCard which already provides the card border —
+// wrapping again here created a nested box-inside-a-box (Decision 3 violation).
+// Content renders flat. (2026-11-10: the bottom "Remove sheet" link moved to a trash icon
+// beside the sheet selector, which asks for confirmation first.)
+function ActiveSheetEditor({ block, onPatchData, disabled }) {
+  return (
+    <div>
+      <PrescriptionSheetEditor
+        block={block}
+        onChange={onPatchData}
+        disabled={disabled}
       />
     </div>
   )
@@ -721,10 +719,20 @@ export default function BlockListEditor({ blocks = [], onChange, disabled = fals
   function addBlock(blockType) {
     const maxOrder = blocks.reduce((m, b) => Math.max(m, b.order_index ?? 0), -1)
     const context  = (blockType === 'prescription_sheet') ? undefined : (activeTab === 'rx' ? 'rx' : 'clinical')
+    const data = defaultData(blockType, context)
+    if (blockType === 'prescription_sheet') {
+      // New sheets are named "Sheet 1", "Sheet 2", … — the next number not already used.
+      const used = new Set(
+        blocks.filter(b => b.block_type === 'prescription_sheet').map(b => (b.data?.label ?? '').trim())
+      )
+      let n = blocks.filter(b => b.block_type === 'prescription_sheet').length + 1
+      while (used.has(`Sheet ${n}`)) n += 1
+      data.label = `Sheet ${n}`
+    }
     onChange([...blocks, {
       block_type:  blockType,
       order_index: maxOrder + 1,
-      data:        defaultData(blockType, context),
+      data,
       _isNew:      true,
     }])
   }
@@ -819,6 +827,10 @@ export default function BlockListEditor({ blocks = [], onChange, disabled = fals
                 addBlock('prescription_sheet')
                 setActiveSheetIndex(sheetItems.length)
               }}
+              onRemove={() => {
+                deleteBlock(activeSheetItem.globalIndex)
+                setActiveSheetIndex(Math.max(0, clampedSheetIndex - 1))
+              }}
               disabled={disabled}
             />
 
@@ -828,10 +840,6 @@ export default function BlockListEditor({ blocks = [], onChange, disabled = fals
               <ActiveSheetEditor
                 block={activeSheetItem.block}
                 onPatchData={(patch) => patchBlockData(activeSheetItem.globalIndex, patch)}
-                onDelete={() => {
-                  deleteBlock(activeSheetItem.globalIndex)
-                  setActiveSheetIndex(Math.max(0, clampedSheetIndex - 1))
-                }}
                 disabled={disabled}
               />
             )}
