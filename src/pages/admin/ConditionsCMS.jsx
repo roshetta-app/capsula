@@ -7,11 +7,20 @@
  *    both creating and editing conditions — no duplicate forms.
  *  - ConditionFormModal import removed entirely.
  *  - Specialties still fetched via fetchSpecialtiesForCMS() for the filter pills.
+ *
+ * 2026-11-10: the list now uses the same pieces as the app's Conditions screen:
+ *  - the app's search (buildConditionIndex / searchConditions from searchUtils —
+ *    same typo-tolerant, tiered matching; the app's useConditionSearch hook is not
+ *    used because it also writes search analytics, which CMS typing must not),
+ *  - the app's ConditionCard (icon, specialty, tagline, highlighted match),
+ *  - the app's A–Z letter dividers and the app's "no results" state.
+ *  CMS-only controls (publish dot, Draft tag, delete) sit in the card's trailing slot;
+ *  tapping a card opens the editor.
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Edit2, Trash2 } from 'lucide-react'
+import { Plus, Trash2 } from 'lucide-react'
 import { useConditionContext } from '../../context/ConditionContext'
 import { useToast } from '../../context/ToastContext'
 import { deleteCondition, toggleConditionPublished, fetchSpecialtiesForCMS } from '../../lib/adminQueries'
@@ -19,6 +28,11 @@ import { fetchAllConditions } from '../../lib/queries'
 import { supabase } from '../../lib/supabase'
 import ConfirmModal from '../../components/admin/ConfirmModal'
 import AdminPageHeader from '../../components/admin/AdminPageHeader'
+import ConditionCard from '../../components/ConditionCard'
+import ConditionsEmptyState from '../../components/conditions/ConditionsEmptyState'
+import AlphabetSectionDivider from '../../components/conditions/AlphabetSectionDivider'
+import { buildConditionIndex, searchConditions } from '../../utils/searchUtils'
+import { alphabetGroup } from '../../utils/alphabetGroup'
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
@@ -65,14 +79,19 @@ export default function ConditionsCMS() {
 
   // ─── Filter ────────────────────────────────────────────────────────────────
 
-  const filtered = conditions.filter(c => {
-    const matchesSpecialty = activeSpecialty === 'all' || c.specialtyId === activeSpecialty
-    const matchesQuery = !query.trim() || (
-      c.name?.toLowerCase().includes(query.toLowerCase()) ||
-      c.specialtyName?.toLowerCase().includes(query.toLowerCase())
-    )
-    return matchesSpecialty && matchesQuery
-  })
+  // Same search as the app: specialty first, then tiered search on that group.
+  // No typed text = the whole group, A–Z. Typed text = best match first.
+  const filtered = useMemo(() => {
+    const pool = activeSpecialty === 'all'
+      ? conditions
+      : conditions.filter(c => c.specialtyId === activeSpecialty)
+    const matched = searchConditions(buildConditionIndex(pool), pool, query) ?? pool
+    return query.trim().length === 0
+      ? [...matched].sort((a, b) => a.name.localeCompare(b.name))
+      : matched
+  }, [conditions, activeSpecialty, query])
+
+  const activeSpecialtyName = specialties.find(sp => sp.id === activeSpecialty)?.name_en ?? ''
 
   // ─── Delete ────────────────────────────────────────────────────────────────
 
@@ -105,6 +124,28 @@ export default function ConditionsCMS() {
       toast.success(next ? `"${condition.name}" published` : `"${condition.name}" unpublished`)
       await refreshPublicCache()
     }
+  }
+
+  function renderCard(condition, isLast) {
+    const isPublished = publishedOverrides[condition.id] ?? condition.isPublished ?? true
+    return (
+      <div key={condition.id} style={{ opacity: isPublished ? 1 : 0.65 }}>
+        <ConditionCard
+          condition={condition}
+          highlight={query}
+          activeSpecialty={activeSpecialty}
+          isLast={isLast}
+          onTap={() => navigate(`/admin/conditions/${condition.id}`)}
+          trailing={
+            <CardControls
+              isPublished={isPublished}
+              onTogglePublished={() => handleTogglePublished(condition)}
+              onDelete={() => setDeleteTarget(condition)}
+            />
+          }
+        />
+      </div>
+    )
   }
 
   // ─── Render ────────────────────────────────────────────────────────────────
@@ -188,29 +229,39 @@ export default function ConditionsCMS() {
           {loadingList ? 'Loading…' : `${filtered.length} condition${filtered.length !== 1 ? 's' : ''}`}
         </div>
 
-        {/* List */}
-        {!loadingList && filtered.length === 0 ? (
+        {/* List — app's cards, A–Z dividers when browsing, app's empty state */}
+        {loadingList ? null : conditions.length === 0 ? (
           <div style={{
             textAlign: 'center', padding: 'var(--space-12) var(--space-4)',
             color: 'var(--color-text-tertiary)', fontSize: 14,
           }}>
-            {query ? `No conditions matching "${query}"` : 'No conditions yet. Click "Add New" to create one.'}
+            No conditions yet. Click "Add New" to create one.
           </div>
+        ) : filtered.length === 0 ? (
+          <ConditionsEmptyState
+            query={query}
+            activeSpecialty={activeSpecialty}
+            specialtyName={activeSpecialtyName}
+            onClearSearch={() => setQuery('')}
+            onClearFilter={() => setActiveSpecialty('all')}
+          />
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-            {filtered.map(condition => {
-              const isPublished = publishedOverrides[condition.id] ?? condition.isPublished ?? true
-              return (
-                <ConditionRow
-                  key={condition.id}
-                  condition={condition}
-                  isPublished={isPublished}
-                  onEdit={() => navigate(`/admin/conditions/${condition.id}`)}
-                  onDelete={() => setDeleteTarget(condition)}
-                  onTogglePublished={() => handleTogglePublished(condition)}
-                />
-              )
-            })}
+          <div style={{
+            backgroundColor: 'var(--color-surface)',
+            border: '1px solid var(--color-border)',
+            borderRadius: 'var(--radius-lg)',
+            padding: '0 var(--space-4)',
+            boxShadow: 'var(--shadow-card)',
+          }}>
+            {query.trim()
+              ? filtered.map((condition, i) => renderCard(condition, i === filtered.length - 1))
+              : alphabetGroup(filtered).map(({ letter, items }, gi, groups) => (
+                  <div key={letter}>
+                    <AlphabetSectionDivider letter={letter} />
+                    {items.map((condition, i) =>
+                      renderCard(condition, gi === groups.length - 1 && i === items.length - 1))}
+                  </div>
+                ))}
           </div>
         )}
 
@@ -232,105 +283,53 @@ export default function ConditionsCMS() {
   )
 }
 
-// ─── Condition row ────────────────────────────────────────────────────────────
+// ─── CMS controls on each card ────────────────────────────────────────────────
+// Sits in the app card's trailing slot. Taps here must not open the editor.
 
-function ConditionRow({ condition, isPublished, onEdit, onDelete, onTogglePublished }) {
-  const rxCount = condition.prescriptions?.length ?? 0
-
+function CardControls({ isPublished, onTogglePublished, onDelete }) {
+  const stop = e => e.stopPropagation()
   return (
-    <div style={{
-      backgroundColor: 'var(--color-surface)',
-      border: `1px solid ${isPublished ? 'var(--color-border)' : 'var(--color-border-subtle)'}`,
-      borderRadius: 'var(--radius-lg)',
-      padding: 'var(--space-3) var(--space-4)',
-      boxShadow: 'var(--shadow-card)',
-      display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
-      opacity: isPublished ? 1 : 0.65,
-    }}>
-      {/* Publish toggle dot */}
+    <div
+      onClick={stop}
+      onPointerDown={stop}
+      onKeyDown={stop}
+      style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}
+    >
+      {!isPublished && (
+        <span style={{
+          fontSize: 10, fontWeight: 600, letterSpacing: '0.05em',
+          color: 'var(--color-text-tertiary)',
+          backgroundColor: 'var(--color-bg)',
+          border: '1px solid var(--color-border)',
+          padding: '1px 6px', borderRadius: 'var(--radius-full)',
+          textTransform: 'uppercase',
+        }}>
+          Draft
+        </span>
+      )}
       <button
         onClick={onTogglePublished}
         title={isPublished ? 'Published — click to unpublish' : 'Draft — click to publish'}
+        aria-label={isPublished ? 'Published — unpublish' : 'Draft — publish'}
         className="cms-tap-expand"
         style={{
-          flexShrink: 0,
-          width: 10, height: 10,
-          borderRadius: '50%',
-          border: 'none',
+          flexShrink: 0, width: 10, height: 10, borderRadius: '50%',
+          border: 'none', padding: 0, cursor: 'pointer',
           backgroundColor: isPublished ? 'var(--color-success)' : 'var(--color-border)',
-          cursor: 'pointer',
-          padding: 0,
         }}
       />
-
-      {/* Content */}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{
-          fontSize: 15, fontWeight: 600,
-          color: 'var(--color-text-primary)',
-          marginBottom: 'var(--space-1)',
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
-        }}>
-          {condition.name}
-          {!isPublished && (
-            <span style={{
-              fontSize: 10, fontWeight: 600, letterSpacing: '0.05em',
-              color: 'var(--color-text-tertiary)',
-              backgroundColor: 'var(--color-bg)',
-              border: '1px solid var(--color-border)',
-              padding: '1px 6px', borderRadius: 'var(--radius-full)',
-              textTransform: 'uppercase',
-            }}>
-              Draft
-            </span>
-          )}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
-          {condition.specialtyName && (
-            <span style={{
-              fontSize: 11, fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase',
-              color: 'var(--color-text-tertiary)', backgroundColor: 'var(--color-bg)',
-              border: '1px solid var(--color-border)', padding: '2px 8px', borderRadius: 'var(--radius-full)',
-            }}>
-              {condition.specialtyName}
-            </span>
-          )}
-          <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)' }}>
-            {rxCount} rx
-          </span>
-        </div>
-      </div>
-
-      {/* Actions */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexShrink: 0 }}>
-        <button
-          onClick={onEdit}
-          aria-label="Edit condition"
-          style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            width: 34, height: 34, borderRadius: 'var(--radius-md)',
-            border: '1px solid var(--color-border)',
-            backgroundColor: 'var(--color-surface)', color: 'var(--color-text-secondary)',
-            cursor: 'pointer',
-          }}
-        >
-          <Edit2 size={15} />
-        </button>
-        <button
-          onClick={onDelete}
-          aria-label="Delete condition"
-          style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            width: 34, height: 34, borderRadius: 'var(--radius-md)',
-            border: '1px solid #FECACA',
-            backgroundColor: '#FEF2F2', color: '#DC2626',
-            cursor: 'pointer',
-          }}
-        >
-          <Trash2 size={15} />
-        </button>
-      </div>
+      <button
+        onClick={onDelete}
+        aria-label="Delete condition"
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          width: 34, height: 34, borderRadius: 'var(--radius-md)',
+          border: '1px solid #FECACA', backgroundColor: '#FEF2F2', color: '#DC2626',
+          cursor: 'pointer',
+        }}
+      >
+        <Trash2 size={15} />
+      </button>
     </div>
   )
 }
