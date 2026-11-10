@@ -170,7 +170,8 @@
  *     DrugPickerModal) — the useDrugs cache is app-facing, not CMS-facing.
  */
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { Plus, X, Library, RotateCcw, Edit2, Check, ChevronDown, MoreHorizontal, StickyNote } from 'lucide-react'
 import DrugPickerModal from '../../DrugPickerModal'
 import { useDrugContext } from '../../../../context/DrugContext'
@@ -1491,16 +1492,71 @@ const addDrugDropdownItemStyle = {
   borderRadius: 'var(--radius-md)',
 }
 
+// 2026-11-10: a dropdown that is drawn in a top layer of the page (a portal on
+// <body>) and placed next to its button. A normal absolute menu lives inside the
+// drug card, so the cards after it paint on top of it. This one can never be
+// covered. It right- or left-aligns to the button, stays on screen, flips above
+// when there is no room below, and closes if the page scrolls or resizes.
+// anchorRef: the element the menu hangs from. innerRef: optional, receives the
+// menu element (for click-outside checks).
+function FloatingMenu({ anchorRef, onClose, align = 'right', minWidth = 170, innerRef = null, children }) {
+  const nodeRef = useRef(null)
+  const [pos, setPos] = useState(null)
+
+  useLayoutEffect(() => {
+    const a = anchorRef.current
+    const m = nodeRef.current
+    if (!a || !m) return
+    const ar = a.getBoundingClientRect()
+    const mw = m.offsetWidth
+    const mh = m.offsetHeight
+    let left = align === 'right' ? ar.right - mw : ar.left
+    left = Math.max(8, Math.min(left, window.innerWidth - mw - 8))
+    let top = ar.bottom + 4
+    if (top + mh > window.innerHeight - 8 && ar.top - mh - 4 > 8) top = ar.top - mh - 4
+    setPos({ left, top })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!onClose) return undefined
+    const close = () => onClose()
+    window.addEventListener('scroll', close, true)
+    window.addEventListener('resize', close)
+    return () => {
+      window.removeEventListener('scroll', close, true)
+      window.removeEventListener('resize', close)
+    }
+  }, [onClose])
+
+  return createPortal(
+    <div
+      data-floating-menu="true"
+      ref={el => { nodeRef.current = el; if (innerRef) innerRef.current = el }}
+      style={{
+        ...addDrugDropdownStyle,
+        position: 'fixed', top: pos?.top ?? 0, left: pos?.left ?? 0, marginTop: 0,
+        zIndex: 3000, minWidth, maxWidth: 'calc(100vw - 16px)',
+        visibility: pos ? 'visible' : 'hidden',
+      }}
+    >
+      {children}
+    </div>,
+    document.body
+  )
+}
+
 // 2026-11-08 CALMER: plain text, no dashed boxes.
 const quietAddStyle = { border: 'none', background: 'none', padding: '6px 4px', fontSize: 13 }
 
 function AddDrugControls({ onPickBrand, onPickFormulation, onAddManual, disabled = false }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef(null)
+  const anchorRef = useRef(null)
 
   // Dismiss on click-outside — same pattern as MoveMenu below.
   useEffect(() => {
     function handlePointerDown(e) {
+      if (e.target.closest?.('[data-floating-menu]')) return
       if (menuRef.current && !menuRef.current.contains(e.target)) {
         setMenuOpen(false)
       }
@@ -1519,7 +1575,7 @@ function AddDrugControls({ onPickBrand, onPickFormulation, onAddManual, disabled
       >
         <Plus size={12} /> Add a drug
       </button>
-      <div style={{ position: 'relative' }}>
+      <div ref={anchorRef}>
         <button
           type="button"
           onClick={() => setMenuOpen(v => !v)}
@@ -1529,7 +1585,7 @@ function AddDrugControls({ onPickBrand, onPickFormulation, onAddManual, disabled
           More options <ChevronDown size={12} />
         </button>
         {menuOpen && (
-          <div ref={el => { menuRef.current = el; fitMenuToScreen(el) }} style={{ ...addDrugDropdownStyle, maxWidth: 'calc(100vw - 16px)' }}>
+          <FloatingMenu anchorRef={anchorRef} innerRef={menuRef} align="left" onClose={() => setMenuOpen(false)}>
             <button
               type="button"
               onClick={() => { setMenuOpen(false); onPickFormulation() }}
@@ -1544,7 +1600,7 @@ function AddDrugControls({ onPickBrand, onPickFormulation, onAddManual, disabled
             >
               Add new drug
             </button>
-          </div>
+          </FloatingMenu>
         )}
       </div>
     </div>
@@ -1711,6 +1767,7 @@ function OptionActionsMenu({
 
   useEffect(() => {
     function handlePointerDown(e) {
+      if (e.target.closest?.('[data-floating-menu]')) return
       if (menuRef.current && !menuRef.current.contains(e.target)) {
         setOpen(false)
       }
@@ -1752,7 +1809,7 @@ function OptionActionsMenu({
         <MoreHorizontal size={13} />
       </button>
       {open && (
-        <div ref={fitMenuToScreen} style={{ ...addDrugDropdownStyle, maxWidth: 'calc(100vw - 16px)' }}>
+        <FloatingMenu anchorRef={menuRef} onClose={() => setOpen(false)}>
           {onAddNote && (
             <button
               type="button"
@@ -1819,7 +1876,7 @@ function OptionActionsMenu({
               Remove this drug from the sheet
             </button>
           )}
-        </div>
+        </FloatingMenu>
       )}
     </div>
   )
@@ -2934,8 +2991,10 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
   const [moreAddOpenIdx, setMoreAddOpenIdx] = useState(null)
   const [groupNoteEditIdx, setGroupNoteEditIdx] = useState(null) // which group's note box is being typed in (opened from the dose menu)
   const doseMenuRef = useRef(null)
+  const doseAnchorRef = useRef(null)
   useEffect(() => {
     function handlePointerDown(e) {
+      if (e.target.closest?.('[data-floating-menu]')) return
       if (doseMenuRef.current && !doseMenuRef.current.contains(e.target)) {
         setDoseMenuOpenGroupIdx(null)
       }
@@ -4581,7 +4640,7 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
                         {restoringGroupIdx === groupIdx ? 'Replacing…' : 'Use library version'}
                       </button>
                     )}
-                    <div style={{ position: 'relative', flexShrink: 0 }}>
+                    <div ref={doseMenuOpenGroupIdx === groupIdx ? doseAnchorRef : undefined} style={{ flexShrink: 0 }}>
                       <button
                         type="button"
                         onClick={() => setDoseMenuOpenGroupIdx(v => v === groupIdx ? null : groupIdx)}
@@ -4592,7 +4651,7 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
                         <MoreHorizontal size={14} />
                       </button>
                       {doseMenuOpenGroupIdx === groupIdx && (
-                        <div ref={el => { doseMenuRef.current = el; fitMenuToScreen(el) }} style={{ ...addDrugDropdownStyle, minWidth: 210, maxWidth: 'calc(100vw - 16px)' }}>
+                        <FloatingMenu anchorRef={doseAnchorRef} innerRef={doseMenuRef} minWidth={210} onClose={() => setDoseMenuOpenGroupIdx(null)}>
                           <button type="button" style={{ ...addDrugDropdownItemStyle, color: '#ef4444' }}
                             onClick={() => { setDoseMenuOpenGroupIdx(null); setConfirmClearGroup(groupIdx) }}>
                             Clear all doses
@@ -4625,7 +4684,7 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
                               </button>
                             </>
                           )}
-                        </div>
+                        </FloatingMenu>
                       )}
                     </div>
                   </div>
