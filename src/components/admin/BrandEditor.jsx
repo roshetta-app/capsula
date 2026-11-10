@@ -52,6 +52,8 @@ import RowMenu from './RowMenu'
  *                  brand itself; everything else is inherited from here.
  *   onChange     (brands) => void
  *   onDelete     (brandId) => void   — called for existing brands being removed
+ *   onInstantSave () => void         — called after an existing brand's publish / draft
+ *                  toggle was written to the database (the drug editor restarts its undo steps)
  *   disabled     boolean
  *   highlightBrandId  string|null — deep-link target brand id (12.4/12.5)
  */
@@ -61,6 +63,7 @@ export default function BrandEditor({
   formulation = {},
   onChange,
   onDelete,
+  onInstantSave,
   disabled = false,
   highlightBrandId = null,
   category = null,
@@ -122,6 +125,7 @@ export default function BrandEditor({
     setToggling(brand.id)
     const { error } = await updateBrand(brand.id, { is_published: newValue })
     setToggling(null)
+    onInstantSave?.()
 
     if (error) {
       // Revert

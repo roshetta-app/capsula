@@ -34,9 +34,9 @@
  * than kept alongside).
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo, Fragment } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { Plus, Save, Trash2, AlertTriangle, Check, ChevronDown, ChevronRight, Eye, EyeOff } from 'lucide-react'
+import { Plus, Save, Trash2, AlertTriangle, Check, ChevronDown, ChevronRight, Eye, EyeOff, Undo2, Redo2, ChevronsDownUp } from 'lucide-react'
 import { useToast } from '../../context/ToastContext'
 import { useDrugContext } from '../../context/DrugContext'
 import GenericEditor from '../../components/admin/GenericEditor'
@@ -57,6 +57,8 @@ import {
 } from '../../lib/adminQueries'
 import { supabase } from '../../lib/supabase'
 import AdminPageHeader from '../../components/admin/AdminPageHeader'
+import { UndoRedoButton, ToolButton } from '../../components/admin/EditorToolbarButtons'
+import { useSnapshotUndoRedo } from '../../hooks/useSnapshotUndoRedo'
 
 // ─── Empty states ─────────────────────────────────────────────────────────────
 
@@ -131,6 +133,34 @@ export default function DrugEditor() {
   const [globalError,   setGlobalError]   = useState(null)
   const [addingForm,    setAddingForm]    = useState(false)
   const [formFilter,    setFormFilter]    = useState(null)  // active form-chip filter, or null for all
+
+  // ── Undo / Redo (2026-11-10, this editing session only) ──────────────────────
+  // Covers edits not yet written to the database. Every write (Save on a formulation or the
+  // generic, add / delete a formulation, publish or draft toggles, a brand's instant publish
+  // toggle) restarts the steps from the page as it is then (writtenCount), so undo can never
+  // put on screen something the database no longer has. The editor fields are rebuilt after an
+  // undo or redo (restoreCount is their key) because some keep their own working copy while
+  // you type. Which cards are open is kept.
+  const [restoreCount, setRestoreCount] = useState(0)
+  const [writtenCount, setWrittenCount] = useState(0)
+  const markWritten = useCallback(() => setWrittenCount(n => n + 1), [])
+  const snapshot = useMemo(() => ({ generic, formulations }), [generic, formulations])
+  const restorePage = useCallback(page => {
+    setGeneric(page.generic)
+    setFormulations(page.formulations)
+    setRestoreCount(c => c + 1)
+  }, [])
+  const { canUndo, canRedo, undo, redo } = useSnapshotUndoRedo({
+    snapshot,
+    ready: !loading && generic !== null,
+    disabled: savingGeneric || savingFormId !== null || addingForm || deleting,
+    resetKey: writtenCount,
+    onRestore: restorePage,
+  })
+
+  // "Collapse all": closes Generic info and every formulation (their brands and doses close
+  // with them, because a closed card does not keep its inside open).
+  function collapseAll() { setGenericOpen(false); setOpenFormId(null) }
 
   // ── Deep link (12.4/12.5) — a brand row on the CMS drug library screen
   // links here with ?formulation=<id>&brand=<id> so this page can land
@@ -253,6 +283,7 @@ export default function DrugEditor() {
     setSavingGeneric(false)
     if (error) { setGlobalError(`Generic: ${error.message}`); return }
     baseGeneric.current = savedSnap
+    markWritten()
     setSavedGeneric(true)
     setTimeout(() => setSavedGeneric(false), 2500)
     await touchAppMetadata('drugs_updated_at')
@@ -326,6 +357,7 @@ export default function DrugEditor() {
     } else {
       baseForms.current[f.id] = snapForm(f)
     }
+    markWritten()
     setSavingFormId(null)
     setSavedFormId(f.id)
     setTimeout(() => setSavedFormId(null), 2500)
@@ -376,6 +408,7 @@ export default function DrugEditor() {
       await load()
     }
     setOpenFormId(newF.id)
+    markWritten()
     toast.success('Formulation added — fill in the details and save')
   }
 
@@ -386,9 +419,11 @@ export default function DrugEditor() {
     const { error } = await updateFormulation(f.id, { is_published: next })
     if (error) {
       patchFormulation(f.id, { is_published: !next })
+      markWritten()
       toast.error(`Could not update: ${error.message}`)
       return
     }
+    markWritten()
     await touchAppMetadata('drugs_updated_at')
     await refresh()
     toast.success(next ? 'Formulation published' : 'Formulation set to draft')
@@ -403,6 +438,7 @@ export default function DrugEditor() {
     setDeleting(false)
     if (error) { setGlobalError(`Delete: ${error.message}`); return }
     setFormulations(prev => prev.filter(x => x.id !== f.id))
+    markWritten()
     if (openFormId === f.id) setOpenFormId(null)
     await refresh()
     toast.success('Formulation deleted')
@@ -457,12 +493,23 @@ export default function DrugEditor() {
   const genericValid = generic?.ingredients?.length > 0 && generic?.category
 
   return (
-    <AdminPageHeader title={generic?.name_en ?? 'Drug'}>
+    <AdminPageHeader
+      title={generic?.name_en ?? 'Drug'}
+      sticky
+      actions={
+        <div className="cms-editor-bar" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+          <ToolButton label="Collapse all" onClick={collapseAll}><ChevronsDownUp size={15} /></ToolButton>
+          <UndoRedoButton label="Undo" onClick={undo} disabled={!canUndo}><Undo2 size={16} /></UndoRedoButton>
+          <UndoRedoButton label="Redo" onClick={redo} disabled={!canRedo}><Redo2 size={16} /></UndoRedoButton>
+        </div>
+      }
+    >
 
       {globalError && (
         <ErrorBanner message={globalError} onDismiss={() => setGlobalError(null)} />
       )}
 
+      <Fragment key={restoreCount}>
       {/* ── Identity — always open, outside the collapsible Generic info ──── */}
       <GenericEditor
         part="identity"
@@ -702,6 +749,7 @@ export default function DrugEditor() {
                     category={generic?.category ?? null}
                     ingredients={generic?.ingredients ?? []}
                     disabled={isSaving}
+                    onInstantSave={markWritten}
                     highlightBrandId={f.id === targetFormulationId ? targetBrandId : null}
                   />
                 </div>
@@ -733,6 +781,8 @@ export default function DrugEditor() {
           {addingForm ? 'Adding…' : 'Add Formulation'}
         </button>
       </div>
+
+      </Fragment>
 
       {/* One Save for the generic (Identity + Generic info). It appears only when something is
           unsaved, and floats so it is reachable from anywhere on the page. */}
