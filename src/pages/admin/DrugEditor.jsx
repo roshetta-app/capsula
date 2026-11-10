@@ -88,7 +88,7 @@ const snapForm = f => {
   return JSON.stringify({
     ...rest,
     brands: (brands ?? []).map(b => b.id
-      ? { id: b.id, tradename_clean: b.tradename_clean, manufacturer: b.manufacturer ?? null, _deleted: !!b._deleted }
+      ? { id: b.id, tradename_clean: b.tradename_clean, manufacturer: b.manufacturer ?? null, name_ar: b.name_ar ?? null, name_ar_full: b.name_ar_full ?? null, _deleted: !!b._deleted }
       : b),
   })
 }
@@ -98,7 +98,7 @@ const FORMULATION_SELECT = `
   strength_value, strength_unit, strength_basis, strength_structured,
   form_modifier, device_type, route_details, formulation_note,
   doses_structured, default_dose_override, is_published,
-  brands ( id, tradename_clean, manufacturer, pack_size, fill_volume, is_published )
+  brands ( id, tradename_clean, manufacturer, name_ar, name_ar_full, pack_size, fill_volume, is_published )
 `
 const toFormulationState = f => ({
   ...f,
@@ -184,7 +184,7 @@ export default function DrugEditor() {
     const { data: gData, error: gErr } = await supabase
       .from('generics')
       .select(`
-        id, slug, name_en, ingredients, category, class, is_published,
+        id, slug, name_en, ingredients, category, class, subclass, is_published,
         mechanism_of_action,
         uses_structured,
         warnings_legacy,
@@ -262,6 +262,7 @@ export default function DrugEditor() {
       name_en:              (generic.ingredients ?? []).join(' + '),
       category:             generic.category,
       class:                generic.class?.trim() || null,
+      subclass:             generic.subclass?.trim() || null,
       is_published:         generic.is_published ?? true,
       mechanism_of_action:  generic.mechanism_of_action?.trim() || null,
       uses_structured:      generic.uses_structured ?? null,
@@ -289,6 +290,14 @@ export default function DrugEditor() {
     await touchAppMetadata('drugs_updated_at')
     await refresh()
     toast.success('Generic saved')
+  }
+
+  // Brands of a formulation as they were when loaded / last saved, by id (for the Arabic-name check).
+  function baseBrandsOf(formId) {
+    try {
+      const snap = JSON.parse(baseForms.current[formId])
+      return Object.fromEntries((snap.brands ?? []).filter(b => b.id).map(b => [b.id, b]))
+    } catch { return null }
   }
 
   // ── Save formulation ────────────────────────────────────────────────────────
@@ -331,6 +340,21 @@ export default function DrugEditor() {
           tradename_clean: brandName,
           manufacturer:    brand.manufacturer?.trim() || null,
           is_published:    brand.is_published ?? true,
+          name_ar:         brand.name_ar?.trim() || null,
+          name_ar_full:    brand.name_ar_full?.trim() || null,
+        }
+        // An Arabic name typed or changed here is marked as hand-edited, so later batch
+        // imports can tell it apart from the machine-filled ones. Untouched names keep
+        // their status and source.
+        const before = (baseBrandsOf(f.id) ?? {})[brand.id]
+        if (!brand.id || !before || before.name_ar !== payload.name_ar || before.name_ar_full !== payload.name_ar_full) {
+          if (payload.name_ar || payload.name_ar_full) {
+            payload.name_ar_status = 'manual'
+            payload.name_ar_source = 'cms'
+          } else if (brand.id) {
+            payload.name_ar_status = null
+            payload.name_ar_source = null
+          }
         }
         if (brand.id) {
           const { error } = await updateBrand(brand.id, payload)

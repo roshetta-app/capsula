@@ -24,8 +24,11 @@ import RowMenu from './RowMenu'
  * stop propagation so they don't also trigger expand/collapse — same
  * pattern already used for DrugEditor.jsx's own SectionCard deleteSlot.
  *
- * Arabic name and source dropped entirely (decision 26) — no CMS field, no
- * app read, no DB column. Name field is `brands.tradename_clean`, not the
+ * Arabic name and source were dropped here once (decision 26). 2026-11-10: the Arabic
+ * brand name (brands.name_ar) and the full Arabic title (brands.name_ar_full) are back as two
+ * fields in the open row, right to left. The app already reads both; they were just not
+ * editable. Editing either one marks the brand as hand-edited when the formulation is saved
+ * (see DrugEditor.saveFormulation). Name field is `brands.tradename_clean`, not the
  * legacy `brands.name` (decision 21's fix for this file specifically).
  *
  * 12.4/12.5 — accepts an optional `highlightBrandId`, the deep-link target
@@ -169,8 +172,8 @@ export default function BrandEditor({
       routeDetails:   formulation.route_details,
       packSize:       brand.pack_size,
       fillVolume:     brand.fill_volume,
-      nameAr:         null,
-      nameArFull:     null,
+      nameAr:         brand.name_ar ?? null,
+      nameArFull:     brand.name_ar_full ?? null,
     }
   }
 
@@ -269,8 +272,34 @@ export default function BrandEditor({
                         style={inputStyle}
                       />
                     </div>
+                    <div style={{ flex: '1 1 160px', minWidth: 0 }}>
+                      <SmallLabel>Arabic name</SmallLabel>
+                      <input
+                        type="text"
+                        dir="rtl"
+                        lang="ar"
+                        value={brand.name_ar ?? ''}
+                        onChange={e => updateLocal(idx, 'name_ar', e.target.value)}
+                        disabled={disabled}
+                        placeholder="الاسم بالعربي"
+                        style={{ ...inputStyle, textAlign: 'right' }}
+                      />
+                    </div>
+                    <div style={{ flex: '1 1 160px', minWidth: 0 }}>
+                      <SmallLabel>Arabic full title</SmallLabel>
+                      <input
+                        type="text"
+                        dir="rtl"
+                        lang="ar"
+                        value={brand.name_ar_full ?? ''}
+                        onChange={e => updateLocal(idx, 'name_ar_full', e.target.value)}
+                        disabled={disabled}
+                        placeholder="الاسم + التركيز + العبوة"
+                        style={{ ...inputStyle, textAlign: 'right' }}
+                      />
+                    </div>
                     <div style={{ flexBasis: '100%', display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-text-tertiary)' }}>
-                      <Pencil size={11} /> Name and manufacturer save with the formulation's Save button.
+                      <Pencil size={11} /> Names and manufacturer save with the formulation's Save button.
                       {busy && ' Saving…'}
                     </div>
                   </div>

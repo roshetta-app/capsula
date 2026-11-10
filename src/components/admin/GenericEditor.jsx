@@ -31,10 +31,13 @@
 
 import { useEffect, useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
-import { fetchCategoriesForCMS, fetchDistinctSources } from '../../lib/adminQueries'
+import { fetchCategoriesForCMS, fetchDistinctSources, fetchClassFamilyPairs } from '../../lib/adminQueries'
 import TagInput   from './TagInput'
 import DoseRowList from './DoseRowList'
 import { SectionCard, SectionCardHeader, FieldLabel } from './adminSectionPrimitives'
+
+// Class / family names already used, read once per page visit (see classPairs below).
+let classPairsCache = null
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -48,6 +51,19 @@ export default function GenericEditor({ generic = {}, onChange, disabled = false
 
   const [categories, setCategories] = useState([])
   const [knownSources, setKnownSources] = useState([])
+  // Existing class / family names, offered while typing so the spelling matches the
+  // other drugs (classes and families are plain text, matched exactly by the app).
+  const [classPairs, setClassPairs] = useState(classPairsCache ?? [])
+
+  useEffect(() => {
+    if (part === 'rest' || classPairsCache) return undefined
+    let cancelled = false
+    fetchClassFamilyPairs().then(({ data }) => {
+      if (data) classPairsCache = data
+      if (!cancelled && data) setClassPairs(data)
+    })
+    return () => { cancelled = true }
+  }, [part])
 
   useEffect(() => {
     let cancelled = false
@@ -226,6 +242,7 @@ export default function GenericEditor({ generic = {}, onChange, disabled = false
           <Field label="Drug class / group" style={{ flex: 1 }}>
             <input
               type="text"
+              list="drug-class-options"
               value={generic.class ?? ''}
               onChange={e => set('class', e.target.value)}
               placeholder="e.g. Beta-lactam antibiotic"
@@ -234,6 +251,26 @@ export default function GenericEditor({ generic = {}, onChange, disabled = false
             />
           </Field>
         </div>
+
+        <Field label="Subclass / family">
+          <input
+            type="text"
+            list="drug-subclass-options"
+            value={generic.subclass ?? ''}
+            onChange={e => set('subclass', e.target.value)}
+            placeholder="e.g. Penicillins"
+            disabled={disabled}
+            style={inputStyle}
+          />
+        </Field>
+        <datalist id="drug-class-options">
+          {[...new Set(classPairs.map(p => p.class))].sort().map(c => <option key={c} value={c} />)}
+        </datalist>
+        <datalist id="drug-subclass-options">
+          {[...new Set(classPairs
+            .filter(p => p.subclass && (!(generic.class ?? '').trim() || p.class === (generic.class ?? '').trim()))
+            .map(p => p.subclass))].sort().map(s => <option key={s} value={s} />)}
+        </datalist>
 
         <Field label="Published">
           <ToggleSwitch
