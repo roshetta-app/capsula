@@ -34,10 +34,14 @@ export default function FreeTextPostBlock({ block }) {
   if (!markdown.trim() && !title.trim()) return null
 
   return (
-    <div
-      dir="auto"
-      className="dir-prose"
-      dangerouslySetInnerHTML={{ __html: renderTitledMarkdown(title, markdown) }}
-    />
+    // 2026-11-11: every text block (Clinical, Rx-level, inside a sheet) uses the
+    // same tight look the sheet text rows had (rx-prose-tight in globals.css).
+    <div className="rx-prose-tight">
+      <div
+        dir="auto"
+        className="dir-prose"
+        dangerouslySetInnerHTML={{ __html: renderTitledMarkdown(title, markdown) }}
+      />
+    </div>
   )
 }

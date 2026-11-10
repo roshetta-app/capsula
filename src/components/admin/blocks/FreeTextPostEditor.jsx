@@ -432,11 +432,13 @@ export default function FreeTextPostEditor({ data, onChange, disabled = false })
 
       {/* Write view: Word-style box with its own toolbar */}
       {viewMode === 'Write' && (
-        <RichTextEditorBox
-          value={markdown}
-          onChange={handleChange}
-          disabled={disabled}
-        />
+        <div className="rx-prose-tight">
+          <RichTextEditorBox
+            value={markdown}
+            onChange={handleChange}
+            disabled={disabled}
+          />
+        </div>
       )}
 
       {/* Code view: formatting toolbar for the plain text box */}
@@ -457,7 +459,9 @@ export default function FreeTextPostEditor({ data, onChange, disabled = false })
       )}
 
       {viewMode === 'Preview' && (
-        <PreviewPanel title={title} markdown={markdown} />
+        <div className="rx-prose-tight">
+          <PreviewPanel title={title} markdown={markdown} />
+        </div>
       )}
     </div>
   )
