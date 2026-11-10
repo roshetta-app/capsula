@@ -1311,16 +1311,17 @@ function PopulationTabs({ whos, activeIdx, shownIdx = 0, renaming = false, panel
       <button
         type="button"
         onClick={onAddTap}
-        aria-label="Add a patient group"
+        aria-label="Add another patient group"
+        title="Add another patient group"
         aria-expanded={addOpen}
         style={{
-          ...chipBase, padding: '6px 12px',
+          ...chipBase, padding: '6px 10px',
           border: '1px dashed var(--color-accent)',
           background: addOpen ? 'var(--color-accent-light)' : 'none',
           color: 'var(--color-accent)',
         }}
       >
-        <Plus size={14} /> Add another
+        <Plus size={16} />
       </button>
     </div>
   )
