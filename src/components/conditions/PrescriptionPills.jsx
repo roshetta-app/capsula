@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Check, ChevronDown } from 'lucide-react'
+import { Check, ChevronDown, Plus } from 'lucide-react'
 
 /**
  * PrescriptionPills — selector for choosing between treatment plans.
@@ -20,10 +20,13 @@ import { Check, ChevronDown } from 'lucide-react'
  *     with a radio ring on the left (filled with a check when active) and
  *     an accent tint on the active row. No hairlines between rows.
  *
- * Props are unchanged: { prescriptions: [{id, label}], activeIndex, onSelect }.
+ * Props: { prescriptions: [{id, label}], activeIndex, onSelect }, plus one optional
+ * pair used only by the CMS condition editor: onAdd (() => void) adds a dashed
+ * "Add sheet" row at the bottom of the menu, and addLabel changes its text.
+ * The app passes neither, so it is unchanged.
  */
 
-export default function PrescriptionPills({ prescriptions, activeIndex, onSelect }) {
+export default function PrescriptionPills({ prescriptions, activeIndex, onSelect, onAdd, addLabel = 'Add sheet' }) {
   const [open, setOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [pressed, setPressed] = useState(false)
@@ -298,6 +301,39 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
               </button>
             )
           })}
+
+          {onAdd && (
+            <button
+              type="button"
+              onClick={() => { setOpen(false); onAdd() }}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                minHeight: 48,
+                padding: '10px 12px',
+                marginTop: 4,
+                textAlign: 'left',
+                cursor: 'pointer',
+                fontFamily: 'var(--font-body)',
+                fontSize: 14,
+                fontWeight: 600,
+                color: accentText,
+                background: 'transparent',
+                border: '1.5px dashed var(--color-border)',
+                borderRadius: 12,
+                boxSizing: 'border-box',
+                WebkitTapHighlightColor: 'transparent',
+                outline: 'none',
+              }}
+            >
+              <span style={{ width: 22, height: 22, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Plus size={16} strokeWidth={2.4} aria-hidden="true" />
+              </span>
+              {addLabel}
+            </button>
+          )}
         </div>
       )}
     </div>

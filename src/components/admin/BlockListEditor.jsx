@@ -25,6 +25,8 @@ import FreeTextPostEditor      from './blocks/FreeTextPostEditor'
 import NoteCalloutEditor       from './blocks/NoteCalloutEditor'
 import BlockDivider            from '../conditions/BlockDivider'
 import PrescriptionSheetEditor from './blocks/PrescriptionSheetEditor'
+import PrescriptionPills from '../conditions/PrescriptionPills'
+import ConfirmModal from './ConfirmModal'
 import { CollapseAllContext } from './CollapseAllContext'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -428,60 +430,46 @@ function SubTabBar({ active, onChange }) {
 
 // ─── SheetPickerBar ───────────────────────────────────────────────────────────
 
+// The app's treatment-plan selector (PrescriptionPills), with an "Add sheet" row in its
+// menu. Shown even for a single sheet so there is always a way to add another.
+// With no sheets yet there is nothing to select, so only the Add button shows.
 function SheetPickerBar({ sheets, activeIndex, onSelect, onAdd, disabled }) {
-  return (
-    <div style={{
-      display: 'flex',
-      gap: 'var(--space-2)',
-      flexWrap: 'wrap',
-      alignItems: 'center',
-      marginBottom: 'var(--space-4)',
-    }}>
-      {sheets.map((item, localIndex) => {
-        const isActive = localIndex === activeIndex
-        return (
-          <button
-            key={item.globalIndex}
-            onClick={() => onSelect(localIndex)}
-            disabled={disabled}
-            style={{
-              padding: '5px 14px',
-              borderRadius: 'var(--radius-md)',
-              fontSize: 13,
-              fontWeight: isActive ? 600 : 400,
-              fontFamily: 'var(--font-body)',
-              cursor: disabled ? 'default' : 'pointer',
-              border: isActive
-                ? '1.5px solid var(--color-accent)'
-                : '1px solid var(--color-border)',
-              backgroundColor: isActive ? 'var(--color-accent)' : 'var(--color-surface)',
-              color: isActive ? '#ffffff' : 'var(--color-text-secondary)',
-              transition: 'all 0.15s ease',
-            }}
-          >
-            {item.block.data?.label || `Sheet ${localIndex + 1}`}
-          </button>
-        )
-      })}
+  if (sheets.length === 0) {
+    return (
+      <div style={{ marginBottom: 'var(--space-4)' }}>
+        <button
+          onClick={onAdd}
+          disabled={disabled}
+          style={{
+            padding: '5px 14px',
+            borderRadius: 'var(--radius-md)',
+            fontSize: 13, fontWeight: 400,
+            fontFamily: 'var(--font-body)',
+            cursor: disabled ? 'default' : 'pointer',
+            border: '1.5px dashed var(--color-border)',
+            backgroundColor: 'transparent',
+            color: 'var(--color-text-secondary)',
+            opacity: disabled ? 0.4 : 1,
+          }}
+        >
+          + Add Sheet
+        </button>
+      </div>
+    )
+  }
 
-      <button
-        onClick={onAdd}
-        disabled={disabled}
-        style={{
-          padding: '5px 14px',
-          borderRadius: 'var(--radius-md)',
-          fontSize: 13, fontWeight: 400,
-          fontFamily: 'var(--font-body)',
-          cursor: disabled ? 'default' : 'pointer',
-          border: '1.5px dashed var(--color-border)',
-          backgroundColor: 'transparent',
-          color: 'var(--color-text-secondary)',
-          opacity: disabled ? 0.4 : 1,
-          transition: 'all 0.15s ease',
-        }}
-      >
-        + Add Sheet
-      </button>
+  return (
+    <div style={disabled ? { opacity: 0.6, pointerEvents: 'none' } : undefined}>
+      <PrescriptionPills
+        prescriptions={sheets.map((item, i) => ({
+          id:    item.block.id ?? `new-${item.globalIndex}`,
+          label: item.block.data?.label || `Sheet ${i + 1}`,
+        }))}
+        activeIndex={activeIndex}
+        onSelect={onSelect}
+        onAdd={onAdd}
+        addLabel="Add sheet"
+      />
     </div>
   )
 }
@@ -493,6 +481,7 @@ function SheetPickerBar({ sheets, activeIndex, onSelect, onAdd, disabled }) {
 // wrapping again here created a nested box-inside-a-box (Decision 3 violation).
 // Content and "Remove sheet" button now render flat with only a top separator.
 function ActiveSheetEditor({ block, onPatchData, onDelete, disabled }) {
+  const [confirmOpen, setConfirmOpen] = useState(false)
   return (
     <div>
       <PrescriptionSheetEditor
@@ -510,7 +499,7 @@ function ActiveSheetEditor({ block, onPatchData, onDelete, disabled }) {
         justifyContent: 'flex-end',
       }}>
         <button
-          onClick={onDelete}
+          onClick={() => setConfirmOpen(true)}
           disabled={disabled}
           aria-label="Remove this sheet"
           style={{
@@ -530,6 +519,16 @@ function ActiveSheetEditor({ block, onPatchData, onDelete, disabled }) {
           Remove sheet
         </button>
       </div>
+
+      <ConfirmModal
+        isOpen={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={() => { setConfirmOpen(false); onDelete() }}
+        title="Remove sheet?"
+        message={`"${block.data?.label?.trim() || 'This sheet'}" and everything in it will be removed from this condition.`}
+        confirmLabel="Remove"
+        confirmVariant="danger"
+      />
     </div>
   )
 }
