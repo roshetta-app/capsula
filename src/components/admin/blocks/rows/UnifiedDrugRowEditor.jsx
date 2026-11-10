@@ -1211,7 +1211,7 @@ function PopulationTabs({ whos, activeIdx, shownIdx = 0, renaming = false, panel
               type="button"
               onClick={onActiveTap}
               aria-expanded={panelOpen}
-              title="Rename, show in the app, or remove this patient group"
+              title="Pick a library group, rename, show in the app, or remove"
               style={{
                 ...chipBase,
                 border: '1px solid var(--color-accent)',
@@ -1248,13 +1248,13 @@ function PopulationTabs({ whos, activeIdx, shownIdx = 0, renaming = false, panel
         aria-label="Add a patient group"
         aria-expanded={addOpen}
         style={{
-          ...chipBase, padding: '6px 10px',
+          ...chipBase, padding: '6px 12px',
           border: '1px dashed var(--color-accent)',
           background: addOpen ? 'var(--color-accent-light)' : 'none',
           color: 'var(--color-accent)',
         }}
       >
-        <Plus size={14} />
+        <Plus size={14} /> Add another
       </button>
     </div>
   )
@@ -3074,7 +3074,7 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
   const [chipPanelGroupIdx, setChipPanelGroupIdx] = useState(null)
   const [newGroupForm, setNewGroupForm] = useState(null) // { groupIdx, name, show, replace } | null
   const [moreAddOpenIdx, setMoreAddOpenIdx] = useState(null)
-  const [libPickIdx, setLibPickIdx] = useState(null) // groupIdx whose "From library" list is open
+  const [confirmLibSwitch, setConfirmLibSwitch] = useState(null) // { groupIdx, pop } waiting for a yes
   const [groupNoteEditIdx, setGroupNoteEditIdx] = useState(null) // which group's note box is being typed in (opened from the dose menu)
   const doseMenuRef = useRef(null)
   const doseAnchorRef = useRef(null)
@@ -4278,102 +4278,113 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
                               </button>
                             )
                           )}
-                          {libGroups.length > 0 && (
-                            <button type="button" style={doseSecondaryButtonStyle}
-                              onClick={() => setLibPickIdx(cur => (cur === groupIdx ? null : groupIdx))}>
-                              <Library size={13} /> From library
-                            </button>
-                          )}
                           {many && (
                             <button type="button" style={{ ...doseSecondaryButtonStyle, color: '#ef4444' }}
                               onClick={() => { setChipPanelGroupIdx(null); setConfirmRemovePop(groupIdx) }}>
-                              <X size={13} /> Remove
+                              <X size={13} /> Remove from this Rx
                             </button>
                           )}
                         </div>
                       )}
 
-                      {chipPanelGroupIdx === groupIdx && libPickIdx === groupIdx && libGroups.length > 0 && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '10px 12px', borderRadius: 10, border: '1px solid var(--color-border)', background: 'var(--color-bg)' }}>
-                          <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
-                            Switch this patient group to one saved in the library. Its doses are replaced.
+                      {chipPanelGroupIdx === groupIdx && renamingGroupIdx !== groupIdx && libGroups.length > 0 && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-secondary)' }}>
+                            Patient groups in the library
                           </span>
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                            {libGroups.map((pop, pi) => (
-                              <button
-                                key={pop.id ?? pi}
-                                type="button"
-                                style={{ ...doseSecondaryButtonStyle, fontWeight: 700 }}
-                                onClick={() => {
-                                  setLibPickIdx(null)
-                                  setChipPanelGroupIdx(null)
-                                  applyDoseToGroup(groupIdx, buildDoseLinesFromPopulation(pop))
-                                }}
-                              >
-                                {pop.population ? doseWhoLabel(pop.population) : 'General dose'}
-                              </button>
-                            ))}
+                            {libGroups.map((pop, pi) => {
+                              const isCurrent = (pop.population ?? '').trim().toLowerCase() === (rg.dose_who ?? '').trim().toLowerCase() && !!pop.population
+                              return (
+                                <button
+                                  key={pop.id ?? pi}
+                                  type="button"
+                                  style={{ ...doseSecondaryButtonStyle, fontWeight: 700, ...(isCurrent ? { borderColor: 'var(--color-accent)', color: 'var(--color-accent)' } : null) }}
+                                  onClick={() => {
+                                    if (isCurrent) { setChipPanelGroupIdx(null); return }
+                                    if (emptyDose) {
+                                      setChipPanelGroupIdx(null)
+                                      applyDoseToGroup(groupIdx, buildDoseLinesFromPopulation(pop))
+                                    } else {
+                                      setConfirmLibSwitch({ groupIdx, pop })
+                                    }
+                                  }}
+                                >
+                                  {isCurrent && <Check size={12} />}
+                                  {pop.population ? doseWhoLabel(pop.population) : 'General dose'}
+                                </button>
+                              )
+                            })}
                           </div>
+                          {confirmLibSwitch?.groupIdx === groupIdx && (
+                            <ConfirmBar
+                              text={`Switch to ${confirmLibSwitch.pop.population ? doseWhoLabel(confirmLibSwitch.pop.population) : 'General dose'}? The doses in this patient group are replaced by the library's.`}
+                              confirmLabel="Switch"
+                              danger={false}
+                              onConfirm={() => {
+                                const pop = confirmLibSwitch.pop
+                                setConfirmLibSwitch(null)
+                                setChipPanelGroupIdx(null)
+                                applyDoseToGroup(groupIdx, buildDoseLinesFromPopulation(pop))
+                              }}
+                              onCancel={() => setConfirmLibSwitch(null)}
+                            />
+                          )}
                         </div>
                       )}
 
                       {newGroupForm?.groupIdx === groupIdx && (() => {
                         const f = newGroupForm
-                        const currentName = rg.dose_who?.trim() ? doseWhoLabel(rg.dose_who) : null
                         const canCreate = !!f.name.trim()
-                        const checkRow = { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--color-text-primary)', cursor: 'pointer' }
+                        const taken = [rg.dose_who, ...(rg.extra_populations ?? []).map(e => e.dose_who)]
+                          .map(w => (w ?? '').trim().toLowerCase())
+                        const freeLib = libGroups.filter(pop => !taken.includes((pop.population ?? '').trim().toLowerCase()))
+                        const suggestions = ['Adult', 'Child', 'Neonate', 'Elderly', 'Renal impairment', 'Hepatic impairment', 'Pregnancy']
+                          .filter(n => !taken.includes(n.toLowerCase()))
                         return (
                           <div style={{
                             display: 'flex', flexDirection: 'column', gap: 10,
                             padding: '10px 12px', borderRadius: 10,
                             border: '1px solid var(--color-accent)', background: 'var(--color-bg)',
                           }}>
-                            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text-primary)' }}>New patient group</span>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text-primary)' }}>Add another patient group</span>
+                            {freeLib.length > 0 && (
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                                {freeLib.map((pop, pi) => (
+                                  <button
+                                    key={pop.id ?? pi}
+                                    type="button"
+                                    style={{ ...doseSecondaryButtonStyle, fontWeight: 700 }}
+                                    onClick={() => createPopulation(groupIdx, { name: null, show: false, replace: false, library: pop })}
+                                  >
+                                    <Library size={12} /> {pop.population ? doseWhoLabel(pop.population) : 'General dose'}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-secondary)' }}>New group</span>
                             <input
                               type="text"
                               value={f.name}
                               onChange={e => setNewGroupForm({ ...f, name: e.target.value })}
-                              onKeyDown={e => { if (e.key === 'Enter' && canCreate) createPopulation(groupIdx, f) }}
+                              onKeyDown={e => { if (e.key === 'Enter' && canCreate) createPopulation(groupIdx, { ...f, show: false, replace: false }) }}
                               placeholder="Name, e.g. Children"
                               dir="auto"
-                              autoFocus
                               style={{ ...doseFieldInputStyle, width: '100%', boxSizing: 'border-box' }}
                             />
-                            {libGroups.length > 0 && (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>Or add one saved in the library:</span>
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                                  {libGroups.map((pop, pi) => (
-                                    <button
-                                      key={pop.id ?? pi}
-                                      type="button"
-                                      style={{ ...doseSecondaryButtonStyle, fontWeight: 700 }}
-                                      onClick={() => createPopulation(groupIdx, { name: null, show: f.show, replace: f.replace, library: pop })}
-                                    >
-                                      <Library size={12} /> {pop.population ? doseWhoLabel(pop.population) : 'General dose'}
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                            <label style={checkRow}>
-                              <input type="checkbox" checked={f.show} onChange={e => setNewGroupForm({ ...f, show: e.target.checked })} />
-                              Show this one in the app
-                            </label>
-                            <label style={checkRow}>
-                              <input type="checkbox" checked={f.replace} onChange={e => setNewGroupForm({ ...f, replace: e.target.checked })} />
-                              Replace {currentName ? `“${currentName}”` : 'the current group'}
-                            </label>
-                            {f.replace && (
-                              <span style={{ fontSize: 12, color: '#B45309' }}>
-                                Its doses are removed from this sheet. The library keeps its own copy.
-                              </span>
-                            )}
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                              {suggestions.map(n => (
+                                <button key={n} type="button" style={doseSecondaryButtonStyle}
+                                  onClick={() => setNewGroupForm({ ...f, name: n })}>
+                                  {n}
+                                </button>
+                              ))}
+                            </div>
                             <div style={{ display: 'flex', gap: 8 }}>
                               <button
                                 type="button"
                                 disabled={!canCreate}
-                                onClick={() => createPopulation(groupIdx, f)}
+                                onClick={() => createPopulation(groupIdx, { ...f, show: false, replace: false })}
                                 style={{ ...dosePrimaryButtonStyle, opacity: canCreate ? 1 : 0.5 }}
                               >
                                 Create
