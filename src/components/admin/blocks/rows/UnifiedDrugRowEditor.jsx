@@ -1532,6 +1532,64 @@ function AddDrugControls({ onPickBrand, onPickFormulation, onAddManual, disabled
   )
 }
 
+// ─── GroupAddButtons ─────────────────────────────────────────────────────────
+// 2026-11-10: "+ or" and "+ plus" under every dose group. Tapping one opens a
+// small menu (brand / formulation / typed drug); the chosen drug goes straight
+// into THIS group with that join word, so it shares the group's dose. No more
+// adding a drug and then moving it up. onAdd(joiner, kind).
+function GroupAddButtons({ onAdd }) {
+  const [openFor, setOpenFor] = useState(null) // 'or' | 'and' | null
+  const wrapRef = useRef(null)
+  useEffect(() => {
+    function handlePointerDown(e) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpenFor(null)
+    }
+    document.addEventListener('pointerdown', handlePointerDown)
+    return () => document.removeEventListener('pointerdown', handlePointerDown)
+  }, [])
+
+  const items = [
+    { kind: 'brand',       label: 'Pick a brand' },
+    { kind: 'formulation', label: 'Pick a formulation' },
+    { kind: 'manual',      label: 'Type a new drug' },
+  ]
+
+  return (
+    <div ref={wrapRef} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '2px 0' }}>
+      {[['or', 'or'], ['and', 'plus']].map(([value, label]) => (
+        <div key={value} style={{ position: 'relative' }}>
+          <button
+            type="button"
+            onClick={() => setOpenFor(cur => (cur === value ? null : value))}
+            style={{
+              ...joinTagStyle(label),
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              padding: '6px 12px', fontSize: 13, fontWeight: 600,
+              borderRadius: 99, cursor: 'pointer', fontFamily: 'var(--font-body)',
+            }}
+          >
+            <Plus size={12} /> {label}
+          </button>
+          {openFor === value && (
+            <div ref={fitMenuToScreen} style={{ ...addDrugDropdownStyle, maxWidth: 'calc(100vw - 16px)' }}>
+              {items.map(it => (
+                <button
+                  key={it.kind}
+                  type="button"
+                  onClick={() => { setOpenFor(null); onAdd(value, it.kind) }}
+                  style={addDrugDropdownItemStyle}
+                >
+                  {it.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ─── OrDivider ─────────────────────────────────────────────────────────────────
 // UI PASS (2026-08-08): shown between stacked drug options — within a group
 // AND between groups. Clarified by the project owner: "groups" only exist to
@@ -2788,6 +2846,14 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
   const [addBrandPickerOpen, setAddBrandPickerOpen]             = useState(false)
   const [addFormulationPickerOpen, setAddFormulationPickerOpen] = useState(false)
 
+  // 2026-11-10: set when a drug is being added from a group's "+ or" / "+ plus"
+  // button: which group, and which join word. null = the bottom "Add a drug"
+  // (starts its own group, as before).
+  const [addTarget, setAddTarget] = useState(null) // { groupIdx, joiner } | null
+  // Shown when a drug added into a group has a different library dose from the
+  // dose the group already has: asks which one to keep. Asked every time.
+  const [pendingDoseAsk, setPendingDoseAsk] = useState(null) // { groupIdx, name, pendingDose } | null
+
   // Unified Drug Row Editor Redesign, Phase 3 (2026-08-08): id of a
   // freshly-added option that should start in manual-entry mode (skips
   // DrugOptionRow's own "empty untouched" AddDrugControls step, since
@@ -3621,6 +3687,85 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
     }
   }
 
+  // 2026-11-10: a short text fingerprint of a dose, to tell whether two doses
+  // say the same thing (spacing and capital letters ignored).
+  function doseFingerprint(d) {
+    const lines = (d?.dose_lines ?? []).map(l => `${l.bracket_title ?? ''} ${l.instruction ?? l.text ?? ''}`)
+    return [d?.dose ?? '', ...lines, d?.dose_max ?? ''].join('|').toLowerCase().replace(/\s+/g, ' ').trim()
+  }
+
+  // Adds a drug straight into one existing group with the chosen join word.
+  // Dose rules: group has no dose -> take the new drug's library dose (age
+  // chooser if it has several). Group already has a dose -> keep it; if the new
+  // drug is a different medicine with a different library dose, ask which to
+  // use. Same medicine, free-text drugs and drugs with no library dose never ask.
+  function addOptionIntoGroup(targetIdx, newOption, pendingDose, joiner) {
+    const target = groups[targetIdx]
+    if (!target) { addOptionToGroups(newOption, pendingDose); return }
+
+    const joined = { ...newOption, group_id: target.group_id, joiner }
+    const groupHasDose = groupHasAnyDose(target)
+    const hasResolvedDose = !!pendingDose && !pendingDose.needsChoice &&
+      !!(pendingDose.dose_lines?.length || pendingDose.dose)
+    const sameMedicine = !!newOption.formulation_id &&
+      target.options.some(o => o.formulation_id === newOption.formulation_id)
+
+    let doseFields = {}
+    let ask = false
+    if (!groupHasDose) {
+      if (hasResolvedDose) {
+        doseFields = {
+          dose: pendingDose.dose, dose_who: pendingDose.dose_who ?? null,
+          dose_lines: pendingDose.dose_lines ?? [], dose_max: pendingDose.dose_max ?? null,
+          dose_max_population_id: pendingDose.dose_max_population_id ?? null,
+          dose_library_base: pendingDose.dose_library_base ?? null,
+        }
+      }
+    } else if (!sameMedicine && pendingDose) {
+      if (pendingDose.needsChoice) ask = true
+      else if (hasResolvedDose && doseFingerprint(pendingDose) !== doseFingerprint(target)) ask = true
+    }
+
+    const nextGroups = groups.map((g, gi) =>
+      gi === targetIdx ? { ...g, ...doseFields, options: [...g.options, joined] } : g
+    )
+    emitGroups(nextGroups)
+
+    if (!groupHasDose && pendingDose?.needsChoice) {
+      setRestorePendingChoice({ groupIdx: targetIdx, populations: pendingDose.populations })
+    }
+    if (ask) {
+      const name = newOption.brand_name || newOption.generic_name || 'this drug'
+      setPendingDoseAsk({ groupIdx: targetIdx, name, pendingDose })
+    }
+  }
+
+  // One place that decides where a freshly built drug goes: into the group whose
+  // "+ or" / "+ plus" was tapped, or (bottom button) the old way.
+  function routeNewOption(newOption, pendingDose) {
+    if (addTarget) {
+      const t = addTarget
+      setAddTarget(null)
+      addOptionIntoGroup(t.groupIdx, newOption, pendingDose, t.joiner)
+    } else {
+      addOptionToGroups(newOption, pendingDose)
+    }
+  }
+
+  function handleGroupAdd(groupIdx, joiner, kind) {
+    setPendingDoseAsk(null)
+    setAddTarget({ groupIdx, joiner })
+    if (kind === 'brand') setAddBrandPickerOpen(true)
+    else if (kind === 'formulation') setAddFormulationPickerOpen(true)
+    else {
+      const id = `opt-${Date.now()}-${Math.random().toString(36).slice(2)}`
+      setManualEntryOptionId(id)
+      // addTarget was just set in this same tap, so add directly with it.
+      setAddTarget(null)
+      addOptionIntoGroup(groupIdx, { ...DRUG_OPTION_TEMPLATE, id }, null, joiner)
+    }
+  }
+
   function addOptionFromBrand(brand) {
     const f       = brand.formulations
     const generic = f?.generics
@@ -3628,7 +3773,7 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
     // Bug fix (2026-06-26): "Add option: pick a brand" buttons previously skipped
     // dose pre-fill entirely; now passed to addOptionToGroups as pendingDose.
     const pendingDose = resolveDosePick(f?.doses_structured)
-    addOptionToGroups({
+    routeNewOption({
       ...DRUG_OPTION_TEMPLATE,
       id:             `opt-${Date.now()}-${Math.random().toString(36).slice(2)}`,
       brand_name:     brand.name,
@@ -3647,7 +3792,7 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
     const generic = formulation.generics
     // Resolve dose pre-fill from library — same fix as addOptionFromBrand above.
     const pendingDose = resolveDosePick(formulation.doses_structured)
-    addOptionToGroups({
+    routeNewOption({
       ...DRUG_OPTION_TEMPLATE,
       id:             `opt-${Date.now()}-${Math.random().toString(36).slice(2)}`,
       generic_name:   generic?.name_en   ?? null,
@@ -3777,6 +3922,40 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
               onConfirm={() => { const id = confirmRemoveOption.optionId; setConfirmRemoveOption(null); removeOption(groupIdx, id) }}
               onCancel={() => setConfirmRemoveOption(null)}
             />
+          )}
+
+          {/* 2026-11-10: add a drug straight into this group (shares its dose). */}
+          {groupHasDoseArea(group) && (
+            <GroupAddButtons onAdd={(joiner, kind) => handleGroupAdd(groupIdx, joiner, kind)} />
+          )}
+
+          {pendingDoseAsk?.groupIdx === groupIdx && (
+            <div style={{
+              display: 'flex', flexDirection: 'column', gap: 8,
+              padding: '10px 12px', borderRadius: 10,
+              border: '1px solid var(--color-accent)', backgroundColor: '#EFF6FF',
+            }}>
+              <span style={{ fontSize: 13, color: 'var(--color-text-primary)' }}>
+                {pendingDoseAsk.name} has its own dose in the library, different from this group's dose. Which dose should this group show?
+              </span>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                <button type="button" onClick={() => setPendingDoseAsk(null)} style={dosePrimaryButtonStyle}>
+                  Keep the group's dose
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const ask = pendingDoseAsk
+                    setPendingDoseAsk(null)
+                    if (ask.pendingDose.needsChoice) setRestorePendingChoice({ groupIdx: ask.groupIdx, populations: ask.pendingDose.populations })
+                    else applyDoseToGroup(ask.groupIdx, ask.pendingDose)
+                  }}
+                  style={doseSecondaryButtonStyle}
+                >
+                  Use {pendingDoseAsk.name}'s dose
+                </button>
+              </div>
+            </div>
           )}
 
           </div>
@@ -4356,9 +4535,10 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
           fields — no intermediate AddDrugControls step for that new option. */}
       {!soleOptionEmpty && (
         <AddDrugControls
-          onPickBrand={() => setAddBrandPickerOpen(true)}
-          onPickFormulation={() => setAddFormulationPickerOpen(true)}
+          onPickBrand={() => { setAddTarget(null); setAddBrandPickerOpen(true) }}
+          onPickFormulation={() => { setAddTarget(null); setAddFormulationPickerOpen(true) }}
           onAddManual={() => {
+            setAddTarget(null)
             const id = `opt-${Date.now()}-${Math.random().toString(36).slice(2)}`
             setManualEntryOptionId(id)
             addOptionToGroups({ ...DRUG_OPTION_TEMPLATE, id })
@@ -4369,13 +4549,13 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
       {/* Picker modals */}
       <DrugPickerModal
         isOpen={addBrandPickerOpen}
-        onClose={() => setAddBrandPickerOpen(false)}
+        onClose={() => { setAddBrandPickerOpen(false); setAddTarget(null) }}
         onSelect={brand => { setAddBrandPickerOpen(false); addOptionFromBrand(brand) }}
         mode="brand"
       />
       <DrugPickerModal
         isOpen={addFormulationPickerOpen}
-        onClose={() => setAddFormulationPickerOpen(false)}
+        onClose={() => { setAddFormulationPickerOpen(false); setAddTarget(null) }}
         onSelect={formulation => { setAddFormulationPickerOpen(false); addOptionFromFormulation(formulation) }}
         mode="formulation"
       />
