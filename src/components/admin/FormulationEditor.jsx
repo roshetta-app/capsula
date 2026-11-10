@@ -45,7 +45,7 @@ import TagInput from './TagInput'
  *   onChange     (patch) => void
  *   disabled     boolean
  */
-export default function FormulationEditor({ formulation, ingredients = [], onChange, disabled = false }) {
+export default function FormulationEditor({ formulation, ingredients = [], onChange, disabled = false, showPublished = true }) {
 
   const rows = getIngredientRows(formulation, ingredients)
 
@@ -242,8 +242,8 @@ export default function FormulationEditor({ formulation, ingredients = [], onCha
         />
       </Card>
 
-      {/* Published */}
-      <div style={{
+      {/* Published — only where there is no ⋮ menu to do it (the Add Drug flow) */}
+      {showPublished && <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)',
         padding: 'var(--space-3) var(--space-4)', border: '1px solid var(--color-border)',
         borderRadius: 'var(--radius-lg)', backgroundColor: 'var(--color-bg)',
@@ -269,7 +269,7 @@ export default function FormulationEditor({ formulation, ingredients = [], onCha
             transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
           }} />
         </button>
-      </div>
+      </div>}
 
     </div>
   )

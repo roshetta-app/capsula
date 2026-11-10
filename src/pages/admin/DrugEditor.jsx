@@ -7,7 +7,7 @@
  * Layout:
  *   ┌─ Header: Drug Library › {genericName}  [Save Generic] ─────────────────┐
  *   │                                                                          │
- *   │  Identity               (always open, own Save)                         │
+ *   │  Identity               (always open)                                   │
  *   │  ▸ Generic info          (collapsible, closed by default)               │
  *   │                                                                          │
  *   │  ▾ 500mg · Capsule · Oral          [● Live]  [Save]  [✕]               │
@@ -76,6 +76,34 @@ const EMPTY_FORMULATION = {
   formulation_note: null,
 }
 
+// ─── Unsaved-change tracking ──────────────────────────────────────────────────
+// What a card looked like when it was loaded or last saved, compared with what it looks like now.
+// Publish switches are left out on purpose: they save at once (the menu, the brand switch), so
+// they are never "unsaved". A brand that is already saved is compared by name and manufacturer.
+const snapGeneric = g => JSON.stringify(g ?? null)
+const snapForm = f => {
+  const { is_published, brands, ...rest } = f
+  return JSON.stringify({
+    ...rest,
+    brands: (brands ?? []).map(b => b.id
+      ? { id: b.id, tradename_clean: b.tradename_clean, manufacturer: b.manufacturer ?? null, _deleted: !!b._deleted }
+      : b),
+  })
+}
+
+const FORMULATION_SELECT = `
+  id, concentration, form, route,
+  strength_value, strength_unit, strength_basis, strength_structured,
+  form_modifier, device_type, route_details, formulation_note,
+  doses_structured, default_dose_override, is_published,
+  brands ( id, tradename_clean, manufacturer, pack_size, fill_volume, is_published )
+`
+const toFormulationState = f => ({
+  ...f,
+  doses: f.doses_structured ?? [],
+  brands: (f.brands ?? []).map(b => ({ ...b })),
+})
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function DrugEditor() {
@@ -112,6 +140,8 @@ export default function DrugEditor() {
   const [searchParams]       = useSearchParams()
   const targetFormulationId  = searchParams.get('formulation')
   const targetBrandId        = searchParams.get('brand')
+  const baseGeneric          = useRef(null)     // snapGeneric of the generic as loaded / last saved
+  const baseForms            = useRef({})       // formulationId -> snapForm as loaded / last saved
   const formSectionRefs      = useRef({})       // formulationId -> DOM node, for scrollIntoView
   const deepLinkOpenedRef    = useRef(false)    // has the target formulation been auto-opened yet
   const deepLinkScrolledRef  = useRef(false)    // has the page already scrolled to it
@@ -143,23 +173,16 @@ export default function DrugEditor() {
 
     const { data: fData, error: fErr } = await supabase
       .from('formulations')
-      .select(`
-        id, concentration, form, route,
-        strength_value, strength_unit, strength_basis, strength_structured,
-        form_modifier, device_type, route_details, formulation_note,
-        doses_structured, default_dose_override, is_published,
-        brands ( id, tradename_clean, manufacturer, pack_size, fill_volume, is_published )
-      `)
+      .select(FORMULATION_SELECT)
       .eq('generic_id', genericId)
       .order('concentration')
 
     if (fErr) { setFetchErr(fErr.message); setLoading(false); return }
 
-    setFormulations(fData.map(f => ({
-      ...f,
-      doses: f.doses_structured ?? [],
-      brands: (f.brands ?? []).map(b => ({ ...b })),
-    })))
+    const loaded = fData.map(toFormulationState)
+    baseGeneric.current = snapGeneric(gData)
+    baseForms.current = Object.fromEntries(loaded.map(f => [f.id, snapForm(f)]))
+    setFormulations(loaded)
     setFormFilter(null)
 
     setLoading(false)
@@ -201,6 +224,7 @@ export default function DrugEditor() {
 
   // ── Save generic ────────────────────────────────────────────────────────────
   async function saveGeneric() {
+    const savedSnap = snapGeneric(generic)
     setSavingGeneric(true)
     setGlobalError(null)
     const { error } = await updateGeneric(genericId, {
@@ -228,6 +252,7 @@ export default function DrugEditor() {
     })
     setSavingGeneric(false)
     if (error) { setGlobalError(`Generic: ${error.message}`); return }
+    baseGeneric.current = savedSnap
     setSavedGeneric(true)
     setTimeout(() => setSavedGeneric(false), 2500)
     await touchAppMetadata('drugs_updated_at')
@@ -290,13 +315,22 @@ export default function DrugEditor() {
       return
     }
 
+    // Re-read only THIS formulation (to pick up new brand ids). The rest of the page, including
+    // unsaved edits in other cards, is left alone.
+    const { data: freshRow } = await supabase
+      .from('formulations').select(FORMULATION_SELECT).eq('id', f.id).single()
+    if (freshRow) {
+      const fresh = toFormulationState(freshRow)
+      baseForms.current[f.id] = snapForm(fresh)
+      setFormulations(prev => prev.map(x => x.id === f.id ? fresh : x))
+    } else {
+      baseForms.current[f.id] = snapForm(f)
+    }
     setSavingFormId(null)
     setSavedFormId(f.id)
     setTimeout(() => setSavedFormId(null), 2500)
     await refresh()
     toast.success('Formulation saved')
-    // Reload brands to pick up new IDs
-    load()
   }
 
   // ── Add formulation ─────────────────────────────────────────────────────────
@@ -331,8 +365,16 @@ export default function DrugEditor() {
     setAddingForm(false)
     if (error) { setGlobalError(`Add formulation: ${error.message}`); return }
 
-    // Reload and open the new formulation
-    await load()
+    // Add just the new formulation (a full reload would throw away unsaved edits elsewhere) and open it
+    const { data: row } = await supabase
+      .from('formulations').select(FORMULATION_SELECT).eq('id', newF.id).single()
+    if (row) {
+      const fresh = toFormulationState(row)
+      baseForms.current[fresh.id] = snapForm(fresh)
+      setFormulations(prev => [...prev, fresh])
+    } else {
+      await load()
+    }
     setOpenFormId(newF.id)
     toast.success('Formulation added — fill in the details and save')
   }
@@ -385,6 +427,19 @@ export default function DrugEditor() {
     ))
   }
 
+  // ── Unsaved changes ──────────────────────────────────────────────────────────
+  const genericDirty = !!generic && baseGeneric.current !== null && snapGeneric(generic) !== baseGeneric.current
+  const isFormDirty  = f => baseForms.current[f.id] !== undefined && snapForm(f) !== baseForms.current[f.id]
+  const anyDirty     = genericDirty || formulations.some(isFormDirty)
+
+  // A refresh or closing the tab asks first when something is unsaved.
+  useEffect(() => {
+    if (!anyDirty) return
+    const warn = e => { e.preventDefault(); e.returnValue = '' }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [anyDirty])
+
   // ── Render ───────────────────────────────────────────────────────────────────
 
   if (loading) return (
@@ -415,14 +470,7 @@ export default function DrugEditor() {
         onChange={patch => setGeneric(g => ({ ...g, ...patch }))}
         disabled={savingGeneric}
       />
-      <div style={{ margin: 'var(--space-3) 0 var(--space-5)' }}>
-        <SaveRow
-          onSave={saveGeneric}
-          saving={savingGeneric}
-          saved={savedGeneric}
-          valid={genericValid}
-        />
-      </div>
+      <div style={{ height: 'var(--space-5)' }} />
 
       {/* ── Generic section ────────────────────────────────────────────────── */}
       <SectionCard
@@ -431,14 +479,7 @@ export default function DrugEditor() {
         badgeLive={generic?.is_published}
         open={genericOpen}
         onToggle={() => setGenericOpen(o => !o)}
-        saveSlot={
-          <SaveRow
-            onSave={saveGeneric}
-            saving={savingGeneric}
-            saved={savedGeneric}
-            valid={genericValid}
-          />
-        }
+        dirty={genericDirty}
       >
         <GenericEditor
           part="rest"
@@ -571,6 +612,7 @@ export default function DrugEditor() {
                 }
                 subtitle={meta}
                 dim={!live}
+                dirty={isFormDirty(f)}
                 badge={live ? null : 'Draft'}
                 badgeLive={false}
                 open={isOpen}
@@ -608,6 +650,7 @@ export default function DrugEditor() {
               >
                 {/* Formulation fields */}
                 <FormulationEditor
+                  showPublished={false}
                   formulation={{
                     concentration:        f.concentration,
                     form:                 f.form,
@@ -691,6 +734,29 @@ export default function DrugEditor() {
         </button>
       </div>
 
+      {/* One Save for the generic (Identity + Generic info). It appears only when something is
+          unsaved, and floats so it is reachable from anywhere on the page. */}
+      {genericDirty && (
+        <>
+          <div style={{ height: 72 }} />
+          <div style={{
+            position: 'fixed', left: 0, right: 0, zIndex: 50, pointerEvents: 'none',
+            bottom: 'calc(12px + env(safe-area-inset-bottom, 0px))',
+            display: 'flex', justifyContent: 'center',
+          }}>
+            <div style={{
+              pointerEvents: 'auto', display: 'flex', alignItems: 'center', gap: 12,
+              padding: '8px 10px 8px 16px', borderRadius: 999,
+              backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
+            }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#92400E' }}>Unsaved changes</span>
+              <SaveRow onSave={saveGeneric} saving={savingGeneric} saved={savedGeneric} valid={genericValid} />
+            </div>
+          </div>
+        </>
+      )}
+
       {/* Confirm delete formulation */}
       {confirmDel && (
         <ConfirmModal
@@ -710,7 +776,7 @@ export default function DrugEditor() {
 
 // ─── SectionCard ──────────────────────────────────────────────────────────────
 
-function SectionCard({ title, subtitle, dim = false, badge, badgeLive, open, onToggle, children, saveSlot, deleteSlot }) {
+function SectionCard({ title, subtitle, dim = false, dirty = false, badge, badgeLive, open, onToggle, children, saveSlot, deleteSlot }) {
   return (
     <div style={{
       backgroundColor: 'var(--color-surface)',
@@ -752,6 +818,15 @@ function SectionCard({ title, subtitle, dim = false, badge, badgeLive, open, onT
             </span>
           )}
         </span>
+        {dirty && (
+          <span style={{
+            fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em',
+            padding: '2px 8px', borderRadius: 'var(--radius-full)', flexShrink: 0,
+            backgroundColor: '#FEF3C7', color: '#92400E', border: '1px solid #FCD34D',
+          }}>
+            Unsaved
+          </span>
+        )}
         {badge && (
           <span style={{
             fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em',
