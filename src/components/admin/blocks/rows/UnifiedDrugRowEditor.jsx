@@ -347,7 +347,7 @@ function PopulationChooser({ populations, onChoose, onSkip }) {
               }}
             >
               <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-accent)', fontStyle: name ? 'normal' : 'italic' }}>
-                {name ? doseWhoLabel(name) : 'Unnamed patient group'}
+                {name ? doseWhoLabel(name) : 'General dose'}
               </span>
               {bands.length === 0 && !max && (
                 <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)', fontStyle: 'italic' }}>
@@ -4223,7 +4223,7 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
                                   applyDoseToGroup(groupIdx, buildDoseLinesFromPopulation(pop))
                                 }}
                               >
-                                {pop.population ? doseWhoLabel(pop.population) : `Library group ${pi + 1}`}
+                                {pop.population ? doseWhoLabel(pop.population) : 'General dose'}
                               </button>
                             ))}
                           </div>
@@ -4263,7 +4263,7 @@ export default function UnifiedDrugRowEditor({ row, onChange, onUnsavedChange })
                                       style={{ ...doseSecondaryButtonStyle, fontWeight: 700 }}
                                       onClick={() => createPopulation(groupIdx, { name: null, show: f.show, replace: f.replace, library: pop })}
                                     >
-                                      <Library size={12} /> {pop.population ? doseWhoLabel(pop.population) : `Library group ${pi + 1}`}
+                                      <Library size={12} /> {pop.population ? doseWhoLabel(pop.population) : 'General dose'}
                                     </button>
                                   ))}
                                 </div>
