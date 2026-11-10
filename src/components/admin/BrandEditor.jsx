@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Trash2, Pencil, MoreVertical, Eye, EyeOff } from 'lucide-react'
+import { Plus, Trash2, Pencil, Eye, EyeOff } from 'lucide-react'
 import { updateBrand } from '../../lib/adminQueries'
 import { useToast } from '../../context/ToastContext'
 import { useCategories } from '../../hooks/useCategories'
 import { useIsDark } from '../../utils/specialtyIcon'
 import SharedDrugCard from '../SharedDrugCard'
 import ConfirmModal from './ConfirmModal'
+import RowMenu from './RowMenu'
 
 /**
  * BrandEditor — manage brands for a formulation.
@@ -403,68 +404,4 @@ const inputStyle = {
   outline: 'none',
   appearance: 'none',
   WebkitAppearance: 'none',
-}
-
-const iconBtn = {
-  display: 'flex', alignItems: 'center', justifyContent: 'center',
-  width: 30, height: 30,
-  borderRadius: 'var(--radius-sm)',
-  border: '1px solid var(--color-border)',
-  backgroundColor: 'var(--color-surface)',
-  color: 'var(--color-text-secondary)',
-  cursor: 'pointer',
-}
-
-// A "..." button that opens a small drop-down of actions; closes on outside tap or Escape.
-function RowMenu({ items, disabled }) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef(null)
-  useEffect(() => {
-    if (!open) return
-    const down = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
-    const key = e => { if (e.key === 'Escape') setOpen(false) }
-    document.addEventListener('pointerdown', down)
-    document.addEventListener('keydown', key)
-    return () => { document.removeEventListener('pointerdown', down); document.removeEventListener('keydown', key) }
-  }, [open])
-  return (
-    <div ref={ref} style={{ position: 'relative' }} onClick={e => e.stopPropagation()}>
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={() => setOpen(o => !o)}
-        aria-label="Brand actions"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        style={{ ...iconBtn, width: 34, height: 34 }}
-      >
-        <MoreVertical size={16} />
-      </button>
-      {open && (
-        <div role="menu" style={{
-          position: 'absolute', right: 0, top: '100%', marginTop: 4, zIndex: 20, minWidth: 170,
-          backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)',
-          borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-card)', padding: 4,
-        }}>
-          {items.map(it => (
-            <button
-              key={it.label}
-              type="button"
-              role="menuitem"
-              onClick={() => { setOpen(false); it.onClick() }}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 8, width: '100%',
-                padding: '10px 12px', border: 'none', background: 'none', textAlign: 'left',
-                borderRadius: 'var(--radius-sm)', cursor: 'pointer',
-                fontSize: 14, fontWeight: 500, fontFamily: 'var(--font-body)',
-                color: it.danger ? '#DC2626' : 'var(--color-text-primary)',
-              }}
-            >
-              {it.icon}{it.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  )
 }

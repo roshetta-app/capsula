@@ -35,13 +35,14 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { Plus, Save, Trash2, AlertTriangle, Check, ChevronDown, ChevronRight } from 'lucide-react'
+import { Plus, Save, Trash2, AlertTriangle, Check, ChevronDown, ChevronRight, Eye, EyeOff } from 'lucide-react'
 import { useToast } from '../../context/ToastContext'
 import { useDrugContext } from '../../context/DrugContext'
 import GenericEditor from '../../components/admin/GenericEditor'
 import FormulationEditor from '../../components/admin/FormulationEditor'
 import BrandEditor from '../../components/admin/BrandEditor'
 import ConfirmModal from '../../components/admin/ConfirmModal'
+import RowMenu from '../../components/admin/RowMenu'
 import { DRUG_FORMS } from '../../config/forms'
 import {
   updateGeneric,
@@ -331,6 +332,21 @@ export default function DrugEditor() {
     toast.success('Formulation added — fill in the details and save')
   }
 
+  // ── Publish / unpublish a formulation (saved at once, like the brands) ───────
+  async function toggleFormulationPublished(f) {
+    const next = !(f.is_published ?? true)
+    patchFormulation(f.id, { is_published: next })
+    const { error } = await updateFormulation(f.id, { is_published: next })
+    if (error) {
+      patchFormulation(f.id, { is_published: !next })
+      toast.error(`Could not update: ${error.message}`)
+      return
+    }
+    await touchAppMetadata('drugs_updated_at')
+    await refresh()
+    toast.success(next ? 'Formulation published' : 'Formulation set to draft')
+  }
+
   // ── Delete formulation ──────────────────────────────────────────────────────
   async function handleDeleteFormulation() {
     const f = confirmDel
@@ -413,11 +429,30 @@ export default function DrugEditor() {
       {/* ── Formulations ───────────────────────────────────────────────────── */}
       <div style={{ marginTop: 'var(--space-5)' }}>
         <div style={{
-          fontSize: 11, fontWeight: 700, textTransform: 'uppercase',
-          letterSpacing: '0.08em', color: 'var(--color-text-tertiary)',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)',
           marginBottom: 'var(--space-3)',
         }}>
-          Formulations ({formulations.length})
+          <div style={{
+            fontSize: 11, fontWeight: 700, textTransform: 'uppercase',
+            letterSpacing: '0.08em', color: 'var(--color-text-tertiary)',
+          }}>
+            Formulations ({formulations.length})
+          </div>
+          {formulations.length > 4 && (
+            <button
+              type="button"
+              onClick={addFormulation}
+              disabled={addingForm}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 4px',
+                border: 'none', background: 'none', color: 'var(--color-accent)',
+                fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-body)',
+                cursor: addingForm ? 'not-allowed' : 'pointer',
+              }}
+            >
+              <Plus size={14} /> {addingForm ? 'Adding…' : 'Formulation'}
+            </button>
+          )}
         </div>
 
         {/* Form chips — filter to the forms actually used by this generic's
@@ -435,6 +470,21 @@ export default function DrugEditor() {
               display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)',
               marginBottom: 'var(--space-3)',
             }}>
+              <button
+                onClick={() => setFormFilter(null)}
+                aria-pressed={!formFilter}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 4,
+                  padding: '5px 12px',
+                  borderRadius: 'var(--radius-full)',
+                  border: `1px solid ${!formFilter ? 'var(--color-accent)' : 'var(--color-border)'}`,
+                  backgroundColor: !formFilter ? 'var(--color-accent)' : 'var(--color-surface)',
+                  color: !formFilter ? '#fff' : 'var(--color-text-secondary)',
+                  fontSize: 12.5, fontWeight: 600, fontFamily: 'var(--font-body)', cursor: 'pointer',
+                }}
+              >
+                All ({formulations.length})
+              </button>
               {presentForms.map(df => {
                 const active = formFilter === df.value
                 return (
@@ -480,23 +530,50 @@ export default function DrugEditor() {
           const isSaved   = savedFormId === f.id
           const visibleBrands = f.brands.filter(b => !b._deleted)
           const formValid = f.form && f.route
+          const brandCount = visibleBrands.length
+          const bandCount = (f.doses ?? []).reduce((n, d) => n + (d.brackets?.length ?? 0), 0)
+          const live = f.is_published ?? true
+          const meta = [
+            brandCount ? `${brandCount} ${brandCount === 1 ? 'brand' : 'brands'}` : 'No brands',
+            bandCount ? `${bandCount} dose ${bandCount === 1 ? 'band' : 'bands'}` : 'No doses',
+          ].join(' · ')
 
           return (
             <div key={f.id} ref={el => { formSectionRefs.current[f.id] = el }}>
               <SectionCard
-                title={[f.concentration, f.form].filter(Boolean).join(' · ')}
-                badge={f.is_published ? 'Live' : 'Draft'}
-                badgeLive={f.is_published}
+                title={
+                  <>
+                    <span>{f.concentration || 'No strength'}</span>
+                    {f.form && <span style={{ fontWeight: 400, color: 'var(--color-text-secondary)' }}>{' · '}{f.form}</span>}
+                  </>
+                }
+                subtitle={meta}
+                dim={!live}
+                badge={live ? null : 'Draft'}
+                badgeLive={false}
                 open={isOpen}
-                onToggle={() => setOpenFormId(isOpen ? null : f.id)}
+                onToggle={() => {
+                  const opening = !isOpen
+                  setOpenFormId(opening ? f.id : null)
+                  // Closing the card above shifts the page, so bring the opened card to the top.
+                  if (opening) setTimeout(() => formSectionRefs.current[f.id]?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60)
+                }}
                 deleteSlot={
-                  <button
-                    onClick={e => { e.stopPropagation(); setConfirmDel(f) }}
-                    title="Delete formulation"
-                    style={iconDangerBtnStyle}
-                  >
-                    <Trash2 size={13} />
-                  </button>
+                  <RowMenu
+                    items={[
+                      {
+                        label: live ? 'Unpublish' : 'Publish',
+                        icon: live ? <EyeOff size={14} /> : <Eye size={14} />,
+                        onClick: () => toggleFormulationPublished(f),
+                      },
+                      {
+                        label: 'Delete formulation',
+                        icon: <Trash2 size={14} />,
+                        danger: true,
+                        onClick: () => setConfirmDel(f),
+                      },
+                    ]}
+                  />
                 }
                 saveSlot={
                   <SaveRow
@@ -611,7 +688,7 @@ export default function DrugEditor() {
 
 // ─── SectionCard ──────────────────────────────────────────────────────────────
 
-function SectionCard({ title, badge, badgeLive, open, onToggle, children, saveSlot, deleteSlot }) {
+function SectionCard({ title, subtitle, dim = false, badge, badgeLive, open, onToggle, children, saveSlot, deleteSlot }) {
   return (
     <div style={{
       backgroundColor: 'var(--color-surface)',
@@ -635,12 +712,23 @@ function SectionCard({ title, badge, badgeLive, open, onToggle, children, saveSl
         <span style={{ color: 'var(--color-text-tertiary)', flexShrink: 0 }}>
           {open ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
         </span>
-        <span style={{
-          flex: 1, fontSize: 14, fontWeight: 600,
-          color: 'var(--color-text-primary)',
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}>
-          {title}
+        <span style={{ flex: 1, minWidth: 0, opacity: dim ? 0.65 : 1 }}>
+          <span style={{
+            display: 'block', fontSize: 15, fontWeight: 600,
+            color: 'var(--color-text-primary)',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
+            {title}
+          </span>
+          {subtitle && (
+            <span style={{
+              display: 'block', marginTop: 2, fontSize: 12,
+              color: 'var(--color-text-tertiary)',
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>
+              {subtitle}
+            </span>
+          )}
         </span>
         {badge && (
           <span style={{
