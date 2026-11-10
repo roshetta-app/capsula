@@ -1246,8 +1246,14 @@ function PopulationTabs({ whos, activeIdx, shownIdx = 0, renaming = false, panel
   const many = whos.length > 1
   const chipBase = {
     display: 'inline-flex', alignItems: 'center', gap: 6,
-    padding: '6px 12px', borderRadius: 99,
+    padding: '7px 12px', borderRadius: 14, maxWidth: '100%', minWidth: 0,
     fontSize: 13, fontWeight: 700, fontFamily: 'var(--font-body)', cursor: 'pointer',
+    textAlign: 'left', lineHeight: 1.3,
+  }
+  // A long name wraps to at most two lines, left-aligned, instead of making a fat pill.
+  const nameStyle = {
+    minWidth: 0, overflowWrap: 'anywhere',
+    display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: 2, overflow: 'hidden',
   }
 
   return (
@@ -1286,9 +1292,9 @@ function PopulationTabs({ whos, activeIdx, shownIdx = 0, renaming = false, panel
                 fontStyle: who ? 'normal' : 'italic',
               }}
             >
-              {i === shownIdx && many && <Check size={12} aria-label="Shown in app" />}
-              {text}
-              <ChevronDown size={12} style={{ transform: panelOpen ? 'rotate(180deg)' : 'none' }} />
+              {i === shownIdx && many && <Check size={12} aria-label="Shown in app" style={{ flexShrink: 0 }} />}
+              <span dir="auto" style={nameStyle}>{text}</span>
+              <ChevronDown size={12} style={{ flexShrink: 0, transform: panelOpen ? 'rotate(180deg)' : 'none' }} />
             </button>
           )
         }
@@ -1303,8 +1309,8 @@ function PopulationTabs({ whos, activeIdx, shownIdx = 0, renaming = false, panel
               fontStyle: who ? 'normal' : 'italic',
             }}
           >
-            {i === shownIdx && many && <Check size={12} aria-label="Shown in app" style={{ color: 'var(--color-accent)' }} />}
-            {text}
+            {i === shownIdx && many && <Check size={12} aria-label="Shown in app" style={{ color: 'var(--color-accent)', flexShrink: 0 }} />}
+            <span dir="auto" style={nameStyle}>{text}</span>
           </button>
         )
       })}
