@@ -1,8 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Trash2, ChevronRight, ChevronDown } from 'lucide-react'
+import { Plus, Trash2, Pencil } from 'lucide-react'
 import { updateBrand } from '../../lib/adminQueries'
 import { useToast } from '../../context/ToastContext'
-import { toTitleCase, getDrugTitleSuffix } from '../../utils/drugTitleFormat'
+import { useCategories } from '../../hooks/useCategories'
+import { useIsDark } from '../../utils/specialtyIcon'
+import SharedDrugCard from '../SharedDrugCard'
+import ConfirmModal from './ConfirmModal'
 
 /**
  * BrandEditor — manage brands for a formulation.
@@ -30,7 +33,17 @@ import { toTitleCase, getDrugTitleSuffix } from '../../utils/drugTitleFormat'
  * `data-brand-id` anchor so a future highlight/scroll target survives
  * whichever redesign of this file lands next (decision 27 #6).
  *
+ * 2026-11-10 (formulation editor): each saved or new brand is now drawn with SharedDrugCard,
+ * the same row the app's Other Brands list uses (category badge, title with strength/form/pack,
+ * generic line, and the image-search strip that opens Google Images for the pack, which is how
+ * a doctor or pharmacist tells two similar packs apart). Tapping the row opens the two edit
+ * fields under it. Trailing: Live/Draft button (saves at once) and a delete button. Delete on a
+ * saved brand RETIRES it (set to draft, saved at once, with a confirm), the same as the Drug
+ * Library; nothing is erased from the database. A brand not saved yet is just removed.
+ *
  * Props:
+ *   category     the generic's category slug (badge colour and icon)
+ *   ingredients  the generic's ingredients, for the second line of each row
  *   brands       { id?, tradename_clean, manufacturer, pack_size?, fill_volume?, is_published }[]
  *   formulation  { concentration, form, form_modifier, route, route_details }
  *                — the parent formulation's fields, needed to build each
@@ -49,8 +62,13 @@ export default function BrandEditor({
   onDelete,
   disabled = false,
   highlightBrandId = null,
+  category = null,
+  ingredients = [],
 }) {
   const { toast } = useToast()
+  const { categories } = useCategories()
+  const isDark = useIsDark()
+  const [confirmIdx, setConfirmIdx] = useState(null)
 
   const [newName,     setNewName]     = useState('')
   const [newMfr,       setNewMfr]     = useState('')
@@ -77,13 +95,13 @@ export default function BrandEditor({
     onChange(brands.map((b, i) => i === idx ? { ...b, [field]: value } : b))
   }
 
-  function removeBrand(idx) {
+  // Delete: an unsaved brand is simply dropped; a saved one is retired (draft, saved now).
+  async function retireBrand(idx) {
     const brand = brands[idx]
-    if (brand.id && onDelete) {
-      onDelete(brand.id)
-    } else {
-      onChange(brands.filter((_, i) => i !== idx))
-    }
+    setConfirmIdx(null)
+    if (!brand.id) { onChange(brands.filter((_, i) => i !== idx)); return }
+    if (!(brand.is_published ?? true)) { toast.success('Brand is already a draft'); return }
+    await togglePublished(idx)
   }
 
   /**
@@ -126,169 +144,156 @@ export default function BrandEditor({
     setNewMfr('')
   }
 
-  // Collapsed-row title — this brand's own pack_size/fill_volume combined
-  // with the parent formulation's concentration/form/route fields, matching
-  // SharedDrugCard.jsx's composition exactly (decision 26). drugTitleFormat.js
-  // expects camelCase fields; the DB-shaped objects here stay snake_case
-  // until this one translation point, same boundary adminQueries.js's
-  // searchDrugsForPicker already draws.
-  function titleFor(brand) {
-    const suffix = getDrugTitleSuffix({
-      concentration: formulation.concentration,
-      form:          formulation.form,
-      formModifier:  formulation.form_modifier,
-      route:         formulation.route,
-      routeDetails:  formulation.route_details,
-      packSize:      brand.pack_size,
-      fillVolume:    brand.fill_volume,
-    })
-    const name = toTitleCase(brand.tradename_clean)
-    return suffix ? `${name} ${suffix}` : name
+  const ingredientNames = (Array.isArray(ingredients) ? ingredients : [])
+    .map(x => (typeof x === 'string' ? x : x?.name ?? x?.name_en ?? ''))
+    .filter(Boolean)
+
+  // The row's data in the shape SharedDrugCard expects (camelCase, like the app's flat drugs).
+  function cardDrug(brand) {
+    return {
+      id:             brand.id ?? undefined,
+      tradenameClean: brand.tradename_clean || 'New brand',
+      ingredients:    ingredientNames,
+      category,
+      concentration:  formulation.concentration,
+      form:           formulation.form,
+      formModifier:   formulation.form_modifier,
+      route:          formulation.route,
+      routeDetails:   formulation.route_details,
+      packSize:       brand.pack_size,
+      fillVolume:     brand.fill_volume,
+      nameAr:         null,
+      nameArFull:     null,
+    }
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
 
-      {/* Existing brand rows */}
-      {brands.map((brand, idx) => {
-        const isOpen = expandedIdx === idx
-        const isHighlighted = brand.id != null && brand.id === highlightBrandId
-        return (
-          <div
-            key={brand.id ?? `new-${idx}`}
-            data-brand-id={brand.id ?? undefined}
-            ref={isHighlighted ? highlightRef : null}
-            onClick={() => !disabled && setExpandedIdx(isOpen ? null : idx)}
-            style={{
-              backgroundColor: (brand.is_published ?? true) ? 'var(--color-surface)' : 'var(--color-bg)',
-              border: '1px solid var(--color-border)',
-              borderRadius: 'var(--radius-md)',
-              padding: 'var(--space-3)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 'var(--space-2)',
-              opacity: (brand.is_published ?? true) ? 1 : 0.65,
-              cursor: disabled ? 'default' : 'pointer',
-              outline: isHighlighted ? '2px solid var(--color-accent)' : 'none',
-              outlineOffset: 2,
-            }}
-          >
-            {/* Collapsed summary line — always shown */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-              <span style={{ color: 'var(--color-text-tertiary)', flexShrink: 0, display: 'flex' }}>
-                {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-              </span>
-
-              {!(brand.is_published ?? true) && (
-                <span style={{
-                  fontSize: 10, fontWeight: 700, letterSpacing: '0.06em',
-                  padding: '1px 6px', borderRadius: 4,
-                  backgroundColor: 'var(--color-border)',
-                  color: 'var(--color-text-tertiary)',
-                  textTransform: 'uppercase',
-                  flexShrink: 0,
-                }}>Draft</span>
-              )}
-
-              <span style={{
-                flex: 1, fontSize: 14, fontWeight: 500,
-                color: 'var(--color-text-primary)',
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-              }}>
-                {titleFor(brand)}
-              </span>
-
-              <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', flexShrink: 0 }}>
-                {brand.manufacturer || '—'}
-              </span>
-
-              <button
-                type="button"
-                role="switch"
-                aria-checked={brand.is_published ?? true}
-                onClick={e => { e.stopPropagation(); !disabled && !toggling && togglePublished(idx) }}
-                disabled={disabled || toggling === brand.id}
-                title={(brand.is_published ?? true) ? 'Click to unpublish' : 'Click to publish'}
+      {/* Brand rows: the app's own drug row, plus Live/Draft and delete */}
+      {brands.length > 0 && (
+        <div style={{
+          backgroundColor: 'var(--color-surface)',
+          border: '1px solid var(--color-border)',
+          borderRadius: 'var(--radius-lg)',
+          padding: '0 var(--space-3)',
+        }}>
+          {brands.map((brand, idx) => {
+            const isOpen = expandedIdx === idx
+            const live = brand.is_published ?? true
+            const isHighlighted = brand.id != null && brand.id === highlightBrandId
+            const busy = toggling === brand.id && brand.id != null
+            return (
+              <div
+                key={brand.id ?? `new-${idx}`}
+                data-brand-id={brand.id ?? undefined}
+                ref={isHighlighted ? highlightRef : null}
                 style={{
-                  width: 32, height: 18,
-                  borderRadius: 9,
-                  border: 'none',
-                  backgroundColor: (brand.is_published ?? true) ? 'var(--color-accent)' : 'var(--color-border)',
-                  position: 'relative',
-                  cursor: (disabled || toggling === brand.id) ? 'not-allowed' : 'pointer',
-                  transition: 'background-color 0.2s',
-                  flexShrink: 0,
-                  opacity: toggling === brand.id ? 0.6 : 1,
+                  borderBottom: idx === brands.length - 1 ? 'none' : '1px solid var(--color-border-subtle)',
+                  opacity: live ? 1 : 0.7,
                 }}
               >
-                <span style={{
-                  position: 'absolute',
-                  top: 2, left: (brand.is_published ?? true) ? 15 : 2,
-                  width: 14, height: 14,
-                  borderRadius: '50%',
-                  backgroundColor: '#fff',
-                  transition: 'left 0.2s',
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.2)',
-                }} />
-              </button>
+                <SharedDrugCard
+                  drug={cardDrug(brand)}
+                  categories={categories}
+                  isDark={isDark}
+                  isLast
+                  showChevron={false}
+                  showImageSearch
+                  disableTap={disabled}
+                  onTap={() => setExpandedIdx(isOpen ? null : idx)}
+                  trailing={
+                    <div style={{ display: 'flex', gap: 'var(--space-1)', alignItems: 'center', opacity: busy ? 0.5 : 1 }}>
+                      {!live && (
+                        <span style={{
+                          fontSize: 10, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase',
+                          padding: '1px 6px', borderRadius: 'var(--radius-full)',
+                          color: 'var(--color-text-tertiary)', backgroundColor: 'var(--color-bg)',
+                          border: '1px solid var(--color-border)',
+                        }} className="cms-hide-phone">Draft</span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={e => { e.stopPropagation(); !disabled && !toggling && togglePublished(idx) }}
+                        disabled={disabled || busy}
+                        aria-label={live ? 'Unpublish brand' : 'Publish brand'}
+                        title={live ? 'Click to unpublish' : 'Click to publish'}
+                        style={{
+                          padding: '3px 10px', borderRadius: 'var(--radius-full)',
+                          fontSize: 11, fontWeight: 600, fontFamily: 'var(--font-body)',
+                          cursor: 'pointer', whiteSpace: 'nowrap',
+                          backgroundColor: live ? '#D1FAE5' : 'var(--color-bg)',
+                          color: live ? '#065F46' : 'var(--color-text-tertiary)',
+                          border: `1px solid ${live ? '#6EE7B7' : 'var(--color-border)'}`,
+                        }}
+                      >
+                        {live ? '● Live' : '○ Draft'}
+                      </button>
+                      {!disabled && (
+                        <button
+                          type="button"
+                          onClick={e => { e.stopPropagation(); brand.id ? setConfirmIdx(idx) : retireBrand(idx) }}
+                          aria-label="Delete brand"
+                          title={brand.id ? 'Retire brand' : 'Remove brand'}
+                          style={{ ...iconBtn, color: '#DC2626' }}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
+                  }
+                />
 
-              {!disabled && (
-                <button
-                  type="button"
-                  onClick={e => { e.stopPropagation(); removeBrand(idx) }}
-                  aria-label="Remove brand"
-                  style={{
-                    background: 'none', border: 'none', cursor: 'pointer',
-                    color: 'var(--color-text-tertiary)',
-                    padding: 4, display: 'flex', alignItems: 'center',
-                    flexShrink: 0,
-                  }}
-                >
-                  <Trash2 size={15} />
-                </button>
-              )}
-            </div>
-
-            {/* Expanded fields — only for the open row */}
-            {isOpen && (
-              <div
-                onClick={e => e.stopPropagation()}
-                style={{ display: 'flex', gap: 'var(--space-2)', paddingLeft: 22 }}
-              >
-                <div style={{ flex: 1 }}>
-                  <SmallLabel>Brand name (EN) *</SmallLabel>
-                  <input
-                    type="text"
-                    value={brand.tradename_clean}
-                    onChange={e => updateLocal(idx, 'tradename_clean', e.target.value)}
-                    disabled={disabled}
-                    placeholder="Brand name"
-                    required
-                    style={inputStyle}
-                  />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <SmallLabel>Manufacturer</SmallLabel>
-                  <input
-                    type="text"
-                    value={brand.manufacturer ?? ''}
-                    onChange={e => updateLocal(idx, 'manufacturer', e.target.value || null)}
-                    disabled={disabled}
-                    placeholder="Optional"
-                    style={inputStyle}
-                  />
-                </div>
+                {isOpen && (
+                  <div style={{
+                    display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap',
+                    margin: '0 0 var(--space-3)', padding: 'var(--space-3)',
+                    border: '1.5px solid var(--color-accent)', borderRadius: 10,
+                    backgroundColor: 'var(--color-surface)',
+                  }}>
+                    <div style={{ flex: '1 1 160px', minWidth: 0 }}>
+                      <SmallLabel>Brand name (EN) *</SmallLabel>
+                      <input
+                        type="text"
+                        value={brand.tradename_clean}
+                        onChange={e => updateLocal(idx, 'tradename_clean', e.target.value)}
+                        disabled={disabled}
+                        placeholder="Brand name"
+                        style={inputStyle}
+                      />
+                    </div>
+                    <div style={{ flex: '1 1 160px', minWidth: 0 }}>
+                      <SmallLabel>Manufacturer</SmallLabel>
+                      <input
+                        type="text"
+                        value={brand.manufacturer ?? ''}
+                        onChange={e => updateLocal(idx, 'manufacturer', e.target.value || null)}
+                        disabled={disabled}
+                        placeholder="Optional"
+                        style={inputStyle}
+                      />
+                    </div>
+                    <div style={{ flexBasis: '100%', display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-text-tertiary)' }}>
+                      <Pencil size={11} /> Name and manufacturer save with the formulation's Save button.
+                      {busy && ' Saving…'}
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
+            )
+          })}
+        </div>
+      )}
 
-            {toggling === brand.id && (
-              <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', paddingLeft: 22 }}>
-                Saving…
-              </div>
-            )}
-          </div>
-        )
-      })}
+      <ConfirmModal
+        isOpen={confirmIdx != null}
+        onClose={() => setConfirmIdx(null)}
+        onConfirm={() => retireBrand(confirmIdx)}
+        title="Retire this brand?"
+        message="It is set to draft now, so it disappears from the app. Nothing is erased; you can publish it again any time."
+        confirmLabel="Retire brand"
+        confirmVariant="danger"
+      />
 
       {/* Add new brand row */}
       {!disabled && (
@@ -379,4 +384,14 @@ const inputStyle = {
   outline: 'none',
   appearance: 'none',
   WebkitAppearance: 'none',
+}
+
+const iconBtn = {
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+  width: 30, height: 30,
+  borderRadius: 'var(--radius-sm)',
+  border: '1px solid var(--color-border)',
+  backgroundColor: 'var(--color-surface)',
+  color: 'var(--color-text-secondary)',
+  cursor: 'pointer',
 }

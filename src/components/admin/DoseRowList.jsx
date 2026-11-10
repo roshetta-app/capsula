@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { Plus, Trash2, ChevronUp, ChevronDown, AlertTriangle } from 'lucide-react'
+import { Plus, X, ChevronUp, ChevronDown, Edit2, AlertTriangle } from 'lucide-react'
 import ConfirmModal from './ConfirmModal'
+import { findNearDuplicateBands } from './blocks/rows/doseLibraryState'
 
 /**
  * DoseRowList (DoseTableEditor) — editable population-tab switcher for
@@ -48,6 +49,13 @@ import ConfirmModal from './ConfirmModal'
  * or bracket gets tagged the next time an admin opens and saves this
  * formulation, no bulk migration required.
  *
+ * 2026-11-10 (formulation editor): the brackets now look and behave like the dose bands of a
+ * condition's drug block (UnifiedDrugRowEditor): a numbered closed row showing 'Applies to: dose',
+ * tap to open ONE 'DOSE BAND n' panel at a time (Applies to + Dose + optional Note, Done, move
+ * up/down, Remove with a confirm bar), a 'Looks the same as dose band n' warning, a max dose row
+ * that opens the same way, and quiet '+ Dose band' / '+ Max dose' links. Patient groups stay as
+ * chips. The saved data shape and ids are unchanged.
+ *
  * Props:
  *   doses     { id: string, population: string, max_dose?: string,
  *               brackets: { id: string, bracket?: string, instruction: string,
@@ -71,44 +79,238 @@ function ensureIds(doses) {
   }))
 }
 
-export default function DoseRowList({ doses = [], onChange, disabled = false }) {
 
+// Same look as the condition drug block's dose pieces.
+const fieldLabel = { fontSize: 12, fontWeight: 700, color: 'var(--color-text-primary)', fontFamily: 'var(--font-body)' }
+const fieldInput = {
+  width: '100%', boxSizing: 'border-box', padding: '9px 10px',
+  border: '1px solid var(--color-border)', borderRadius: 8,
+  fontSize: 14, fontFamily: 'var(--font-body)',
+  backgroundColor: 'var(--color-surface)', color: 'var(--color-text-primary)', outline: 'none',
+}
+const addLink = {
+  display: 'inline-flex', alignItems: 'center', gap: 4, padding: '6px 4px',
+  border: 'none', background: 'none', color: 'var(--color-text-secondary)',
+  fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-body)', cursor: 'pointer',
+}
+const primaryBtn = {
+  padding: '7px 14px', border: 'none', borderRadius: 8,
+  background: 'var(--color-accent-solid, var(--color-accent))', color: '#fff',
+  fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-body)', cursor: 'pointer',
+}
+const secondaryBtn = {
+  display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 12px',
+  border: '1px solid var(--color-border)', borderRadius: 8, background: 'none',
+  color: 'var(--color-text-secondary)', fontSize: 13, fontWeight: 600,
+  fontFamily: 'var(--font-body)', cursor: 'pointer',
+}
+const dangerBtn = {
+  marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 4, padding: '7px 6px',
+  border: 'none', background: 'none', color: '#ef4444',
+  fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-body)', cursor: 'pointer',
+}
+const openPanel = {
+  display: 'flex', flexDirection: 'column', gap: 10, margin: '6px 0', padding: 12,
+  boxSizing: 'border-box', border: '1.5px solid var(--color-accent)', borderRadius: 10,
+  backgroundColor: 'var(--color-surface)',
+}
+const closedRow = {
+  display: 'flex', alignItems: 'flex-start', gap: 10, width: '100%', boxSizing: 'border-box',
+  padding: '10px 6px', textAlign: 'left', border: 'none', borderRadius: 8,
+  backgroundColor: 'transparent', cursor: 'pointer', fontFamily: 'var(--font-body)',
+}
+
+function ConfirmBar({ text, confirmLabel = 'Remove', onConfirm, onCancel }) {
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', gap: 8, padding: '10px 12px',
+      borderRadius: 10, border: '1px solid #ef4444', backgroundColor: '#ef444410',
+    }}>
+      <span style={{ fontSize: 13, color: 'var(--color-text-primary)' }}>{text}</span>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button type="button" onClick={onConfirm} style={{ ...primaryBtn, background: '#ef4444' }}>{confirmLabel}</button>
+        <button type="button" onClick={onCancel} style={secondaryBtn}>Cancel</button>
+      </div>
+    </div>
+  )
+}
+
+const isBandEmpty = b => !b.bracket?.trim() && !b.instruction?.trim() && !b.note?.trim()
+
+function DoseBand({
+  band, index, count, isOpen, disabled, duplicateOf,
+  onOpen, onClose, onUpdate, onRemove, onMove,
+}) {
+  const [showNote, setShowNote] = useState(false)
+  const [confirmRemove, setConfirmRemove] = useState(false)
+  const empty = isBandEmpty(band)
+  const number = index + 1
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, borderTop: index > 0 ? '1px solid var(--color-border)' : 'none' }}>
+      {isOpen ? (
+        <div style={openPanel}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-accent)', letterSpacing: '0.03em' }}>
+            DOSE BAND {number}
+          </span>
+          <div className="cms-stack" style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '0 0 36%', minWidth: 0 }}>
+              <span style={fieldLabel}>Applies to</span>
+              <input
+                type="text" value={band.bracket ?? ''} disabled={disabled} dir="auto"
+                onChange={e => onUpdate('bracket', e.target.value)}
+                placeholder="e.g. 5-7.9kg" style={fieldInput}
+              />
+            </label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 0 }}>
+              <span style={fieldLabel}>Dose</span>
+              <textarea
+                value={band.instruction ?? ''} disabled={disabled} dir="auto" rows={2}
+                onChange={e => onUpdate('instruction', e.target.value)}
+                placeholder="e.g. 1gm/12hr I.V. for 5-7 days"
+                style={{ ...fieldInput, resize: 'vertical' }}
+              />
+            </label>
+          </div>
+          {(showNote || band.note) ? (
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <span style={fieldLabel}>Note</span>
+              <textarea
+                value={band.note ?? ''} disabled={disabled} dir="auto" rows={2}
+                autoFocus={showNote && !band.note}
+                onChange={e => onUpdate('note', e.target.value)}
+                placeholder="Note" style={{ ...fieldInput, resize: 'vertical', fontStyle: 'italic' }}
+              />
+            </label>
+          ) : (
+            <div>
+              <button type="button" onClick={() => setShowNote(true)} style={addLink}><Plus size={14} /> Note</button>
+            </div>
+          )}
+          {band.instruction?.trim() === '' && (band.bracket?.trim() || band.note?.trim()) && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#B45309' }}>
+              <AlertTriangle size={12} /> Add the dose, or this band will not show in the app.
+            </span>
+          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <button type="button" onClick={onClose} style={primaryBtn}>Done</button>
+            <button type="button" onClick={() => onMove(-1)} disabled={disabled || index === 0} aria-label="Move up" style={{ ...secondaryBtn, padding: '7px 8px', opacity: index === 0 ? 0.4 : 1 }}>
+              <ChevronUp size={14} />
+            </button>
+            <button type="button" onClick={() => onMove(1)} disabled={disabled || index === count - 1} aria-label="Move down" style={{ ...secondaryBtn, padding: '7px 8px', opacity: index === count - 1 ? 0.4 : 1 }}>
+              <ChevronDown size={14} />
+            </button>
+            <button type="button" disabled={disabled} onClick={() => (empty ? onRemove() : setConfirmRemove(true))} style={dangerBtn}>
+              <X size={13} /> Remove
+            </button>
+          </div>
+          {confirmRemove && (
+            <ConfirmBar
+              text="Remove this dose band?"
+              onConfirm={() => { setConfirmRemove(false); onRemove() }}
+              onCancel={() => setConfirmRemove(false)}
+            />
+          )}
+        </div>
+      ) : (
+        <button type="button" onClick={onOpen} aria-label={`Edit dose band ${number}`} style={closedRow}>
+          <span style={{
+            flexShrink: 0, width: 22, height: 22, borderRadius: 99,
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 11, fontWeight: 700, color: 'var(--color-accent)', background: 'var(--color-accent-light)',
+          }}>{number}</span>
+          <span dir="auto" style={{ flex: 1, minWidth: 0, display: 'block', fontSize: 14, color: 'var(--color-text-primary)' }}>
+            {empty ? (
+              <span style={{ fontStyle: 'italic', color: 'var(--color-text-tertiary)' }}>Empty dose band, tap to fill in</span>
+            ) : (
+              <>
+                {band.bracket && <span style={{ fontWeight: 700 }}>{band.bracket}{': '}</span>}
+                {band.instruction}
+                {band.note && (
+                  <span style={{ display: 'block', marginTop: 2, fontSize: 12, fontStyle: 'italic', color: 'var(--color-text-tertiary)' }}>
+                    {band.note}
+                  </span>
+                )}
+              </>
+            )}
+          </span>
+          <Edit2 size={14} style={{ flexShrink: 0, marginTop: 3, color: 'var(--color-text-tertiary)' }} />
+        </button>
+      )}
+      {duplicateOf && !empty && (
+        <span style={{ padding: '0 6px 8px 38px', fontSize: 12, color: '#B45309', fontFamily: 'var(--font-body)' }}>
+          Looks the same as dose band {duplicateOf}. Remove one if it is a repeat.
+        </span>
+      )}
+    </div>
+  )
+}
+
+function MaxDoseRow({ value, isOpen, disabled, onOpen, onClose, onChange }) {
+  const [confirmRemove, setConfirmRemove] = useState(false)
+  if (isOpen) {
+    return (
+      <div style={openPanel}>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <span style={fieldLabel}>Max dose</span>
+          <input
+            type="text" value={value ?? ''} disabled={disabled} dir="auto" autoFocus
+            onChange={e => onChange(e.target.value)}
+            placeholder="e.g. 4gm/day" style={fieldInput}
+          />
+        </label>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <button type="button" onClick={onClose} style={primaryBtn}>Done</button>
+          {value && (
+            <button type="button" disabled={disabled} onClick={() => setConfirmRemove(true)} style={dangerBtn}>
+              <X size={13} /> Remove
+            </button>
+          )}
+        </div>
+        {confirmRemove && (
+          <ConfirmBar
+            text="Remove the max dose?"
+            onConfirm={() => { setConfirmRemove(false); onChange(''); onClose() }}
+            onCancel={() => setConfirmRemove(false)}
+          />
+        )}
+      </div>
+    )
+  }
+  if (!value) return null
+  return (
+    <button type="button" onClick={onOpen} aria-label="Edit max dose" style={closedRow}>
+      <span dir="auto" style={{ flex: 1, minWidth: 0, display: 'block', fontSize: 14, color: 'var(--color-text-primary)' }}>
+        <span style={{ fontWeight: 700 }}>Max dose: </span>
+        <span style={{ fontStyle: 'italic' }}>{value}</span>
+      </span>
+      <Edit2 size={14} style={{ flexShrink: 0, marginTop: 3, color: 'var(--color-text-tertiary)' }} />
+    </button>
+  )
+}
+
+export default function DoseRowList({ doses = [], onChange, disabled = false }) {
   const [activeIndex, setActiveIndex] = useState(0)
   const [pendingRemoveIndex, setPendingRemoveIndex] = useState(null)
-  // OPTIONAL POPULATION NAME (2026-08-08): true only right after
-  // addPopulation() was blocked because an existing population is still
-  // unnamed — drives the inline warning near the name input. Cleared
-  // whenever the admin switches tabs manually, and effectively cleared
-  // whenever the flagged population gets a real name (see the warning's
-  // render condition below, same reactive pattern as the bracket
-  // instruction-flag).
   const [addBlockedWarning, setAddBlockedWarning] = useState(false)
+  // ONE open editor at a time, like the condition block: a band id, or 'max'.
+  const [openId, setOpenId] = useState(null)
 
   const currentIndex = doses.length === 0 ? 0 : Math.min(activeIndex, doses.length - 1)
   const current = doses[currentIndex]
 
-  // ── Population (tab) helpers ──
+  function selectTab(i) { setActiveIndex(i); setOpenId(null); setAddBlockedWarning(false) }
 
   function updatePopulation(idx, field, value) {
     onChange(ensureIds(doses.map((d, i) => i === idx ? { ...d, [field]: value } : d)))
   }
 
   function addPopulation() {
-    // OPTIONAL POPULATION NAME (2026-08-08): a formulation may have at most
-    // one population with a blank name at any time. If one already exists,
-    // block adding a second and surface the existing unnamed one instead —
-    // it's what needs a name, not the new one that triggered the conflict.
     const blankIdx = doses.findIndex(d => !d.population?.trim())
-    if (blankIdx !== -1) {
-      setActiveIndex(blankIdx)
-      setAddBlockedWarning(true)
-      return
-    }
-    onChange(ensureIds([
-      ...doses,
-      { population: '', max_dose: '', brackets: [{ bracket: '', instruction: '', note: '' }] },
-    ]))
+    if (blankIdx !== -1) { setActiveIndex(blankIdx); setAddBlockedWarning(true); return }
+    onChange(ensureIds([...doses, { population: '', max_dose: '', brackets: [{ bracket: '', instruction: '', note: '' }] }]))
     setActiveIndex(doses.length)
+    setOpenId(null)
   }
 
   function confirmRemovePopulation() {
@@ -116,298 +318,150 @@ export default function DoseRowList({ doses = [], onChange, disabled = false }) 
     setPendingRemoveIndex(null)
     const next = doses.filter((_, i) => i !== idx)
     onChange(ensureIds(next))
-    if (activeIndex >= next.length) {
-      setActiveIndex(Math.max(0, next.length - 1))
-    }
+    if (activeIndex >= next.length) setActiveIndex(Math.max(0, next.length - 1))
+    setOpenId(null)
   }
 
-  // ── Bracket helpers (scoped to one population) ──
-
-  function updateBracket(popIdx, bracketIdx, field, value) {
-    onChange(ensureIds(doses.map((d, i) => {
-      if (i !== popIdx) return d
-      return {
-        ...d,
-        brackets: d.brackets.map((b, bi) => bi === bracketIdx ? { ...b, [field]: value } : b),
-      }
+  function updateBracket(popIdx, bi, field, value) {
+    onChange(ensureIds(doses.map((d, i) => i !== popIdx ? d : {
+      ...d, brackets: d.brackets.map((b, j) => j === bi ? { ...b, [field]: value } : b),
     })))
   }
 
   function addBracket(popIdx) {
-    onChange(ensureIds(doses.map((d, i) => i === popIdx
-      ? { ...d, brackets: [...d.brackets, { bracket: '', instruction: '', note: '' }] }
-      : d
-    )))
-  }
-
-  function removeBracket(popIdx, bracketIdx) {
-    onChange(ensureIds(doses.map((d, i) => i === popIdx
-      ? { ...d, brackets: d.brackets.filter((_, bi) => bi !== bracketIdx) }
-      : d
-    )))
-  }
-
-  function moveBracket(popIdx, bracketIdx, direction) {
+    // No second empty band while one is still waiting (same rule as the condition block).
     const pop = doses[popIdx]
-    const target = bracketIdx + direction
-    if (target < 0 || target >= pop.brackets.length) return
-    const nextBrackets = [...pop.brackets]
-    ;[nextBrackets[bracketIdx], nextBrackets[target]] = [nextBrackets[target], nextBrackets[bracketIdx]]
-    onChange(ensureIds(doses.map((d, i) => i === popIdx ? { ...d, brackets: nextBrackets } : d)))
+    const waitingIdx = (pop.brackets ?? []).findIndex(isBandEmpty)
+    if (waitingIdx !== -1) { setOpenId(`b-${waitingIdx}`); return }
+    onChange(ensureIds(doses.map((d, i) => i === popIdx
+      ? { ...d, brackets: [...d.brackets, { bracket: '', instruction: '', note: '' }] } : d)))
+    setOpenId(`b-${pop.brackets.length}`)
   }
+
+  function removeBracket(popIdx, bi) {
+    onChange(ensureIds(doses.map((d, i) => i === popIdx
+      ? { ...d, brackets: d.brackets.filter((_, j) => j !== bi) } : d)))
+    setOpenId(null)
+  }
+
+  function moveBracket(popIdx, bi, dir) {
+    const target = bi + dir
+    onChange(ensureIds(doses.map((d, i) => {
+      if (i !== popIdx || target < 0 || target >= d.brackets.length) return d
+      const next = [...d.brackets]
+      ;[next[bi], next[target]] = [next[target], next[bi]]
+      return { ...d, brackets: next }
+    })))
+    if (openId === `b-${bi}`) setOpenId(`b-${target}`)
+    else if (openId === `b-${target}`) setOpenId(`b-${bi}`)
+  }
+
+  const many = doses.length > 1
+  const chipBase = {
+    display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 99,
+    fontSize: 13, fontWeight: 700, fontFamily: 'var(--font-body)', cursor: 'pointer',
+  }
+
+  const bands = current?.brackets ?? []
+  const duplicates = findNearDuplicateBands(bands.map((b, bi) => ({ id: bi, bracket_title: b.bracket, instruction: b.instruction })))
+  const hasMax = !!current?.max_dose?.trim()
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-
-      {/* Population tabs */}
-      {doses.length > 0 && (
-        <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
-          {doses.map((pop, idx) => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {/* Patient groups */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
+        {doses.map((d, i) => {
+          const text = d.population?.trim() || (many ? `Patient group ${i + 1}` : 'Patient group')
+          const active = i === currentIndex
+          return (
             <button
-              key={idx}
-              type="button"
-              onClick={() => { setActiveIndex(idx); setAddBlockedWarning(false) }}
+              key={d.id ?? i} type="button" onClick={() => selectTab(i)}
               style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                padding: '6px 10px 6px 14px',
-                borderRadius: 'var(--radius-full)',
-                cursor: 'pointer',
-                fontFamily: 'var(--font-body)',
-                fontSize: 13,
-                fontWeight: 600,
-                border: idx === currentIndex ? 'none' : '1px solid var(--color-border)',
-                backgroundColor: idx === currentIndex ? 'var(--color-text-primary)' : 'transparent',
-                color: idx === currentIndex ? 'var(--color-surface)' : 'var(--color-text-secondary)',
+                ...chipBase,
+                background: active ? 'var(--color-accent-light)' : 'none',
+                border: active ? '1px solid transparent' : '1px solid var(--color-border)',
+                color: active ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+                fontStyle: d.population?.trim() ? 'normal' : 'italic',
               }}
             >
-              {pop.population?.trim() || 'Untitled'}
-              {!disabled && (
-                <span
-                  role="button"
-                  aria-label="Remove population"
-                  onClick={e => { e.stopPropagation(); setPendingRemoveIndex(idx) }}
-                  style={{ display: 'flex', alignItems: 'center', opacity: 0.7 }}
-                >
-                  <Trash2 size={12} />
-                </span>
-              )}
+              {text}
             </button>
-          ))}
+          )
+        })}
+        {!disabled && (
+          <button type="button" onClick={addPopulation} style={addLink}><Plus size={14} /> Patient group</button>
+        )}
+      </div>
+
+      {doses.length === 0 && (
+        <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)' }}>
+          No practical doses yet. Add a patient group to start.
         </div>
       )}
 
-      {!disabled && (
-        <button
-          type="button"
-          onClick={addPopulation}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
-            padding: 'var(--space-2) var(--space-3)',
-            borderRadius: 'var(--radius-sm)',
-            border: '1px dashed var(--color-border)',
-            backgroundColor: 'transparent',
-            color: 'var(--color-text-secondary)',
-            fontSize: 13, fontWeight: 500,
-            fontFamily: 'var(--font-body)',
-            cursor: 'pointer',
-            alignSelf: 'flex-start',
-          }}
-        >
-          <Plus size={14} />
-          Add population
-        </button>
-      )}
-
-      {/* Active tab panel */}
       {current && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+        <>
+          {/* Group name, and remove group */}
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 0 }}>
+              <span style={fieldLabel}>Patient group</span>
+              <input
+                type="text" value={current.population ?? ''} disabled={disabled} dir="auto"
+                onChange={e => { updatePopulation(currentIndex, 'population', e.target.value); setAddBlockedWarning(false) }}
+                placeholder="e.g. Adults (optional)" style={fieldInput}
+              />
+            </label>
+            {!disabled && (
+              <button type="button" onClick={() => setPendingRemoveIndex(currentIndex)} style={{ ...dangerBtn, marginLeft: 0 }}>
+                <X size={13} /> Remove group
+              </button>
+            )}
+          </div>
+          {addBlockedWarning && !current.population?.trim() && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#B45309' }}>
+              <AlertTriangle size={12} /> Name this group before adding another.
+            </span>
+          )}
 
-          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-            <input
-              type="text"
-              value={current.population ?? ''}
-              onChange={e => updatePopulation(currentIndex, 'population', e.target.value)}
-              placeholder="Population, e.g. Adult"
-              disabled={disabled}
-              style={{ ...inputBase, flex: 1 }}
-            />
-            <input
-              type="text"
-              value={current.max_dose ?? ''}
-              onChange={e => updatePopulation(currentIndex, 'max_dose', e.target.value)}
-              placeholder="Max dose for this tab, e.g. 3g/day (optional)"
-              disabled={disabled}
-              style={{ ...inputBase, flex: 1 }}
+          {/* Dose bands */}
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {bands.map((b, bi) => (
+              <DoseBand
+                key={b.id ?? bi} band={b} index={bi} count={bands.length} disabled={disabled}
+                isOpen={openId === `b-${bi}`} duplicateOf={duplicates[bi] ?? null}
+                onOpen={() => setOpenId(`b-${bi}`)} onClose={() => setOpenId(null)}
+                onUpdate={(field, value) => updateBracket(currentIndex, bi, field, value)}
+                onRemove={() => removeBracket(currentIndex, bi)}
+                onMove={dir => moveBracket(currentIndex, bi, dir)}
+              />
+            ))}
+            <MaxDoseRow
+              value={current.max_dose} disabled={disabled}
+              isOpen={openId === 'max'} onOpen={() => setOpenId('max')} onClose={() => setOpenId(null)}
+              onChange={v => updatePopulation(currentIndex, 'max_dose', v)}
             />
           </div>
 
-          {addBlockedWarning && !current.population?.trim() && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#B45309' }}>
-              <AlertTriangle size={12} />
-              Name this population before adding another.
+          {!disabled && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              <button type="button" onClick={() => addBracket(currentIndex)} style={addLink}><Plus size={14} /> Dose band</button>
+              {!hasMax && openId !== 'max' && (
+                <button type="button" onClick={() => setOpenId('max')} style={addLink}><Plus size={14} /> Max dose</button>
+              )}
             </div>
           )}
-
-          {(current.brackets ?? []).map((bracket, bIdx) => {
-            const isFlagged = !bracket.instruction?.trim()
-              && (bracket.bracket?.trim() || bracket.note?.trim())
-
-            return (
-              <div
-                key={bIdx}
-                style={{
-                  display: 'flex', flexDirection: 'column', gap: 'var(--space-2)',
-                  padding: 'var(--space-3)',
-                  borderRadius: 'var(--radius-md)',
-                  backgroundColor: '#F9FAFB',
-                }}
-              >
-                <div className="cms-cols" style={{ display: 'grid', gridTemplateColumns: '130px 1fr 56px', gap: 'var(--space-2)', alignItems: 'flex-start' }}>
-                  <div>
-                    <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.03em', color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 2 }}>{`BRACKET ${bIdx + 1} TITLE`}</span>
-                    <input
-                      type="text"
-                      value={bracket.bracket ?? ''}
-                      onChange={e => updateBracket(currentIndex, bIdx, 'bracket', e.target.value)}
-                      placeholder="e.g. 5-7.9kg (optional)"
-                      disabled={disabled}
-                      style={inputBase}
-                    />
-                  </div>
-                  <div>
-                    <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.03em', color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 2 }}>{`BRACKET ${bIdx + 1} DOSE INSTRUCTION (required)`}</span>
-                    <textarea
-                      value={bracket.instruction ?? ''}
-                      onChange={e => updateBracket(currentIndex, bIdx, 'instruction', e.target.value)}
-                      placeholder="Dose instruction…"
-                      disabled={disabled}
-                      dir="auto"
-                      rows={2}
-                      style={{ ...inputBase, resize: 'vertical', fontFamily: 'var(--font-body)' }}
-                    />
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    {!disabled && (
-                      <>
-                        <div style={{ display: 'flex', gap: 2 }}>
-                          <button
-                            type="button"
-                            onClick={() => moveBracket(currentIndex, bIdx, -1)}
-                            disabled={bIdx === 0}
-                            aria-label="Move bracket up"
-                            style={reorderBtnStyle(bIdx === 0)}
-                          >
-                            <ChevronUp size={13} />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => moveBracket(currentIndex, bIdx, 1)}
-                            disabled={bIdx === (current.brackets?.length ?? 1) - 1}
-                            aria-label="Move bracket down"
-                            style={reorderBtnStyle(bIdx === (current.brackets?.length ?? 1) - 1)}
-                          >
-                            <ChevronDown size={13} />
-                          </button>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => removeBracket(currentIndex, bIdx)}
-                          aria-label="Remove bracket"
-                          style={{
-                            background: 'none', border: 'none', cursor: 'pointer',
-                            color: 'var(--color-text-tertiary)', padding: 4,
-                            display: 'flex', alignItems: 'center',
-                          }}
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                {isFlagged && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#B45309' }}>
-                    <AlertTriangle size={12} />
-                    Instruction needed for this bracket to be saved
-                  </div>
-                )}
-
-                <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.03em', color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 2 }}>{`BRACKET ${bIdx + 1} NOTE (optional)`}</span>
-                <textarea
-                  value={bracket.note ?? ''}
-                  onChange={e => updateBracket(currentIndex, bIdx, 'note', e.target.value)}
-                  placeholder="Note for this bracket only (optional) — shown under this card on the app"
-                  disabled={disabled}
-                  dir="auto"
-                  rows={1}
-                  style={{ ...inputBase, resize: 'vertical', fontFamily: 'var(--font-body)', fontStyle: 'italic' }}
-                />
-              </div>
-            )
-          })}
-
-          {!disabled && (
-            <button
-              type="button"
-              onClick={() => addBracket(currentIndex)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
-                padding: 'var(--space-2) var(--space-3)',
-                borderRadius: 'var(--radius-sm)',
-                border: '1px dashed var(--color-border)',
-                backgroundColor: 'transparent',
-                color: 'var(--color-text-secondary)',
-                fontSize: 13, fontWeight: 500,
-                fontFamily: 'var(--font-body)',
-                cursor: 'pointer',
-                alignSelf: 'flex-start',
-              }}
-            >
-              <Plus size={14} />
-              Add bracket
-            </button>
-          )}
-        </div>
+        </>
       )}
 
       <ConfirmModal
-        isOpen={pendingRemoveIndex !== null}
+        isOpen={pendingRemoveIndex != null}
         onClose={() => setPendingRemoveIndex(null)}
         onConfirm={confirmRemovePopulation}
-        title="Remove this population?"
-        message="This removes every bracket under this population tab. This can't be undone once saved."
-        confirmLabel="Remove"
+        title="Remove this patient group?"
+        message="Every dose band under it is removed too."
+        confirmLabel="Remove group"
         confirmVariant="danger"
       />
-
     </div>
   )
-}
-
-function reorderBtnStyle(isDisabled) {
-  return {
-    background: 'none',
-    border: 'none',
-    cursor: isDisabled ? 'default' : 'pointer',
-    color: isDisabled ? 'var(--color-border)' : 'var(--color-text-tertiary)',
-    padding: 2,
-    display: 'flex',
-    alignItems: 'center',
-  }
-}
-
-const inputBase = {
-  padding: 'var(--space-2) var(--space-3)',
-  borderRadius: 'var(--radius-sm)',
-  border: '1px solid var(--color-border)',
-  backgroundColor: 'var(--color-surface)',
-  color: 'var(--color-text-primary)',
-  fontSize: 13,
-  fontFamily: 'var(--font-body)',
-  outline: 'none',
-  boxSizing: 'border-box',
-  width: '100%',
-  appearance: 'none',
-  WebkitAppearance: 'none',
 }

@@ -557,6 +557,8 @@ export default function DrugEditor() {
                       ...f.brands.filter(b => b._deleted),
                     ])}
                     onDelete={brandId => markBrandDeleted(f.id, brandId)}
+                    category={generic?.category ?? null}
+                    ingredients={generic?.ingredients ?? []}
                     disabled={isSaving}
                     highlightBrandId={f.id === targetFormulationId ? targetBrandId : null}
                   />
