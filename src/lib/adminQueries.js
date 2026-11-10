@@ -870,6 +870,160 @@ export async function searchBrandsForCMS(query, { limit = 50, page = 0, forms = 
   return { data: mapped, count: count ?? 0, error: null }
 }
 
+// ─── CMS drug library — the full search index (2026-11-10) ────────────────────
+//
+// The Drug Library now runs the app's own search engine (useDrugSearch) on the admin's
+// device, so it needs the same kind of flat list the app downloads: one row per brand with
+// its formulation and generic folded in. Differences from the app's list:
+//   - drafts and unpublished rows are kept (the admin manages those), each row carries its
+//     published flags;
+//   - only the fields search, the cards and the row actions read, none of the big dose and
+//     warning columns, so the download stays small;
+//   - a generic with no brand yet (a new one just added in the CMS) becomes one 'generic only'
+//     row (id 'generic:<id>', empty brand name), so Generic mode can still find it;
+//   - 'genericsById' carries each generic's own facts (update date, number of formulations).
+// Read in pages of 1000 (the server's row cap), a few at a time, ordered by id so the pages
+// never overlap.
+const CMS_INDEX_PAGE  = 1000
+const CMS_INDEX_BATCH = 4
+
+const CMS_INDEX_BRAND_SELECT = `
+  id, tradename_clean, name_ar, name_ar_full, manufacturer, pack_size, fill_volume, is_published,
+  formulations (
+    id, concentration, strength_value, strength_unit, strength_basis, form, form_modifier, route, is_published,
+    generics ( id, name_en, category, class, subclass, ingredients, is_published )
+  )
+`
+const CMS_INDEX_GENERIC_SELECT = `
+  id, name_en, category, class, subclass, ingredients, is_published, updated_at, brand_count,
+  formulations ( id )
+`
+
+async function fetchPagesInBatches(table, select, pageCount, onPageDone) {
+  const rows = []
+  for (let start = 0; start < pageCount; start += CMS_INDEX_BATCH) {
+    const idx = Array.from({ length: Math.min(CMS_INDEX_BATCH, pageCount - start) }, (_, i) => start + i)
+    const batch = await Promise.all(idx.map(async i => {
+      const from = i * CMS_INDEX_PAGE
+      const { data, error } = await supabase
+        .from(table)
+        .select(select)
+        .order('id', { ascending: true })
+        .range(from, from + CMS_INDEX_PAGE - 1)
+      if (error) throw error
+      onPageDone?.()
+      return data ?? []
+    }))
+    batch.forEach(b => rows.push(...b))
+  }
+  return rows
+}
+
+export async function fetchCmsDrugIndex(onProgress) {
+  try {
+    const [{ count: brandCount, error: e1 }, { count: genericCount, error: e2 }] = await Promise.all([
+      supabase.from('brands').select('id', { count: 'exact', head: true }),
+      supabase.from('generics').select('id', { count: 'exact', head: true }),
+    ])
+    if (e1) throw e1
+    if (e2) throw e2
+
+    const brandPages   = Math.max(1, Math.ceil((brandCount ?? 0) / CMS_INDEX_PAGE))
+    const genericPages = Math.max(1, Math.ceil((genericCount ?? 0) / CMS_INDEX_PAGE))
+    const total = brandPages + genericPages
+    let loaded = 0
+    onProgress?.(0, total)
+    const tick = () => { loaded += 1; onProgress?.(loaded, total) }
+
+    const [brandRows, genericRows] = await Promise.all([
+      fetchPagesInBatches('brands',   CMS_INDEX_BRAND_SELECT,   brandPages,   tick),
+      fetchPagesInBatches('generics', CMS_INDEX_GENERIC_SELECT, genericPages, tick),
+    ])
+
+    const genericsById = new Map(genericRows.map(g => [g.id, {
+      id:               g.id,
+      name_en:          g.name_en,
+      category:         g.category,
+      class:            g.class,
+      subclass:         g.subclass,
+      is_published:     g.is_published,
+      updated_at:       g.updated_at,
+      brand_count:      g.brand_count,
+      formulationCount: (g.formulations ?? []).length,
+    }]))
+
+    const drugs = []
+    const genericsWithBrands = new Set()
+    for (const b of brandRows) {
+      const f = b.formulations
+      const g = f?.generics
+      if (!f || !g) continue // defensive: a brand always has both, never draw a broken row
+      genericsWithBrands.add(g.id)
+      drugs.push({
+        id:                   b.id,
+        tradenameClean:       b.tradename_clean,
+        nameAr:               b.name_ar ?? null,
+        nameArFull:           b.name_ar_full ?? null,
+        manufacturer:         b.manufacturer,
+        packSize:             b.pack_size,
+        fillVolume:           b.fill_volume,
+        isPublished:          b.is_published,
+        formulationId:        f.id,
+        concentration:        f.concentration,
+        strengthValue:        f.strength_value,
+        strengthUnit:         f.strength_unit,
+        strengthBasis:        f.strength_basis,
+        form:                 f.form,
+        formModifier:         f.form_modifier ?? [],
+        route:                f.route,
+        formulationPublished: f.is_published,
+        genericId:            g.id,
+        genericName:          g.name_en,
+        ingredients:          g.ingredients ?? null,
+        category:             g.category,
+        class:                g.class,
+        subclass:             g.subclass,
+        genericPublished:     g.is_published,
+      })
+    }
+
+    for (const g of genericRows) {
+      if (genericsWithBrands.has(g.id)) continue
+      drugs.push({
+        id:                   `generic:${g.id}`,
+        isGenericOnly:        true,
+        tradenameClean:       '',
+        nameAr:               null,
+        nameArFull:           null,
+        manufacturer:         null,
+        packSize:             null,
+        fillVolume:           null,
+        isPublished:          false,
+        formulationId:        null,
+        concentration:        null,
+        strengthValue:        null,
+        strengthUnit:         null,
+        strengthBasis:        null,
+        form:                 null,
+        formModifier:         [],
+        route:                null,
+        formulationPublished: false,
+        genericId:            g.id,
+        genericName:          g.name_en,
+        ingredients:          g.ingredients ?? null,
+        category:             g.category,
+        class:                g.class,
+        subclass:             g.subclass,
+        genericPublished:     g.is_published,
+      })
+    }
+
+    return { data: { drugs, genericsById }, error: null }
+  } catch (error) {
+    return { data: null, error }
+  }
+}
+
 // ─── CMS drug library — Class mode and the class pages (2026-11-10) ───────────
 //
 // generics.class and generics.subclass are plain text columns (see the note above

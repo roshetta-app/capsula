@@ -1,82 +1,76 @@
 /**
- * DrugCMS.jsx — Phase 3E rebuild
+ * DrugCMS.jsx
  * /admin/drugs
  *
- * Lists all generics (published + drafts) in a table with:
- *   - Columns: Name | Category | Formulations | Published | Actions
- *   - Published toggle (immediate update + ConfirmModal for unpublish)
- *   - Edit (pencil) → navigates to DrugEditor (/admin/drugs/generic/:id)
- *   - Delete → ConfirmModal
- *   - "Forms" count → navigates to DrugEditor
- *   - "+ Add New" → navigates to AddDrugFlow (/admin/drugs/new)
- *   - Search (name_en) + category filter, both querying the live
- *     database directly (debounced, capped at 50 rows) — never a client-side
- *     re-filter of a preloaded list. Category options come from the real
- *     drug_categories table via useCategories, shown as a full-width dropdown.
+ * The Drug Library: find a generic, a brand or a class and manage it.
  *
- * 2026-11-10 (CMS drug library search, same look as the app): the search bar and the
- * Brand / Generic chips are now the app's own (DrugSearchBar, ModeSegmentedControl) on the same
- * tinted block, and a generic is a flat GenericDrugCard row (the twin of SharedDrugCard) instead
- * of a table row, so Generic and Brand results look alike. Category filter, sort, Live / Draft,
- * edit and delete work as before. The old table column header is gone.
+ * 2026-11-10 (full search engine): the screen now runs the app's OWN search on the admin's
+ * device, the same hook the Drugs screen uses (useDrugSearch), on a copy of the whole drug list
+ * (useCmsDrugIndex: every brand, drafts included, plus one row for each generic that has no
+ * brand yet). So it matches the app exactly: starts-with / word-starts / anywhere tiers,
+ * strength and form typed in the text ('para 500 tab'), Arabic names, plurals, 'Did you mean',
+ * the 'it matches in another mode' card, the class hint, and the 'your filter is hiding
+ * these results' card. Search is not logged (logSearches: false), so the admin's searches are not
+ * counted as real user searches.
  *
- * 2026-11-10 (later): third chip, Class: class and family cards built from the generics' class and
- * subclass text (the app's own search and ClassSearchResults), opening the new /admin/drugs/class page.
- * The category dropdown moved into the filter icon in the search bar (DrugFilterSheet), which also
- * holds the new Form filter for Brand mode. Sort uses the same chips as the search modes.
+ *   Brand mode    one SharedDrugCard row per brand (the app's row), with Live / Draft, edit, retire.
+ *   Generic mode  one GenericDrugCard row per generic (the generic twin of that row), with
+ *                 Live / Draft, edit, delete. The engine ranks brand rows; they are folded into
+ *                 their generics in the same order. With no text typed, the sort chips order
+ *                 the whole list (Alphabetical / Most Common).
+ *   Class mode    class and family cards (ClassSearchResults); with no text, every class A to Z.
+ *                 A card opens /admin/drugs/class (ClassCMS.jsx).
  *
- * 12.2 (decisions 27-28): added a Generic/Brand mode toggle, styled like the
- * existing Alphabetical/Most Common sort toggle. Generic mode is the table
- * above, completely unchanged. Brand mode searches brands.tradename_clean
- * (searchBrandsForCMS, 12.1/12.2) instead of generics.name_en, and renders
- * its own flat-row result list built on the shared SharedDrugCard (the same
- * row component the consumer app's Drugs screen already uses) rather than
- * the generic table — a brand row shows the brand name plus its real
- * composition underneath, so one brand name that spans several different
- * medicines (e.g. Panadol) still shows each as its own clear row. Category
- * filter and the Alphabetical/Most Common sort are hidden in Brand mode —
- * neither maps onto a list of brands. Brand mode's edit action navigates to
- * the right generic's editor now; auto-expanding the right formulation and
- * highlighting the specific brand is 12.4.
+ * The filter icon in the search bar opens DrugFilterSheet: Category (Generic mode) or Form
+ * (Brand mode), applied after the search like the app does, so the 'filter is hiding results'
+ * card can say how many matches it hides. Mode, category, forms, sort and page live in the
+ * address, so they survive a refresh and the browser Back button.
  *
- * 12.3 (decision 28): brand rows now get full parity with a generic row —
- * publish/draft toggle and delete added alongside Edit in the trailing
- * slot. Publish is immediate; unpublish opens ConfirmModal first, same as
- * the generic table. "Delete" is a soft retire (toggleBrandPublished(id,
- * false)) behind that same ConfirmModal pattern, never the hard
- * deleteBrand — every brand row here comes from searchBrandsForCMS, so its
- * identity is always the brand itself.
+ * Row actions keep the earlier rules: publish is immediate, unpublish asks first, a generic's
+ * delete asks first and removes its formulations and brands, a brand's 'delete' is a soft retire
+ * (toggleBrandPublished(id, false)), never the hard deleteBrand. After each one the in-memory
+ * list is edited in place, so the screen changes at once without reloading 21,000 rows.
  */
 
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Plus, Edit2, Trash2, Search, X, AlertTriangle, Tag, FlaskConical, Layers, ArrowDownAZ, TrendingUp } from 'lucide-react'
+import { Plus, Edit2, Trash2, Search, X, AlertTriangle, Tag, FlaskConical, Layers, ArrowDownAZ, TrendingUp, RefreshCw } from 'lucide-react'
 import { useToast } from '../../context/ToastContext'
 import { useCategories } from '../../hooks/useCategories'
+import { useClassKeywords } from '../../hooks/useClassKeywords'
+import { useDrugSearch } from '../../hooks/useDrugSearch'
+import { useCmsDrugIndex } from '../../hooks/useCmsDrugIndex'
 import { useIsDark } from '../../utils/specialtyIcon'
+import { buildClassIndex } from '../../utils/classSearch'
 import ConfirmModal from '../../components/admin/ConfirmModal'
 import SharedDrugCard from '../../components/SharedDrugCard'
 import GenericDrugCard from '../../components/admin/GenericDrugCard'
+import DrugFilterSheet from '../../components/admin/DrugFilterSheet'
 import DrugSearchBar from '../../components/drugs/DrugSearchBar'
 import ModeSegmentedControl from '../../components/drugs/home/ModeSegmentedControl'
 import ClearFiltersButton from '../../components/drugs/home/ClearFiltersButton'
 import ClassSearchResults from '../../components/drugs/classes/ClassSearchResults'
-import DrugFilterSheet from '../../components/admin/DrugFilterSheet'
+import {
+  EmptyState as SearchEmptyState,
+  ModeSwitchState,
+  DidYouMeanState,
+  FilterMaskedState,
+  TooShortState,
+  SearchSwitchingState,
+  ClassHintStrip,
+} from '../../components/drugs/search/SearchStates'
 import { FORM_OPTIONS } from '../../components/drugs/DrugFilterPanel'
-import { buildClassIndex, searchClassIndex } from '../../utils/classSearch'
 import AdminPageHeader from '../../components/admin/AdminPageHeader'
 import {
-  fetchGenericsPage,
   toggleGenericPublished,
   deleteGeneric,
-  searchBrandsForCMS,
   toggleBrandPublished,
-  fetchClassIndexRows,
 } from '../../lib/adminQueries'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const PAGE_SIZE = 50
+const NO_DRUGS = []
 
 // Same three chips as the app's Drugs search.
 const SEARCH_MODES = [
@@ -85,18 +79,20 @@ const SEARCH_MODES = [
   { value: 'class',   label: 'Class',   icon: Layers },
 ]
 
-// Sort chips (Generic mode), drawn with the same chip look as the search modes.
+// Sort chips (Generic mode, nothing typed), drawn with the same chip look as the search modes.
 const SORT_OPTIONS = [
   { value: 'name',   label: 'Alphabetical', icon: ArrowDownAZ },
   { value: 'common', label: 'Most Common',  icon: TrendingUp },
 ]
 
-// The chosen Form chips turned into the raw form / route lists the query needs.
+// The chosen Form chips turned into the raw form / route lists a row is checked against
+// (the same rule the app's Form / Route filter uses: form in 'matches' OR route in 'routes').
 function formsToFilter(values) {
   const chosen = FORM_OPTIONS.filter(o => values.includes(o.value))
-  const matches = [...new Set(chosen.flatMap(o => o.matches ?? []))]
-  const routes  = [...new Set(chosen.flatMap(o => o.routes  ?? []))]
-  return { matches, routes }
+  return {
+    matches: new Set(chosen.flatMap(o => o.matches ?? [])),
+    routes:  new Set(chosen.flatMap(o => o.routes  ?? [])),
+  }
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
@@ -106,25 +102,16 @@ export default function DrugCMS() {
   const { toast }     = useToast()
   const [searchParams, setSearchParams] = useSearchParams()
 
-  const [generics,     setGenerics]     = useState([])
-  const [brands,       setBrands]       = useState([])
-  const [totalCount,   setTotalCount]   = useState(0)
-  const [loading,      setLoading]      = useState(true)
-  const [loadError,    setLoadError]    = useState(null)
-
-  const [query,           setQuery]           = useState('')
-  const [debouncedQuery,  setDebouncedQuery]  = useState('')
-
-  // Category, sort, mode, and page live in the URL — not component state —
+  // Category, forms, sort, mode, and page live in the URL — not component state —
   // so they survive a refresh and restore correctly on browser back/forward
   // after opening a generic. A brand-new session (no params in the URL yet)
-  // falls through to sort='common' / mode='generic' by default, per request.
+  // falls through to sort='common' / mode='generic' by default.
   const activeCategory = searchParams.get('category') || null
   const sortBy         = searchParams.get('sort') || 'common' // 'name' | 'common'
-  const mode            = searchParams.get('mode') || 'generic' // 'generic' | 'brand' | 'class'
-  const formsParam      = searchParams.get('forms') || ''
-  const activeForms     = formsParam ? formsParam.split(',').filter(Boolean) : []
-  const page            = Number(searchParams.get('page') || '0')
+  const mode           = searchParams.get('mode') || 'generic' // 'generic' | 'brand' | 'class'
+  const formsParam     = searchParams.get('forms') || ''
+  const activeForms    = formsParam ? formsParam.split(',').filter(Boolean) : []
+  const page           = Number(searchParams.get('page') || '0')
 
   const isDark = useIsDark()
 
@@ -139,122 +126,109 @@ export default function DrugCMS() {
     }, { replace: true })
   }
 
-  // Filter pop-up (the icon inside the search bar) and Class mode's list of class / family rows.
   const [filterOpen, setFilterOpen] = useState(false)
-  const [classRows,  setClassRows]  = useState(null)
 
   const [confirmUnpub, setConfirmUnpub] = useState(null)
   const [confirmDel,   setConfirmDel]   = useState(null)
   const [actionId,     setActionId]     = useState(null)
 
-  // 12.3 (decision 28) — brand row actions, kept separate from the generic
-  // row's own confirm/action state above so the two lists never collide.
   const [confirmUnpubBrand, setConfirmUnpubBrand] = useState(null)
   const [confirmDelBrand,   setConfirmDelBrand]   = useState(null)
   const [actionIdBrand,     setActionIdBrand]     = useState(null)
 
-  // Real, admin-curated category list (drug_categories table), not scanned
-  // from whatever text happens to be sitting on generics right now.
+  const [dismissedError, setDismissedError] = useState(false)
+
+  // Real, admin-curated category list (drug_categories table).
   const { categories } = useCategories()
+  const { classKeywords } = useClassKeywords()
 
-  // ── Debounce search input — one query per pause-in-typing, not per keystroke ──
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedQuery(query), 150)
-    return () => clearTimeout(t)
-  }, [query])
+  // The whole drug list, and the app's search running on it.
+  const index = useCmsDrugIndex()
+  const drugs = index.drugs ?? NO_DRUGS
+  const {
+    query, setQuery, results, queryTooShort, suggestions, crossModeMatch,
+    classResults, crossModeTargets, classHint, searchPending,
+  } = useDrugSearch(drugs, mode, classKeywords, { logSearches: false })
 
-  // A new search, or switching Generic/Brand mode, always starts back at
-  // page 1 — the old page number wouldn't mean anything against a different
-  // result set. Skips the very first render so a deep-linked/persisted page
-  // number isn't immediately wiped.
+  const trimmed  = query.trim()
+  const hasQuery = trimmed.length > 0
+  const typedSearch = hasQuery && !queryTooShort // a real search is showing, not the full list
+
+  // A new search, a new mode or a new filter always starts back at page 1. Skips the very first
+  // render so a deep-linked page number is not wiped.
   const isFirstRender = useRef(true)
   useEffect(() => {
     if (isFirstRender.current) { isFirstRender.current = false; return }
     updateSearchParams({ page: 0 })
-  }, [debouncedQuery, mode])
+  }, [query, mode, formsParam, activeCategory])
 
-  // ── Load — always a real, filtered, sorted, paginated query against the live DB ──
-  // Generic mode (unchanged): fetchGenericsPage, category + sort apply.
-  // Brand mode (12.2): searchBrandsForCMS instead — category and sort don't
-  // apply to a brand list (decision 27), so they're simply not passed.
-  async function load() {
-    setLoading(true)
-    setLoadError(null)
+  // ── What the list shows ─────────────────────────────────────────────────────
+  // 'matched' is the engine's answer before the filter; 'shown' is after it. Brand mode needs a
+  // typed text or a Form filter to list anything (21,000 brands is not a browse list); Generic
+  // mode with nothing typed lists every generic.
+  const formFilter = mode === 'brand' && activeForms.length > 0 ? formsToFilter(activeForms) : null
+  const hasActiveFilter = mode === 'brand' ? activeForms.length > 0 : mode === 'generic' ? !!activeCategory : false
 
-    // Class mode builds its cards from classRows (loaded by its own effect below).
-    if (mode === 'class') { setLoading(false); return }
+  const { matched, shown } = useMemo(() => {
+    if (index.drugs === null || mode === 'class') return { matched: [], shown: [] }
 
     if (mode === 'brand') {
-      const { data, count, error } = await searchBrandsForCMS(debouncedQuery, {
-        limit: PAGE_SIZE,
-        page,
-        forms: activeForms.length > 0 ? formsToFilter(activeForms) : null,
-      })
-      setLoading(false)
-      if (error) { setLoadError(error.message); return }
-      setBrands(data)
-      setTotalCount(count)
-      return
+      const base = (!hasQuery && !formFilter) ? [] : results.filter(d => !d.isGenericOnly)
+      const kept = formFilter
+        ? base.filter(d => formFilter.matches.has(String(d.form ?? '').toLowerCase()) || formFilter.routes.has(d.route))
+        : base
+      return { matched: base, shown: kept }
     }
 
-    const { data, count, error } = await fetchGenericsPage({
-      query: debouncedQuery,
-      category: activeCategory,
-      sortBy,
-      limit: PAGE_SIZE,
-      page,
-    })
-    setLoading(false)
-    if (error) { setLoadError(error.message); return }
-    setGenerics(data)
-    setTotalCount(count)
-  }
-
-  useEffect(() => { load() }, [debouncedQuery, activeCategory, sortBy, mode, page, formsParam])
-
-  // Class mode: one slim list of { class, subclass } per generic, read when the mode is opened.
-  useEffect(() => {
-    if (mode !== 'class') return
-    let cancelled = false
-    setLoading(true)
-    setLoadError(null)
-    fetchClassIndexRows().then(({ data, error }) => {
-      if (cancelled) return
-      setLoading(false)
-      if (error) { setLoadError(error.message); return }
-      setClassRows(data)
-    })
-    return () => { cancelled = true }
-  }, [mode])
-
-  const classIndex = useMemo(() => (classRows ? buildClassIndex(classRows) : null), [classRows])
-  const classResults = useMemo(() => {
-    if (!classIndex) return { classes: [], subclasses: [] }
-    if (debouncedQuery.trim().length >= 2) return searchClassIndex(classIndex, debouncedQuery)
-    // No search text: browse every class, A to Z (families show once a class is opened).
-    return {
-      classes: [...classIndex.classes].sort((a, b) => a.name.localeCompare(b.name)),
-      subclasses: [],
+    // Generic mode: fold the engine's brand rows into their generics, keeping the engine's order.
+    const seen = new Set()
+    const generics = []
+    for (const d of results) {
+      if (seen.has(d.genericId)) continue
+      seen.add(d.genericId)
+      const g = index.genericsById.get(d.genericId)
+      if (g) generics.push(g)
     }
-  }, [classIndex, debouncedQuery])
+    if (!typedSearch) {
+      generics.sort(sortBy === 'common'
+        ? (a, b) => (b.brand_count ?? 0) - (a.brand_count ?? 0) || a.name_en.localeCompare(b.name_en)
+        : (a, b) => a.name_en.localeCompare(b.name_en))
+    }
+    const kept = activeCategory ? generics.filter(g => g.category === activeCategory) : generics
+    return { matched: generics, shown: kept }
+  // 'index.version' changes when a row is edited in place, so the lists redraw.
+  }, [index.drugs, index.genericsById, index.version, results, mode, hasQuery, typedSearch, formFilter, activeCategory, sortBy]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const hasActiveFilter = mode === 'brand' ? activeForms.length > 0 : mode === 'generic' ? !!activeCategory : false
+  const pageCount = Math.max(1, Math.ceil(shown.length / PAGE_SIZE))
+  const safePage  = Math.min(page, pageCount - 1)
+  const pageItems = shown.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE)
+
+  const isFilterMasked = typedSearch && shown.length === 0 && matched.length > 0
+
+  // Class mode: with nothing typed, every class A to Z; with text, the engine's class cards.
+  const classBrowse = useMemo(() => {
+    if (mode !== 'class' || index.drugs === null) return null
+    const idx = buildClassIndex(index.drugs)
+    return { classes: [...idx.classes].sort((a, b) => a.name.localeCompare(b.name)), subclasses: [] }
+  }, [mode, index.drugs])
+  const classShown = hasQuery && !queryTooShort ? classResults : classBrowse
+  // Right after a mode change the hook may still hold the other kind of answer for a moment.
+  const classNotReady = mode === 'class' && hasQuery && !queryTooShort && classResults == null
+  const driveNotReady = mode !== 'class' && hasQuery && !queryTooShort && classResults != null
+
   function clearFilters() {
     updateSearchParams(mode === 'brand' ? { forms: null, page: 0 } : { category: null, page: 0 })
   }
+  function handleModeChange(m) { updateSearchParams({ mode: m, page: 0 }) }
 
-  // ── Publish toggle ──────────────────────────────────────────────────────────
+  // ── Publish toggle (generic) ────────────────────────────────────────────────
   async function handlePublishToggle(generic) {
-    const toPublish = !generic.is_published
-    if (!toPublish) {
-      setConfirmUnpub(generic)
-      return
-    }
+    if (generic.is_published) { setConfirmUnpub(generic); return }
     setActionId(generic.id)
     const { error } = await toggleGenericPublished(generic.id, true)
     setActionId(null)
     if (error) { toast.error(`Failed: ${error.message}`); return }
-    setGenerics(prev => prev.map(g => g.id === generic.id ? { ...g, is_published: true } : g))
+    index.setGenericPublished(generic.id, true)
     toast.success('Generic published')
   }
 
@@ -265,11 +239,11 @@ export default function DrugCMS() {
     const { error } = await toggleGenericPublished(g.id, false)
     setActionId(null)
     if (error) { toast.error(`Failed: ${error.message}`); return }
-    setGenerics(prev => prev.map(x => x.id === g.id ? { ...x, is_published: false } : x))
+    index.setGenericPublished(g.id, false)
     toast.success('Generic unpublished')
   }
 
-  // ── Delete ──────────────────────────────────────────────────────────────────
+  // ── Delete (generic) ────────────────────────────────────────────────────────
   async function handleDelete() {
     const g = confirmDel
     setConfirmDel(null)
@@ -277,27 +251,20 @@ export default function DrugCMS() {
     const { error } = await deleteGeneric(g.id)
     setActionId(null)
     if (error) { toast.error(`Delete failed: ${error.message}`); return }
-    setGenerics(prev => prev.filter(x => x.id !== g.id))
+    index.removeGeneric(g.id)
     toast.success('Generic deleted')
   }
 
   // ── Brand row actions (12.3, decision 28) ────────────────────────────────────
-  // Full parity with the generic row above: publish is immediate, unpublish
-  // confirms first, "delete" is a soft retire (toggleBrandPublished(id, false)),
-  // never the hard deleteBrand — every row here comes from searchBrandsForCMS,
-  // so its identity is always the brand itself; toggleGenericPublished never
-  // applies on this screen.
+  // Full parity with the generic row: publish is immediate, unpublish confirms first, "delete"
+  // is a soft retire (toggleBrandPublished(id, false)), never the hard deleteBrand.
   async function handleBrandPublishToggle(brand) {
-    const toPublish = !brand.isPublished
-    if (!toPublish) {
-      setConfirmUnpubBrand(brand)
-      return
-    }
+    if (brand.isPublished) { setConfirmUnpubBrand(brand); return }
     setActionIdBrand(brand.id)
     const { error } = await toggleBrandPublished(brand.id, true)
     setActionIdBrand(null)
     if (error) { toast.error(`Failed: ${error.message}`); return }
-    setBrands(prev => prev.map(b => b.id === brand.id ? { ...b, isPublished: true } : b))
+    index.setBrandPublished(brand.id, true)
     toast.success('Brand published')
   }
 
@@ -308,7 +275,7 @@ export default function DrugCMS() {
     const { error } = await toggleBrandPublished(b.id, false)
     setActionIdBrand(null)
     if (error) { toast.error(`Failed: ${error.message}`); return }
-    setBrands(prev => prev.map(x => x.id === b.id ? { ...x, isPublished: false } : x))
+    index.setBrandPublished(b.id, false)
     toast.success('Brand unpublished')
   }
 
@@ -319,20 +286,230 @@ export default function DrugCMS() {
     const { error } = await toggleBrandPublished(b.id, false)
     setActionIdBrand(null)
     if (error) { toast.error(`Failed: ${error.message}`); return }
-    setBrands(prev => prev.map(x => x.id === b.id ? { ...x, isPublished: false } : x))
+    index.setBrandPublished(b.id, false)
     toast.success('Brand retired')
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
 
+  const listBoxStyle = {
+    backgroundColor: 'var(--color-surface)',
+    border: '1px solid var(--color-border)',
+    borderRadius: 'var(--radius-lg)',
+    overflow: 'hidden',
+    boxShadow: 'var(--shadow-card)',
+    padding: '0 var(--space-4)',
+  }
+
+  // What the results area draws.
+  let body
+  if (index.loading || (index.drugs === null && !index.error)) {
+    const p = index.progress
+    body = (
+      <div style={listBoxStyle}>
+        <div style={{ padding: 'var(--space-4) 0 var(--space-2)', fontSize: 13, color: 'var(--color-text-secondary)' }}>
+          Loading the drug list{p ? ` (${p.loaded} of ${p.total})` : '…'}
+        </div>
+        {p && (
+          <div style={{ height: 4, borderRadius: 2, backgroundColor: 'var(--color-border-subtle)', marginBottom: 'var(--space-2)', overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${Math.round((p.loaded / Math.max(1, p.total)) * 100)}%`, backgroundColor: 'var(--color-accent)', transition: 'width 0.2s ease' }} />
+          </div>
+        )}
+        {[1,2,3,4].map(i => <SkeletonRow key={i} height={64} />)}
+      </div>
+    )
+  } else if (index.drugs === null) {
+    body = null // the load error banner above says what happened
+  } else if (queryTooShort) {
+    body = <TooShortState />
+  } else if (mode === 'class') {
+    if (classNotReady) {
+      body = <SearchSwitchingState />
+    } else if (classShown && (classShown.classes.length + classShown.subclasses.length) > 0) {
+      body = (
+        <ClassSearchResults
+          results={classShown}
+          query={typedSearch ? query : ''}
+          startExpanded
+          onOpenClass={name => navigate(`/admin/drugs/class?class=${encodeURIComponent(name)}`)}
+          onOpenSubclass={(className, name) =>
+            navigate(`/admin/drugs/class?class=${encodeURIComponent(className)}&family=${encodeURIComponent(name)}`)}
+        />
+      )
+    } else if (crossModeTargets.length > 0) {
+      body = <ModeSwitchState query={query} mode={mode} hint={null} targets={crossModeTargets} onSwitch={handleModeChange} />
+    } else if (suggestions.length > 0) {
+      body = <DidYouMeanState query={query} suggestions={suggestions} onSelect={setQuery} />
+    } else {
+      body = <SearchEmptyState query={query} mode={mode} onClear={() => setQuery('')} />
+    }
+  } else if (driveNotReady || (searchPending && hasQuery && shown.length === 0)) {
+    body = <SearchSwitchingState />
+  } else if (mode === 'brand' && !hasQuery && !formFilter) {
+    body = (
+      <div style={{ textAlign: 'center', padding: 'var(--space-12) var(--space-4)', color: 'var(--color-text-tertiary)' }}>
+        <div style={{ marginBottom: 'var(--space-3)', opacity: 0.4 }}><Search size={32} /></div>
+        <div style={{ fontSize: 15, color: 'var(--color-text-secondary)', marginBottom: 'var(--space-1)' }}>Search for a brand</div>
+        <div style={{ fontSize: 13 }}>Type a brand name, or use the filter icon to list brands by form</div>
+      </div>
+    )
+  } else if (shown.length === 0) {
+    if (isFilterMasked) {
+      body = <FilterMaskedState count={matched.length} query={query} onClearFilter={clearFilters} />
+    } else if (hasQuery && (classHint || crossModeMatch)) {
+      body = (
+        <ModeSwitchState
+          query={query}
+          mode={mode}
+          hint={classHint}
+          targets={[
+            ...(classHint ? ['class'] : []),
+            ...(crossModeMatch ? [mode === 'brand' ? 'generic' : 'brand'] : []),
+          ]}
+          onSwitch={handleModeChange}
+        />
+      )
+    } else if (hasQuery && suggestions.length > 0) {
+      body = <DidYouMeanState query={query} suggestions={suggestions} onSelect={setQuery} />
+    } else {
+      body = <SearchEmptyState query={query} mode={mode} onClear={() => setQuery('')} />
+    }
+  } else if (mode === 'brand') {
+    body = (
+      <div style={listBoxStyle}>
+        {pageItems.map((b, idx) => (
+          <SharedDrugCard
+            key={b.id}
+            drug={b}
+            categories={categories}
+            isDark={isDark}
+            isLast={idx === pageItems.length - 1}
+            highlight={query}
+            searchMode="brand"
+            onTap={() => navigate(`/admin/drugs/generic/${b.genericId}?formulation=${b.formulationId}&brand=${b.id}`)}
+            trailing={
+              <div style={{
+                display: 'flex', gap: 'var(--space-1)', alignItems: 'center',
+                opacity: actionIdBrand === b.id ? 0.5 : 1,
+              }}>
+                <button
+                  onClick={(e) => { e.stopPropagation(); actionIdBrand !== b.id && handleBrandPublishToggle(b) }}
+                  disabled={actionIdBrand === b.id}
+                  aria-label={b.isPublished ? 'Unpublish' : 'Publish'}
+                  title={b.isPublished ? 'Click to unpublish' : 'Click to publish'}
+                  style={{
+                    ...toggleBtnStyle,
+                    backgroundColor: b.isPublished ? '#D1FAE5' : 'var(--color-bg)',
+                    color: b.isPublished ? '#065F46' : 'var(--color-text-tertiary)',
+                    border: `1px solid ${b.isPublished ? '#6EE7B7' : 'var(--color-border)'}`,
+                  }}
+                >
+                  {b.isPublished ? '● Live' : '○ Draft'}
+                </button>
+                <button
+                  className="cms-hide-phone"
+                  onClick={(e) => { e.stopPropagation(); navigate(`/admin/drugs/generic/${b.genericId}?formulation=${b.formulationId}&brand=${b.id}`) }}
+                  aria-label="Edit"
+                  title="Edit generic, formulations & brands"
+                  style={iconBtnStyle}
+                >
+                  <Edit2 size={14} />
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setConfirmDelBrand(b) }}
+                  aria-label="Delete"
+                  title="Retire brand"
+                  style={{ ...iconBtnStyle, color: '#DC2626' }}
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            }
+          />
+        ))}
+      </div>
+    )
+  } else {
+    body = (
+      <div style={listBoxStyle}>
+        {pageItems.map((g, idx) => {
+          const isActing = actionId === g.id
+          return (
+            <GenericDrugCard
+              key={g.id}
+              generic={g}
+              categories={categories}
+              isDark={isDark}
+              isLast={idx === pageItems.length - 1}
+              highlight={query}
+              onTap={() => navigate(`/admin/drugs/generic/${g.id}`)}
+              trailing={
+                <div style={{
+                  display: 'flex', gap: 'var(--space-1)', alignItems: 'center',
+                  opacity: isActing ? 0.5 : 1,
+                }}>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); !isActing && handlePublishToggle(g) }}
+                    disabled={isActing}
+                    aria-label={g.is_published ? 'Unpublish' : 'Publish'}
+                    title={g.is_published ? 'Click to unpublish' : 'Click to publish'}
+                    style={{
+                      ...toggleBtnStyle,
+                      backgroundColor: g.is_published ? '#D1FAE5' : 'var(--color-bg)',
+                      color: g.is_published ? '#065F46' : 'var(--color-text-tertiary)',
+                      border: `1px solid ${g.is_published ? '#6EE7B7' : 'var(--color-border)'}`,
+                    }}
+                  >
+                    {g.is_published ? '● Live' : '○ Draft'}
+                  </button>
+                  <button
+                    className="cms-hide-phone"
+                    onClick={(e) => { e.stopPropagation(); navigate(`/admin/drugs/generic/${g.id}`) }}
+                    aria-label="Edit"
+                    title="Edit generic, formulations & brands"
+                    style={iconBtnStyle}
+                  >
+                    <Edit2 size={14} />
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setConfirmDel(g) }}
+                    aria-label="Delete"
+                    title="Delete"
+                    style={{ ...iconBtnStyle, color: '#DC2626' }}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              }
+            />
+          )
+        })}
+      </div>
+    )
+  }
+
+  const showCount = mode !== 'class' && index.drugs !== null && shown.length > 0 && !queryTooShort
+  const noun = mode === 'brand' ? 'brands' : 'generics'
+
   return (
     <AdminPageHeader
       title="Drug Library"
       actions={
-        <button onClick={() => navigate('/admin/drugs/new')} style={primaryBtnStyle}>
-          <Plus size={15} />
-          Add Generic
-        </button>
+        <>
+          <button
+            onClick={() => index.refresh()}
+            disabled={index.loading || index.refreshing}
+            aria-label="Reload the drug list"
+            title="Reload the drug list from the database"
+            style={{ ...iconBtnStyle, width: 34, height: 34 }}
+          >
+            <RefreshCw size={15} style={{ opacity: index.refreshing ? 0.4 : 1 }} />
+          </button>
+          <button onClick={() => navigate('/admin/drugs/new')} style={primaryBtnStyle}>
+            <Plus size={15} />
+            Add Generic
+          </button>
+        </>
       }
     >
       {/* Search block — the app's own search bar and Brand / Generic / Class chips on the same
@@ -358,11 +535,7 @@ export default function DrugCMS() {
           tall
         />
         <div style={{ marginTop: 'var(--space-3)' }}>
-          <ModeSegmentedControl
-            options={SEARCH_MODES}
-            mode={mode}
-            onChange={m => updateSearchParams({ mode: m, page: 0 })}
-          />
+          <ModeSegmentedControl options={SEARCH_MODES} mode={mode} onChange={handleModeChange} />
         </div>
       </div>
 
@@ -372,9 +545,9 @@ export default function DrugCMS() {
         </div>
       )}
 
-      {/* Sort chips — generics only; "Most Common" counts a generic's brands,
-          which doesn't map onto a list of brands or classes */}
-      {mode === 'generic' && (
+      {/* Sort chips — Generic mode with nothing typed; a typed search keeps the engine's
+          best-match-first order, and brands and classes have nothing to count */}
+      {mode === 'generic' && !typedSearch && (
         <div style={{ marginBottom: 'var(--space-3)' }}>
           <ModeSegmentedControl
             options={SORT_OPTIONS}
@@ -384,188 +557,53 @@ export default function DrugCMS() {
         </div>
       )}
 
+      {/* The class hint: the typed text also names a class or drug family */}
+      {typedSearch && mode !== 'class' && classHint && shown.length > 0 && (
+        <ClassHintStrip hint={classHint} onSwitch={() => handleModeChange('class')} />
+      )}
+
       {/* Count (Class mode has its own count line inside its results) */}
-      {mode !== 'class' && (
-      <div style={{
-        fontSize: 12, color: 'var(--color-text-tertiary)',
-        fontFamily: 'var(--font-mono)', marginBottom: 'var(--space-3)',
-      }}>
-        {loading
-          ? 'Loading…'
-          : totalCount === 0
-            ? `0 ${mode === 'brand' ? 'brands' : 'generics'}`
-            : `Showing ${page * PAGE_SIZE + 1}–${page * PAGE_SIZE + (mode === 'brand' ? brands.length : generics.length)} of ${totalCount}`}
-        {query && ` for "${query}"`}
-      </div>
-      )}
-
-      {/* Load error */}
-      {loadError && (
-        <ErrorBanner message={loadError} onDismiss={() => setLoadError(null)} />
-      )}
-
-      {/* Results — Generic mode: the table below, unchanged. Brand mode
-          (12.2): a flat SharedDrugCard list, no table header, since a brand
-          row isn't a table row. */}
-      {mode === 'class' ? (
-        loading ? (
-          <div style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
-            {[1,2,3,4].map(i => <SkeletonRow key={i} height={56} />)}
-          </div>
-        ) : classResults.classes.length === 0 && classResults.subclasses.length === 0 ? (
-          <EmptyState query={query} noun="classes" />
-        ) : (
-          <ClassSearchResults
-            results={classResults}
-            query={query}
-            startExpanded
-            onOpenClass={name => navigate(`/admin/drugs/class?class=${encodeURIComponent(name)}`)}
-            onOpenSubclass={(className, name) =>
-              navigate(`/admin/drugs/class?class=${encodeURIComponent(className)}&family=${encodeURIComponent(name)}`)}
-          />
-        )
-      ) : !loading && (mode === 'brand' ? brands.length === 0 : generics.length === 0) ? (
-        <EmptyState query={query} noun={mode === 'brand' ? 'brands' : 'generics'} />
-      ) : (
+      {showCount && (
         <div style={{
-          backgroundColor: 'var(--color-surface)',
-          border: '1px solid var(--color-border)',
-          borderRadius: 'var(--radius-lg)',
-          overflow: 'hidden',
-          boxShadow: 'var(--shadow-card)',
-          padding: '0 var(--space-4)',
+          fontSize: 12, color: 'var(--color-text-tertiary)',
+          fontFamily: 'var(--font-mono)', marginBottom: 'var(--space-3)',
         }}>
-
-          {loading ? (
-            [1,2,3,4].map(i => <SkeletonRow key={i} height={64} />)
-          ) : mode === 'brand' ? (
-            brands.map((b, idx) => (
-              <SharedDrugCard
-                key={b.id}
-                drug={b}
-                categories={categories}
-                isDark={isDark}
-                isLast={idx === brands.length - 1}
-                highlight={query}
-                searchMode="brand"
-                onTap={() => navigate(`/admin/drugs/generic/${b.genericId}?formulation=${b.formulationId}&brand=${b.id}`)}
-                trailing={
-                  <div style={{
-                    display: 'flex', gap: 'var(--space-1)', alignItems: 'center',
-                    opacity: actionIdBrand === b.id ? 0.5 : 1,
-                  }}>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); actionIdBrand !== b.id && handleBrandPublishToggle(b) }}
-                      disabled={actionIdBrand === b.id}
-                      aria-label={b.isPublished ? 'Unpublish' : 'Publish'}
-                      title={b.isPublished ? 'Click to unpublish' : 'Click to publish'}
-                      style={{
-                        ...toggleBtnStyle,
-                        backgroundColor: b.isPublished ? '#D1FAE5' : 'var(--color-bg)',
-                        color: b.isPublished ? '#065F46' : 'var(--color-text-tertiary)',
-                        border: `1px solid ${b.isPublished ? '#6EE7B7' : 'var(--color-border)'}`,
-                      }}
-                    >
-                      {b.isPublished ? '● Live' : '○ Draft'}
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); navigate(`/admin/drugs/generic/${b.genericId}?formulation=${b.formulationId}&brand=${b.id}`) }}
-                      className="cms-hide-phone"
-                      aria-label="Edit"
-                      title="Edit generic, formulations & brands"
-                      style={iconBtnStyle}
-                    >
-                      <Edit2 size={14} />
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setConfirmDelBrand(b) }}
-                      aria-label="Delete"
-                      title="Retire brand"
-                      style={{ ...iconBtnStyle, color: '#DC2626' }}
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                }
-              />
-            ))
-          ) : (
-            generics.map((g, idx) => {
-              const isActing = actionId === g.id
-              return (
-                <GenericDrugCard
-                  key={g.id}
-                  generic={g}
-                  categories={categories}
-                  isDark={isDark}
-                  isLast={idx === generics.length - 1}
-                  highlight={query}
-                  onTap={() => navigate(`/admin/drugs/generic/${g.id}`)}
-                  trailing={
-                    <div style={{
-                      display: 'flex', gap: 'var(--space-1)', alignItems: 'center',
-                      opacity: isActing ? 0.5 : 1,
-                    }}>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); !isActing && handlePublishToggle(g) }}
-                        disabled={isActing}
-                        aria-label={g.is_published ? 'Unpublish' : 'Publish'}
-                        title={g.is_published ? 'Click to unpublish' : 'Click to publish'}
-                        style={{
-                          ...toggleBtnStyle,
-                          backgroundColor: g.is_published ? '#D1FAE5' : 'var(--color-bg)',
-                          color: g.is_published ? '#065F46' : 'var(--color-text-tertiary)',
-                          border: `1px solid ${g.is_published ? '#6EE7B7' : 'var(--color-border)'}`,
-                        }}
-                      >
-                        {g.is_published ? '● Live' : '○ Draft'}
-                      </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); navigate(`/admin/drugs/generic/${g.id}`) }}
-                        className="cms-hide-phone"
-                      aria-label="Edit"
-                        title="Edit generic, formulations & brands"
-                        style={iconBtnStyle}
-                      >
-                        <Edit2 size={14} />
-                      </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setConfirmDel(g) }}
-                        aria-label="Delete"
-                        title="Delete"
-                        style={{ ...iconBtnStyle, color: '#DC2626' }}
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  }
-                />
-              )
-            })
-          )}
+          {`Showing ${safePage * PAGE_SIZE + 1}–${safePage * PAGE_SIZE + pageItems.length} of ${shown.length} ${noun}`}
+          {typedSearch && ` for "${query}"`}
         </div>
       )}
 
+      {/* Load error */}
+      {index.error && !dismissedError && (
+        <ErrorBanner
+          message={`${index.error}. `}
+          onDismiss={() => setDismissedError(true)}
+          onRetry={() => { setDismissedError(false); index.refresh() }}
+        />
+      )}
+
+      {body}
+
       {/* Pager */}
-      {mode !== 'class' && !loading && totalCount > PAGE_SIZE && (
+      {mode !== 'class' && !queryTooShort && shown.length > PAGE_SIZE && (
         <div style={pagerStyle}>
           <button
-            onClick={() => updateSearchParams({ page: Math.max(0, page - 1) })}
-            disabled={page === 0}
-            style={{ ...pagerBtnStyle, opacity: page === 0 ? 0.4 : 1, cursor: page === 0 ? 'default' : 'pointer' }}
+            onClick={() => updateSearchParams({ page: Math.max(0, safePage - 1) })}
+            disabled={safePage === 0}
+            style={{ ...pagerBtnStyle, opacity: safePage === 0 ? 0.4 : 1, cursor: safePage === 0 ? 'default' : 'pointer' }}
           >
             ‹ Prev
           </button>
           <span style={pagerLabelStyle}>
-            Page {page + 1} of {Math.ceil(totalCount / PAGE_SIZE)}
+            Page {safePage + 1} of {pageCount}
           </span>
           <button
-            onClick={() => updateSearchParams({ page: (page + 1) * PAGE_SIZE < totalCount ? page + 1 : page })}
-            disabled={(page + 1) * PAGE_SIZE >= totalCount}
+            onClick={() => updateSearchParams({ page: Math.min(pageCount - 1, safePage + 1) })}
+            disabled={safePage >= pageCount - 1}
             style={{
               ...pagerBtnStyle,
-              opacity: (page + 1) * PAGE_SIZE >= totalCount ? 0.4 : 1,
-              cursor: (page + 1) * PAGE_SIZE >= totalCount ? 'default' : 'pointer',
+              opacity: safePage >= pageCount - 1 ? 0.4 : 1,
+              cursor: safePage >= pageCount - 1 ? 'default' : 'pointer',
             }}
           >
             Next ›
@@ -644,7 +682,7 @@ export default function DrugCMS() {
 
 // ─── Small components ─────────────────────────────────────────────────────────
 
-function ErrorBanner({ message, onDismiss }) {
+function ErrorBanner({ message, onDismiss, onRetry }) {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
@@ -653,24 +691,10 @@ function ErrorBanner({ message, onDismiss }) {
       marginBottom: 'var(--space-3)', fontSize: 13, color: '#DC2626',
     }}>
       <AlertTriangle size={15} style={{ flexShrink: 0 }} />
-      {message}
+      <span>{message}{onRetry && <button onClick={onRetry} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#DC2626', textDecoration: 'underline', padding: 0, font: 'inherit' }}>Try again</button>}</span>
       <button onClick={onDismiss} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#DC2626' }}>
         <X size={14} />
       </button>
-    </div>
-  )
-}
-
-function EmptyState({ query, noun = 'generics' }) {
-  return (
-    <div style={{ textAlign: 'center', padding: 'var(--space-12) var(--space-4)', color: 'var(--color-text-tertiary)' }}>
-      <div style={{ marginBottom: 'var(--space-3)', opacity: 0.4 }}>
-        <Search size={32} />
-      </div>
-      <div style={{ fontSize: 15, color: 'var(--color-text-secondary)', marginBottom: 'var(--space-1)' }}>
-        No {noun} found{query ? ` for "${query}"` : ''}
-      </div>
-      <div style={{ fontSize: 13 }}>Try a different search{noun === 'generics' ? ' or category filter' : ''}</div>
     </div>
   )
 }
