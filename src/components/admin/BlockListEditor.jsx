@@ -5,7 +5,7 @@
  *
  * Decision 1: Colored chip + tinted header per block type (left border REMOVED).
  * Decision 2: Collapse by default; new blocks open expanded; preview in header.
- * Decision 3: SummaryBar — ordered map of block types above each list.
+ * Decision 3: (removed 2026-11-11) the summary bar above each list is gone.
  * Decision 5: Section dividers ("Prescription Sheets", "Rx-level blocks") are
  *             real visual dividers: larger weight, full-width hairline, more space.
  * Decision 6: "Remove sheet" moved from top action bar to bottom of sheet content,
@@ -34,23 +34,23 @@ import { CollapseAllContext } from './CollapseAllContext'
 
 const BLOCK_LABELS = {
   image_gallery: {
-    clinical: 'Clinical — Image Gallery',
-    rx:       'Rx — Image Gallery',
+    clinical: 'Image Gallery',
+    rx:       'Image Gallery',
     default:  'Image Gallery',
   },
   free_text_post: {
-    clinical: 'Clinical — Text Post',
-    rx:       'Rx — Text Post',
+    clinical: 'Text Post',
+    rx:       'Text Post',
     default:  'Text Post',
   },
   note_callout: {
-    clinical: 'Clinical — Note',
-    rx:       'Rx — Note',
+    clinical: 'Note',
+    rx:       'Note',
     default:  'Note',
   },
   divider: {
-    clinical: 'Clinical — Divider',
-    rx:       'Rx — Divider',
+    clinical: 'Divider',
+    rx:       'Divider',
     default:  'Divider',
   },
   prescription_sheet: {
@@ -297,79 +297,6 @@ function iconBtnStyle({ disabled, danger } = {}) {
     padding: 0,
     transition: 'opacity 0.1s',
   }
-}
-
-// ─── Decision 3: SummaryBar ───────────────────────────────────────────────────
-
-function SummaryBar({ items, expandRefs }) {
-  if (!items || items.length === 0) return null
-
-  function shortLabel(block) {
-    switch (block.block_type) {
-      case 'note_callout':       return 'Note'
-      case 'free_text_post':     return 'Text'
-      case 'image_gallery':      return 'Images'
-      case 'divider':            return 'Divider'
-      case 'prescription_sheet': return block.data?.label || 'Sheet'
-      default:                   return block.block_type
-    }
-  }
-
-  function handleTap(globalIndex) {
-    const entry = expandRefs?.get(globalIndex)
-    if (!entry) return
-    entry.expand()
-    setTimeout(() => {
-      entry.domRef?.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }, 40)
-  }
-
-  return (
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: 4,
-      flexWrap: 'wrap',
-      padding: '6px 10px',
-      marginBottom: 'var(--space-3)',
-      backgroundColor: 'var(--color-bg)',
-      border: '1px solid var(--color-border-subtle)',
-      borderRadius: 'var(--radius-md)',
-    }}>
-      {items.map(({ block, globalIndex }, i) => {
-        const colors = BLOCK_CHIP_COLORS[block.block_type] ?? FALLBACK_COLORS
-        return (
-          <span key={globalIndex} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-            {i > 0 && (
-              <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', userSelect: 'none' }}>
-                →
-              </span>
-            )}
-            <button
-              onClick={() => handleTap(globalIndex)}
-              style={{
-                display: 'inline-flex', alignItems: 'center',
-                fontSize: 11, fontWeight: 600,
-                letterSpacing: '0.03em',
-                color: colors.chipColor,
-                backgroundColor: colors.chipBg,
-                border: `1px solid ${colors.chipColor}44`,
-                padding: '2px 8px',
-                borderRadius: 'var(--radius-full)',
-                fontFamily: 'var(--font-body)',
-                cursor: 'pointer',
-                transition: 'opacity 0.12s',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.opacity = '0.7' }}
-              onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
-            >
-              {shortLabel(block)}
-            </button>
-          </span>
-        )
-      })}
-    </div>
-  )
 }
 
 // ─── Sub-tab bar — full width, underline style, Rx first ─────────────────────
@@ -662,8 +589,6 @@ function BlockCardList({ items, disabled, onMoveUp, onMoveDown, onDelete, render
 
   return (
     <>
-      <SummaryBar items={items} expandRefs={expandRefs} />
-
       {items.map(({ block, globalIndex }, localIndex) => {
         if (!expandRefs.has(globalIndex)) {
           expandRefs.set(globalIndex, { domRef: { current: null }, expand: () => {} })
