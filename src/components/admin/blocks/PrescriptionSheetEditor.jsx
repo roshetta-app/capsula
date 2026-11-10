@@ -82,10 +82,15 @@
  * fresh ids and sit right after their originals. Copy to / Move to another
  * sheet is done by BlockListEditor (it sees every sheet) through the
  * onTransferRows prop, in one change so Undo brings everything back at once.
+ *
+ * 2026-11-10 (second pass): the bottom bar is now four big buttons (Duplicate,
+ * Move, To sheet, Delete) that open a small panel. Move offers Top, Up, Down,
+ * Bottom and Pick any spot, which shows a Move here strip in every gap so the
+ * ticked rows can go anywhere in one tap.
  */
 
 import { useState, useCallback, useEffect, useRef, useContext } from 'react'
-import { ChevronUp, ChevronDown, MoreHorizontal, Plus, Pill, LayoutList, StickyNote, Type, Minus, X, Check, Image as ImageIcon } from 'lucide-react'
+import { ChevronUp, ChevronDown, MoreHorizontal, Plus, Pill, LayoutList, StickyNote, Type, Minus, X, Check, Copy, Trash2, ArrowUpDown, ArrowUp, ArrowDown, ChevronsUp, ChevronsDown, Send, Image as ImageIcon } from 'lucide-react'
 import UnifiedDrugRowEditor, { PromoteAlternativeDialog } from './rows/UnifiedDrugRowEditor'
 import NoteRowEditor         from './rows/NoteRowEditor'
 import FreeTextPostEditor    from './FreeTextPostEditor'
@@ -981,8 +986,10 @@ function SelectBox({ checked }) {
 function barBtn(disabled = false, kind = 'plain') {
   const danger = kind === 'danger'
   const primary = kind === 'primary'
+  const small = kind === 'small'
   return {
-    padding: '7px 12px', fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-body)',
+    padding: small ? '5px 12px' : '9px 12px', fontSize: 13,
+    minHeight: small ? 30 : 40, fontWeight: 600, fontFamily: 'var(--font-body)',
     borderRadius: 'var(--radius-md)',
     border: primary ? 'none' : `1.5px solid ${danger ? '#ef4444' : 'var(--color-border)'}`,
     background: primary ? 'var(--color-accent-solid)' : danger ? '#ef444410' : 'transparent',
@@ -990,6 +997,42 @@ function barBtn(disabled = false, kind = 'plain') {
     opacity: disabled ? 0.4 : 1,
     cursor: disabled ? 'default' : 'pointer',
   }
+}
+
+// A big icon-over-label button on the action bar (easy to hit by thumb).
+function actionBtn(kind = 'plain', disabled = false) {
+  const danger = kind === 'danger'
+  return {
+    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3,
+    minHeight: 52, padding: '6px 4px',
+    fontSize: 12, fontWeight: 600, fontFamily: 'var(--font-body)',
+    border: `1.5px solid ${danger ? '#ef4444' : 'var(--color-border)'}`,
+    borderRadius: 'var(--radius-md)',
+    background: danger ? '#ef444410' : 'transparent',
+    color: danger ? '#ef4444' : 'var(--color-text-primary)',
+    opacity: disabled ? 0.35 : 1,
+    cursor: disabled ? 'default' : 'pointer',
+  }
+}
+
+// While choosing where to drop the ticked rows: a tappable strip in every gap.
+function DropStrip({ onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+        width: '100%', minHeight: 34, margin: '3px 0', padding: 0,
+        border: '1.5px dashed var(--color-accent-solid)',
+        borderRadius: 'var(--radius-md)',
+        background: 'transparent', color: 'var(--color-accent-solid)',
+        fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-body)', cursor: 'pointer',
+      }}
+    >
+      Move here
+    </button>
+  )
 }
 
 // One small ⋯ menu for the rarely used row actions.
@@ -1109,8 +1152,12 @@ export default function PrescriptionSheetEditor({ block, onChange, disabled = fa
   // 2026-11-10: select mode. 'selected' holds the positions of ticked rows.
   const [selectMode,    setSelectMode]    = useState(false)
   const [selected,      setSelected]      = useState([])
-  const [pickerMode,    setPickerMode]    = useState(null)   // null | 'copy' | 'move'
-  const [confirmDelete, setConfirmDelete] = useState(false)
+  // Which panel the bottom bar shows: null (main buttons), 'move' (where to put
+  // the rows), 'sheet' (copy or move to another sheet) or 'delete' (confirm).
+  const [panel,         setPanel]         = useState(null)
+  const [sheetAction,   setSheetAction]   = useState('copy')  // 'copy' | 'move'
+  // True while the person is choosing the exact spot to drop the ticked rows.
+  const [placing,       setPlacing]       = useState(false)
   const [notice,        setNotice]        = useState('')
 
   // An undo or redo can shorten the list; drop ticks that no longer exist.
@@ -1138,8 +1185,8 @@ export default function PrescriptionSheetEditor({ block, onChange, disabled = fa
   const countText   = n => (n === 1 ? '1 row' : `${n} rows`)
 
   function resetBars() {
-    setPickerMode(null)
-    setConfirmDelete(false)
+    setPanel(null)
+    setPlacing(false)
   }
 
   function exitSelectMode() {
@@ -1165,7 +1212,7 @@ export default function PrescriptionSheetEditor({ block, onChange, disabled = fa
   // edge stays put, and so does anything it blocks. The ticks stay on, so the
   // same group can be moved again.
   function moveSelected(direction) {
-    resetBars()
+    setNotice('')
     const flags = rows.map((_, i) => selectedSet.has(i))
     const next  = [...rows]
     if (direction < 0) {
@@ -1187,6 +1234,19 @@ export default function PrescriptionSheetEditor({ block, onChange, disabled = fa
     setSelected(flags.map((f, i) => (f ? i : -1)).filter(i => i >= 0))
   }
 
+  // Drop the ticked rows (kept in their order) at any spot: insertAt is a gap
+  // position in the current list, 0 = before the first row, rows.length = after
+  // the last. The ticks stay on, at the rows' new positions.
+  function placeSelected(insertAt) {
+    const picked = selected.map(i => rows[i])
+    const rest   = rows.filter((_, i) => !selectedSet.has(i))
+    const at     = insertAt - selected.filter(i => i < insertAt).length
+    update({ rows: [...rest.slice(0, at), ...picked, ...rest.slice(at)] })
+    setSelected(picked.map((_, k) => at + k))
+    resetBars()
+    setNotice(`Moved ${countText(picked.length)}.`)
+  }
+
   function duplicateSelected() {
     const n = selected.length
     duplicateRows(selected)
@@ -1204,8 +1264,8 @@ export default function PrescriptionSheetEditor({ block, onChange, disabled = fa
   }
 
   function transferSelected(target) {
-    if (!onTransferRows || !pickerMode) return
-    const isMove = pickerMode === 'move'
+    if (!onTransferRows) return
+    const isMove = sheetAction === 'move'
     const picked = selected.map(i => rows[i]).filter(Boolean)
     onTransferRows(target.globalIndex, picked.map(cloneRowFresh), isMove ? selected : [])
     setNotice(`${isMove ? 'Moved' : 'Copied'} ${countText(picked.length)} to ${target.label}.`)
@@ -1359,6 +1419,7 @@ export default function PrescriptionSheetEditor({ block, onChange, disabled = fa
             </div>
           )}
           {/* Gap before the first row */}
+          {selectMode && placing && <DropStrip onClick={() => placeSelected(0)} />}
           {!selectMode && (
             <GapInsertControl
               insertIndex={0}
@@ -1398,7 +1459,8 @@ export default function PrescriptionSheetEditor({ block, onChange, disabled = fa
                   disabled={disabled}
                 />
               )}
-              {selectMode && <div style={{ height: 8 }} />}
+              {selectMode && placing && <DropStrip onClick={() => placeSelected(idx + 1)} />}
+              {selectMode && !placing && <div style={{ height: 8 }} />}
             </div>
           ))}
         </div>
@@ -1408,46 +1470,122 @@ export default function PrescriptionSheetEditor({ block, onChange, disabled = fa
       {selectMode && selected.length > 0 && (
         <div style={{
           position: 'sticky', bottom: 0, zIndex: 30,
-          padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8,
+          padding: '8px 10px calc(8px + env(safe-area-inset-bottom, 0px))',
+          display: 'flex', flexDirection: 'column', gap: 8,
           background: 'var(--color-surface)',
           border: '1px solid var(--color-border)',
           borderRadius: 'var(--radius-md)',
-          boxShadow: '0 -2px 14px rgba(0,0,0,0.12)',
+          boxShadow: '0 -2px 14px rgba(0,0,0,0.14)',
         }}>
-          {confirmDelete ? (
+          {/* Top line: how many, all / none, and a way back from any panel */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ flex: 1, fontSize: 13, fontWeight: 700, color: 'var(--color-text-primary)' }}>
+              {panel === 'delete' ? `Delete ${countText(selected.length)}?`
+                : placing ? 'Tap where to put them'
+                : panel === 'move' ? `Move ${countText(selected.length)}`
+                : panel === 'sheet' ? `Send ${countText(selected.length)} to another sheet`
+                : `${countText(selected.length)} selected`}
+            </span>
+            {panel === null && (
+              <button type="button" onClick={toggleSelectAll} style={barBtn(false, 'small')}>
+                {allSelected ? 'None' : 'All'}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => (panel === null ? (setNotice(''), setSelected([])) : resetBars())}
+              aria-label={panel === null ? 'Clear selection' : 'Back'}
+              title={panel === null ? 'Clear selection' : 'Back'}
+              style={barBtn(false, 'small')}
+            >
+              {panel === null ? <X size={15} /> : 'Back'}
+            </button>
+          </div>
+
+          {/* Main buttons: four big targets, icon over label */}
+          {panel === null && (
+            <div style={{ display: 'grid', gridTemplateColumns: canTransfer ? 'repeat(4, 1fr)' : 'repeat(3, 1fr)', gap: 6 }}>
+              <button type="button" onClick={duplicateSelected} style={actionBtn()}>
+                <Copy size={18} /><span>Duplicate</span>
+              </button>
+              <button type="button" onClick={() => setPanel('move')} style={actionBtn()}>
+                <ArrowUpDown size={18} /><span>Move</span>
+              </button>
+              {canTransfer && (
+                <button type="button" onClick={() => setPanel('sheet')} style={actionBtn()}>
+                  <Send size={18} /><span>To sheet</span>
+                </button>
+              )}
+              <button type="button" onClick={() => setPanel('delete')} style={actionBtn('danger')}>
+                <Trash2 size={18} /><span>Delete</span>
+              </button>
+            </div>
+          )}
+
+          {/* Move panel: jump to the top or bottom, nudge one place, or pick any spot */}
+          {panel === 'move' && !placing && (
             <>
-              <span style={{ fontSize: 13, color: 'var(--color-text-primary)' }}>
-                Delete {countText(selected.length)} from this sheet? Drugs inside a deleted section go with it. Undo brings them back.
-              </span>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button type="button" onClick={deleteSelected} style={barBtn(false, 'danger')}>Delete</button>
-                <button type="button" onClick={() => setConfirmDelete(false)} style={barBtn(false)}>Cancel</button>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
+                <button type="button" onClick={() => placeSelected(0)} disabled={!canMoveUp} style={actionBtn('plain', !canMoveUp)}>
+                  <ChevronsUp size={18} /><span>Top</span>
+                </button>
+                <button type="button" onClick={() => moveSelected(-1)} disabled={!canMoveUp} style={actionBtn('plain', !canMoveUp)}>
+                  <ArrowUp size={18} /><span>Up</span>
+                </button>
+                <button type="button" onClick={() => moveSelected(1)} disabled={!canMoveDown} style={actionBtn('plain', !canMoveDown)}>
+                  <ArrowDown size={18} /><span>Down</span>
+                </button>
+                <button type="button" onClick={() => placeSelected(rows.length)} disabled={!canMoveDown} style={actionBtn('plain', !canMoveDown)}>
+                  <ChevronsDown size={18} /><span>Bottom</span>
+                </button>
               </div>
+              <button type="button" onClick={() => setPlacing(true)} style={barBtn(false, 'primary')}>
+                Pick any spot in the list
+              </button>
             </>
-          ) : pickerMode ? (
+          )}
+
+          {/* Placing: the list above now shows a Move here strip in every gap */}
+          {panel === 'move' && placing && (
+            <button type="button" onClick={() => setPlacing(false)} style={barBtn(false)}>Cancel</button>
+          )}
+
+          {/* Send to another sheet: choose copy or move once, then tap the sheet */}
+          {panel === 'sheet' && (
             <>
-              <span style={{ fontSize: 13, color: 'var(--color-text-primary)' }}>
-                {pickerMode === 'move' ? 'Move' : 'Copy'} {countText(selected.length)} to:
-              </span>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {otherSheets.map(sheet => (
-                  <button key={sheet.globalIndex} type="button" onClick={() => transferSelected(sheet)} style={barBtn(false, 'primary')}>
-                    {sheet.label}
+              <div style={{ display: 'flex', gap: 6 }}>
+                {['copy', 'move'].map(kind => (
+                  <button
+                    key={kind}
+                    type="button"
+                    onClick={() => setSheetAction(kind)}
+                    style={{ ...barBtn(false, sheetAction === kind ? 'primary' : 'plain'), flex: 1 }}
+                  >
+                    {kind === 'copy' ? 'Copy' : 'Move'}
                   </button>
                 ))}
-                <button type="button" onClick={() => setPickerMode(null)} style={barBtn(false)}>Cancel</button>
+              </div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {otherSheets.map(sheet => (
+                  <button key={sheet.globalIndex} type="button" onClick={() => transferSelected(sheet)} style={{ ...barBtn(false), flex: '1 1 40%' }}>
+                    {sheetAction === 'copy' ? 'Copy to ' : 'Move to '}{sheet.label}
+                  </button>
+                ))}
               </div>
             </>
-          ) : (
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <button type="button" onClick={toggleSelectAll} style={barBtn(false)}>{allSelected ? 'Select none' : 'Select all'}</button>
-              <button type="button" onClick={duplicateSelected} style={barBtn(false)}>Duplicate</button>
-              <button type="button" onClick={() => moveSelected(-1)} disabled={!canMoveUp} style={barBtn(!canMoveUp)}>Up</button>
-              <button type="button" onClick={() => moveSelected(1)} disabled={!canMoveDown} style={barBtn(!canMoveDown)}>Down</button>
-              {canTransfer && <button type="button" onClick={() => setPickerMode('copy')} style={barBtn(false)}>Copy to…</button>}
-              {canTransfer && <button type="button" onClick={() => setPickerMode('move')} style={barBtn(false)}>Move to…</button>}
-              <button type="button" onClick={() => setConfirmDelete(true)} style={barBtn(false, 'danger')}>Delete</button>
-            </div>
+          )}
+
+          {/* Delete: one confirm, names the count */}
+          {panel === 'delete' && (
+            <>
+              <span style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
+                Drugs inside a deleted section go with it. Undo brings them back.
+              </span>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button type="button" onClick={deleteSelected} style={{ ...barBtn(false, 'danger'), flex: 1 }}>Delete</button>
+                <button type="button" onClick={resetBars} style={{ ...barBtn(false), flex: 1 }}>Cancel</button>
+              </div>
+            </>
           )}
         </div>
       )}
