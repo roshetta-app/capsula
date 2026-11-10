@@ -57,6 +57,7 @@ import {
 } from '../../lib/adminQueries'
 import { supabase } from '../../lib/supabase'
 import AdminPageHeader from '../../components/admin/AdminPageHeader'
+import { setPageTitle } from '../../utils/pageTitle'
 import { UndoRedoButton, ToolButton } from '../../components/admin/EditorToolbarButtons'
 import { useSnapshotUndoRedo } from '../../hooks/useSnapshotUndoRedo'
 
@@ -541,6 +542,9 @@ export default function DrugEditor() {
     window.addEventListener('beforeunload', warn)
     return () => window.removeEventListener('beforeunload', warn)
   }, [anyDirty])
+
+  // The generic name shows in the phone top bar instead of "Drug Library".
+  useEffect(() => setPageTitle(generic?.name_en), [generic?.name_en])
 
   // ── Render ───────────────────────────────────────────────────────────────────
 

@@ -46,6 +46,7 @@ import { SectionCard, SectionCardHeader, FieldLabel } from './adminSectionPrimit
 import AdminPageHeader from './AdminPageHeader'
 import PhonePreviewModal from './PhonePreviewModal'
 import { CollapseAllContext } from './CollapseAllContext'
+import { setPageTitle } from '../../utils/pageTitle'
 
 // ─── Undo / Redo button ───────────────────────────────────────────────────────
 
@@ -593,6 +594,9 @@ export default function ConditionEditor() {
     { value: '', label: specialtiesLoading ? 'Loading…' : 'Select specialty…' },
     ...specialties.map(s => ({ value: s.id, label: s.name_en })),
   ]
+
+  // The condition name shows in the phone top bar instead of "Conditions".
+  useEffect(() => setPageTitle(form.name), [form.name])
 
   // ─── Render ──────────────────────────────────────────────────────────────
 

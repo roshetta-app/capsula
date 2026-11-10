@@ -11,6 +11,7 @@ import { useAuth } from '../../hooks/useAuth'
 import useIsPhone from '../../hooks/useIsPhone'
 import ConfirmModal from '../../components/admin/ConfirmModal'
 import { requestLeave, setLeaveAsker } from '../../utils/leaveGuard'
+import { usePageTitle } from '../../utils/pageTitle'
 
 /**
  * AdminLayout — shared shell for all /admin/* screens (post-D1/D2).
@@ -103,6 +104,9 @@ function currentPageLabel(pathname) {
 export default function AdminLayout() {
   const { signOut } = useAuth()
   const isPhone = useIsPhone()
+  // Name set by an editor screen (drug / condition); shown in the phone top bar
+  // in place of the page label while that screen is open.
+  const editorTitle = usePageTitle()
   const [menuOpen, setMenuOpen] = useState(false)
   const navigate     = useNavigate()
   const location      = useLocation()
@@ -185,7 +189,7 @@ export default function AdminLayout() {
           >
             <Menu size={22} />
           </button>
-          <div className="cms-topbar-title">{currentPageLabel(location.pathname)}</div>
+          <div className="cms-topbar-title">{editorTitle || currentPageLabel(location.pathname)}</div>
         </header>
       )}
       {isPhone && menuOpen && (
