@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { AlertTriangle, ChevronDown, ChevronRight } from 'lucide-react'
+import { AlertTriangle, Pencil } from 'lucide-react'
 import { DRUG_FORMS, DRUG_ROUTES, INJECTION_ROUTE_DETAILS } from '../../config/forms'
 import DoseRowList from './DoseRowList'
 import TagInput from './TagInput'
+import Modal from './Modal'
 
 /**
  * FormulationEditor — edit fields on a formulation row.
@@ -82,22 +83,39 @@ export default function FormulationEditor({ formulation, ingredients = [], onCha
           cleanup only, no field behavior changed. Mirrors the same
           chevron-toggle pattern already used one level up, for the
           formulation card itself. */}
-      <div>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
+        padding: 'var(--space-3)', border: '1px solid var(--color-border)',
+        borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-bg)',
+      }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ ...labelStyle, marginBottom: 2 }}>Formulation details</div>
+          <div style={{
+            fontSize: 13, color: 'var(--color-text-secondary)',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
+            {[formulation.concentration, formulation.form, formulation.route].filter(Boolean).join(' · ') || 'Nothing set yet'}
+          </div>
+        </div>
         <button
           type="button"
-          onClick={() => setDetailsOpen(open => !open)}
+          onClick={() => setDetailsOpen(true)}
           style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-            ...labelStyle,
+            display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0,
+            padding: '7px 12px', borderRadius: 'var(--radius-md)',
+            border: '1px solid var(--color-border)', backgroundColor: 'var(--color-surface)',
+            color: 'var(--color-text-primary)', fontSize: 13, fontWeight: 600,
+            fontFamily: 'var(--font-body)', cursor: 'pointer',
           }}
         >
-          {detailsOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-          Formulation Details
+          <Pencil size={13} /> Edit
         </button>
+      </div>
 
-        {detailsOpen && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', marginTop: 'var(--space-3)' }}>
+      {/* Pop-up on a computer, bottom sheet on a phone (Modal does both). Fields change the
+          formulation live, so Done only closes it. */}
+      <Modal isOpen={detailsOpen} onClose={() => setDetailsOpen(false)} title="Formulation details" size="lg">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
 
       {/* Strength — one Value/Unit/Basis row per ingredient */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
@@ -122,7 +140,7 @@ export default function FormulationEditor({ formulation, ingredients = [], onCha
                   Doesn't match this generic's ingredient list
                 </div>
               )}
-              <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
+              <div className="cms-stack" style={{ display: 'flex', gap: 'var(--space-3)' }}>
                 <Field label="Strength Value" style={{ flex: 1 }}>
                   <input
                     type="text"
@@ -170,7 +188,7 @@ export default function FormulationEditor({ formulation, ingredients = [], onCha
       </Field>
 
       {/* Form + Route row */}
-      <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
+      <div className="cms-stack" style={{ display: 'flex', gap: 'var(--space-3)' }}>
         <Field label="Form" required style={{ flex: 1 }}>
           <select
             value={formulation.form ?? ''}
@@ -239,7 +257,7 @@ export default function FormulationEditor({ formulation, ingredients = [], onCha
       )}
 
       {/* Form Modifier + Device Type row */}
-      <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
+      <div className="cms-stack" style={{ display: 'flex', gap: 'var(--space-3)' }}>
         <Field label="Form Modifier" hint="e.g. chewable, extended-release" style={{ flex: 1 }}>
           <TagInput
             tags={formulation.form_modifier ?? []}
@@ -260,9 +278,21 @@ export default function FormulationEditor({ formulation, ingredients = [], onCha
           />
         </Field>
       </div>
-      </div>
-        )}
-      </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <button
+            type="button"
+            onClick={() => setDetailsOpen(false)}
+            style={{
+              height: 36, padding: '0 18px', borderRadius: 'var(--radius-md)', border: 'none',
+              backgroundColor: 'var(--color-accent)', color: '#fff', fontFamily: 'var(--font-body)',
+              fontSize: 14, fontWeight: 600, cursor: 'pointer',
+            }}
+          >
+            Done
+          </button>
+        </div>
+        </div>
+      </Modal>
 
       {/* Practical doses */}
       <Field label="Practical doses" hint="Patient-friendly doses shown for this formulation">

@@ -72,6 +72,7 @@ export default function BrandEditor({
 
   const [newName,     setNewName]     = useState('')
   const [newMfr,       setNewMfr]     = useState('')
+  const [adding,       setAdding]     = useState(false) // the Add brand form is hidden until asked for
   const [toggling,    setToggling]    = useState(null) // brandId being toggled
   // Starts expanded on the deep-linked brand, if any, so a click from the
   // CMS drug library screen lands already open on the right row.
@@ -142,6 +143,7 @@ export default function BrandEditor({
     ])
     setNewName('')
     setNewMfr('')
+    setAdding(false)
   }
 
   const ingredientNames = (Array.isArray(ingredients) ? ingredients : [])
@@ -296,7 +298,22 @@ export default function BrandEditor({
       />
 
       {/* Add new brand row */}
-      {!disabled && (
+      {!disabled && !adding && (
+        <button
+          type="button"
+          onClick={() => setAdding(true)}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 4, alignSelf: 'flex-start',
+            padding: '6px 4px', border: 'none', background: 'none',
+            color: 'var(--color-text-secondary)', fontSize: 13, fontWeight: 600,
+            fontFamily: 'var(--font-body)', cursor: 'pointer',
+          }}
+        >
+          <Plus size={14} /> Brand
+        </button>
+      )}
+
+      {!disabled && adding && (
         <div style={{
           border: '1px dashed var(--color-border)',
           borderRadius: 'var(--radius-md)',
@@ -316,6 +333,7 @@ export default function BrandEditor({
               value={newName}
               onChange={e => setNewName(e.target.value)}
               placeholder="Brand name (EN) *"
+              autoFocus
               style={inputStyle}
               onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addBrand())}
             />
@@ -348,6 +366,18 @@ export default function BrandEditor({
             >
               <Plus size={14} />
               Add
+            </button>
+            <button
+              type="button"
+              onClick={() => { setAdding(false); setNewName(''); setNewMfr('') }}
+              style={{
+                padding: 'var(--space-2) var(--space-3)', borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--color-border)', background: 'none',
+                color: 'var(--color-text-secondary)', fontSize: 13, fontWeight: 600,
+                fontFamily: 'var(--font-body)', cursor: 'pointer', flexShrink: 0,
+              }}
+            >
+              Cancel
             </button>
           </div>
         </div>
