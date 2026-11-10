@@ -465,45 +465,45 @@ export default function DrugEditor() {
           const presentForms = DRUG_FORMS.filter(df => counts[df.value] > 0)
           if (presentForms.length < 2) return null  // nothing to filter with only one form
 
+          const chipStyle = active => ({
+            flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5,
+            padding: '6px 12px', whiteSpace: 'nowrap',
+            borderRadius: 'var(--radius-full)',
+            border: `1px solid ${active ? 'var(--color-accent)' : 'var(--color-border)'}`,
+            backgroundColor: active ? 'var(--color-accent)' : 'var(--color-surface)',
+            color: active ? '#fff' : 'var(--color-text-secondary)',
+            fontSize: 12.5, fontWeight: 600, fontFamily: 'var(--font-body)', cursor: 'pointer',
+          })
+          const countStyle = active => ({ fontWeight: 500, opacity: active ? 0.85 : 0.6 })
+          const pick = (value, e) => {
+            setFormFilter(value)
+            e.currentTarget.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
+          }
+
+          // One swipeable row instead of wrapping onto 3 lines.
           return (
-            <div style={{
-              display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)',
-              marginBottom: 'var(--space-3)',
-            }}>
-              <button
-                onClick={() => setFormFilter(null)}
-                aria-pressed={!formFilter}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 4,
-                  padding: '5px 12px',
-                  borderRadius: 'var(--radius-full)',
-                  border: `1px solid ${!formFilter ? 'var(--color-accent)' : 'var(--color-border)'}`,
-                  backgroundColor: !formFilter ? 'var(--color-accent)' : 'var(--color-surface)',
-                  color: !formFilter ? '#fff' : 'var(--color-text-secondary)',
-                  fontSize: 12.5, fontWeight: 600, fontFamily: 'var(--font-body)', cursor: 'pointer',
-                }}
-              >
-                All ({formulations.length})
+            <div
+              role="group"
+              aria-label="Filter by form"
+              style={{
+                display: 'flex', flexWrap: 'nowrap', gap: 'var(--space-2)',
+                overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none',
+                margin: '0 0 var(--space-3)', padding: '2px 0',
+              }}
+            >
+              <button onClick={e => pick(null, e)} aria-pressed={!formFilter} style={chipStyle(!formFilter)}>
+                All <span style={countStyle(!formFilter)}>{formulations.length}</span>
               </button>
               {presentForms.map(df => {
                 const active = formFilter === df.value
                 return (
                   <button
                     key={df.value}
-                    onClick={() => setFormFilter(active ? null : df.value)}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 4,
-                      padding: '5px 12px',
-                      borderRadius: 'var(--radius-full)',
-                      border: `1px solid ${active ? 'var(--color-accent)' : 'var(--color-border)'}`,
-                      backgroundColor: active ? 'var(--color-accent)' : 'var(--color-surface)',
-                      color: active ? '#fff' : 'var(--color-text-secondary)',
-                      fontSize: 12.5, fontWeight: 600,
-                      fontFamily: 'var(--font-body)',
-                      cursor: 'pointer',
-                    }}
+                    onClick={e => pick(active ? null : df.value, e)}
+                    aria-pressed={active}
+                    style={chipStyle(active)}
                   >
-                    {df.label} ({counts[df.value]})
+                    {df.label} <span style={countStyle(active)}>{counts[df.value]}</span>
                   </button>
                 )
               })}
