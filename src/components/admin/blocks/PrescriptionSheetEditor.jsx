@@ -258,11 +258,32 @@ function rowSummary(row) {
 // 2026-11-10: a copy of a row with fresh ids (the row, and the drugs inside a
 // section). It starts collapsed, so it opens independently of the original.
 function cloneRowFresh(row) {
-  const copy = JSON.parse(JSON.stringify(row))
-  copy.id = nanoid()
-  copy._isNew = false
+  const copy = cloneIdsFresh(row)
   if (Array.isArray(copy.drugs)) {
-    copy.drugs = copy.drugs.map(d => ({ ...d, id: nanoid(), _isNew: false }))
+    copy.drugs = copy.drugs.map(d => cloneIdsFresh(d))
+  }
+  return copy
+}
+
+// 2026-11-10: gives one row a fresh id WITHOUT breaking its drug groups.
+// Inside a drug row, the first drug's group is identified by the row's own id,
+// and every other drug points at its group by a group id. Giving the copy a new
+// id while the others still point at the old one made them drop out of the
+// group. So the old id is swapped for the new one everywhere, and each other
+// group gets one new id shared by all its members, keeping the structure.
+function cloneIdsFresh(row) {
+  const copy = JSON.parse(JSON.stringify(row))
+  const oldId = row.id
+  const newId = nanoid()
+  copy.id = newId
+  copy._isNew = false
+  if (Array.isArray(copy.alternatives) && copy.alternatives.length > 0) {
+    const idMap = new Map([[oldId, newId]])
+    copy.alternatives = copy.alternatives.map(alt => {
+      if (!alt?.group_id) return alt
+      if (!idMap.has(alt.group_id)) idMap.set(alt.group_id, nanoid())
+      return { ...alt, group_id: idMap.get(alt.group_id) }
+    })
   }
   return copy
 }
