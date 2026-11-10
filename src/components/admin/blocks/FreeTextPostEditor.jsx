@@ -11,9 +11,17 @@
  *     app). Title and body can each be used without the other.
  *   - Formatting toolbar for the body (bold, italic, underline, font color, font
  *     size, clear formatting) with Ctrl/Cmd+B/I/U shortcuts — see RichTextToolbar.jsx.
- *   - Split view (box + live preview) is the default.
+ *   - (Split view was replaced by the Write / Code / Preview views, see below.)
  *   - The old 'Title' button (turned a line into a heading) was replaced by the
  *     Title field; '# ' headings in older text still render as before.
+ *
+ * Word-style editing (2026-11-10):
+ *   - The body is now edited in a Word-style box (RichTextEditorBox) that looks like
+ *     the finished text, with no code visible. The saved text format is unchanged.
+ *   - Views: Write (default), Code (the old plain text box + toolbar, kept as a
+ *     safety net and for pasting) and Preview (exactly what the app shows).
+ *   - A block whose text cannot be shown safely in the Write view (the check in
+ *     richTextConvert.canEditVisually) opens in Code view instead.
  *
  * Props:
  *   data     { title?: string, markdown: string } — block.data (read-only; patch via onChange)
@@ -23,7 +31,7 @@
  * Features:
  *   - Auto-growing textarea for markdown input
  *   - Live preview panel — renders title + directive cards + markdown (matches app exactly)
- *   - Toggle between Edit / Preview / Split view
+ *   - Toggle between Write / Code / Preview views
  *   - Character count
  *   - Copy AI Prompt button — one-click clipboard copy of the stored system prompt
  *   - RTL-aware: dir="auto" on both textarea and preview (Arabic/English mixed content)
@@ -33,17 +41,16 @@
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import useIsPhone from '../../../hooks/useIsPhone'
 import { renderTitledMarkdown } from '../../../lib/directiveRenderer'
 import RichTextToolbar, { applyFormat, getActiveFormats, EMPTY_ACTIVE } from './RichTextToolbar'
+import RichTextEditorBox from './RichTextEditorBox'
+import { canEditVisually } from '../../../lib/richTextConvert'
 import { supabase } from '../../../lib/supabase'
 import { fetchCmsConfig } from '../../../lib/queries'
 
 // ─── View mode toggle ──────────────────────────────────────────────────────────
 
-const MODES = ['Edit', 'Split', 'Preview']
-// On a phone there is no room for two columns, so Split is not offered.
-const PHONE_MODES = ['Edit', 'Preview']
+const MODES = ['Write', 'Code', 'Preview']
 
 function ModeToggle({ mode, onChange, modes = MODES }) {
   return (
@@ -255,11 +262,20 @@ function PreviewPanel({ title, markdown }) {
 export default function FreeTextPostEditor({ data, onChange, disabled = false }) {
   const markdown = data?.markdown ?? ''
   const title = data?.title ?? ''
-  const [mode, setMode]             = useState('Split')
-  const isPhone = useIsPhone()
-  // On a phone a Split choice is shown as Edit (the choice itself is kept, so
-  // turning the phone sideways or widening the window brings Split back).
-  const viewMode = isPhone && mode === 'Split' ? 'Edit' : mode
+  // Write (Word-style) unless this block's text cannot be shown safely that way.
+  const [visualOk] = useState(() => canEditVisually(data?.markdown ?? ''))
+  const [mode, setModeRaw]          = useState(visualOk ? 'Write' : 'Code')
+  const [codeNote, setCodeNote]     = useState(!visualOk)
+  const viewMode = mode
+
+  function setMode(next) {
+    if (next === 'Write' && !canEditVisually(markdown)) {
+      setCodeNote(true)
+      return
+    }
+    setCodeNote(false)
+    setModeRaw(next)
+  }
   const [aiPrompt, setAiPrompt]     = useState(null)   // null = not yet fetched
   const [copyStatus, setCopyStatus] = useState('idle') // idle | loading | copied | error
 
@@ -387,14 +403,14 @@ export default function FreeTextPostEditor({ data, onChange, disabled = false })
         gap: 'var(--space-2)',
         flexWrap: 'wrap',
       }}>
-        <ModeToggle mode={viewMode} onChange={setMode} modes={isPhone ? PHONE_MODES : MODES} />
+        <ModeToggle mode={viewMode} onChange={setMode} modes={MODES} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
           <span style={{
             fontSize: 11,
             color: 'var(--color-text-tertiary)',
             fontFamily: 'var(--font-body)',
           }}>
-            {charCount > 0 ? `${charCount.toLocaleString()} chars` : 'Markdown + cards supported'}
+            {charCount > 0 ? `${charCount.toLocaleString()} chars` : ''}
           </span>
           <CopyPromptButton onCopy={handleCopyPrompt} status={copyStatus} />
         </div>
@@ -403,13 +419,33 @@ export default function FreeTextPostEditor({ data, onChange, disabled = false })
       {/* Title (optional) */}
       <TitleField value={title} onChange={val => onChange({ title: val })} disabled={disabled} />
 
-      {/* Formatting toolbar for the body */}
-      {viewMode !== 'Preview' && (
+      {codeNote && (
+        <div style={{
+          fontSize: 12, lineHeight: 1.5, color: 'var(--color-text-secondary)',
+          fontFamily: 'var(--font-body)', background: 'var(--color-bg)',
+          border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)',
+          padding: '6px var(--space-3)',
+        }}>
+          This text has formatting the Write view can't show safely, so it is open in Code view. Nothing was changed.
+        </div>
+      )}
+
+      {/* Write view: Word-style box with its own toolbar */}
+      {viewMode === 'Write' && (
+        <RichTextEditorBox
+          value={markdown}
+          onChange={handleChange}
+          disabled={disabled}
+        />
+      )}
+
+      {/* Code view: formatting toolbar for the plain text box */}
+      {viewMode === 'Code' && (
         <RichTextToolbar active={active} onAction={runFormat} disabled={disabled} />
       )}
 
       {/* Editor area */}
-      {viewMode === 'Edit' && (
+      {viewMode === 'Code' && (
         <AutoTextarea
           value={markdown}
           onChange={handleChange}
@@ -422,25 +458,6 @@ export default function FreeTextPostEditor({ data, onChange, disabled = false })
 
       {viewMode === 'Preview' && (
         <PreviewPanel title={title} markdown={markdown} />
-      )}
-
-      {viewMode === 'Split' && (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: 'var(--space-2)',
-          minWidth: 0,
-        }}>
-          <AutoTextarea
-            value={markdown}
-            onChange={handleChange}
-            disabled={disabled}
-            textareaRef={textareaRef}
-            onKeyDown={handleKeyDown}
-            placeholder="Write here… select text and use the toolbar. Use :::warning, :::dose, :::redflags etc. for cards"
-          />
-          <PreviewPanel title={title} markdown={markdown} />
-        </div>
       )}
     </div>
   )

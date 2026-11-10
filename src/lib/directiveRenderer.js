@@ -98,7 +98,7 @@ export function renderDirectiveMarkdown(raw) {
         const fallbackHtml = stripLooseListParagraphs(
           marked.parse(body.trim(), { breaks: true, gfm: true })
         )
-        const key = `DIRECTIVE_PLACEHOLDER_${counter++}`
+        const key = `DIRECTIVE_PLACEHOLDER_${counter++}_END`
         blocks[key] = fallbackHtml
         return `\n\n${key}\n\n`
       }
@@ -113,7 +113,7 @@ export function renderDirectiveMarkdown(raw) {
   <div class="dir-card-header">${labelText}</div>
   ${innerHtml}</div>`
 
-      const key = `DIRECTIVE_PLACEHOLDER_${counter++}`
+      const key = `DIRECTIVE_PLACEHOLDER_${counter++}_END`
       blocks[key] = cardHtml
       return `\n\n${key}\n\n`
     }
