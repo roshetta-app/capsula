@@ -57,9 +57,12 @@ export default function FormulationEditor({ formulation, ingredients = [], onCha
     const nextRows = rows.map((row, i) =>
       i === idx ? { ...row, [field]: value } : row
     )
+    // All strength boxes empty (cleared by hand) means "no strength yet": store nothing, not
+    // a blank row per ingredient, and not a "/" concentration.
+    const allBlank = nextRows.every(r => !(r.value ?? '').toString().trim() && !(r.unit ?? '').trim() && !(r.basis ?? '').trim())
     const patch = {
-      strength_structured: { ingredients: nextRows },
-      concentration: buildConcentration(nextRows),
+      strength_structured: allBlank ? null : { ingredients: nextRows },
+      concentration: allBlank ? '' : buildConcentration(nextRows),
     }
     if (nextRows.length === 1) {
       patch.strength_value = nextRows[0].value || null
@@ -362,6 +365,7 @@ function buildConcentration(ingredients) {
     const u = (ing.unit ?? '').trim()
     return `${v}${u}`.trim()
   })
+  if (parts.every(p => !p)) return ''   // nothing typed in any box: no strength, not "/"
   const joined = parts.join('/')
   const rawBasis = ingredients.map(i => i.basis).find(b => b && b.trim())
   if (!rawBasis) return joined
