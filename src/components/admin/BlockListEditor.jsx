@@ -435,7 +435,7 @@ function SubTabBar({ active, onChange }) {
 // menu, and a trash icon beside it that removes the open sheet (after a confirmation).
 // Shown even for a single sheet so there is always a way to add another.
 // With no sheets yet there is nothing to select, so only the Add button shows.
-function SheetPickerBar({ sheets, activeIndex, onSelect, onAdd, onRemove, disabled }) {
+function SheetPickerBar({ sheets, activeIndex, onSelect, onAdd, onRemove, onRename, disabled }) {
   const [confirmOpen, setConfirmOpen] = useState(false)
 
   if (sheets.length === 0) {
@@ -481,23 +481,11 @@ function SheetPickerBar({ sheets, activeIndex, onSelect, onAdd, onRemove, disabl
             onSelect={onSelect}
             onAdd={onAdd}
             addLabel="Add sheet"
+            onRename={onRename}
+            renameValue={activeItem?.block.data?.label ?? ''}
+            onRemove={() => setConfirmOpen(true)}
           />
         </div>
-        <button
-          type="button"
-          onClick={() => setConfirmOpen(true)}
-          aria-label={`Remove sheet ${activeLabel}`}
-          title="Remove this sheet"
-          style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            flexShrink: 0, width: 48, height: 48,
-            borderRadius: 'var(--radius-lg)',
-            border: '1px solid #FECACA', backgroundColor: '#FEF2F2', color: '#DC2626',
-            cursor: 'pointer', WebkitTapHighlightColor: 'transparent',
-          }}
-        >
-          <Trash2 size={18} />
-        </button>
       </div>
 
       <ConfirmModal
@@ -871,6 +859,7 @@ export default function BlockListEditor({ blocks = [], onChange, disabled = fals
                 addBlock('prescription_sheet')
                 setActiveSheetIndex(sheetItems.length)
               }}
+              onRename={label => patchBlockData(activeSheetItem.globalIndex, { label })}
               onRemove={() => {
                 deleteBlock(activeSheetItem.globalIndex)
                 setActiveSheetIndex(Math.max(0, clampedSheetIndex - 1))

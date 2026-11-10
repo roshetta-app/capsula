@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Check, ChevronDown, Plus } from 'lucide-react'
+import { Check, ChevronDown, Plus, Pencil, Trash2 } from 'lucide-react'
 
 /**
  * PrescriptionPills — selector for choosing between treatment plans.
@@ -26,8 +26,10 @@ import { Check, ChevronDown, Plus } from 'lucide-react'
  * The app passes neither, so it is unchanged.
  */
 
-export default function PrescriptionPills({ prescriptions, activeIndex, onSelect, onAdd, addLabel = 'Add sheet' }) {
+export default function PrescriptionPills({ prescriptions, activeIndex, onSelect, onAdd, addLabel = 'Add sheet', onRename, renameValue = '', onRemove }) {
   const [open, setOpen] = useState(false)
+  // CMS only: the menu can also rename or delete the open sheet (onRename / onRemove).
+  const [renaming, setRenaming] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [pressed, setPressed] = useState(false)
   // entered: flips one frame after the menu mounts, so the blur and the menu
@@ -41,6 +43,8 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
 
   // Keep the menu in the DOM for one transition cycle after close so the
   // fade/scale plays on the way out instead of snapping away.
+  useEffect(() => { if (!open) setRenaming(false) }, [open])
+
   useEffect(() => {
     if (open) {
       if (unmountTimer.current) clearTimeout(unmountTimer.current)
@@ -333,6 +337,76 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
               </span>
               {addLabel}
             </button>
+          )}
+
+          {(onRename || onRemove) && (
+            <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid var(--color-border-subtle, var(--color-border))', display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {onRename && (renaming ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 6px 6px 12px' }}>
+                  <input
+                    type="text"
+                    value={renameValue}
+                    autoFocus
+                    dir="auto"
+                    onChange={e => onRename(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') setRenaming(false) }}
+                    placeholder="Sheet name, e.g. Adults"
+                    style={{
+                      flex: 1, minWidth: 0, boxSizing: 'border-box', height: 40, padding: '0 10px',
+                      border: '1.5px solid var(--color-accent)', borderRadius: 10,
+                      fontSize: 14, fontFamily: 'var(--font-body)',
+                      background: 'var(--color-surface)', color: 'var(--color-text-primary)', outline: 'none',
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setRenaming(false)}
+                    aria-label="Done"
+                    style={{
+                      width: 40, height: 40, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      border: 'none', borderRadius: 10, cursor: 'pointer', color: '#fff', background: accentSolid,
+                    }}
+                  >
+                    <Check size={18} strokeWidth={2.6} aria-hidden="true" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setRenaming(true)}
+                  style={{
+                    width: '100%', display: 'flex', alignItems: 'center', gap: 12, minHeight: 48,
+                    padding: '10px 12px', textAlign: 'left', cursor: 'pointer',
+                    fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 500,
+                    color: 'var(--color-text-secondary)', background: 'transparent',
+                    border: 'none', borderRadius: 12, boxSizing: 'border-box',
+                  }}
+                >
+                  <span style={{ width: 22, height: 22, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Pencil size={16} aria-hidden="true" />
+                  </span>
+                  Edit sheet name
+                </button>
+              ))}
+              {onRemove && (
+                <button
+                  type="button"
+                  onClick={() => { setOpen(false); onRemove() }}
+                  style={{
+                    width: '100%', display: 'flex', alignItems: 'center', gap: 12, minHeight: 48,
+                    padding: '10px 12px', textAlign: 'left', cursor: 'pointer',
+                    fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 500,
+                    color: '#DC2626', background: 'transparent',
+                    border: 'none', borderRadius: 12, boxSizing: 'border-box',
+                  }}
+                >
+                  <span style={{ width: 22, height: 22, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Trash2 size={16} aria-hidden="true" />
+                  </span>
+                  Delete sheet
+                </button>
+              )}
+            </div>
           )}
         </div>
       )}

@@ -1492,36 +1492,6 @@ export default function PrescriptionSheetEditor({ block, onChange, disabled = fa
       onTouchStart={handleEditorBodyTouch}
     >
 
-      {/* ── Sheet label ── */}
-      <div>
-        <div style={{ marginBottom: 4 }}>
-          <span style={{
-            fontSize: 11, fontWeight: 700,
-            color: 'var(--color-text-secondary)',
-            textTransform: 'uppercase', letterSpacing: '0.05em',
-          }}>
-            Sheet label
-          </span>
-        </div>
-        <input
-          type="text"
-          value={label}
-          onChange={e => update({ label: e.target.value })}
-          placeholder="e.g. Standard, Adults, Paediatric"
-          disabled={disabled}
-          style={{
-            width: '100%', boxSizing: 'border-box',
-            padding: '7px 10px',
-            border: '1.5px solid var(--color-border)',
-            borderRadius: 'var(--radius-md)',
-            fontSize: 13, fontFamily: 'var(--font-body)',
-            backgroundColor: 'var(--color-surface)',
-            color: 'var(--color-text-primary)',
-            outline: 'none',
-          }}
-        />
-      </div>
-
       {/* ── Row list ─────────────────────────────────────────────────────────── */}
       {rows.length === 0 ? (
         <div style={{
