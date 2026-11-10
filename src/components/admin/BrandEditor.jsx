@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Trash2, Pencil } from 'lucide-react'
+import { Plus, Trash2, Pencil, MoreVertical, Eye, EyeOff } from 'lucide-react'
 import { updateBrand } from '../../lib/adminQueries'
 import { useToast } from '../../context/ToastContext'
 import { useCategories } from '../../hooks/useCategories'
@@ -36,7 +36,7 @@ import ConfirmModal from './ConfirmModal'
  * 2026-11-10 (formulation editor): each saved or new brand is now drawn with SharedDrugCard,
  * the same row the app's Other Brands list uses (category badge, title with strength/form/pack,
  * generic line, and the image-search strip that opens Google Images for the pack, which is how
- * a doctor or pharmacist tells two similar packs apart). Tapping the row opens the two edit
+ * a doctor or pharmacist tells two similar packs apart; removed again 2026-11-10 at the user's request). Tapping the row opens the two edit
  * fields under it. Trailing: Live/Draft button (saves at once) and a delete button. Delete on a
  * saved brand RETIRES it (set to draft, saved at once, with a confirm), the same as the Drug
  * Library; nothing is erased from the database. A brand not saved yet is just removed.
@@ -201,7 +201,6 @@ export default function BrandEditor({
                   isDark={isDark}
                   isLast
                   showChevron={false}
-                  showImageSearch
                   disableTap={disabled}
                   onTap={() => setExpandedIdx(isOpen ? null : idx)}
                   trailing={
@@ -212,35 +211,25 @@ export default function BrandEditor({
                           padding: '1px 6px', borderRadius: 'var(--radius-full)',
                           color: 'var(--color-text-tertiary)', backgroundColor: 'var(--color-bg)',
                           border: '1px solid var(--color-border)',
-                        }} className="cms-hide-phone">Draft</span>
+                        }}>Draft</span>
                       )}
-                      <button
-                        type="button"
-                        onClick={e => { e.stopPropagation(); !disabled && !toggling && togglePublished(idx) }}
-                        disabled={disabled || busy}
-                        aria-label={live ? 'Unpublish brand' : 'Publish brand'}
-                        title={live ? 'Click to unpublish' : 'Click to publish'}
-                        style={{
-                          padding: '3px 10px', borderRadius: 'var(--radius-full)',
-                          fontSize: 11, fontWeight: 600, fontFamily: 'var(--font-body)',
-                          cursor: 'pointer', whiteSpace: 'nowrap',
-                          backgroundColor: live ? '#D1FAE5' : 'var(--color-bg)',
-                          color: live ? '#065F46' : 'var(--color-text-tertiary)',
-                          border: `1px solid ${live ? '#6EE7B7' : 'var(--color-border)'}`,
-                        }}
-                      >
-                        {live ? '● Live' : '○ Draft'}
-                      </button>
                       {!disabled && (
-                        <button
-                          type="button"
-                          onClick={e => { e.stopPropagation(); brand.id ? setConfirmIdx(idx) : retireBrand(idx) }}
-                          aria-label="Delete brand"
-                          title={brand.id ? 'Retire brand' : 'Remove brand'}
-                          style={{ ...iconBtn, color: '#DC2626' }}
-                        >
-                          <Trash2 size={14} />
-                        </button>
+                        <RowMenu
+                          disabled={busy}
+                          items={[
+                            {
+                              label: live ? 'Unpublish' : 'Publish',
+                              icon: live ? <EyeOff size={14} /> : <Eye size={14} />,
+                              onClick: () => !toggling && togglePublished(idx),
+                            },
+                            {
+                              label: brand.id ? 'Delete (retire)' : 'Remove',
+                              icon: <Trash2 size={14} />,
+                              danger: true,
+                              onClick: () => (brand.id ? setConfirmIdx(idx) : retireBrand(idx)),
+                            },
+                          ]}
+                        />
                       )}
                     </div>
                   }
@@ -424,4 +413,58 @@ const iconBtn = {
   backgroundColor: 'var(--color-surface)',
   color: 'var(--color-text-secondary)',
   cursor: 'pointer',
+}
+
+// A "..." button that opens a small drop-down of actions; closes on outside tap or Escape.
+function RowMenu({ items, disabled }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+  useEffect(() => {
+    if (!open) return
+    const down = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    const key = e => { if (e.key === 'Escape') setOpen(false) }
+    document.addEventListener('pointerdown', down)
+    document.addEventListener('keydown', key)
+    return () => { document.removeEventListener('pointerdown', down); document.removeEventListener('keydown', key) }
+  }, [open])
+  return (
+    <div ref={ref} style={{ position: 'relative' }} onClick={e => e.stopPropagation()}>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setOpen(o => !o)}
+        aria-label="Brand actions"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        style={{ ...iconBtn, width: 34, height: 34 }}
+      >
+        <MoreVertical size={16} />
+      </button>
+      {open && (
+        <div role="menu" style={{
+          position: 'absolute', right: 0, top: '100%', marginTop: 4, zIndex: 20, minWidth: 170,
+          backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)',
+          borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-card)', padding: 4,
+        }}>
+          {items.map(it => (
+            <button
+              key={it.label}
+              type="button"
+              role="menuitem"
+              onClick={() => { setOpen(false); it.onClick() }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+                padding: '10px 12px', border: 'none', background: 'none', textAlign: 'left',
+                borderRadius: 'var(--radius-sm)', cursor: 'pointer',
+                fontSize: 14, fontWeight: 500, fontFamily: 'var(--font-body)',
+                color: it.danger ? '#DC2626' : 'var(--color-text-primary)',
+              }}
+            >
+              {it.icon}{it.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
