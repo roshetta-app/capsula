@@ -423,6 +423,12 @@ export default function RichTextEditorBox({ value, onChange, disabled = false, p
     const text = e.clipboardData?.getData('text/plain')
     if (text == null) return
     e.preventDefault()
+    insertSmartText(text)
+  }
+
+  // Shared by normal paste, drag-and-drop and keyboard / phone clipboard inserts, so
+  // every way of getting text in is tidied the same way.
+  function insertSmartText(text) {
     const insideCard = !!window.getSelection()?.anchorNode?.parentElement?.closest?.('.rt-card-body')
     let html
     // tidy pasted text first (tables with no divider line, lists stuck under a
@@ -449,6 +455,29 @@ export default function RichTextEditorBox({ value, onChange, disabled = false, p
     padCards(elRef.current)
     emit()
   }
+
+  // Some ways of inserting text (the phone keyboard's clipboard strip, drag-and-drop)
+  // never fire a paste event. Without this they were typed in as plain lines and the
+  // symbols (##, -, :::) came out escaped. Multi-line inserts now take the smart route.
+  const smartInsertRef = useRef(null)
+  smartInsertRef.current = { insertSmartText, disabled }
+  useEffect(() => {
+    const el = elRef.current
+    if (!el) return undefined
+    function onBeforeInput(e) {
+      const { insertSmartText: insert, disabled: off } = smartInsertRef.current
+      if (off) return
+      const kind = e.inputType
+      if (kind !== 'insertText' && kind !== 'insertFromPaste' && kind !== 'insertFromDrop'
+        && kind !== 'insertReplacementText') return
+      const text = e.dataTransfer?.getData('text/plain') ?? e.data
+      if (typeof text !== 'string' || !text.includes('\n')) return
+      e.preventDefault()
+      insert(text)
+    }
+    el.addEventListener('beforeinput', onBeforeInput)
+    return () => el.removeEventListener('beforeinput', onBeforeInput)
+  }, [])
 
   function handleFocus() {
     try { document.execCommand('defaultParagraphSeparator', false, 'p') } catch { /* ignore */ }
