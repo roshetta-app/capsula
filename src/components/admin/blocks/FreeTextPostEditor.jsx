@@ -168,6 +168,34 @@ function CleanUpButton({ onClick, disabled }) {
   )
 }
 
+// ─── Clear all text button ─────────────────────────────────────────────────────
+
+function ClearButton({ onClick, disabled }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title="Remove all the text in this block (you can undo)"
+      style={{
+        padding: '4px 10px',
+        fontSize: 11,
+        fontWeight: 500,
+        fontFamily: 'var(--font-body)',
+        borderRadius: 'var(--radius-sm)',
+        border: '1px solid var(--color-border)',
+        cursor: disabled ? 'default' : 'pointer',
+        backgroundColor: 'var(--color-surface)',
+        color: 'var(--color-text-secondary)',
+        whiteSpace: 'nowrap',
+        opacity: disabled ? 0.6 : 1,
+      }}
+    >
+      🗑 Clear
+    </button>
+  )
+}
+
 // ─── Auto-growing textarea ─────────────────────────────────────────────────────
 
 function AutoTextarea({ value, onChange, disabled, placeholder, textareaRef, onKeyDown }) {
@@ -365,8 +393,17 @@ export default function FreeTextPostEditor({ data, onChange, disabled = false })
     setCleanNote({ kind: 'done', before: markdown })
   }
 
+  // Empties the text of this block (the title field is left alone). The old text is
+  // kept for one Undo, the same way as Clean up formatting.
+  function handleClearAll() {
+    if (disabled || !markdown.trim()) return
+    const before = markdown
+    handleChange('')
+    setCleanNote({ kind: 'cleared', before })
+  }
+
   function handleUndoCleanUp() {
-    if (cleanNote?.kind !== 'done') return
+    if (cleanNote?.kind !== 'done' && cleanNote?.kind !== 'cleared') return
     handleChange(cleanNote.before)
   }
 
@@ -464,7 +501,7 @@ export default function FreeTextPostEditor({ data, onChange, disabled = false })
         flexWrap: 'wrap',
       }}>
         <ModeToggle mode={viewMode} onChange={setMode} modes={MODES} />
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap', minWidth: 0 }}>
           <span style={{
             fontSize: 11,
             color: 'var(--color-text-tertiary)',
@@ -473,6 +510,7 @@ export default function FreeTextPostEditor({ data, onChange, disabled = false })
             {charCount > 0 ? `${charCount.toLocaleString()} chars` : ''}
           </span>
           {viewMode !== 'Preview' && <CleanUpButton onClick={handleCleanUp} disabled={disabled || !markdown.trim()} />}
+          {viewMode !== 'Preview' && <ClearButton onClick={handleClearAll} disabled={disabled || !markdown.trim()} />}
           <CopyPromptButton onCopy={handleCopyPrompt} status={copyStatus} />
         </div>
       </div>
@@ -491,9 +529,11 @@ export default function FreeTextPostEditor({ data, onChange, disabled = false })
           <span>
             {cleanNote.kind === 'done'
               ? 'Formatting cleaned up. Check the result, or undo it.'
-              : 'Nothing to fix: the formatting already looks right.'}
+              : cleanNote.kind === 'cleared'
+                ? 'Text cleared. Undo if that was a mistake.'
+                : 'Nothing to fix: the formatting already looks right.'}
           </span>
-          {cleanNote.kind === 'done' && (
+          {(cleanNote.kind === 'done' || cleanNote.kind === 'cleared') && (
             <button
               type="button"
               onClick={handleUndoCleanUp}

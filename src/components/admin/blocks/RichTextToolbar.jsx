@@ -33,7 +33,7 @@
  * prop (null = nothing copied yet, or an object { b, i, u, color, size }).
  */
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { Bold, Italic, Underline, Palette, Type, Eraser, List, Paintbrush, ClipboardPaste } from 'lucide-react'
 
 // ─── Choices ───────────────────────────────────────────────────────────────────
@@ -409,6 +409,35 @@ const popoverStyle = {
   boxShadow: '0 6px 20px rgba(0,0,0,0.12)',
 }
 
+// A menu that slides back inside the editor box (and the screen) when its button sits
+// near the right edge of a narrow phone, instead of running off the side.
+function ClampedPopover({ width, onMouseDown, children }) {
+  const ref = useRef(null)
+  useLayoutEffect(() => {
+    const menu = ref.current
+    const host = menu?.parentElement
+    if (!menu || !host) return
+    const box = (host.closest('[data-rt-box]') || document.body).getBoundingClientRect()
+    const lo = Math.max(box.left, 0) + 4
+    const hi = Math.min(box.right, window.innerWidth) - 4
+    const btnLeft = host.getBoundingClientRect().left
+    let left = btnLeft
+    if (left + menu.offsetWidth > hi) left = hi - menu.offsetWidth
+    if (left < lo) left = lo
+    menu.style.insetInlineStart = 'auto'
+    menu.style.left = `${Math.round(left - btnLeft)}px`   // set directly: no flash
+  }, [])
+  return (
+    <div
+      ref={ref}
+      style={{ ...popoverStyle, width, maxWidth: 'calc(100vw - 24px)', boxSizing: 'border-box' }}
+      onMouseDown={onMouseDown}
+    >
+      {children}
+    </div>
+  )
+}
+
 const menuRowStyle = isActive => ({
   display: 'flex',
   alignItems: 'center',
@@ -498,7 +527,7 @@ export default function RichTextToolbar({ active = EMPTY_ACTIVE, onAction, disab
           )}
         </IconButton>
         {menu === 'color' && (
-          <div style={{ ...popoverStyle, width: 168 }} onMouseDown={keepSelection}>
+          <ClampedPopover width={168} onMouseDown={keepSelection}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, padding: 4 }}>
               {COLORS.map(c => (
                 <button
@@ -524,7 +553,7 @@ export default function RichTextToolbar({ active = EMPTY_ACTIVE, onAction, disab
             >
               Default color
             </button>
-          </div>
+          </ClampedPopover>
         )}
       </div>
 
@@ -539,7 +568,7 @@ export default function RichTextToolbar({ active = EMPTY_ACTIVE, onAction, disab
           <Type size={16} />
         </IconButton>
         {menu === 'size' && (
-          <div style={{ ...popoverStyle, width: 150 }} onMouseDown={keepSelection}>
+          <ClampedPopover width={150} onMouseDown={keepSelection}>
             {SIZES.map(s => (
               <button
                 key={s.label}
@@ -550,7 +579,7 @@ export default function RichTextToolbar({ active = EMPTY_ACTIVE, onAction, disab
                 <span style={{ fontSize: s.px, lineHeight: 1.2 }}>{s.label}</span>
               </button>
             ))}
-          </div>
+          </ClampedPopover>
         )}
       </div>
 
