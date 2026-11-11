@@ -182,6 +182,25 @@ function plainToHtml(t) {
 function CardMenu({ onPick, disabled }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
+  const menuRef = useRef(null)
+
+  // The Card button can sit at the far right of a narrow screen: slide the menu back
+  // inside the editor box (and the screen) instead of letting it run off the edge.
+  useLayoutEffect(() => {
+    if (!open) return
+    const host = ref.current
+    const menu = menuRef.current
+    if (!host || !menu) return
+    const box = (host.closest('[data-rt-box]') || document.body).getBoundingClientRect()
+    const lo = Math.max(box.left, 0) + 4
+    const hi = Math.min(box.right, window.innerWidth) - 4
+    const btnLeft = host.getBoundingClientRect().left
+    let left = btnLeft
+    if (left + menu.offsetWidth > hi) left = hi - menu.offsetWidth
+    if (left < lo) left = lo
+    menu.style.left = `${Math.round(left - btnLeft)}px`   // set directly: no flash, no extra render
+  }, [open])
+
   useEffect(() => {
     if (!open) return undefined
     const close = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
@@ -209,6 +228,7 @@ function CardMenu({ onPick, disabled }) {
       </button>
       {open && (
         <div
+          ref={menuRef}
           onMouseDown={e => e.preventDefault()}
           style={{
             position: 'absolute', top: 36, left: 0, zIndex: 50, minWidth: 170, maxWidth: 'min(240px, calc(100vw - 48px))',
@@ -435,7 +455,7 @@ export default function RichTextEditorBox({ value, onChange, disabled = false, p
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+    <div data-rt-box style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
       <style>{EDITOR_CSS}</style>
       <StickyBar style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
         <div style={{ flex: '1 1 auto', minWidth: 0 }}>
