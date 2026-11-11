@@ -197,7 +197,7 @@ function BlockCard({
         border: '1.5px solid var(--color-border)',
         borderRadius: 'var(--radius-lg)',
         backgroundColor: 'var(--color-surface)',
-        overflow: 'hidden',
+        overflow: 'clip',   // clips the rounded corners like 'hidden' but still lets the text toolbar stay pinned
         marginBottom: 'var(--space-3)',
         scrollMarginTop: 80,
       }}

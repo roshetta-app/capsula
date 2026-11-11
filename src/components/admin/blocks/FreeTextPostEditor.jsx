@@ -50,6 +50,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { renderTitledMarkdown } from '../../../lib/directiveRenderer'
 import RichTextToolbar, { applyFormat, getActiveFormats, EMPTY_ACTIVE } from './RichTextToolbar'
 import RichTextEditorBox from './RichTextEditorBox'
+import StickyBar from './StickyBar'
 import { canEditVisually } from '../../../lib/richTextConvert'
 import { repairMarkdown } from '../../../lib/markdownRepair'
 import { supabase } from '../../../lib/supabase'
@@ -533,7 +534,9 @@ export default function FreeTextPostEditor({ data, onChange, disabled = false })
 
       {/* Code view: formatting toolbar for the plain text box */}
       {viewMode === 'Code' && (
-        <RichTextToolbar active={active} onAction={runFormat} disabled={disabled} />
+        <StickyBar>
+          <RichTextToolbar active={active} onAction={runFormat} disabled={disabled} />
+        </StickyBar>
       )}
 
       {/* Editor area */}

@@ -26,10 +26,15 @@
  *   { type: 'size',   value: 'sm' | 'lg' | null }   (null = normal)
  *   { type: 'clear' }
  *   { type: 'list' }                                      (bullet list on the selected lines, toggles)
+ *   { type: 'copyFormat' }                                (remember the look of the selected text)
+ *   { type: 'pasteFormat' }                               (give the selected text that look)
+ *
+ * The copy / paste format buttons only show when the parent passes the `painter`
+ * prop (null = nothing copied yet, or an object { b, i, u, color, size }).
  */
 
 import { useState, useEffect, useRef } from 'react'
-import { Bold, Italic, Underline, Palette, Type, Eraser, List } from 'lucide-react'
+import { Bold, Italic, Underline, Palette, Type, Eraser, List, Paintbrush, ClipboardPaste } from 'lucide-react'
 
 // ─── Choices ───────────────────────────────────────────────────────────────────
 
@@ -47,6 +52,18 @@ export const SIZES = [
   { key: null, label: 'Normal', px: 14 },
   { key: 'lg', label: 'Large',  px: 18 },
 ]
+
+// Short words for a copied look, e.g. "Bold · Red · Large" ("Normal text" when plain).
+function describePainter(f) {
+  if (!f) return ''
+  const parts = []
+  if (f.b) parts.push('Bold')
+  if (f.i) parts.push('Italic')
+  if (f.u) parts.push('Underline')
+  if (f.color) parts.push(COLORS.find(c => c.key === f.color)?.label ?? f.color)
+  if (f.size) parts.push(SIZES.find(z => z.key === f.size)?.label ?? f.size)
+  return parts.length ? parts.join(' · ') : 'Normal text'
+}
 
 export const EMPTY_ACTIVE = { b: false, i: false, u: false, color: null, size: null, list: false }
 
@@ -409,7 +426,7 @@ const menuRowStyle = isActive => ({
   fontWeight: isActive ? 600 : 400,
 })
 
-export default function RichTextToolbar({ active = EMPTY_ACTIVE, onAction, disabled = false }) {
+export default function RichTextToolbar({ active = EMPTY_ACTIVE, onAction, disabled = false, painter }) {
   const [menu, setMenu] = useState(null) // null | 'color' | 'size'
   const wrapRef = useRef(null)
 
@@ -542,6 +559,30 @@ export default function RichTextToolbar({ active = EMPTY_ACTIVE, onAction, disab
       <IconButton label="Clear formatting" disabled={disabled} onClick={() => pick({ type: 'clear' })}>
         <Eraser size={16} />
       </IconButton>
+
+      {painter !== undefined && (
+        <>
+          <Divider />
+          <IconButton label="Copy format of the selected text" active={!!painter} disabled={disabled} onClick={() => pick({ type: 'copyFormat' })}>
+            <Paintbrush size={16} />
+          </IconButton>
+          <IconButton
+            label={painter ? `Paste format (${describePainter(painter)})` : 'Paste format (copy a format first)'}
+            disabled={disabled || !painter}
+            onClick={() => pick({ type: 'pasteFormat' })}
+          >
+            <ClipboardPaste size={16} />
+          </IconButton>
+          {painter && (
+            <span style={{
+              fontSize: 11, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-body)',
+              padding: '0 6px', whiteSpace: 'nowrap',
+            }}>
+              {describePainter(painter)}
+            </span>
+          )}
+        </>
+      )}
     </div>
   )
 }

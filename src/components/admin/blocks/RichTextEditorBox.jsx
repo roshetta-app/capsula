@@ -16,13 +16,15 @@
  *   disabled   freezes the box while the page saves
  *   placeholder
  *
- * Contains its own formatting toolbar (RichTextToolbar, unchanged) plus a
+ * Contains its own formatting toolbar (RichTextToolbar), pinned at the top of the screen
+ * while you scroll (StickyBar), with copy / paste format buttons, plus a
  * "Card" button for adding warning / dose / ... cards.
  */
 
 import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react'
 import { LayoutPanelTop } from 'lucide-react'
 import RichTextToolbar, { EMPTY_ACTIVE } from './RichTextToolbar'
+import StickyBar from './StickyBar'
 import { markdownToEditorHtml, editorToMarkdown, newCardHtml, padCards } from '../../../lib/richTextConvert'
 import { applyAutoDir } from '../../../lib/autoDir'
 import { DIRECTIVES } from '../../../lib/directiveRenderer'
@@ -149,6 +151,21 @@ function applySpanClass(root, kind, value) {
   return true
 }
 
+// Gives the selected text (or the word at the cursor) the copied look: bold, italic,
+// underline, colour and size each end up exactly as copied, including "off".
+function pasteFormat(root, look) {
+  const range = selectionRangeIn(root)
+  if (!range) return
+  if (range.collapsed && !expandCollapsedToWord(range)) return
+  for (const [flag, cmd] of [['b', 'bold'], ['i', 'italic'], ['u', 'underline']]) {
+    let on = false
+    try { on = document.queryCommandState(cmd) } catch { /* ignore */ }
+    if (on !== !!look[flag]) document.execCommand(cmd)
+  }
+  applySpanClass(root, 'c', look.color)
+  applySpanClass(root, 's', look.size)
+}
+
 function looksLikeMarkdown(t) {
   return /(^|\n)\s*(#{1,6} |[-*+] |\d+[.)] |> |:::|\|.*\|)/.test(t)
     || /(^|\n)\s*([-*_])(\s*\2){2,}\s*(\n|$)/.test(t)
@@ -248,6 +265,7 @@ export default function RichTextEditorBox({ value, onChange, disabled = false, p
   const elRef = useRef(null)
   const lastEmitted = useRef(null)
   const [active, setActive] = useState(EMPTY_ACTIVE)
+  const [painter, setPainter] = useState(null) // copied look: { b, i, u, color, size }
   const [empty, setEmpty] = useState(!(value ?? '').trim())
 
   // Put the saved text into the box (first time, and whenever it is changed from
@@ -272,11 +290,12 @@ export default function RichTextEditorBox({ value, onChange, disabled = false, p
     onChange(md)
   }, [onChange])
 
-  const readActive = useCallback(() => {
+  // The look of the text at the cursor / selection, or null when the cursor is elsewhere.
+  const computeActive = useCallback(() => {
     const el = elRef.current
-    if (!el) return
+    if (!el) return null
     const sel = window.getSelection()
-    if (!sel || !sel.rangeCount || !el.contains(sel.anchorNode)) return
+    if (!sel || !sel.rangeCount || !el.contains(sel.anchorNode)) return null
     const host = sel.anchorNode.nodeType === 3 ? sel.anchorNode.parentElement : sel.anchorNode
     const find = prefix => {
       const s = host?.closest?.(`span[class*="${prefix}"]`)
@@ -290,12 +309,17 @@ export default function RichTextEditorBox({ value, onChange, disabled = false, p
       u = document.queryCommandState('underline')
       list = document.queryCommandState('insertUnorderedList')
     } catch { /* not supported: buttons just stay unlit */ }
-    const next = { b, i, u, color: find('rt-c-'), size: find('rt-s-'), list }
+    return { b, i, u, color: find('rt-c-'), size: find('rt-s-'), list }
+  }, [])
+
+  const readActive = useCallback(() => {
+    const next = computeActive()
+    if (!next) return
     setActive(prev => (
       prev.b === next.b && prev.i === next.i && prev.u === next.u &&
       prev.color === next.color && prev.size === next.size && prev.list === next.list ? prev : next
     ))
-  }, [])
+  }, [computeActive])
 
   useEffect(() => {
     document.addEventListener('selectionchange', readActive)
@@ -307,7 +331,16 @@ export default function RichTextEditorBox({ value, onChange, disabled = false, p
     if (!el || disabled) return
     el.focus()
     try { document.execCommand('styleWithCSS', false, false) } catch { /* ignore */ }
-    if (action.type === 'toggle') {
+    if (action.type === 'copyFormat') {
+      // remember the look of the selected text; the text itself is not changed
+      const now = computeActive() ?? active
+      setPainter({ b: !!now.b, i: !!now.i, u: !!now.u, color: now.color ?? null, size: now.size ?? null })
+      return
+    }
+    if (action.type === 'pasteFormat') {
+      if (!painter) return
+      pasteFormat(el, painter)
+    } else if (action.type === 'toggle') {
       document.execCommand({ b: 'bold', i: 'italic', u: 'underline' }[action.id])
     } else if (action.type === 'list') {
       document.execCommand('insertUnorderedList')
@@ -404,12 +437,12 @@ export default function RichTextEditorBox({ value, onChange, disabled = false, p
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
       <style>{EDITOR_CSS}</style>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+      <StickyBar style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
         <div style={{ flex: '1 1 auto', minWidth: 0 }}>
-          <RichTextToolbar active={active} onAction={runAction} disabled={disabled} />
+          <RichTextToolbar active={active} onAction={runAction} disabled={disabled} painter={painter} />
         </div>
         <CardMenu onPick={insertCard} disabled={disabled} />
-      </div>
+      </StickyBar>
       <div style={{ position: 'relative' }}>
         <div
           ref={elRef}
