@@ -23,6 +23,12 @@
  *   - A block whose text cannot be shown safely in the Write view (the check in
  *     richTextConvert.canEditVisually) opens in Code view instead.
  *
+ * Smart paste + Clean up (2026-11-11):
+ *   - Pasting into the Write view tidies the text first (src/lib/markdownRepair.js):
+ *     tables with no divider line, lists stuck under a paragraph, "•" bullets, etc.
+ *   - A "Clean up formatting" button applies the same tidy-up to text already in the
+ *     block, with a one-step Undo. Nothing changes until the button is clicked.
+ *
  * Props:
  *   data     { title?: string, markdown: string } — block.data (read-only; patch via onChange)
  *   onChange (dataPatch) => void    — called with { markdown } or { title }
@@ -45,6 +51,7 @@ import { renderTitledMarkdown } from '../../../lib/directiveRenderer'
 import RichTextToolbar, { applyFormat, getActiveFormats, EMPTY_ACTIVE } from './RichTextToolbar'
 import RichTextEditorBox from './RichTextEditorBox'
 import { canEditVisually } from '../../../lib/richTextConvert'
+import { repairMarkdown } from '../../../lib/markdownRepair'
 import { supabase } from '../../../lib/supabase'
 import { fetchCmsConfig } from '../../../lib/queries'
 
@@ -128,6 +135,34 @@ function CopyPromptButton({ onCopy, status }) {
       }}
     >
       {label}
+    </button>
+  )
+}
+
+// ─── Clean up formatting button ────────────────────────────────────────────────
+
+function CleanUpButton({ onClick, disabled }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title="Fix tables, lists and line spacing in this text"
+      style={{
+        padding: '4px 10px',
+        fontSize: 11,
+        fontWeight: 500,
+        fontFamily: 'var(--font-body)',
+        borderRadius: 'var(--radius-sm)',
+        border: '1px solid var(--color-border)',
+        cursor: disabled ? 'default' : 'pointer',
+        backgroundColor: 'var(--color-surface)',
+        color: 'var(--color-text-secondary)',
+        whiteSpace: 'nowrap',
+        opacity: disabled ? 0.6 : 1,
+      }}
+    >
+      ✨ Clean up formatting
     </button>
   )
 }
@@ -278,6 +313,7 @@ export default function FreeTextPostEditor({ data, onChange, disabled = false })
   }
   const [aiPrompt, setAiPrompt]     = useState(null)   // null = not yet fetched
   const [copyStatus, setCopyStatus] = useState('idle') // idle | loading | copied | error
+  const [cleanNote, setCleanNote]   = useState(null)   // null | { kind: 'none' } | { kind: 'done', before: string }
 
   const charCount = markdown.length
   const textareaRef = useRef(null)
@@ -307,7 +343,30 @@ export default function FreeTextPostEditor({ data, onChange, disabled = false })
   }, [])
 
   function handleChange(val) {
+    setCleanNote(null)
     onChange({ markdown: val })
+  }
+
+  // Fixes tables with no divider line, lists stuck under a paragraph, bullets, and
+  // line spacing in the text already saved. The first version is kept for one Undo.
+  function handleCleanUp() {
+    if (disabled) return
+    const fixed = repairMarkdown(markdown)
+    if (fixed === markdown) {
+      setCleanNote({ kind: 'none' })
+      return
+    }
+    handleChange(fixed)
+    if (viewMode === 'Write' && !canEditVisually(fixed)) {
+      setModeRaw('Code')
+      setCodeNote(true)
+    }
+    setCleanNote({ kind: 'done', before: markdown })
+  }
+
+  function handleUndoCleanUp() {
+    if (cleanNote?.kind !== 'done') return
+    handleChange(cleanNote.before)
   }
 
   async function handleCopyPrompt() {
@@ -412,12 +471,43 @@ export default function FreeTextPostEditor({ data, onChange, disabled = false })
           }}>
             {charCount > 0 ? `${charCount.toLocaleString()} chars` : ''}
           </span>
+          {viewMode !== 'Preview' && <CleanUpButton onClick={handleCleanUp} disabled={disabled || !markdown.trim()} />}
           <CopyPromptButton onCopy={handleCopyPrompt} status={copyStatus} />
         </div>
       </div>
 
       {/* Title (optional) */}
       <TitleField value={title} onChange={val => onChange({ title: val })} disabled={disabled} />
+
+      {cleanNote && (
+        <div style={{
+          fontSize: 12, lineHeight: 1.5, color: 'var(--color-text-secondary)',
+          fontFamily: 'var(--font-body)', background: 'var(--color-bg)',
+          border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)',
+          padding: '6px var(--space-3)', display: 'flex', alignItems: 'center',
+          justifyContent: 'space-between', gap: 'var(--space-2)',
+        }}>
+          <span>
+            {cleanNote.kind === 'done'
+              ? 'Formatting cleaned up. Check the result, or undo it.'
+              : 'Nothing to fix: the formatting already looks right.'}
+          </span>
+          {cleanNote.kind === 'done' && (
+            <button
+              type="button"
+              onClick={handleUndoCleanUp}
+              style={{
+                padding: '2px 8px', fontSize: 11, fontWeight: 500, fontFamily: 'var(--font-body)',
+                borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)',
+                backgroundColor: 'var(--color-surface)', color: 'var(--color-text-secondary)',
+                cursor: 'pointer', whiteSpace: 'nowrap',
+              }}
+            >
+              Undo
+            </button>
+          )}
+        </div>
+      )}
 
       {codeNote && (
         <div style={{

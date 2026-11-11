@@ -25,6 +25,7 @@ import { LayoutPanelTop } from 'lucide-react'
 import RichTextToolbar, { EMPTY_ACTIVE } from './RichTextToolbar'
 import { markdownToEditorHtml, editorToMarkdown, newCardHtml, padCards } from '../../../lib/richTextConvert'
 import { DIRECTIVES } from '../../../lib/directiveRenderer'
+import { repairMarkdown } from '../../../lib/markdownRepair'
 
 // ─── Small helpers ───────────────────────────────────────────────────────────
 
@@ -148,7 +149,9 @@ function applySpanClass(root, kind, value) {
 }
 
 function looksLikeMarkdown(t) {
-  return /(^|\n)\s*(#{1,6} |[-*+] |\d+[.)] |> |:::|\|.*\|)/.test(t) || /\*\*[^*]+\*\*|\[[^\]]+\]\([^)]+\)/.test(t)
+  return /(^|\n)\s*(#{1,6} |[-*+] |\d+[.)] |> |:::|\|.*\|)/.test(t)
+    || /(^|\n)\s*([-*_])(\s*\2){2,}\s*(\n|$)/.test(t)
+    || /\*\*[^*]+\*\*|\[[^\]]+\]\([^)]+\)/.test(t)
 }
 
 function plainToHtml(t) {
@@ -367,8 +370,11 @@ export default function RichTextEditorBox({ value, onChange, disabled = false, p
     e.preventDefault()
     const insideCard = !!window.getSelection()?.anchorNode?.parentElement?.closest?.('.rt-card-body')
     let html
-    if (looksLikeMarkdown(text)) {
-      html = markdownToEditorHtml(text)
+    // tidy pasted text first (tables with no divider line, lists stuck under a
+    // paragraph, ...) so it shows the way the writer meant it
+    const fixed = repairMarkdown(text)
+    if (looksLikeMarkdown(fixed)) {
+      html = markdownToEditorHtml(fixed)
       if (insideCard) {
         // a card cannot go inside another card: keep only the card's text
         const tpl = document.createElement('template')
