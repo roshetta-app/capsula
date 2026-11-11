@@ -29,6 +29,12 @@
  * drug is opened online (utils/cache.js, 'drug-pictures'). A drug never
  * opened online before still shows the crossed-out icon while offline.
  *
+ * 2026-11-11 (picture flash, Omar): after the pictures moved to our R2 copy, a drug
+ * opened before the move showed its picture from the saved DawaaGate address, then
+ * the server answered with the R2 address, which hid the picture and loaded it
+ * again (two flashes). When the answer is the same picture file on another server,
+ * the picture on screen is kept and only the saved address is updated.
+ *
  * Picture, every case:
  *   - looking up / loading : picture icon, dimmed and pulsing
  *   - picture and online   : small preview on a blurred copy of itself (so
@@ -65,6 +71,11 @@ const NAME_LINE = 1.45 // line height of the Arabic name
 const REST_MIN = 11 // px, smallest size of the second line (strength and pack)
 const OFFLINE_PICTURE_MSG = 'Pictures need an internet connection. Connect and try again.'
 const noop = () => {}
+
+// A picture's file name is the last part of its address. The same file lives on
+// DawaaGate and on our own R2 copy, so two addresses with the same file name are
+// the same picture on a different server.
+const pictureFile = address => (typeof address === 'string' ? address.split('?')[0].replace(/^.*\//, '') : null)
 
 export default function DrugMediaStrip({ drug }) {
   const { isOnline } = useOnlineStatus()
@@ -112,7 +123,13 @@ export default function DrugMediaStrip({ drug }) {
         const fresh = typeof data === 'string' && data ? data : null
         const before = pictureRef.current
         lookedUpRef.current = drug.id
-        if (before !== fresh) {
+        // Same picture, new server (saved address from DawaaGate, answer now from
+        // our R2 copy, or back): keep showing the picture that is already on
+        // screen. Swapping it would hide it and bring it back, a visible flash.
+        // Only the saved address changes, so the next open uses the new server.
+        const sameFile = typeof before === 'string' && typeof fresh === 'string'
+          && pictureFile(before) === pictureFile(fresh)
+        if (before !== fresh && !sameFile) {
           setPicture(fresh)
           setImgState('loading')
           // Picture replaced or removed: drop the old saved file.
