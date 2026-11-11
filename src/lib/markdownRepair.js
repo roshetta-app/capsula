@@ -12,6 +12,10 @@
  *   - "•" style bullets
  *   - a bold-only line ("**Additional Notes:**") sharing a paragraph with the next line
  *   - lines that were typed one under the other (kept as separate lines)
+ *   - symbols switched off by a backslash at the start of a line, as Google Docs /
+ *     Word exports do:  \---   1\.   \-   \#   (the backslash is removed so the
+ *     divider line, numbered list, bullet or heading works again)
+ *   - table rows that have blank lines between them (joined into one table)
  *
  * It never touches: fenced code, ::: card marker lines, tables that are already
  * proper, indented lines, or any wording. Running it twice gives the same result.
@@ -31,6 +35,22 @@ const BOLD_ONLY = /^\s*(\*\*|__)(?!\s)[^*_]+?(?<!\s)\1\s*$/
 const DELIM_ROW = /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)+\|?\s*$/
 const UNESCAPED_PIPE = /(?<!\\)\|/
 
+// Google Docs / Word exports switch off markdown symbols at the start of a line with
+// a backslash: \--- , 1\. , \- , \# . Only these line-start cases are undone, so a
+// backslash in the middle of a sentence is never touched.
+const ESC_HR = /^(\s{0,3})\\(?=([-*_])(\s*\2){2,}\s*$)/
+const ESC_BULLET = /^(\s*)\\(?=[-*+]\s+\S)/
+const ESC_ORDERED = /^(\s*)(\d+)\\(?=[.)]\s+\S)/
+const ESC_HEADING = /^(\s{0,3})\\(?=#{1,6}\s)/
+
+function unescapeLine(line) {
+  return line
+    .replace(ESC_HR, '$1')
+    .replace(ESC_BULLET, '$1')
+    .replace(ESC_ORDERED, '$1$2')
+    .replace(ESC_HEADING, '$1')
+}
+
 function splitCells(line) {
   const t = line.trim().replace(/^\|/, '').replace(/(?<!\\)\|$/, '')
   return t.split(UNESCAPED_PIPE).map(c => c.trim())
@@ -47,6 +67,10 @@ function kindOf(line) {
   if (QUOTE.test(line)) return 'quote'
   if (BOLD_ONLY.test(line)) return 'title'
   return 'prose'
+}
+
+function isPipeRow(line) {
+  return kindOf(unescapeLine(line)) === 'prose' && UNESCAPED_PIPE.test(line) && !FENCE.test(line)
 }
 
 // Groups the lines into items: blank, card, heading, hr, list, quote, title, raw,
@@ -70,21 +94,30 @@ function toItems(lines) {
       continue
     }
 
-    const fixedLine = line.replace(BULLET_GLYPH, '$1- ')
+    const fixedLine = unescapeLine(line).replace(BULLET_GLYPH, '$1- ')
     const kind = kindOf(fixedLine)
     const pipey = (kind === 'prose') && UNESCAPED_PIPE.test(line)
 
     if (pipey) {
+      // collect pipe rows; blank lines between two pipe rows do not end the table
       const run = []
       let j = i
-      while (j < lines.length && kindOf(lines[j]) === 'prose' && UNESCAPED_PIPE.test(lines[j]) && !FENCE.test(lines[j])) {
-        run.push(lines[j])
-        j += 1
+      let end = i
+      while (j < lines.length) {
+        if (isPipeRow(lines[j])) {
+          run.push(lines[j])
+          j += 1
+          end = j
+        } else if (!lines[j].trim()) {
+          j += 1
+        } else {
+          break
+        }
       }
       const table = tableFromRun(run)
       if (table) {
         items.push({ kind: 'table', lines: table })
-        i = j
+        i = end
         continue
       }
     }
