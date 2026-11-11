@@ -24,6 +24,7 @@ import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react
 import { LayoutPanelTop } from 'lucide-react'
 import RichTextToolbar, { EMPTY_ACTIVE } from './RichTextToolbar'
 import { markdownToEditorHtml, editorToMarkdown, newCardHtml, padCards } from '../../../lib/richTextConvert'
+import { applyAutoDir } from '../../../lib/autoDir'
 import { DIRECTIVES } from '../../../lib/directiveRenderer'
 import { repairMarkdown } from '../../../lib/markdownRepair'
 
@@ -264,6 +265,7 @@ export default function RichTextEditorBox({ value, onChange, disabled = false, p
   const emit = useCallback(() => {
     const el = elRef.current
     if (!el) return
+    applyAutoDir(el)   // new lines typed or pasted get their own direction
     const md = editorToMarkdown(el)
     lastEmitted.current = md
     setEmpty(!md.trim())

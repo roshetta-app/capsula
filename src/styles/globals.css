@@ -642,13 +642,14 @@ body {
    Explicitly restore bullet and number markers so they render in .dir-prose. */
 .dir-prose ul {
   margin: 0 0 8px;
-  padding-inline-start: 20px;
+  /* room on BOTH sides: each item picks its own side from its language */
+  padding-inline: 20px;
   list-style-type: disc;
 }
 
 .dir-prose ol {
   margin: 0 0 8px;
-  padding-inline-start: 20px;
+  padding-inline: 20px;
   list-style-type: decimal;
 }
 
@@ -675,8 +676,8 @@ body {
 }
 
 .dir-prose blockquote {
-  border-left: 3px solid var(--color-border);
-  padding-left: 0.8em;
+  border-inline-start: 3px solid var(--color-border);
+  padding-inline-start: 0.8em;
   margin: 0 0 10px;
   color: var(--color-text-secondary);
 }
@@ -753,7 +754,7 @@ body {
 
 .dir-prose th {
   padding: 8px 12px;
-  text-align: left;
+  text-align: start;
   font-weight: 600;
   font-size: 12px;
   text-transform: uppercase;

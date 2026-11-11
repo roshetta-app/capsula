@@ -24,6 +24,7 @@
 
 import { marked } from 'marked'
 import { DIRECTIVES, renderDirectiveMarkdown } from './directiveRenderer'
+import { addAutoDir, applyAutoDir } from './autoDir'
 
 // ─── saved text -> editor HTML ───────────────────────────────────────────────
 
@@ -75,7 +76,7 @@ export function markdownToEditorHtml(raw) {
     html = html.replace(new RegExp(`<p>\\s*${key}\\s*</p>`, 'g'), () => cardHtml)
     html = html.replace(new RegExp(key, 'g'), () => cardHtml)
   })
-  return html
+  return addAutoDir(html)
 }
 
 // Makes sure the cursor can reach the spot before, between and after cards.
@@ -88,6 +89,7 @@ export function padCards(root) {
     if (!card.nextSibling || isCard(card.nextSibling)) root.insertBefore(blank(), card.nextSibling)
   }
   if (!root.firstChild) root.appendChild(blank())
+  applyAutoDir(root)
 }
 
 // Empty card HTML for the toolbar's "insert card" choice.

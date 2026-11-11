@@ -32,6 +32,7 @@
  */
 
 import { marked } from 'marked'
+import { addAutoDir } from './autoDir'
 
 // ─── Directive config ──────────────────────────────────────────────────────────
 
@@ -131,7 +132,8 @@ export function renderDirectiveMarkdown(raw) {
     html = html.replace(new RegExp(key, 'g'), cardHtml)
   })
 
-  return html
+  // every line gets its own direction (bullets / numbers follow the line's language)
+  return addAutoDir(html)
 }
 
 function escapeHtml(text) {
