@@ -636,6 +636,22 @@ body {
   margin-top: 0;
 }
 
+/* #### → track label inside a subsection: Mild / Severe, Adult / Child,
+   First line / Second line. Smaller than ### but clearly a heading. */
+.dir-prose h4 {
+  margin: var(--space-3) 0 var(--space-1);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  color: var(--color-text-primary);
+  unicode-bidi: plaintext;
+}
+
+.dir-prose h4:first-child {
+  margin-top: 0;
+}
+
 /* ─── Lists ───────────────────────────────────────────────────────────────────── */
 
 /* FIX: Tailwind v4 preflight resets list-style to none on all ul/ol.
