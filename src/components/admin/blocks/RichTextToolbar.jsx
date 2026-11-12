@@ -49,7 +49,7 @@
  */
 
 import { useState, useEffect, useLayoutEffect, useRef } from 'react'
-import { Bold, Italic, Underline, Palette, Type, Eraser, List, ListOrdered, Paintbrush, ClipboardPaste, Highlighter, Tag, Heading, Table, Minus, Undo2, Redo2, Pill } from 'lucide-react'
+import { Bold, Italic, Underline, Palette, Type, Eraser, List, ListOrdered, Paintbrush, ClipboardPaste, Highlighter, Tag, Heading, Table, Minus, Undo2, Redo2, Pill, Trash2 } from 'lucide-react'
 import { MoleculeIcon } from '../../drugs/classes/ClassIcons'
 import TextLinkPicker from './TextLinkPicker'
 import { drugLinkMarkdown, classLinkMarkdown, linkEditorHtml } from '../../../lib/textLinks'
@@ -707,7 +707,7 @@ const menuRowStyle = isActive => ({
   fontWeight: isActive ? 600 : 400,
 })
 
-export default function RichTextToolbar({ active = EMPTY_ACTIVE, onAction, disabled = false, painter, canUndo = false, canRedo = false }) {
+export default function RichTextToolbar({ active = EMPTY_ACTIVE, onAction, disabled = false, painter, canUndo = false, canRedo = false, canClear = false }) {
   const [menu, setMenu] = useState(null) // null | 'color' | 'size' | 'highlight' | 'badge' | 'heading' | 'list'
   const wrapRef = useRef(null)
   const [picker, setPicker] = useState(null) // null | 'drug' | 'class'  (the link pop-up)
@@ -819,12 +819,15 @@ export default function RichTextToolbar({ active = EMPTY_ACTIVE, onAction, disab
     >
       {/* Line 1: sections, left to right: History | Font | Paragraph | Insert | Format painter */}
       <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
-        {/* History */}
+        {/* History: undo, redo, clear all text */}
         <IconButton label="Undo (Ctrl+Z)" disabled={disabled || !canUndo} onClick={() => pick({ type: 'undo' })}>
           <Undo2 size={16} />
         </IconButton>
         <IconButton label="Redo" disabled={disabled || !canRedo} onClick={() => pick({ type: 'redo' })}>
           <Redo2 size={16} />
+        </IconButton>
+        <IconButton label="Clear all text (Undo brings it back)" disabled={disabled || !canClear} onClick={() => pick({ type: 'clearAll' })}>
+          <Trash2 size={16} />
         </IconButton>
 
         <Divider />

@@ -47,6 +47,7 @@
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { Sparkles, Check, ChevronDown, Pencil, Code2, Eye } from 'lucide-react'
 import { renderTitledMarkdown } from '../../../lib/directiveRenderer'
 import { fixDrugLinkNames } from '../../../lib/textLinks'
 import RichTextToolbar, { applyFormat, getActiveFormats, EMPTY_ACTIVE } from './RichTextToolbar'
@@ -61,138 +62,118 @@ import { fetchCmsConfig } from '../../../lib/queries'
 
 const MODES = ['Write', 'Code', 'Preview']
 
-function ModeToggle({ mode, onChange, modes = MODES }) {
+// 2026-11-12: the three views (Write, Code, Preview) sit behind one small button, and so
+// does Clean up formatting, which is rarely needed (pasting already tidies the text).
+function ViewMenu({ mode, onChange, onCleanUp, cleanUpDisabled, modes = MODES }) {
+  const [open, setOpen] = useState(false)
+  const Icon = { Write: Pencil, Code: Code2, Preview: Eye }[mode] ?? Pencil
+
+  const itemStyle = (active, disabled) => ({
+    display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left',
+    padding: '9px 14px', fontSize: 13, fontFamily: 'var(--font-body)',
+    fontWeight: active ? 600 : 400,
+    color: disabled ? 'var(--color-text-tertiary)' : 'var(--color-text-primary)',
+    backgroundColor: active ? 'var(--color-bg)' : 'transparent',
+    border: 'none', cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.6 : 1,
+  })
+
   return (
-    <div style={{
-      display: 'flex',
-      backgroundColor: 'var(--color-bg)',
-      border: '1px solid var(--color-border)',
-      borderRadius: 'var(--radius-md)',
-      padding: 2,
-      gap: 2,
-    }}>
-      {modes.map(m => {
-        const isActive = mode === m
-        return (
-          <button
-            key={m}
-            onClick={() => onChange(m)}
-            style={{
-              padding: '4px 12px',
-              fontSize: 12,
-              fontWeight: isActive ? 600 : 400,
-              fontFamily: 'var(--font-body)',
-              borderRadius: 'var(--radius-sm)',
-              border: 'none',
-              cursor: 'pointer',
-              backgroundColor: isActive ? 'var(--color-surface)' : 'transparent',
-              color: isActive ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-              boxShadow: isActive ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-              transition: 'all 0.12s ease',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {m}
-          </button>
-        )
-      })}
+    <div style={{ position: 'relative', flexShrink: 0 }}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        aria-label="View and tools"
+        title="Switch view, clean up formatting"
+        style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          height: 36, padding: '0 10px',
+          fontSize: 12, fontWeight: 500, fontFamily: 'var(--font-body)',
+          borderRadius: 'var(--radius-md)',
+          border: '1px solid var(--color-border)',
+          backgroundColor: 'var(--color-surface)',
+          color: 'var(--color-text-secondary)',
+          cursor: 'pointer', whiteSpace: 'nowrap',
+        }}
+      >
+        <Icon size={15} />
+        {mode}
+        <ChevronDown size={14} />
+      </button>
+      {open && (
+        <>
+          <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 49 }} />
+          <div style={{
+            position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 50,
+            minWidth: 210, overflow: 'hidden',
+            backgroundColor: 'var(--color-surface)',
+            border: '1.5px solid var(--color-border)',
+            borderRadius: 'var(--radius-lg)',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+          }}>
+            {modes.map(m => {
+              const MIcon = { Write: Pencil, Code: Code2, Preview: Eye }[m]
+              return (
+                <button key={m} type="button" style={itemStyle(mode === m, false)}
+                  onClick={() => { setOpen(false); onChange(m) }}>
+                  <MIcon size={15} />
+                  {m === 'Write' ? 'Write (visual)' : m === 'Code' ? 'Code (plain text)' : 'Preview (as in the app)'}
+                </button>
+              )
+            })}
+            <div style={{ height: 1, backgroundColor: 'var(--color-border)' }} />
+            <button type="button" disabled={cleanUpDisabled} style={itemStyle(false, cleanUpDisabled)}
+              title="Fix tables, lists and line spacing in this text"
+              onClick={() => { setOpen(false); onCleanUp() }}>
+              <Sparkles size={15} />
+              Clean up formatting
+            </button>
+          </div>
+        </>
+      )}
     </div>
   )
 }
 
-// ─── Copy AI Prompt button ─────────────────────────────────────────────────────
+// ─── AI prompt button ──────────────────────────────────────────────────────────
+// The first step of the usual workflow (copy the prompt, give it to the AI together with
+// the source text, paste the result here), so it has its own tinted button beside the title.
 
 // status: idle | loading | copied | error
 function CopyPromptButton({ onCopy, status }) {
   const label = {
-    idle:    '⚡ Copy AI Prompt',
+    idle:    'AI prompt',
     loading: 'Loading…',
-    copied:  '✓ Copied!',
-    error:   'Failed — try again',
-  }[status] ?? '⚡ Copy AI Prompt'
+    copied:  'Copied',
+    error:   'Failed, retry',
+  }[status] ?? 'AI prompt'
 
-  const color = {
-    idle:    'var(--color-text-secondary)',
-    loading: 'var(--color-text-tertiary)',
-    copied:  'var(--color-success)',
-    error:   'var(--color-danger)',
-  }[status] ?? 'var(--color-text-secondary)'
+  const tint = status === 'error' ? 'var(--color-danger)'
+    : status === 'copied' ? 'var(--color-success)'
+    : 'var(--color-accent)'
+  const Icon = status === 'copied' ? Check : Sparkles
 
   return (
     <button
+      type="button"
       onClick={onCopy}
+      title="Copy the AI formatting prompt. Give it to your AI together with the source text, then paste the result here."
       style={{
-        padding: '4px 10px',
-        fontSize: 11,
-        fontWeight: 500,
+        display: 'flex', alignItems: 'center', gap: 6,
+        height: 36, padding: '0 12px',
+        fontSize: 13, fontWeight: 600,
         fontFamily: 'var(--font-body)',
-        borderRadius: 'var(--radius-sm)',
-        border: '1px solid var(--color-border)',
+        borderRadius: 'var(--radius-md)',
+        border: `1px solid color-mix(in srgb, ${tint} 40%, transparent)`,
+        backgroundColor: `color-mix(in srgb, ${tint} 10%, transparent)`,
+        color: tint,
         cursor: status === 'loading' ? 'default' : 'pointer',
-        backgroundColor: 'var(--color-surface)',
-        color,
-        transition: 'color 0.15s',
         whiteSpace: 'nowrap',
+        flexShrink: 0,
         opacity: status === 'loading' ? 0.6 : 1,
       }}
     >
+      <Icon size={15} />
       {label}
-    </button>
-  )
-}
-
-// ─── Clean up formatting button ────────────────────────────────────────────────
-
-function CleanUpButton({ onClick, disabled }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      title="Fix tables, lists and line spacing in this text"
-      style={{
-        padding: '4px 10px',
-        fontSize: 11,
-        fontWeight: 500,
-        fontFamily: 'var(--font-body)',
-        borderRadius: 'var(--radius-sm)',
-        border: '1px solid var(--color-border)',
-        cursor: disabled ? 'default' : 'pointer',
-        backgroundColor: 'var(--color-surface)',
-        color: 'var(--color-text-secondary)',
-        whiteSpace: 'nowrap',
-        opacity: disabled ? 0.6 : 1,
-      }}
-    >
-      ✨ Clean up formatting
-    </button>
-  )
-}
-
-// ─── Clear all text button ─────────────────────────────────────────────────────
-
-function ClearButton({ onClick, disabled }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      title="Remove all the text in this block (you can undo)"
-      style={{
-        padding: '4px 10px',
-        fontSize: 11,
-        fontWeight: 500,
-        fontFamily: 'var(--font-body)',
-        borderRadius: 'var(--radius-sm)',
-        border: '1px solid var(--color-border)',
-        cursor: disabled ? 'default' : 'pointer',
-        backgroundColor: 'var(--color-surface)',
-        color: 'var(--color-text-secondary)',
-        whiteSpace: 'nowrap',
-        opacity: disabled ? 0.6 : 1,
-      }}
-    >
-      🗑 Clear
     </button>
   )
 }
@@ -410,6 +391,8 @@ export default function FreeTextPostEditor({ data, onChange, disabled = false })
     canRedo: hist.current.future.length > 0,
     undo: () => stepHistory('past', 'future'),
     redo: () => stepHistory('future', 'past'),
+    canClear: !disabled && markdown.trim().length > 0,
+    clearAll: handleClearAll,
   }
 
   // Fixes tables with no divider line, lists stuck under a paragraph, bullets, and
@@ -474,6 +457,7 @@ export default function FreeTextPostEditor({ data, onChange, disabled = false })
   // Applies one toolbar choice to the selected text (or the word at the cursor)
   // and keeps that text selected so the next choice builds on it.
   function runFormat(action) {
+    if (action.type === 'clearAll') { handleClearAll(); return }
     const el = textareaRef.current
     if (!el || disabled) return
     if (action.type === 'undo') { history.undo(); return }
@@ -534,31 +518,19 @@ export default function FreeTextPostEditor({ data, onChange, disabled = false })
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-      {/* Toolbar */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: 'var(--space-2)',
-        flexWrap: 'wrap',
-      }}>
-        <ModeToggle mode={viewMode} onChange={setMode} modes={MODES} />
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap', minWidth: 0 }}>
-          <span style={{
-            fontSize: 11,
-            color: 'var(--color-text-tertiary)',
-            fontFamily: 'var(--font-body)',
-          }}>
-            {charCount > 0 ? `${charCount.toLocaleString()} chars` : ''}
-          </span>
-          {viewMode !== 'Preview' && <CleanUpButton onClick={handleCleanUp} disabled={disabled || !markdown.trim()} />}
-          {viewMode !== 'Preview' && <ClearButton onClick={handleClearAll} disabled={disabled || !markdown.trim()} />}
-          <CopyPromptButton onCopy={handleCopyPrompt} status={copyStatus} />
+      {/* Title, the AI prompt button and the view menu */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+        <div style={{ flex: '1 1 160px', minWidth: 0 }}>
+          <TitleField value={title} onChange={val => onChange({ title: val })} disabled={disabled} />
         </div>
+        <CopyPromptButton onCopy={handleCopyPrompt} status={copyStatus} />
+        <ViewMenu
+          mode={viewMode}
+          onChange={setMode}
+          onCleanUp={handleCleanUp}
+          cleanUpDisabled={disabled || viewMode === 'Preview' || !markdown.trim()}
+        />
       </div>
-
-      {/* Title (optional) */}
-      <TitleField value={title} onChange={val => onChange({ title: val })} disabled={disabled} />
 
       {cleanNote && (
         <div style={{
@@ -619,7 +591,7 @@ export default function FreeTextPostEditor({ data, onChange, disabled = false })
       {viewMode === 'Code' && (
         <StickyBar>
           <RichTextToolbar active={active} onAction={runFormat} disabled={disabled}
-            canUndo={history.canUndo} canRedo={history.canRedo} />
+            canUndo={history.canUndo} canRedo={history.canRedo} canClear={history.canClear} />
         </StickyBar>
       )}
 
@@ -638,6 +610,12 @@ export default function FreeTextPostEditor({ data, onChange, disabled = false })
       {viewMode === 'Preview' && (
         <div className="rx-prose-tight">
           <PreviewPanel title={title} markdown={markdown} />
+        </div>
+      )}
+
+      {charCount > 0 && (
+        <div style={{ textAlign: 'right', fontSize: 11, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-body)' }}>
+          {charCount.toLocaleString()} chars
         </div>
       )}
     </div>

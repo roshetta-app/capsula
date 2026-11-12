@@ -435,6 +435,7 @@ export default function RichTextEditorBox({ value, onChange, disabled = false, h
     if (!el || disabled) return
     if (action.type === 'undo') { history?.undo(); return }
     if (action.type === 'redo') { history?.redo(); return }
+    if (action.type === 'clearAll') { history?.clearAll?.(); return }
     if (action.type === 'linkStart') {
       linkRangeRef.current = selectionRangeIn(el)?.cloneRange() ?? null
       return
@@ -684,7 +685,7 @@ export default function RichTextEditorBox({ value, onChange, disabled = false, h
       <StickyBar style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
         <div style={{ flex: '1 1 auto', minWidth: 0 }}>
           <RichTextToolbar active={active} onAction={runAction} disabled={disabled} painter={painter}
-            canUndo={!!history?.canUndo} canRedo={!!history?.canRedo} />
+            canUndo={!!history?.canUndo} canRedo={!!history?.canRedo} canClear={!!history?.canClear} />
         </div>
         <CardMenu onPick={insertCard} disabled={disabled} />
       </StickyBar>
