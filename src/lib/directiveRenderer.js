@@ -82,7 +82,7 @@ function stripLooseListParagraphs(html) {
  * Unknown directive types (including removed types like :::rx, :::info, :::note, :::success)
  * fall back to plain prose — prevents raw ::: text leaking into the rendered output.
  */
-export function renderDirectiveMarkdown(raw) {
+export function renderDirectiveMarkdown(raw, { wrapCardTables = false } = {}) {
   if (!raw?.trim()) return ''
 
   const blocks = {}
@@ -110,9 +110,16 @@ export function renderDirectiveMarkdown(raw) {
         marked.parse(body.trim(), { breaks: true, gfm: true })
       )
 
+      // On the app screen a card's table sits in its own sideways scroller: it fills the
+      // card when it fits and scrolls only when its content is really wider than the card.
+      // (The editor keeps plain tables, so saving and re-opening stays exact.)
+      const bodyHtml = wrapCardTables
+        ? innerHtml.replace(/<table>/g, '<div class="dir-table-wrap"><table>').replace(/<\/table>/g, '</table></div>')
+        : innerHtml
+
       const cardHtml = `<div class="dir-card ${cfg.cls}" dir="auto">
   <div class="dir-card-header">${labelText}</div>
-  ${innerHtml}</div>`
+  ${bodyHtml}</div>`
 
       const key = `DIRECTIVE_PLACEHOLDER_${counter++}_END`
       blocks[key] = cardHtml
@@ -150,5 +157,5 @@ function escapeHtml(text) {
 export function renderTitledMarkdown(title, markdown) {
   const t = (title ?? '').trim()
   const head = t ? `<div class="dir-title">${escapeHtml(t)}</div>` : ''
-  return head + renderDirectiveMarkdown(markdown ?? '')
+  return head + renderDirectiveMarkdown(markdown ?? '', { wrapCardTables: true })
 }
