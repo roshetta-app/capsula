@@ -617,12 +617,31 @@ body {
   box-decoration-break: clone;
   -webkit-tap-highlight-color: transparent;
 }
-.dir-prose a[href^="capsula:drug/"] {
+.dir-prose a[href^="capsula:drug/"],
+.dir-prose a[href^="capsula:generic/"] {
   color: var(--color-accent, #2563EB);
   background: color-mix(in srgb, var(--color-accent, #2563EB) 11%, transparent);
 }
-.dir-prose a[href^="capsula:drug/"] strong {
+.dir-prose a[href^="capsula:drug/"] strong,
+.dir-prose a[href^="capsula:generic/"] strong {
   font-weight: 700;
+}
+/* Generic link: the same blue chip as a brand link, plus a small filled "Generic" badge after the
+   name, so it is clear the tap opens the generic's page and not a brand. */
+.dir-prose a[href^="capsula:generic/"]::after {
+  content: "Generic";
+  display: inline-block;
+  margin-inline-start: 6px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--color-accent, #2563EB);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  line-height: 1.4;
+  text-transform: uppercase;
+  vertical-align: 1px;
 }
 .dir-prose a[href^="capsula:class/"],
 .dir-prose a[href^="capsula:family/"] {

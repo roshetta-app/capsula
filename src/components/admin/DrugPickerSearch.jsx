@@ -30,6 +30,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import SearchBar from '../ui/SearchBar'
 import SharedDrugCard from '../SharedDrugCard'
+import GenericPickerCard from './GenericPickerCard'
 import {
   SearchSwitchingState, TooShortState, EmptyState, DidYouMeanState,
 } from '../drugs/search/SearchStates'
@@ -91,6 +92,17 @@ export default function DrugPickerSearch({ mode = 'brand', onPick, uniqueBy = 'f
     [results, mode, uniqueBy],
   )
 
+  // Generic links: how many brands each generic has (brands counted by name, not by strength or form).
+  const brandCounts = useMemo(() => {
+    const sets = new Map()
+    for (const d of drugs ?? []) {
+      if (!d.genericId) continue
+      if (!sets.has(d.genericId)) sets.set(d.genericId, new Set())
+      sets.get(d.genericId).add(String(d.tradenameClean || d.name || d.id).toLowerCase())
+    }
+    return sets
+  }, [drugs])
+
   // Refresh by hand: a full download of the drug list.
   const [refreshing, setRefreshing] = useState(false)
   async function handleRefresh() {
@@ -123,7 +135,15 @@ export default function DrugPickerSearch({ mode = 'brand', onPick, uniqueBy = 'f
           {rows.length} result{rows.length !== 1 ? 's' : ''} for &quot;{query}&quot;
           {rows.length > MAX_ROWS && ' · type more to narrow'}
         </div>
-        {shown.map((drug, i) => (
+        {shown.map((drug, i) => (mode === 'generic' && uniqueBy === 'generic' ? (
+          <GenericPickerCard
+            key={drug.genericId ?? drug.id}
+            drug={drug}
+            brandCount={brandCounts.get(drug.genericId)?.size ?? 0}
+            onTap={() => onPick(drug)}
+            isLast={i === shown.length - 1}
+          />
+        ) : (
           <SharedDrugCard
             key={drug.id}
             drug={drug}
@@ -134,7 +154,7 @@ export default function DrugPickerSearch({ mode = 'brand', onPick, uniqueBy = 'f
             searchMode={mode}
             highlight={query}
           />
-        ))}
+        )))}
       </div>
     )
   }

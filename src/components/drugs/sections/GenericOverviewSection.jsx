@@ -462,8 +462,9 @@ const MOA_CLAMP_LINES = 3
 // How long the Mechanism of Action text takes to slide open or closed.
 const MOA_SLIDE_MS = 300
 
-// genericMode (2026-11-13, generic page): no brand lists anywhere, so the class and family rows
-// are plain text, and the brands sheets are not drawn.
+// genericMode (2026-11-13, generic page): the Active ingredient label and chip are not drawn.
+// 2026-11-13 (generic page, round 2): the Related drugs button, the class row and the family row
+// open the brand lists exactly as on the brand page.
 export default function GenericOverviewSection({ drug, siblings = [], alternatives = [], classDrugs = [], onSelectBrand, genericMode = false }) {
   const [brandsOpen, setBrandsOpen] = useState(false)
   // Which tab the brands sheet opens on: 'similar' or 'alternatives'.
@@ -605,6 +606,9 @@ export default function GenericOverviewSection({ drug, siblings = [], alternativ
     <div style={{ marginBottom: 'var(--space-5)' }}>
 
       {/* ── Block 1: Active Ingredients ─────────────────────────────────── */}
+      {/* 2026-11-13 (generic page): in generic mode the ingredient label and chip are not drawn
+          (the page title is already the generic name); only the Related drugs button stays,
+          and it lists this generic's brands. */}
       <div style={{ marginBottom: 'var(--space-4)' }}>
 
         {/* Top row: flask icon + "Active ingredient(s)" label + Available
@@ -616,18 +620,22 @@ export default function GenericOverviewSection({ drug, siblings = [], alternativ
           display:        'flex',
           alignItems:     'center',
           justifyContent: 'space-between',
-          marginBottom:   'var(--space-2)',
+          marginBottom:   genericMode ? 0 : 'var(--space-2)',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <FlaskConical size={12} color="var(--color-text-secondary)" />
-            <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-secondary)' }}>
-              Active ingredient{isCombo ? 's' : ''}
-            </span>
-          </div>
+          {genericMode
+            ? <span />
+            : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <FlaskConical size={12} color="var(--color-text-secondary)" />
+                <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-secondary)' }}>
+                  Active ingredient{isCombo ? 's' : ''}
+                </span>
+              </div>
+            )}
 
           {/* Always shown (2026-10-07): with nothing related, the sheet itself
               explains why. */}
-          {!genericMode && (
+          {(
             <button
               onClick={openRelated}
               onPointerDown={() => setSimilarBrandsPressed(true)}
@@ -663,7 +671,7 @@ export default function GenericOverviewSection({ drug, siblings = [], alternativ
         {/* Ingredient chip(s) — combo path truncates past 5 with the
             inline ChipToggle ("+N more" / "Show less"); single-ingredient
             path renders one chip, no toggle needed. */}
-        {isCombo
+        {genericMode ? null : isCombo
           ? <InlineTruncatedList
               items={ingredients.map(toTitleCase)}
               max={5}
@@ -752,7 +760,7 @@ export default function GenericOverviewSection({ drug, siblings = [], alternativ
           {subclass && (
             <CardRow
               label={subclass}
-              onClick={genericMode ? undefined : (subclassOpensFamily ? openFamily : openAlternatives)}
+              onClick={subclassOpensFamily ? openFamily : openAlternatives}
               ariaLabel={subclassOpensFamily ? `Show drugs in ${subclass}` : `Show alternatives in ${subclass}`}
               child={!!drugClass}
               kind="subclass"
@@ -779,7 +787,7 @@ export default function GenericOverviewSection({ drug, siblings = [], alternativ
         </div>
       )}
 
-      {!genericMode && <SimilarAlternativesSheet
+      {<SimilarAlternativesSheet
         isOpen={brandsOpen}
         onClose={() => setBrandsOpen(false)}
         siblings={siblings}
@@ -789,7 +797,7 @@ export default function GenericOverviewSection({ drug, siblings = [], alternativ
         onSelectBrand={onSelectBrand}
       />}
 
-      {drugClass && !genericMode && (
+      {drugClass && (
         <ClassSheet
           isOpen={classOpen}
           onClose={() => setClassOpen(false)}

@@ -8,7 +8,11 @@
  *   - no picture / Arabic name / Check price strip
  *   - no "See Available Brands", and the class and family rows are plain text
  *   - the Alternatives list is a list of OTHER GENERICS in the same class and family
- * Kept: active ingredient + mechanism, Uses, Dose, Side effects, Pregnancy, Contraindications,
+ * 2026-11-13 (round 2): the Active ingredient block at the top is gone (mechanism stays). A
+ * Related drugs button lists this generic's brands and a tap opens that brand's page. The class
+ * and family rows open the brand lists as on the brand page. "Other generics in this family" is
+ * a button under Dose that opens the list in place.
+ * Kept: mechanism, Uses, Dose, Side effects, Pregnancy, Contraindications,
  * Interactions, Pharmacology, Sources. All of those read generic-level data, so the sections
  * are the same components the brand page uses, fed with one brand of this generic as the
  * carrier of that data (the brand itself is never shown).
@@ -19,8 +23,8 @@
  */
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
-import { WifiOff, ChevronRight } from 'lucide-react'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
+import { WifiOff, ChevronRight, ChevronDown } from 'lucide-react'
 import DrugHeader from '../components/drugs/DrugHeader'
 import DrugDetailSheet from '../components/drugs/DrugDetailSheet'
 import BottomNav from '../components/BottomNav'
@@ -33,7 +37,6 @@ import ContraindicationsSection from '../components/drugs/sections/Contraindicat
 import DrugInteractionsSection from '../components/drugs/sections/DrugInteractionsSection'
 import PharmacologySection from '../components/drugs/sections/PharmacologySection'
 import SourcesSection from '../components/drugs/sections/SourcesSection'
-import { SectionHeader } from '../components/drugs/sections/sectionPrimitives'
 import { DrugDetailSkeleton } from './DrugDetailScreen'
 import { useDrugContext } from '../context/DrugContext'
 import { useCategories } from '../hooks/useCategories'
@@ -43,6 +46,19 @@ import { resolveToken, FALLBACK_TOKEN } from '../utils/specialtyTokens'
 import { toTitleCase } from '../utils/drugTitleFormat'
 import { logUsageEvent } from '../analytics/usageEvents'
 import { ROUTES } from '../router'
+
+// Same two lists the brand page builds for its sheets (DrugDetailScreen: findAlternatives and
+// findClassDrugs): the brands of the other generics in this class AND family, and every brand in
+// the class. Kept here as copies so the brand page file stays as it is.
+function findAlternatives(drugs, drug) {
+  if (!drug || !drug.class || !drug.subclass) return []
+  return drugs.filter(d =>
+    d.genericId !== drug.genericId && d.class === drug.class && d.subclass === drug.subclass)
+}
+function findClassDrugs(drugs, drug) {
+  if (!drug || !drug.class) return []
+  return drugs.filter(d => d.class === drug.class)
+}
 
 // Other generics in the same class AND family as this one (one row per generic).
 function findOtherGenerics(drugs, drug) {
@@ -59,29 +75,50 @@ function findOtherGenerics(drugs, drug) {
 }
 
 function OtherGenerics({ list, onOpen }) {
+  const [open, setOpen] = useState(false)
   if (list.length === 0) return null
   return (
     <div style={{ marginBottom: 'var(--space-5)' }}>
-      <SectionHeader title="Other generics in this family" />
-      <div style={{ display: 'flex', flexDirection: 'column' }}>
-        {list.map(d => (
-          <button
-            key={d.genericId}
-            type="button"
-            onClick={() => onOpen(d.genericSlug)}
-            style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
-              padding: '12px 0', background: 'none', border: 'none',
-              borderBottom: '0.5px solid var(--color-border)', cursor: 'pointer',
-              textAlign: 'start', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600,
-              color: 'var(--color-text-primary)', WebkitTapHighlightColor: 'transparent',
-            }}
-          >
-            <span>{toTitleCase(d.genericName)}</span>
-            <ChevronRight size={16} color="var(--color-text-tertiary)" />
-          </button>
-        ))}
-      </div>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        aria-expanded={open}
+        style={{
+          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+          padding: '12px 14px', borderRadius: 'var(--radius-md)',
+          border: '0.5px solid var(--color-border)', background: 'var(--color-accent-light)',
+          cursor: 'pointer', textAlign: 'start', fontFamily: 'var(--font-body)',
+          fontSize: 14, fontWeight: 600, color: 'var(--color-accent)',
+          WebkitTapHighlightColor: 'transparent',
+        }}
+      >
+        <span>Other generics in this family ({list.length})</span>
+        <ChevronDown
+          size={16}
+          style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform var(--motion-fast) var(--ease-settle)' }}
+        />
+      </button>
+      {open && (
+        <div style={{ display: 'flex', flexDirection: 'column', marginTop: 'var(--space-1)' }}>
+          {list.map(d => (
+            <button
+              key={d.genericId}
+              type="button"
+              onClick={() => onOpen(d.genericSlug)}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+                padding: '12px 4px', background: 'none', border: 'none',
+                borderBottom: '0.5px solid var(--color-border)', cursor: 'pointer',
+                textAlign: 'start', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600,
+                color: 'var(--color-text-primary)', WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              <span>{toTitleCase(d.genericName)}</span>
+              <ChevronRight size={16} color="var(--color-text-tertiary)" />
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -111,6 +148,7 @@ function Message({ icon, title, text, actionLabel, onAction }) {
 export default function GenericDetailScreen() {
   const { slug } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
   useDeepLinkParent('/drugs')
 
   const { drugs, loading, error, retry } = useDrugContext()
@@ -121,6 +159,55 @@ export default function GenericDetailScreen() {
     () => findOtherGenerics(drugs, drug),
     [drugs, drug?.genericId, drug?.class, drug?.subclass], // eslint-disable-line react-hooks/exhaustive-deps
   )
+
+  // The brands of this generic (all of them: the carrier brand is never singled out), the brands of
+  // the other generics in the same family, and everything in the same class. Same rules as the brand page.
+  const siblings = useMemo(
+    () => (drug ? drugs.filter(d => d.genericId === drug.genericId) : []),
+    [drugs, drug?.genericId], // eslint-disable-line react-hooks/exhaustive-deps
+  )
+  const alternatives = useMemo(
+    () => findAlternatives(drugs, drug),
+    [drugs, drug?.genericId, drug?.class, drug?.subclass], // eslint-disable-line react-hooks/exhaustive-deps
+  )
+  const classDrugs = useMemo(
+    () => findClassDrugs(drugs, drug),
+    [drugs, drug?.class], // eslint-disable-line react-hooks/exhaustive-deps
+  )
+
+  // Tapping a brand in a sheet opens that brand's page. Same history handling as the brand page, so
+  // Back from the brand page returns here (see DrugDetailScreen, handleAlternativeTap).
+  // The page change waits for the sheet to finish closing, so it runs in an effect after a tap. The
+  // tap is kept in a ref and the effect is woken by a counter, so the effect never sets state itself.
+  const pendingNavRef = useRef(null)
+  const [navTick, setNavTick] = useState(0)
+  function handleBrandTap(item) {
+    const hadSheetPlaceholder = !!window.history.state?.capsulaBackClose
+    const alreadyHop          = !!location.state?.relatedHop
+    const mode = hadSheetPlaceholder
+      ? (alreadyHop ? 'pop-replace' : 'replace')
+      : (alreadyHop ? 'replace' : 'push')
+    pendingNavRef.current = { slug: item.slug || item.id, mode }
+    setNavTick(t => t + 1)
+  }
+  useEffect(() => {
+    const pending = pendingNavRef.current
+    if (!pending) return undefined
+    pendingNavRef.current = null
+    const to   = ROUTES.DRUG_DETAIL(pending.slug)
+    const opts = { state: { relatedHop: true } }
+    if (pending.mode === 'pop-replace') {
+      function onPop() {
+        window.removeEventListener('popstate', onPop)
+        navigate(to, { ...opts, replace: true })
+      }
+      window.addEventListener('popstate', onPop)
+      window.history.back()
+      return () => window.removeEventListener('popstate', onPop)
+    }
+    navigate(to, { ...opts, replace: pending.mode === 'replace' })
+    return undefined
+  }, [navTick]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (drug) logUsageEvent('drug_view', drug.genericId ?? drug.id, drug.genericName ?? slug)
@@ -177,16 +264,23 @@ export default function GenericDetailScreen() {
 
         <DrugDetailSheet resetKey={drug.genericId}>
           <div style={{ paddingTop: 'var(--space-5)', paddingBottom: 'var(--space-12)' }}>
-            <GenericOverviewSection drug={drug} genericMode />
+            <GenericOverviewSection
+              drug={drug}
+              genericMode
+              siblings={siblings}
+              alternatives={alternatives}
+              classDrugs={classDrugs}
+              onSelectBrand={handleBrandTap}
+            />
             <UsesSection drug={drug} colors={colors} isDark={isDark} />
-            <DoseSection drug={drug} />
+            <DoseSection key={drug.genericId} drug={drug} />
+            <OtherGenerics list={others} onOpen={s => navigate(ROUTES.GENERIC_DETAIL(s))} />
             <SideEffectsSection drug={drug} />
             <PregnancySection drug={drug} />
             <ContraindicationsSection drug={drug} />
             <DrugInteractionsSection drug={drug} />
             <PharmacologySection drug={drug} />
             <SourcesSection drug={drug} />
-            <OtherGenerics list={others} onOpen={s => navigate(ROUTES.GENERIC_DETAIL(s))} />
           </div>
         </DrugDetailSheet>
       </div>
