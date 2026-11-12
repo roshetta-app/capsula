@@ -17,6 +17,7 @@
  *   classLinkMarkdown(className, family?)  saved text for a class or a family
  *   linkEditorHtml(markdown)               the same link as the editing box shows it
  *   parseTextLink(href)                    what a saved link points at, or null
+ *   fixDrugLinkNames(html)                 shows drug names in a link with capital first letters
  *   resolveTextLinks(html, drugs)          for the app screen: a link whose drug,
  *                                          class or family no longer exists becomes
  *                                          plain text (the look stays, the tap goes)
@@ -96,6 +97,14 @@ export function textLinkTargetExists(link, drugs) {
   if (link.kind === 'class')  return list.some(d => d.class === link.className)
   if (link.kind === 'family') return list.some(d => d.class === link.className && d.subclass === link.familyName)
   return false
+}
+
+// Drug names in links saved before the capital-letter rule (or typed by hand) are shown the
+// same way as the drug block shows brand names, whatever was saved. Names only, nothing else.
+const DRUG_NAME_RE = /(<a\s+href="capsula:drug\/[^"]*"[^>]*>\s*<strong>)([^<]*)(<\/strong>)/g
+export function fixDrugLinkNames(html) {
+  if (!html || !html.includes('capsula:drug/')) return html
+  return html.replace(DRUG_NAME_RE, (_m, open, name, close) => `${open}${toTitleCase(name)}${close}`)
 }
 
 const LINK_RE = /<a\s+href="(capsula:[^"]*)"[^>]*>([\s\S]*?)<\/a>/g

@@ -609,6 +609,10 @@ body {
   text-decoration: none;
   padding: 1px 6px;
   border-radius: 6px;
+  /* names are English: keep each link left to right (icon on the left, strength after the name)
+     even inside Arabic text, and as one unit for the text around it */
+  direction: ltr;
+  unicode-bidi: isolate;
   -webkit-box-decoration-break: clone;
   box-decoration-break: clone;
   -webkit-tap-highlight-color: transparent;
