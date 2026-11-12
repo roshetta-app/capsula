@@ -90,17 +90,17 @@ function ClassPickerSearch({ onPick }) {
 
 // The "name only" choice is remembered while the page stays open, so several drugs in a row
 // can be added the same way.
-let rememberNameOnly = false
-let rememberGeneric = false   // Brand / Generic choice, remembered the same way
+const remembered = { nameOnly: false, generic: false }   // Brand / Generic choice too
+function remember(key, value) { remembered[key] = value }
 
 export default function TextLinkPicker({ kind, onClose, onPick }) {
   // A fresh search every time the pop-up opens.
   const [openCount, setOpenCount] = useState(0)
-  const [nameOnly, setNameOnly] = useState(rememberNameOnly)
-  const [generic, setGeneric] = useState(rememberGeneric)
+  const [nameOnly, setNameOnly] = useState(remembered.nameOnly)
+  const [generic, setGeneric] = useState(remembered.generic)
   useEffect(() => { if (kind) setOpenCount(n => n + 1) }, [kind])
-  function toggleNameOnly(v) { rememberNameOnly = v; setNameOnly(v) }
-  function chooseGeneric(v) { rememberGeneric = v; setGeneric(v) }
+  function toggleNameOnly(v) { remember('nameOnly', v); setNameOnly(v) }
+  function chooseGeneric(v) { remember('generic', v); setGeneric(v) }
 
   if (!kind) return null
   const title = kind === 'drug' ? 'Link a drug' : 'Link a class or drug family'
@@ -124,17 +124,17 @@ export default function TextLinkPicker({ kind, onClose, onPick }) {
               >{label}</button>
             ))}
           </div>
-          <label style={{
+          {!generic && <label style={{
             display: 'flex', alignItems: 'center', gap: 8, margin: '0 0 var(--space-3)', fontSize: 13,
             fontFamily: 'var(--font-body)', color: 'var(--color-text-primary)', cursor: 'pointer',
           }}>
             <input type="checkbox" checked={nameOnly} onChange={e => toggleNameOnly(e.target.checked)} />
             Name only (leave out the strength and form)
-          </label>
+          </label>}
         </>
       )}
       {kind === 'drug'
-        ? <DrugPickerSearch key={`${openCount}-${generic ? 'g' : 'b'}`} mode={generic ? 'generic' : 'brand'} onPick={drug => onPick(drug, { nameOnly, generic })} />
+        ? <DrugPickerSearch key={`${openCount}-${generic ? 'g' : 'b'}`} mode={generic ? 'generic' : 'brand'} uniqueBy={generic ? 'generic' : 'formulation'} onPick={drug => onPick(drug, { nameOnly, generic })} />
         : <ClassPickerSearch key={openCount} onPick={onPick} />}
     </Modal>,
     document.body,

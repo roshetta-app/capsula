@@ -73,6 +73,10 @@ export default function FreeTextPostBlock({ block }) {
       realNavigate(`/drugs/${link.slug}`)
       return
     }
+    if (link.kind === 'generic') {
+      realNavigate(`/drugs/generic/${link.slug}`)
+      return
+    }
     setClassTarget({ className: link.className, familyName: link.kind === 'family' ? link.familyName : null })
     setClassOpen(true)
   }

@@ -462,7 +462,9 @@ const MOA_CLAMP_LINES = 3
 // How long the Mechanism of Action text takes to slide open or closed.
 const MOA_SLIDE_MS = 300
 
-export default function GenericOverviewSection({ drug, siblings = [], alternatives = [], classDrugs = [], onSelectBrand }) {
+// genericMode (2026-11-13, generic page): no brand lists anywhere, so the class and family rows
+// are plain text, and the brands sheets are not drawn.
+export default function GenericOverviewSection({ drug, siblings = [], alternatives = [], classDrugs = [], onSelectBrand, genericMode = false }) {
   const [brandsOpen, setBrandsOpen] = useState(false)
   // Which tab the brands sheet opens on: 'similar' or 'alternatives'.
   const [sheetTab, setSheetTab] = useState('similar')
@@ -625,7 +627,7 @@ export default function GenericOverviewSection({ drug, siblings = [], alternativ
 
           {/* Always shown (2026-10-07): with nothing related, the sheet itself
               explains why. */}
-          {(
+          {!genericMode && (
             <button
               onClick={openRelated}
               onPointerDown={() => setSimilarBrandsPressed(true)}
@@ -750,7 +752,7 @@ export default function GenericOverviewSection({ drug, siblings = [], alternativ
           {subclass && (
             <CardRow
               label={subclass}
-              onClick={subclassOpensFamily ? openFamily : openAlternatives}
+              onClick={genericMode ? undefined : (subclassOpensFamily ? openFamily : openAlternatives)}
               ariaLabel={subclassOpensFamily ? `Show drugs in ${subclass}` : `Show alternatives in ${subclass}`}
               child={!!drugClass}
               kind="subclass"
@@ -777,7 +779,7 @@ export default function GenericOverviewSection({ drug, siblings = [], alternativ
         </div>
       )}
 
-      <SimilarAlternativesSheet
+      {!genericMode && <SimilarAlternativesSheet
         isOpen={brandsOpen}
         onClose={() => setBrandsOpen(false)}
         siblings={siblings}
@@ -785,9 +787,9 @@ export default function GenericOverviewSection({ drug, siblings = [], alternativ
         alternatives={alternatives}
         initialTab={sheetTab}
         onSelectBrand={onSelectBrand}
-      />
+      />}
 
-      {drugClass && (
+      {drugClass && !genericMode && (
         <ClassSheet
           isOpen={classOpen}
           onClose={() => setClassOpen(false)}

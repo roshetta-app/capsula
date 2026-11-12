@@ -257,7 +257,9 @@ function edgeFadeStyle(fade) {
 }
 
 
-export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, onAddToGroup, category, colors }) {
+// genericMode (2026-11-13, generic page): the generic's name is the title; no brand name, no
+// strength line, no heart, no Add to group and no Share (they all belong to a brand).
+export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, onAddToGroup, category, colors, genericMode = false }) {
   const backLabel = useBackLabel()
   const brandFade  = useEdgeFade(drug.id)
   const suffixFade = useEdgeFade(drug.id)
@@ -419,7 +421,7 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, on
                 <FolderPlus size={20} strokeWidth={2} />
               </button>
             )}
-            <button
+            {!genericMode && <button
               onClick={handleShare}
               {...shareHandlers}
               aria-label="Share this drug"
@@ -433,7 +435,7 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, on
               }}
             >
               <Share2 size={20} strokeWidth={2} />
-            </button>
+            </button>}
           </div>
         </div>
 
@@ -470,7 +472,7 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, on
                   fontSize: 20, fontWeight: 700, color: 'var(--color-text-primary)',
                   lineHeight: 1.2,
                 }}>
-                  {toTitleCase(drug.tradenameClean)}
+                  {toTitleCase(genericMode ? drug.genericName : drug.tradenameClean)}
                 </span>
               </div>
 
@@ -481,7 +483,7 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, on
                 edge-fade + horizontal-scroll treatment as the brand-name line
                 above, reusing the same hook. Whole row hidden if there's no
                 suffix to show. */}
-            {titleSuffix && (
+            {titleSuffix && !genericMode && (
               <div
                 ref={suffixFade.ref}
                 onScroll={suffixFade.onScroll}
@@ -502,12 +504,12 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, on
               </div>
             )}
           </div>
-          <FavouriteHeart
+          {!genericMode && <FavouriteHeart
             active={isFavourited}
             onToggle={onToggleFav}
             size={28}
             style={{ margin: '-10px -8px -10px 0' }}
-          />
+          />}
         </div>
 
       </div>

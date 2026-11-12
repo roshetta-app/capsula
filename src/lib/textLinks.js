@@ -6,6 +6,7 @@
  *
  * How a link is saved (a normal link in the text, so old text is not affected):
  *   drug    [**Panadol** <span class="rt-s-sm rt-c-gray">500mg - Tab.</span>](capsula:drug/<brand slug>)
+ *   generic [**Paracetamol**](capsula:generic/<generic slug>)   opens the generic's own page
  *   class   [Statins](capsula:class/<class name>)
  *   family  [Statins](capsula:family/<class name>/<family name>)
  * Names are written with percent-codes so spaces, commas and brackets are safe.
@@ -27,6 +28,7 @@ import { marked } from 'marked'
 import { getSheetDrugSuffix, toTitleCase } from '../utils/drugTitleFormat'
 
 export const DRUG_PREFIX   = 'capsula:drug/'
+export const GENERIC_PREFIX = 'capsula:generic/'
 export const CLASS_PREFIX  = 'capsula:class/'
 export const FAMILY_PREFIX = 'capsula:family/'
 
@@ -45,9 +47,14 @@ function safeLabel(s) {
 }
 
 // nameOnly: just the drug name (Doliprane), without its strength and form (1g - Tab.).
-// generic: the link shows the generic name (Paracetamol) instead of the brand name; it still
-// opens the picked drug's page, the same as tapping a generic result on the Drugs screen.
+// generic: a link to the generic's own page, shown with the generic name (Paracetamol) only.
 export function drugLinkMarkdown(drug, { nameOnly = false, generic = false } = {}) {
+  // A generic link points at the generic's own page (no brand, no strength or form).
+  if (generic) {
+    const gslug = drug?.genericSlug
+    const gname = toTitleCase(safeLabel(drug?.genericName || drug?.generic))
+    return gslug && gname ? `[**${gname}**](${GENERIC_PREFIX}${enc(gslug)})` : ''
+  }
   const slug = drug?.slug || drug?.id
   // first letter of each word capital, the same as the drug block shows brand names
   const rawName = generic
@@ -84,6 +91,10 @@ export function parseTextLink(href) {
     const slug = dec(h.slice(DRUG_PREFIX.length))
     return slug ? { kind: 'drug', slug } : null
   }
+  if (h.startsWith(GENERIC_PREFIX)) {
+    const slug = dec(h.slice(GENERIC_PREFIX.length))
+    return slug ? { kind: 'generic', slug } : null
+  }
   if (h.startsWith(FAMILY_PREFIX)) {
     const [c, f] = h.slice(FAMILY_PREFIX.length).split('/')
     return c && f ? { kind: 'family', className: dec(c), familyName: dec(f) } : null
@@ -100,6 +111,7 @@ export function textLinkTargetExists(link, drugs) {
   if (!link) return false
   const list = drugs ?? []
   if (link.kind === 'drug')   return list.some(d => d.slug === link.slug || d.id === link.slug)
+  if (link.kind === 'generic') return list.some(d => d.genericSlug === link.slug)
   if (link.kind === 'class')  return list.some(d => d.class === link.className)
   if (link.kind === 'family') return list.some(d => d.class === link.className && d.subclass === link.familyName)
   return false
@@ -107,9 +119,9 @@ export function textLinkTargetExists(link, drugs) {
 
 // Drug names in links saved before the capital-letter rule (or typed by hand) are shown the
 // same way as the drug block shows brand names, whatever was saved. Names only, nothing else.
-const DRUG_NAME_RE = /(<a\s+href="capsula:drug\/[^"]*"[^>]*>\s*<strong>)([^<]*)(<\/strong>)/g
+const DRUG_NAME_RE = /(<a\s+href="capsula:(?:drug|generic)\/[^"]*"[^>]*>\s*<strong>)([^<]*)(<\/strong>)/g
 export function fixDrugLinkNames(html) {
-  if (!html || !html.includes('capsula:drug/')) return html
+  if (!html || !(html.includes('capsula:drug/') || html.includes('capsula:generic/'))) return html
   return html.replace(DRUG_NAME_RE, (_m, open, name, close) => `${open}${toTitleCase(name)}${close}`)
 }
 

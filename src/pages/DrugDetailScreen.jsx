@@ -153,7 +153,7 @@ function shimmer(extra = {}) {
 
 const SKELETON_SECTION_COUNT = 6
 
-function DrugDetailSkeleton() {
+export function DrugDetailSkeleton() {
   return (
     <div style={{
       height:          '100dvh',

@@ -66,6 +66,7 @@ import DrugGroupsScreen      from './pages/DrugGroupsScreen'
 import AddDrugsToGroupScreen from './pages/AddDrugsToGroupScreen'
 import SharedGroupScreen     from './pages/SharedGroupScreen'
 import DrugDetailScreen      from './pages/DrugDetailScreen'
+import GenericDetailScreen   from './pages/GenericDetailScreen'
 import FavouritesScreen      from './pages/FavouritesScreen'
 import AccountScreen         from './pages/AccountScreen'
 import AccountEditScreen     from './pages/AccountEditScreen'
@@ -118,6 +119,7 @@ export const ROUTES = {
   // from a share link. No sign-in needed.
   SHARED_GROUP:          (code) => `/g/${code}`,
   DRUG_DETAIL:       (slug) => `/drugs/${slug}`,
+  GENERIC_DETAIL:    (slug) => `/drugs/generic/${slug}`,
   FAVOURITES:        '/favourites',
   ACCOUNT:           '/account',
   ACCOUNT_EDIT:      '/account/edit',
@@ -178,6 +180,7 @@ export function PublicRoutes() {
           back-arrow header, no BottomNav) — see file header note above. */}
       <Route path="/conditions/:slug"    element={<ConditionDetailScreen />} />
       <Route path="/drugs/:slug"                   element={<DrugDetailScreen />} />
+      <Route path="/drugs/generic/:slug"           element={<GenericDetailScreen />} />
       <Route path="/g/:code"                       element={<SharedGroupScreen />} />
       <Route path="/account/edit"        element={<AccountEditScreen />} />
       <Route path="/account/faq"         element={<AccountFaqScreen />} />

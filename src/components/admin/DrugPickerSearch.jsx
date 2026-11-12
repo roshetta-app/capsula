@@ -44,11 +44,11 @@ const MAX_ROWS = 100
 
 // Generic mode can list the same formulation once per brand; the admin picks a formulation, so
 // keep the first row of each.
-function oneRowPerFormulation(list) {
+function oneRowPerFormulation(list, byGeneric = false) {
   const seen = new Set()
   const out = []
   for (const d of list) {
-    const key = d.formulationId ?? d.id
+    const key = byGeneric ? (d.genericId ?? d.id) : (d.formulationId ?? d.id)
     if (seen.has(key)) continue
     seen.add(key)
     out.push(d)
@@ -61,7 +61,8 @@ const hintStyle = {
   color: 'var(--color-text-tertiary)',
 }
 
-export default function DrugPickerSearch({ mode = 'brand', onPick }) {
+// uniqueBy 'generic' (generic links): one row per generic, not per formulation.
+export default function DrugPickerSearch({ mode = 'brand', onPick, uniqueBy = 'formulation' }) {
   const { drugs, loading: drugsLoading, refresh } = useDrugContext()
   const { categories } = useCategories()
   const inputRef = useRef(null)
@@ -86,8 +87,8 @@ export default function DrugPickerSearch({ mode = 'brand', onPick }) {
   }, [searchPending])
 
   const rows = useMemo(
-    () => (mode === 'generic' ? oneRowPerFormulation(results) : results),
-    [results, mode],
+    () => (mode === 'generic' ? oneRowPerFormulation(results, uniqueBy === 'generic') : results),
+    [results, mode, uniqueBy],
   )
 
   // Refresh by hand: a full download of the drug list.
