@@ -353,10 +353,7 @@ export default function FreeTextPostEditor({ data, onChange, disabled = false })
     const el = textareaRef.current
     if (!el || document.activeElement !== el) return
     const next = getActiveFormats(el.value, el.selectionStart, el.selectionEnd)
-    setActive(prev => (
-      prev.b === next.b && prev.i === next.i && prev.u === next.u &&
-      prev.color === next.color && prev.size === next.size ? prev : next
-    ))
+    setActive(prev => (Object.keys(next).every(k => prev[k] === next[k]) ? prev : next))
   }, [])
 
   useEffect(() => {

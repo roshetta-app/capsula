@@ -11,6 +11,9 @@
  *   italic     _text_
  *   underline  <u>text</u>
  *   color      <span class="rt-c-red">text</span>   (fixed set, see COLORS)
+ *   highlight  <span class="rt-h-yellow">text</span>  (see HIGHLIGHTS)
+ *   badge      <span class="rt-b-red">text</span>     (see COLORS, shown as a small tag)
+ *   heading    ## / ### / #### at the start of the line
  *   size       <span class="rt-s-lg">text</span>    (small / large, see SIZES)
  * The classes are styled in globals.css, with light and dark mode values.
  *
@@ -26,6 +29,11 @@
  *   { type: 'size',   value: 'sm' | 'lg' | null }   (null = normal)
  *   { type: 'clear' }
  *   { type: 'list' }                                      (bullet list on the selected lines, toggles)
+ *   { type: 'olist' }                                     (numbered list on the selected lines, toggles)
+ *   { type: 'highlight', value: 'yellow' | 'green' | 'blue' | 'pink' | null }   (highlighter, null = off)
+ *   { type: 'badge',     value: 'red' | ... | null }      (small coloured tag, null = off)
+ *   { type: 'heading',   value: 2 | 3 | 4 | null }        (heading level of the line, null = normal text)
+ *   { type: 'table' }                                     (adds a small table after the current line)
  *   { type: 'copyFormat' }                                (remember the look of the selected text)
  *   { type: 'pasteFormat' }                               (give the selected text that look)
  *
@@ -34,7 +42,7 @@
  */
 
 import { useState, useEffect, useLayoutEffect, useRef } from 'react'
-import { Bold, Italic, Underline, Palette, Type, Eraser, List, Paintbrush, ClipboardPaste } from 'lucide-react'
+import { Bold, Italic, Underline, Palette, Type, Eraser, List, ListOrdered, Paintbrush, ClipboardPaste, Highlighter, Tag, Heading, Table } from 'lucide-react'
 
 // ─── Choices ───────────────────────────────────────────────────────────────────
 
@@ -45,6 +53,20 @@ export const COLORS = [
   { key: 'blue',   label: 'Blue',   hex: '#2563EB' },
   { key: 'purple', label: 'Purple', hex: '#7C3AED' },
   { key: 'gray',   label: 'Gray',   hex: '#6B7280' },
+]
+
+export const HIGHLIGHTS = [
+  { key: 'yellow', label: 'Yellow', hex: '#FACC15' },
+  { key: 'green',  label: 'Green',  hex: '#4ADE80' },
+  { key: 'blue',   label: 'Blue',   hex: '#60A5FA' },
+  { key: 'pink',   label: 'Pink',   hex: '#F472B6' },
+]
+
+export const HEADINGS = [
+  { level: 2, label: 'Heading' },
+  { level: 3, label: 'Sub-heading' },
+  { level: 4, label: 'Pill label' },
+  { level: null, label: 'Normal text' },
 ]
 
 export const SIZES = [
@@ -62,10 +84,12 @@ function describePainter(f) {
   if (f.u) parts.push('Underline')
   if (f.color) parts.push(COLORS.find(c => c.key === f.color)?.label ?? f.color)
   if (f.size) parts.push(SIZES.find(z => z.key === f.size)?.label ?? f.size)
+  if (f.highlight) parts.push(`${HIGHLIGHTS.find(h => h.key === f.highlight)?.label ?? f.highlight} highlight`)
+  if (f.badge) parts.push(`${COLORS.find(c => c.key === f.badge)?.label ?? f.badge} badge`)
   return parts.length ? parts.join(' · ') : 'Normal text'
 }
 
-export const EMPTY_ACTIVE = { b: false, i: false, u: false, color: null, size: null, list: false }
+export const EMPTY_ACTIVE = { b: false, i: false, u: false, color: null, size: null, highlight: null, badge: null, list: false, olist: false, heading: null }
 
 // ─── Formatting engine ─────────────────────────────────────────────────────────
 
@@ -77,6 +101,8 @@ const TOKENS = [
   { id: 'u', o: '<u>',                         c: '<\\/u>' },
   { id: 'c', o: '<span class="rt-c-[a-z]+">',  c: '<\\/span>' },
   { id: 's', o: '<span class="rt-s-[a-z]+">',  c: '<\\/span>' },
+  { id: 'hl', o: '<span class="rt-h-[a-z]+">',  c: '<\\/span>' },
+  { id: 'bd', o: '<span class="rt-b-[a-z]+">',  c: '<\\/span>' },
 ].map(t => ({
   ...t,
   reOpenEnd:    new RegExp(t.o + '$'),
@@ -93,6 +119,8 @@ function wrapperFor(action) {
     return ['<u>', '</u>']
   }
   if (action.type === 'color') return [`<span class="rt-c-${action.value}">`, '</span>']
+  if (action.type === 'highlight') return [`<span class="rt-h-${action.value}">`, '</span>']
+  if (action.type === 'badge') return [`<span class="rt-b-${action.value}">`, '</span>']
   return [`<span class="rt-s-${action.value}">`, '</span>']
 }
 
@@ -123,7 +151,7 @@ function peelOutside(value, a, b) {
 }
 
 function ambiguousInside(tok, inner) {
-  if (tok.id === 'c' || tok.id === 's') {
+  if (tok.id === 'c' || tok.id === 's' || tok.id === 'hl' || tok.id === 'bd') {
     const opens = (inner.match(/<span /g) || []).length
     const closes = (inner.match(/<\/span>/g) || []).length
     return opens !== closes
@@ -222,6 +250,7 @@ function applyEdits(value, edits) {
 // line already is a bullet the bullets come off; otherwise every line becomes
 // a bullet (a numbered line is turned into a bullet).
 const BULLET_RE = /^(\s*)[-*+]\s+/
+const NUMBER_RE = /^(\s*)\d+[.)]\s+/
 
 function listLines(value, start, end) {
   const lineStart = value.lastIndexOf('\n', start - 1) + 1
@@ -236,15 +265,18 @@ function listLines(value, start, end) {
   return { lineStart, lineEnd, lines, isTarget }
 }
 
-function applyList(value, start, end) {
+function applyList(value, start, end, numbered = false) {
   const { lineStart, lineEnd, lines, isTarget } = listLines(value, start, end)
   const targets = lines.filter(isTarget)
   if (!targets.length) return null
-  const allBullets = targets.every(l => BULLET_RE.test(l))
+  const re = numbered ? NUMBER_RE : BULLET_RE
+  const allOn = targets.every(l => re.test(l))
+  let n = 0
   const next = lines.map(l => {
     if (!isTarget(l)) return l
-    if (allBullets) return l.replace(BULLET_RE, '$1')
-    return '- ' + l.replace(/^\s*(?:[-*+]|\d+[.)])\s+/, '').trimStart()
+    if (allOn) return l.replace(re, '$1')
+    n += 1
+    return (numbered ? `${n}. ` : '- ') + l.replace(/^\s*(?:[-*+]|\d+[.)])\s+/, '').trimStart()
   })
   const newBlock = next.join('\n')
   const out = value.slice(0, lineStart) + newBlock + value.slice(lineEnd)
@@ -257,14 +289,69 @@ function applyList(value, start, end) {
   return { value: out, selStart: lineStart, selEnd: lineStart + newBlock.length }
 }
 
-function isListActive(value, start, end) {
+function isListActive(value, start, end, numbered = false) {
   const { lines, isTarget } = listLines(value, start, end)
   const targets = lines.filter(isTarget)
-  return targets.length > 0 && targets.every(l => BULLET_RE.test(l))
+  const re = numbered ? NUMBER_RE : BULLET_RE
+  return targets.length > 0 && targets.every(l => re.test(l))
 }
+
+// ─── Headings ──────────────────────────────────────────────────────────────────
+// Works on whole lines, like the lists. A line that already has the chosen level
+// goes back to normal text; "Normal text" (value null) removes any level.
+const HEADING_RE = /^(\s*)(#{1,6})\s+/
+
+function applyHeading(value, start, end, level) {
+  const { lineStart, lineEnd, lines } = listLines(value, start, end)
+  const isTarget = l => l.trim() !== '' && !l.trim().startsWith(':::')
+  const targets = lines.filter(isTarget)
+  if (!targets.length) return null
+  const allSame = level && targets.every(l => (l.match(HEADING_RE)?.[2].length ?? 0) === level)
+  const next = lines.map(l => {
+    if (!isTarget(l)) return l
+    const bare = l.replace(/^\s*(?:#{1,6}|[-*+]|\d+[.)])\s+/, '').trimStart()
+    return level && !allSame ? `${'#'.repeat(level)} ${bare}` : bare
+  })
+  const newBlock = next.join('\n')
+  const out = value.slice(0, lineStart) + newBlock + value.slice(lineEnd)
+  if (start === end) {
+    const idx = value.slice(lineStart, start).split('\n').length - 1
+    const caret = Math.max(lineStart, start + next[idx].length - lines[idx].length)
+    return { value: out, selStart: caret, selEnd: caret }
+  }
+  return { value: out, selStart: lineStart, selEnd: lineStart + newBlock.length }
+}
+
+function headingLevelAt(value, start, end) {
+  const { lines } = listLines(value, start, end)
+  const levels = lines.filter(l => l.trim() !== '' && !l.trim().startsWith(':::'))
+    .map(l => l.match(HEADING_RE)?.[2].length ?? 0)
+  if (!levels.length || levels.some(v => v !== levels[0])) return null
+  return levels[0] || null
+}
+
+// ─── Table ─────────────────────────────────────────────────────────────────────
+// A small starter table (2 columns, 2 rows) after the line the cursor is on.
+const TABLE_TEXT = '| Column 1 | Column 2 |\n| --- | --- |\n|  |  |\n|  |  |'
+
+function applyTable(value, end) {
+  let lineEnd = value.indexOf('\n', end)
+  if (lineEnd === -1) lineEnd = value.length
+  const before = value.slice(0, lineEnd)
+  const after = value.slice(lineEnd).replace(/^\n+/, '')
+  const lead = before.trim() === '' ? '' : '\n\n'
+  const insertAt = before.length + lead.length
+  const out = before + lead + TABLE_TEXT + (after ? '\n\n' + after : '\n')
+  return { value: out, selStart: insertAt + 2, selEnd: insertAt + 10 }
+}
+
+const SPAN_KIND = { color: 'c', size: 's', highlight: 'hl', badge: 'bd' }
 
 export function applyFormat(value, start, end, action) {
   if (action.type === 'list') return applyList(value, start, end)
+  if (action.type === 'olist') return applyList(value, start, end, true)
+  if (action.type === 'heading') return applyHeading(value, start, end, action.value)
+  if (action.type === 'table') return applyTable(value, end)
   const ps = getPieces(value, start, end)
 
   // Nothing selected and no word under the cursor: open an empty pair to type in.
@@ -295,8 +382,8 @@ export function applyFormat(value, start, end, action) {
         insert(b, c)
       }
     })
-  } else if (action.type === 'color' || action.type === 'size') {
-    const id = action.type === 'color' ? 'c' : 's'
+  } else if (action.type in SPAN_KIND) {
+    const id = SPAN_KIND[action.type]
     ps.list.forEach(([a, b]) => {
       const old = firstLayer(findLayers(value, a, b), id)
       if (old) {
@@ -339,8 +426,10 @@ export function applyFormat(value, start, end, action) {
 
 export function getActiveFormats(value, start, end) {
   const list = isListActive(value, start, end)
+  const olist = isListActive(value, start, end, true)
+  const heading = headingLevelAt(value, start, end)
   const ps = getPieces(value, start, end)
-  if (ps.caret || !ps.list.length) return { ...EMPTY_ACTIVE, list }
+  if (ps.caret || !ps.list.length) return { ...EMPTY_ACTIVE, list, olist, heading }
   const perPiece = ps.list.map(([a, b]) => findLayers(value, a, b))
   const every = id => perPiece.every(l => !!firstLayer(l, id))
   const keyOf = (id, re) => {
@@ -353,7 +442,11 @@ export function getActiveFormats(value, start, end) {
     u: every('u'),
     color: keyOf('c', /rt-c-([a-z]+)/),
     size: keyOf('s', /rt-s-([a-z]+)/),
+    highlight: keyOf('hl', /rt-h-([a-z]+)/),
+    badge: keyOf('bd', /rt-b-([a-z]+)/),
     list,
+    olist,
+    heading,
   }
 }
 
@@ -456,7 +549,7 @@ const menuRowStyle = isActive => ({
 })
 
 export default function RichTextToolbar({ active = EMPTY_ACTIVE, onAction, disabled = false, painter }) {
-  const [menu, setMenu] = useState(null) // null | 'color' | 'size'
+  const [menu, setMenu] = useState(null) // null | 'color' | 'size' | 'highlight' | 'badge' | 'heading'
   const wrapRef = useRef(null)
 
   // Close an open menu when clicking anywhere outside the toolbar.
@@ -475,6 +568,41 @@ export default function RichTextToolbar({ active = EMPTY_ACTIVE, onAction, disab
   }
 
   const colorHex = COLORS.find(c => c.key === active.color)?.hex ?? null
+  const highlightHex = HIGHLIGHTS.find(h => h.key === active.highlight)?.hex ?? null
+  const badgeHex = COLORS.find(c => c.key === active.badge)?.hex ?? null
+
+  // A menu of colour squares (font colour, highlighter, badge) plus an "off" row.
+  function swatchMenu(kind, items, current, offLabel) {
+    return (
+      <ClampedPopover width={168} onMouseDown={keepSelection}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, padding: 4 }}>
+          {items.map(c => (
+            <button
+              key={c.key}
+              type="button"
+              title={c.label}
+              aria-label={c.label}
+              onClick={() => pick({ type: kind, value: c.key })}
+              style={{
+                height: 36,
+                borderRadius: 'var(--radius-sm)',
+                border: current === c.key ? '2px solid var(--color-text-primary)' : '1px solid var(--color-border)',
+                backgroundColor: c.hex,
+                cursor: 'pointer',
+              }}
+            />
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={() => pick({ type: kind, value: null })}
+          style={{ ...menuRowStyle(false), marginTop: 4, color: 'var(--color-text-secondary)' }}
+        >
+          {offLabel}
+        </button>
+      </ClampedPopover>
+    )
+  }
 
   return (
     <div
@@ -504,8 +632,40 @@ export default function RichTextToolbar({ active = EMPTY_ACTIVE, onAction, disab
 
       <Divider />
 
+      {/* Heading level */}
+      <div style={{ position: 'relative' }}>
+        <IconButton
+          label="Heading"
+          active={menu === 'heading' || !!active.heading}
+          disabled={disabled}
+          onClick={() => setMenu(menu === 'heading' ? null : 'heading')}
+        >
+          <Heading size={16} />
+        </IconButton>
+        {menu === 'heading' && (
+          <ClampedPopover width={160} onMouseDown={keepSelection}>
+            {HEADINGS.map(h => (
+              <button
+                key={h.label}
+                type="button"
+                onClick={() => pick({ type: 'heading', value: h.level })}
+                style={menuRowStyle((active.heading ?? null) === h.level)}
+              >
+                {h.label}
+              </button>
+            ))}
+          </ClampedPopover>
+        )}
+      </div>
+
       <IconButton label="Bullet list" active={active.list} disabled={disabled} onClick={() => pick({ type: 'list' })}>
         <List size={16} />
+      </IconButton>
+      <IconButton label="Numbered list" active={active.olist} disabled={disabled} onClick={() => pick({ type: 'olist' })}>
+        <ListOrdered size={16} />
+      </IconButton>
+      <IconButton label="Add a table" disabled={disabled} onClick={() => pick({ type: 'table' })}>
+        <Table size={16} />
       </IconButton>
 
       <Divider />
@@ -526,35 +686,45 @@ export default function RichTextToolbar({ active = EMPTY_ACTIVE, onAction, disab
             }} />
           )}
         </IconButton>
-        {menu === 'color' && (
-          <ClampedPopover width={168} onMouseDown={keepSelection}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, padding: 4 }}>
-              {COLORS.map(c => (
-                <button
-                  key={c.key}
-                  type="button"
-                  title={c.label}
-                  aria-label={c.label}
-                  onClick={() => pick({ type: 'color', value: c.key })}
-                  style={{
-                    height: 36,
-                    borderRadius: 'var(--radius-sm)',
-                    border: active.color === c.key ? '2px solid var(--color-text-primary)' : '1px solid var(--color-border)',
-                    backgroundColor: c.hex,
-                    cursor: 'pointer',
-                  }}
-                />
-              ))}
-            </div>
-            <button
-              type="button"
-              onClick={() => pick({ type: 'color', value: null })}
-              style={{ ...menuRowStyle(false), marginTop: 4, color: 'var(--color-text-secondary)' }}
-            >
-              Default color
-            </button>
-          </ClampedPopover>
-        )}
+        {menu === 'color' && swatchMenu('color', COLORS, active.color, 'Default color')}
+      </div>
+
+      {/* Highlighter */}
+      <div style={{ position: 'relative' }}>
+        <IconButton
+          label="Highlighter"
+          active={menu === 'highlight' || !!active.highlight}
+          disabled={disabled}
+          onClick={() => setMenu(menu === 'highlight' ? null : 'highlight')}
+        >
+          <Highlighter size={16} />
+          {highlightHex && (
+            <span style={{
+              position: 'absolute', bottom: 3, insetInline: 8, height: 3,
+              borderRadius: 2, backgroundColor: highlightHex,
+            }} />
+          )}
+        </IconButton>
+        {menu === 'highlight' && swatchMenu('highlight', HIGHLIGHTS, active.highlight, 'No highlight')}
+      </div>
+
+      {/* Badge (small coloured tag) */}
+      <div style={{ position: 'relative' }}>
+        <IconButton
+          label="Badge (small tag)"
+          active={menu === 'badge' || !!active.badge}
+          disabled={disabled}
+          onClick={() => setMenu(menu === 'badge' ? null : 'badge')}
+        >
+          <Tag size={16} />
+          {badgeHex && (
+            <span style={{
+              position: 'absolute', bottom: 3, insetInline: 8, height: 3,
+              borderRadius: 2, backgroundColor: badgeHex,
+            }} />
+          )}
+        </IconButton>
+        {menu === 'badge' && swatchMenu('badge', COLORS, active.badge, 'No badge')}
       </div>
 
       {/* Font size */}

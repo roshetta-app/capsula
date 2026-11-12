@@ -119,7 +119,7 @@ function unwrap(el) {
   parent.removeChild(el)
 }
 
-// kind 'c' (colour) or 's' (size); value null = back to normal.
+// kind 'c' (colour), 's' (size), 'h' (highlighter) or 'b' (badge); value null = back to normal.
 function applySpanClass(root, kind, value) {
   const range = selectionRangeIn(root)
   if (!range) return false
@@ -164,6 +164,8 @@ function pasteFormat(root, look) {
   }
   applySpanClass(root, 'c', look.color)
   applySpanClass(root, 's', look.size)
+  applySpanClass(root, 'h', look.highlight ?? null)
+  applySpanClass(root, 'b', look.badge ?? null)
 }
 
 function looksLikeMarkdown(t) {
@@ -322,23 +324,23 @@ export default function RichTextEditorBox({ value, onChange, disabled = false, p
       const c = s && Array.from(s.classList).find(x => x.startsWith(prefix))
       return c ? c.slice(prefix.length) : null
     }
-    let b = false; let i = false; let u = false; let list = false
+    let b = false; let i = false; let u = false; let list = false; let olist = false
     try {
       b = document.queryCommandState('bold')
       i = document.queryCommandState('italic')
       u = document.queryCommandState('underline')
       list = document.queryCommandState('insertUnorderedList')
+      olist = document.queryCommandState('insertOrderedList')
     } catch { /* not supported: buttons just stay unlit */ }
-    return { b, i, u, color: find('rt-c-'), size: find('rt-s-'), list }
+    const h = host?.closest?.('h2, h3, h4')
+    const heading = h && el.contains(h) ? Number(h.tagName[1]) : null
+    return { b, i, u, color: find('rt-c-'), size: find('rt-s-'), highlight: find('rt-h-'), badge: find('rt-b-'), list, olist, heading }
   }, [])
 
   const readActive = useCallback(() => {
     const next = computeActive()
     if (!next) return
-    setActive(prev => (
-      prev.b === next.b && prev.i === next.i && prev.u === next.u &&
-      prev.color === next.color && prev.size === next.size && prev.list === next.list ? prev : next
-    ))
+    setActive(prev => (Object.keys(next).every(k => prev[k] === next[k]) ? prev : next))
   }, [computeActive])
 
   useEffect(() => {
@@ -354,7 +356,7 @@ export default function RichTextEditorBox({ value, onChange, disabled = false, p
     if (action.type === 'copyFormat') {
       // remember the look of the selected text; the text itself is not changed
       const now = computeActive() ?? active
-      setPainter({ b: !!now.b, i: !!now.i, u: !!now.u, color: now.color ?? null, size: now.size ?? null })
+      setPainter({ b: !!now.b, i: !!now.i, u: !!now.u, color: now.color ?? null, size: now.size ?? null, highlight: now.highlight ?? null, badge: now.badge ?? null })
       return
     }
     if (action.type === 'pasteFormat') {
@@ -368,10 +370,26 @@ export default function RichTextEditorBox({ value, onChange, disabled = false, p
       applySpanClass(el, 'c', action.value)
     } else if (action.type === 'size') {
       applySpanClass(el, 's', action.value)
+    } else if (action.type === 'highlight') {
+      applySpanClass(el, 'h', action.value)
+    } else if (action.type === 'badge') {
+      applySpanClass(el, 'b', action.value)
+    } else if (action.type === 'olist') {
+      document.execCommand('insertOrderedList')
+    } else if (action.type === 'heading') {
+      // choosing the level the line already has turns it back into normal text
+      const nowLevel = computeActive()?.heading ?? null
+      const tag = action.value && action.value !== nowLevel ? `H${action.value}` : 'P'
+      document.execCommand('formatBlock', false, tag)
+    } else if (action.type === 'table') {
+      insertTable()
+      return
     } else if (action.type === 'clear') {
       document.execCommand('removeFormat')
       applySpanClass(el, 'c', null)
       applySpanClass(el, 's', null)
+      applySpanClass(el, 'h', null)
+      applySpanClass(el, 'b', null)
     }
     emit()
     readActive()
@@ -404,6 +422,46 @@ export default function RichTextEditorBox({ value, onChange, disabled = false, p
     sel.removeAllRanges()
     sel.addRange(r)
     emit()
+  }
+
+  // A small starter table (2 columns, 2 rows) after the block the cursor is in.
+  function insertTable() {
+    const el = elRef.current
+    if (!el || disabled) return
+    const range = selectionRangeIn(el)
+    const host = range
+      ? (range.startContainer.nodeType === 3 ? range.startContainer.parentElement : range.startContainer)
+      : null
+    const container = host?.closest?.('.rt-card-body') || el
+    let anchor = null
+    if (range) {
+      anchor = range.startContainer
+      while (anchor && anchor.parentNode !== container) anchor = anchor.parentNode
+      if (anchor && !container.contains(anchor)) anchor = null
+    }
+    const tpl = document.createElement('template')
+    tpl.innerHTML =
+      '<table><thead><tr><th>Column 1</th><th>Column 2</th></tr></thead>' +
+      '<tbody><tr><td><br></td><td><br></td></tr><tr><td><br></td><td><br></td></tr></tbody></table>'
+    const table = tpl.content.firstElementChild
+    const after = document.createElement('p')
+    after.appendChild(document.createElement('br'))
+    if (anchor) {
+      container.insertBefore(table, anchor.nextSibling)
+      container.insertBefore(after, table.nextSibling)
+    } else {
+      container.appendChild(table)
+      container.appendChild(after)
+    }
+    padCards(el)
+    const firstCell = table.querySelector('th')
+    const r = document.createRange()
+    r.selectNodeContents(firstCell)
+    const sel = window.getSelection()
+    sel.removeAllRanges()
+    sel.addRange(r)
+    emit()
+    readActive()
   }
 
   function handleClick(e) {

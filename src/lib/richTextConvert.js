@@ -247,7 +247,7 @@ function tableToText(el, ctx) {
   const rows = Array.from(el.querySelectorAll('tr'))
   if (!rows.length) return ''
   const cellsOf = tr => Array.from(tr.children).filter(c => /^(th|td)$/i.test(c.tagName))
-  const cellText = c => inlineOf(c, { ...ctx, cell: true }).replace(/\n/g, ' ').replace(/\|/g, '\\|').trim()
+  const cellText = c => inlineOf(c, { ...ctx, cell: true }).replace(/\n/g, ' ').replace(/\|/g, '\\|').trim().replace(/^(?:<br>\s*)+$/, '')
   const head = cellsOf(rows[0])
   const cols = head.length
   if (!cols) return ''
