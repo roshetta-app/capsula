@@ -11,7 +11,7 @@
  * 2026-11-13 (round 2): the Active ingredient block at the top is gone (mechanism stays). A
  * Related drugs button lists this generic's brands and a tap opens that brand's page. The class
  * and family rows open the brand lists as on the brand page. "Other generics in this family" is
- * a button under Dose that opens the list in place.
+ * removed again (the family row in the class tree covers it).
  * Kept: mechanism, Uses, Dose, Side effects, Pregnancy, Contraindications,
  * Interactions, Pharmacology, Sources. All of those read generic-level data, so the sections
  * are the same components the brand page uses, fed with one brand of this generic as the
@@ -24,7 +24,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
-import { WifiOff, ChevronRight, ChevronDown } from 'lucide-react'
+import { WifiOff } from 'lucide-react'
 import DrugHeader from '../components/drugs/DrugHeader'
 import DrugDetailSheet from '../components/drugs/DrugDetailSheet'
 import BottomNav from '../components/BottomNav'
@@ -43,7 +43,6 @@ import { useCategories } from '../hooks/useCategories'
 import { useDeepLinkParent } from '../hooks/useDeepLinkParent'
 import { useIsDark } from '../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN } from '../utils/specialtyTokens'
-import { toTitleCase } from '../utils/drugTitleFormat'
 import { logUsageEvent } from '../analytics/usageEvents'
 import { ROUTES } from '../router'
 
@@ -58,69 +57,6 @@ function findAlternatives(drugs, drug) {
 function findClassDrugs(drugs, drug) {
   if (!drug || !drug.class) return []
   return drugs.filter(d => d.class === drug.class)
-}
-
-// Other generics in the same class AND family as this one (one row per generic).
-function findOtherGenerics(drugs, drug) {
-  if (!drug || !drug.class || !drug.subclass) return []
-  const seen = new Set([drug.genericId])
-  const out = []
-  for (const d of drugs) {
-    if (d.class !== drug.class || d.subclass !== drug.subclass) continue
-    if (!d.genericId || !d.genericSlug || seen.has(d.genericId)) continue
-    seen.add(d.genericId)
-    out.push(d)
-  }
-  return out.sort((a, b) => String(a.genericName).localeCompare(String(b.genericName)))
-}
-
-function OtherGenerics({ list, onOpen }) {
-  const [open, setOpen] = useState(false)
-  if (list.length === 0) return null
-  return (
-    <div style={{ marginBottom: 'var(--space-5)' }}>
-      <button
-        type="button"
-        onClick={() => setOpen(o => !o)}
-        aria-expanded={open}
-        style={{
-          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
-          padding: '12px 14px', borderRadius: 'var(--radius-md)',
-          border: '0.5px solid var(--color-border)', background: 'var(--color-accent-light)',
-          cursor: 'pointer', textAlign: 'start', fontFamily: 'var(--font-body)',
-          fontSize: 14, fontWeight: 600, color: 'var(--color-accent)',
-          WebkitTapHighlightColor: 'transparent',
-        }}
-      >
-        <span>Other generics in this family ({list.length})</span>
-        <ChevronDown
-          size={16}
-          style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform var(--motion-fast) var(--ease-settle)' }}
-        />
-      </button>
-      {open && (
-        <div style={{ display: 'flex', flexDirection: 'column', marginTop: 'var(--space-1)' }}>
-          {list.map(d => (
-            <button
-              key={d.genericId}
-              type="button"
-              onClick={() => onOpen(d.genericSlug)}
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
-                padding: '12px 4px', background: 'none', border: 'none',
-                borderBottom: '0.5px solid var(--color-border)', cursor: 'pointer',
-                textAlign: 'start', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600,
-                color: 'var(--color-text-primary)', WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              <span>{toTitleCase(d.genericName)}</span>
-              <ChevronRight size={16} color="var(--color-text-tertiary)" />
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  )
 }
 
 function Message({ icon, title, text, actionLabel, onAction }) {
@@ -155,10 +91,6 @@ export default function GenericDetailScreen() {
 
   // One brand of this generic carries the generic's data into the sections. It is never shown.
   const drug = useMemo(() => drugs.find(d => d.genericSlug === slug), [drugs, slug])
-  const others = useMemo(
-    () => findOtherGenerics(drugs, drug),
-    [drugs, drug?.genericId, drug?.class, drug?.subclass], // eslint-disable-line react-hooks/exhaustive-deps
-  )
 
   // The brands of this generic (all of them: the carrier brand is never singled out), the brands of
   // the other generics in the same family, and everything in the same class. Same rules as the brand page.
@@ -274,7 +206,6 @@ export default function GenericDetailScreen() {
             />
             <UsesSection drug={drug} colors={colors} isDark={isDark} />
             <DoseSection key={drug.genericId} drug={drug} />
-            <OtherGenerics list={others} onOpen={s => navigate(ROUTES.GENERIC_DETAIL(s))} />
             <SideEffectsSection drug={drug} />
             <PregnancySection drug={drug} />
             <ContraindicationsSection drug={drug} />

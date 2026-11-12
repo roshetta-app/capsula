@@ -72,7 +72,7 @@ export default function BrandsListHeading({ headingName, titleIcon = null, group
   }
   return (
     <p style={headingStyle}>
-      {iconNode}{hideOther ? null : 'Other '}{nameNode} drugs
+      {iconNode}{nameNode} drugs
     </p>
   )
 }

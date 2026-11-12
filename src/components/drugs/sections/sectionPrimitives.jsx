@@ -33,7 +33,7 @@ import { ChevronDown, ChevronUp } from 'lucide-react'
 
 // --- Section header -----------------------------------------------------
 
-export function SectionHeader({ title }) {
+export function SectionHeader({ title, style }) {
   return (
     <div style={{
       fontSize:      10,
@@ -42,6 +42,7 @@ export function SectionHeader({ title }) {
       textTransform: 'uppercase',
       color:         'var(--color-text-tertiary)',
       marginBottom:  'var(--space-3)',
+      ...style,
     }}>
       {title}
     </div>

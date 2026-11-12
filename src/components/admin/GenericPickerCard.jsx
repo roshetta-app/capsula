@@ -33,10 +33,6 @@ export default function GenericPickerCard({ drug, brandCount = 0, onTap, isLast 
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text-primary)' }}>{name}</span>
-          <span style={{
-            padding: '1px 5px', borderRadius: 4, background: 'var(--color-accent)', color: '#fff',
-            fontSize: 10, fontWeight: 700, letterSpacing: '0.03em', textTransform: 'uppercase', lineHeight: 1.4,
-          }}>Generic</span>
         </div>
         {groupLine && (
           <div style={{ marginTop: 2, fontSize: 12, color: 'var(--color-text-secondary)' }}>{groupLine}</div>

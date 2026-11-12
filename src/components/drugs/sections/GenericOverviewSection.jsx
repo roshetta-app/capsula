@@ -304,7 +304,7 @@ import { FlaskConical, ChevronRight, Layers } from 'lucide-react'
 import SimilarAlternativesSheet from '../brands/SimilarAlternativesSheet.jsx'
 import ClassSheet from '../classes/ClassSheet.jsx'
 import { MoleculeIcon } from '../classes/ClassIcons.jsx'
-import { InlineTruncatedList, IngredientChip, TextToggle } from './sectionPrimitives.jsx'
+import { InlineTruncatedList, IngredientChip, TextToggle, SectionHeader } from './sectionPrimitives.jsx'
 import { toTitleCase } from '../../../utils/drugTitleFormat.js'
 
 // One row of the Class/Subclass tree. A button with a quiet grey arrow when
@@ -623,7 +623,7 @@ export default function GenericOverviewSection({ drug, siblings = [], alternativ
           marginBottom:   genericMode ? 0 : 'var(--space-2)',
         }}>
           {genericMode
-            ? <span />
+            ? <SectionHeader title="Overview" style={{ marginBottom: 0 }} />
             : (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <FlaskConical size={12} color="var(--color-text-secondary)" />
