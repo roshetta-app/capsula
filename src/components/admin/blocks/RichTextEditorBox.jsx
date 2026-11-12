@@ -36,6 +36,22 @@ function escText(s) {
   return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
+// Gives the focus back to the box WITHOUT moving the cursor or the screen. 2026-11-13 (editor):
+// a toolbar choice used to call root.focus(), which pulled the focus out of a card's own text
+// area (the card body is its own editing area) and put the cursor back at the start of the text:
+// the screen jumped to the top and bullets, formatting and tables did not land in the card.
+// Now the focus goes to the editing area the cursor is already in (card body or the main text),
+// the cursor is put back exactly where it was, and the browser is told not to scroll.
+function focusKeepingSelection(root) {
+  const sel = window.getSelection()
+  const saved = sel && sel.rangeCount && root.contains(sel.anchorNode) ? sel.getRangeAt(0).cloneRange() : null
+  const node = saved ? saved.startContainer : null
+  const base = node ? (node.nodeType === 3 ? node.parentElement : node) : null
+  const host = (base && base.closest && base.closest('[contenteditable="true"]')) || root
+  if (document.activeElement !== host) host.focus({ preventScroll: true })
+  if (saved) { sel.removeAllRanges(); sel.addRange(saved) }
+}
+
 function selectionRangeIn(root) {
   const sel = window.getSelection()
   if (!sel || !sel.rangeCount) return null
@@ -537,11 +553,17 @@ export default function RichTextEditorBox({ value, onChange, disabled = false, h
     }
     if (inTitle && action.type !== 'copyFormat') return
     if (action.type === 'link') {
-      el.focus()
       const sel = window.getSelection()
       const saved = linkRangeRef.current
       linkRangeRef.current = null
       const range = saved && el.contains(saved.commonAncestorContainer) ? saved : document.createRange()
+      // focus the area the cursor was in (a card body stays a card body), without scrolling
+      {
+        const n = range === saved ? saved.startContainer : null
+        const b = n ? (n.nodeType === 3 ? n.parentElement : n) : null
+        const h = (b && b.closest && b.closest('[contenteditable="true"]')) || el
+        h.focus({ preventScroll: true })
+      }
       if (range === saved) {
         sel.removeAllRanges(); sel.addRange(range)
       } else {
@@ -555,7 +577,7 @@ export default function RichTextEditorBox({ value, onChange, disabled = false, h
       readActive()
       return
     }
-    el.focus()
+    focusKeepingSelection(el)
     try { document.execCommand('styleWithCSS', false, false) } catch { /* ignore */ }
     if (action.type === 'copyFormat') {
       // remember the look of the selected text; the text itself is not changed
@@ -669,7 +691,7 @@ export default function RichTextEditorBox({ value, onChange, disabled = false, h
   function insertTable() {
     const el = elRef.current
     if (!el || disabled) return
-    el.focus()
+    focusKeepingSelection(el)
     const tpl = document.createElement('template')
     tpl.innerHTML =
       '<table><thead><tr><th>Column 1</th><th>Column 2</th></tr></thead>' +
@@ -684,7 +706,7 @@ export default function RichTextEditorBox({ value, onChange, disabled = false, h
   function insertDivider() {
     const el = elRef.current
     if (!el || disabled) return
-    el.focus()
+    focusKeepingSelection(el)
     const after = placeBlockAfterCursor(document.createElement('hr'))
     placeCaretIn(after)
     emit(true)
