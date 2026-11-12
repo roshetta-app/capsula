@@ -1286,8 +1286,15 @@ body {
   border-bottom: 1px solid rgba(127, 127, 127, 0.28);
   font-size: 13.5px; line-height: 1.55;
 }
+/* Up to 3 columns: the cells wrap (even long unbroken words), so the table can never push
+   past the card. 4 or more columns: the table becomes its own sideways scroller. */
+.dir-prose .dir-card td, .dir-prose .dir-card th { min-width: 0; overflow-wrap: anywhere; }
 .dir-prose .dir-card table:has(th:nth-child(4), td:nth-child(4)) {
   display: block; overflow-x: auto; -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain; touch-action: pan-x pan-y;
+}
+.dir-prose .dir-card table:has(th:nth-child(4), td:nth-child(4)) :is(td, th) {
+  min-width: 110px; overflow-wrap: normal;
 }
 .dir-prose .dir-card th {
   padding: 9px 12px; font-size: 12.5px; font-weight: 700; text-transform: none; letter-spacing: 0;
