@@ -51,6 +51,10 @@ const scrollMemory = new Map()
 // a fresh visit from the list always starts on the first plan.
 const planMemory = new Map()
 
+// Same idea for the open tab (Treatment or Review), keyed by condition slug.
+// Read only on Back (POP), so a fresh visit from the list still opens Treatment.
+const tabMemory = new Map()
+
 export default function ConditionDetailScreen() {
   const { slug }    = useParams()
   const navigate    = useNavigate()
@@ -66,7 +70,10 @@ export default function ConditionDetailScreen() {
   const { isConditionFavourited, toggleCondition } = useFavouritesContext()
   const { toast } = useToast()
 
-  const [activeTab, setActiveTab] = useState(0)
+  const [activeTab, setActiveTab] = useState(
+    () => (navigationType === 'POP' ? tabMemory.get(slug) ?? 0 : 0)
+  )
+  useEffect(() => { tabMemory.set(slug, activeTab) }, [slug, activeTab])
 
   // Chosen treatment plan (Rx tab dropdown). Lives here, not inside the Rx tab,
   // so it survives switching to the Clinical tab and back; planMemory carries it

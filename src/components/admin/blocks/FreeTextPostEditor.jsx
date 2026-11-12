@@ -48,6 +48,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { renderTitledMarkdown } from '../../../lib/directiveRenderer'
+import { fixDrugLinkNames } from '../../../lib/textLinks'
 import RichTextToolbar, { applyFormat, getActiveFormats, EMPTY_ACTIVE } from './RichTextToolbar'
 import RichTextEditorBox from './RichTextEditorBox'
 import StickyBar from './StickyBar'
@@ -309,7 +310,7 @@ function PreviewPanel({ title, markdown }) {
         minHeight: 140,
         overflowY: 'auto',
       }}
-      dangerouslySetInnerHTML={{ __html: renderTitledMarkdown(title, markdown) }}
+      dangerouslySetInnerHTML={{ __html: fixDrugLinkNames(renderTitledMarkdown(title, markdown)) }}
     />
   )
 }

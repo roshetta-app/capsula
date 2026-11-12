@@ -31,7 +31,7 @@
 import { useContext, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { renderTitledMarkdown } from '../../lib/directiveRenderer'
-import { resolveTextLinks, parseTextLink } from '../../lib/textLinks'
+import { resolveTextLinks, fixDrugLinkNames, parseTextLink } from '../../lib/textLinks'
 import { PreviewModeContext } from '../../context/PreviewModeContext'
 import { useDrugContext } from '../../context/DrugContext'
 import ClassSheet from '../drugs/classes/ClassSheet'
@@ -52,7 +52,7 @@ export default function FreeTextPostBlock({ block }) {
 
   const html = useMemo(() => {
     const raw = renderTitledMarkdown(title, markdown)
-    return resolveTextLinks(raw, drugs, !(loading && (drugs ?? []).length === 0))
+    return fixDrugLinkNames(resolveTextLinks(raw, drugs, !(loading && (drugs ?? []).length === 0)))
   }, [title, markdown, drugs, loading])
 
   const classDrugs = useMemo(

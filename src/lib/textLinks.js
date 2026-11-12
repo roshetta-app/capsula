@@ -69,7 +69,7 @@ export function classLinkMarkdown(className, familyName = null) {
 
 // The editing box shows the link as its HTML; marked builds it the same way the app does.
 export function linkEditorHtml(markdown) {
-  return marked.parseInline(markdown, { gfm: true })
+  return fixDrugLinkNames(marked.parseInline(markdown, { gfm: true }))
 }
 
 export function parseTextLink(href) {
