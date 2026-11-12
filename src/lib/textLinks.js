@@ -13,7 +13,7 @@
  * family breaks its links (they then show as plain text).
  *
  * Exports:
- *   drugLinkMarkdown(drug, {nameOnly})     saved text for a drug picked in the drug picker
+ *   drugLinkMarkdown(drug, {nameOnly, generic})  saved text for a drug picked in the drug picker
  *   classLinkMarkdown(className, family?)  saved text for a class or a family
  *   linkEditorHtml(markdown)               the same link as the editing box shows it
  *   parseTextLink(href)                    what a saved link points at, or null
@@ -45,16 +45,21 @@ function safeLabel(s) {
 }
 
 // nameOnly: just the drug name (Doliprane), without its strength and form (1g - Tab.).
-export function drugLinkMarkdown(drug, { nameOnly = false } = {}) {
+// generic: the link shows the generic name (Paracetamol) instead of the brand name; it still
+// opens the picked drug's page, the same as tapping a generic result on the Drugs screen.
+export function drugLinkMarkdown(drug, { nameOnly = false, generic = false } = {}) {
   const slug = drug?.slug || drug?.id
   // first letter of each word capital, the same as the drug block shows brand names
-  const name = toTitleCase(safeLabel(drug?.tradenameClean || drug?.name || drug?.genericName))
+  const rawName = generic
+    ? (drug?.genericName || drug?.generic)
+    : (drug?.tradenameClean || drug?.name || drug?.genericName)
+  const name = toTitleCase(safeLabel(rawName))
   if (!slug || !name) return ''
   const suffix = nameOnly ? '' : safeLabel(getSheetDrugSuffix({
     concentration: drug.concentration,
     form: drug.form,
     formulation: drug,
-    tradenameClean: drug.tradenameClean,
+    tradenameClean: generic ? '' : drug.tradenameClean,
   }))
   const small = suffix ? ` <span class="rt-s-sm rt-c-gray">${suffix}</span>` : ''
   return `[**${name}**${small}](${DRUG_PREFIX}${enc(slug)})`

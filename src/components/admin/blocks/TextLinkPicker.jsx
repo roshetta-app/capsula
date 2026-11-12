@@ -3,8 +3,8 @@
  *
  * The pop-up behind the Drug and Class buttons of the text toolbar (plan step 4).
  *
- *   kind="drug"   the same drug picker the drug block uses (DrugPickerSearch, brand
- *                 mode). onPick(flatDrug) gets the app's own drug object.
+ *   kind="drug"   the same drug picker the drug block uses (DrugPickerSearch, brand or
+ *                 generic mode, chosen with the Brand / Generic switch). onPick(flatDrug) gets the app's own drug object.
  *   kind="class"  the app's class search (same search, same cards as Class mode on the
  *                 Drugs screen). Tapping a class card gives { className }, tapping a
  *                 drug family card gives { className, familyName }.
@@ -91,13 +91,16 @@ function ClassPickerSearch({ onPick }) {
 // The "name only" choice is remembered while the page stays open, so several drugs in a row
 // can be added the same way.
 let rememberNameOnly = false
+let rememberGeneric = false   // Brand / Generic choice, remembered the same way
 
 export default function TextLinkPicker({ kind, onClose, onPick }) {
   // A fresh search every time the pop-up opens.
   const [openCount, setOpenCount] = useState(0)
   const [nameOnly, setNameOnly] = useState(rememberNameOnly)
+  const [generic, setGeneric] = useState(rememberGeneric)
   useEffect(() => { if (kind) setOpenCount(n => n + 1) }, [kind])
   function toggleNameOnly(v) { rememberNameOnly = v; setNameOnly(v) }
+  function chooseGeneric(v) { rememberGeneric = v; setGeneric(v) }
 
   if (!kind) return null
   const title = kind === 'drug' ? 'Link a drug' : 'Link a class or drug family'
@@ -105,16 +108,33 @@ export default function TextLinkPicker({ kind, onClose, onPick }) {
   return createPortal(
     <Modal isOpen onClose={onClose} title={title} size="md">
       {kind === 'drug' && (
-        <label style={{
-          display: 'flex', alignItems: 'center', gap: 8, margin: '0 0 var(--space-3)', fontSize: 13,
-          fontFamily: 'var(--font-body)', color: 'var(--color-text-primary)', cursor: 'pointer',
-        }}>
-          <input type="checkbox" checked={nameOnly} onChange={e => toggleNameOnly(e.target.checked)} />
-          Name only (leave out the strength and form)
-        </label>
+        <>
+          <div role="tablist" style={{ display: 'flex', gap: 6, margin: '0 0 var(--space-3)' }}>
+            {[['Brand', false], ['Generic', true]].map(([label, isGeneric]) => (
+              <button
+                key={label} type="button" role="tab" aria-selected={generic === isGeneric}
+                onClick={() => chooseGeneric(isGeneric)}
+                style={{
+                  flex: 1, padding: '8px 0', borderRadius: 8, fontSize: 13, fontWeight: 600,
+                  fontFamily: 'var(--font-body)', cursor: 'pointer',
+                  border: '1px solid var(--color-border)',
+                  background: generic === isGeneric ? 'var(--color-text-primary)' : 'transparent',
+                  color: generic === isGeneric ? 'var(--color-surface, #fff)' : 'var(--color-text-primary)',
+                }}
+              >{label}</button>
+            ))}
+          </div>
+          <label style={{
+            display: 'flex', alignItems: 'center', gap: 8, margin: '0 0 var(--space-3)', fontSize: 13,
+            fontFamily: 'var(--font-body)', color: 'var(--color-text-primary)', cursor: 'pointer',
+          }}>
+            <input type="checkbox" checked={nameOnly} onChange={e => toggleNameOnly(e.target.checked)} />
+            Name only (leave out the strength and form)
+          </label>
+        </>
       )}
       {kind === 'drug'
-        ? <DrugPickerSearch key={openCount} mode="brand" onPick={drug => onPick(drug, { nameOnly })} />
+        ? <DrugPickerSearch key={`${openCount}-${generic ? 'g' : 'b'}`} mode={generic ? 'generic' : 'brand'} onPick={drug => onPick(drug, { nameOnly, generic })} />
         : <ClassPickerSearch key={openCount} onPick={onPick} />}
     </Modal>,
     document.body,
