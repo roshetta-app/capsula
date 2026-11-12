@@ -152,7 +152,7 @@ function inlineNode(n, ctx) {
     case 'em': case 'i': return wrapMarks(inlineOf(n, ctx), '*')
     case 'u': return wrapMarks(inlineOf(n, ctx), '<u>', '</u>')
     case 'span': {
-      const classes = Array.from(n.classList || []).filter(c => /^rt-[cs]-[a-z]+$/.test(c))
+      const classes = Array.from(n.classList || []).filter(c => /^rt-[csbh]-[a-z]+$/.test(c))
       const inner = inlineOf(n, ctx)
       if (!classes.length || !inner.trim()) return inner
       return wrapMarks(inner, `<span class="${classes.join(' ')}">`, '</span>')

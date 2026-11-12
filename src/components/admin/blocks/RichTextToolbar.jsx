@@ -202,7 +202,7 @@ function getPieces(value, start, end) {
 function stripInline(t) {
   return t
     .replace(/<\/?u>/g, '')
-    .replace(/<span class="rt-[cs]-[a-z]+">/g, '')
+    .replace(/<span class="rt-[csbh]-[a-z]+">/g, '')
     .replace(/<\/span>/g, '')
     .replace(/\*\*/g, '')
     .replace(/(^|[\s(>])_(?=\S)/g, '$1')

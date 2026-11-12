@@ -206,7 +206,24 @@ export default function ConditionDetailScreen() {
     }
   }, [])
 
+  // True when the finger lands on something that scrolls sideways itself (a wide table):
+  // that touch belongs to the table, not to the Rx / Clinical tab swipe.
+  function startsOnSidewaysScroller(target, boundary) {
+    for (let n = target; n && n !== boundary && n.nodeType === 1; n = n.parentElement) {
+      if (n.scrollWidth > n.clientWidth + 1) {
+        const ox = window.getComputedStyle(n).overflowX
+        if (ox === 'auto' || ox === 'scroll') return true
+      }
+    }
+    return false
+  }
+
   function handleTouchStart(e) {
+    if (startsOnSidewaysScroller(e.target, e.currentTarget)) {
+      touchStartX.current = null
+      touchStartY.current = null
+      return
+    }
     touchStartX.current = e.touches[0].clientX
     touchStartY.current = e.touches[0].clientY
   }

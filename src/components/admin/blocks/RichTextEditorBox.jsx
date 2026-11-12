@@ -268,8 +268,8 @@ const EDITOR_CSS = `
 .rt-editor .dir-card { position: relative; margin: 10px 0; }
 .rt-editor .rt-card-body { outline: none; min-height: 1.6em; }
 .rt-editor .rt-card-body > :last-child { margin-bottom: 0; }
-.rt-editor .dir-card-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.rt-editor .rt-card-remove { border: none; background: none; cursor: pointer; font-size: 18px; line-height: 1;
+.rt-editor .dir-card-header { display: flex; align-items: center; justify-content: flex-start; gap: 8px; }
+.rt-editor .rt-card-remove { margin-inline-start: auto; border: none; background: none; cursor: pointer; font-size: 18px; line-height: 1;
   padding: 0 4px; color: var(--color-text-tertiary); }
 .rt-editor .rt-plain-card { position: relative; margin: 8px 0; padding: 6px 28px 2px 8px;
   border: 1px dashed var(--color-border); border-radius: 8px; }

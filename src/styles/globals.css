@@ -1079,3 +1079,147 @@ body {
 @media (prefers-reduced-motion: reduce) {
   [data-cap-toast] { animation-duration: 1ms !important; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   TEXT SYSTEM v2 (2026-11-11) — one scale and one spacing rhythm for every text block
+   (app, CMS preview, prescription-sheet rows). Later rules win over the older ones above.
+
+   FONT HIERARCHY (size / weight)
+     Block title (Title field) 18 / 700     ## section        17 / 700 + thin line
+     ### subsection            15 / 600     #### track label  12.5 / 600 tinted chip
+     Body text and lists       14.5 / 400   Table text 13.5, table header 12.5 / 700
+     Card label                12.5 / 700   Small text (rt-s-sm) 12, large (rt-s-lg) 18
+     Titles are never grey, never all-capitals.
+
+   SPACING RHYTHM (4px grid; neighbouring margins collapse to the larger one)
+     paragraph 10 · list 10 · table 14 · card 16 · divider 24
+     ## above 28 / below 10 · ### above 20 / below 6 · #### above 14 / below 6
+     heading straight under a heading: ### 12, #### 8 · first item in a block: 0 above
+     last item in a block: 0 below
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+.dir-prose { font-size: 14.5px; line-height: 1.7; }
+.dir-prose > :last-child { margin-bottom: 0; }
+
+.dir-prose p { font-size: 14.5px; line-height: 1.7; margin: 0 0 10px; }
+.dir-prose .dir-title { font-size: 18px; font-weight: 700; line-height: 1.3; margin: 0 0 12px; }
+
+.dir-prose h2 {
+  font-size: 17px; font-weight: 700; line-height: 1.3; letter-spacing: 0; text-transform: none;
+  color: var(--color-text-primary);
+  margin: 28px 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--color-border);
+}
+.dir-prose h3 {
+  font-size: 15px; font-weight: 600; line-height: 1.35; letter-spacing: 0; text-transform: none;
+  color: var(--color-text-primary);
+  margin: 20px 0 6px;
+}
+.dir-prose h4 {
+  display: block; width: fit-content; max-width: 100%;
+  font-size: 12.5px; font-weight: 600; line-height: 1.4; letter-spacing: 0.01em; text-transform: none;
+  color: var(--color-accent-text, #2563EB); background: rgba(37, 99, 235, 0.10);
+  padding: 2px 10px; border-radius: 999px;
+  margin: 14px 0 6px;
+  unicode-bidi: plaintext;
+}
+.dark .dir-prose h4 { color: #93C5FD; background: rgba(96, 165, 250, 0.16); }
+.dir-prose h2:first-child, .dir-prose h3:first-child, .dir-prose h4:first-child { margin-top: 0; }
+.dir-prose h2 + h3 { margin-top: 12px; }
+.dir-prose h3 + h4 { margin-top: 8px; }
+.dir-prose h2 + h4 { margin-top: 8px; }
+
+.dir-prose ul, .dir-prose ol { margin: 0 0 10px; }
+.dir-prose li { font-size: 14.5px; line-height: 1.65; }
+.dir-prose li + li { margin-top: 4px; }
+.dir-prose li > ul, .dir-prose li > ol { margin: 4px 0 0; }
+.dir-prose ul > li::marker { color: var(--color-accent-text, #2563EB); }
+.dir-prose ol > li::marker { color: var(--color-accent-text, #2563EB); font-weight: 700; }
+
+.dir-prose hr { margin: 24px 0; }
+.dir-prose blockquote {
+  margin: 0 0 14px; padding: 10px 14px;
+  background: var(--color-surface-muted);
+  border-inline-start: 3px solid var(--color-accent-text, #2563EB);
+  border-start-end-radius: 8px; border-end-end-radius: 8px;
+  color: var(--color-text-secondary);
+}
+.dir-prose blockquote > :last-child { margin-bottom: 0; }
+
+/* Tables: the table itself scrolls sideways. Columns keep a readable minimum width, so a
+   table with many columns scrolls instead of squeezing every word. */
+.dir-prose table, .dir-card table {
+  display: block; width: 100%; max-width: 100%;
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain; touch-action: pan-x pan-y;
+}
+.dir-prose td, .dir-prose th, .dir-card td, .dir-card th { min-width: 96px; }
+.dir-prose table {
+  margin: 14px 0; font-size: 13.5px; line-height: 1.55;
+  border: 1px solid var(--color-border); border-radius: 10px;
+}
+.dir-prose th {
+  padding: 9px 12px; font-size: 12.5px; font-weight: 700; text-transform: none; letter-spacing: 0;
+  color: var(--color-text-primary); background: var(--color-surface-muted);
+  border-bottom: 1px solid var(--color-border);
+}
+.dir-prose td { padding: 9px 12px; }
+.dir-prose th + th, .dir-prose td + td { border-inline-start: 1px solid var(--color-border); }
+.dir-prose tbody tr:nth-child(even) td { background: rgba(127, 127, 127, 0.06); }
+
+/* Cards: clearer label with a small line icon, more breathing room. Colours unchanged. */
+.dir-card { padding: 14px 16px 16px; margin: 16px 0; border-radius: 12px; font-size: 14.5px; line-height: 1.7; }
+.dir-card-header {
+  align-items: flex-start; gap: 8px; margin-bottom: 10px; padding-bottom: 10px;
+  font-size: 12.5px; line-height: 1.4; letter-spacing: 0.01em; text-transform: none;
+}
+.dir-card-header::before {
+  content: ""; flex: none; width: 16px; height: 16px; margin-top: 1px;
+  background-color: currentColor;
+  -webkit-mask: var(--dir-icon) center / contain no-repeat;
+  mask: var(--dir-icon) center / contain no-repeat;
+}
+.dir-card-danger { --dir-icon: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%20fill='none'%20stroke='black'%20stroke-width='2'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Cpath%20d='M12%2016h.01'/%3E%3Cpath%20d='M12%208v4'/%3E%3Cpath%20d='M15.312%202a2%202%200%200%201%201.414.586l4.688%204.688A2%202%200%200%201%2022%208.688v6.624a2%202%200%200%201-.586%201.414l-4.688%204.688a2%202%200%200%201-1.414.586H8.688a2%202%200%200%201-1.414-.586l-4.688-4.688A2%202%200%200%201%202%2015.312V8.688a2%202%200%200%201%20.586-1.414l4.688-4.688A2%202%200%200%201%208.688%202z'/%3E%3C/svg%3E"); }
+.dir-card-warning { --dir-icon: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%20fill='none'%20stroke='black'%20stroke-width='2'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Cpath%20d='m21.73%2018-8-14a2%202%200%200%200-3.48%200l-8%2014A2%202%200%200%200%204%2021h16a2%202%200%200%200%201.73-3'/%3E%3Cpath%20d='M12%209v4'/%3E%3Cpath%20d='M12%2017h.01'/%3E%3C/svg%3E"); }
+.dir-card-redflags { --dir-icon: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%20fill='none'%20stroke='black'%20stroke-width='2'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Cpath%20d='M4%2015s1-1%204-1%205%202%208%202%204-1%204-1V3s-1%201-4%201-5-2-8-2-4%201-4%201z'/%3E%3Cline%20x1='4'%20x2='4'%20y1='22'%20y2='15'/%3E%3C/svg%3E"); }
+.dir-card-contraindications { --dir-icon: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%20fill='none'%20stroke='black'%20stroke-width='2'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Ccircle%20cx='12'%20cy='12'%20r='10'/%3E%3Cpath%20d='m4.9%204.9%2014.2%2014.2'/%3E%3C/svg%3E"); }
+.dir-card-dose { --dir-icon: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%20fill='none'%20stroke='black'%20stroke-width='2'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Cpath%20d='m10.5%2020.5%2010-10a4.95%204.95%200%201%200-7-7l-10%2010a4.95%204.95%200%201%200%207%207Z'/%3E%3Cpath%20d='m8.5%208.5%207%207'/%3E%3C/svg%3E"); }
+.dir-card-criteria { --dir-icon: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%20fill='none'%20stroke='black'%20stroke-width='2'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Crect%20width='8'%20height='4'%20x='8'%20y='2'%20rx='1'%20ry='1'/%3E%3Cpath%20d='M16%204h2a2%202%200%200%201%202%202v14a2%202%200%200%201-2%202H6a2%202%200%200%201-2-2V6a2%202%200%200%201%202-2h2'/%3E%3Cpath%20d='m9%2014%202%202%204-4'/%3E%3C/svg%3E"); }
+.dir-card-tip { --dir-icon: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%20fill='none'%20stroke='black'%20stroke-width='2'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Cpath%20d='M15%2014c.2-1%20.7-1.7%201.5-2.5%201-.9%201.5-2.2%201.5-3.5A6%206%200%200%200%206%208c0%201%20.2%202.2%201.5%203.5.7.7%201.3%201.5%201.5%202.5'/%3E%3Cpath%20d='M9%2018h6'/%3E%3Cpath%20d='M10%2022h4'/%3E%3C/svg%3E"); }
+.dir-card-pearls { --dir-icon: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%20fill='none'%20stroke='black'%20stroke-width='2'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Cpath%20d='M6%203h12l4%206-10%2013L2%209Z'/%3E%3Cpath%20d='M11%203%208%209l4%2013%204-13-3-6'/%3E%3Cpath%20d='M2%209h20'/%3E%3C/svg%3E"); }
+.dir-card li { margin-bottom: 4px; }
+.dir-card li:last-child { margin-bottom: 0; }
+
+/* Extra looks the AI (and Code view) can use: highlighter and badges. */
+.dir-prose .rt-h-yellow, .dir-prose .rt-h-green, .dir-prose .rt-h-blue, .dir-prose .rt-h-pink {
+  border-radius: 3px; padding: 0 2px;
+  -webkit-box-decoration-break: clone; box-decoration-break: clone;
+}
+.dir-prose .rt-h-yellow { background: rgba(250, 204, 21, 0.38); }
+.dir-prose .rt-h-green  { background: rgba(74, 222, 128, 0.32); }
+.dir-prose .rt-h-blue   { background: rgba(96, 165, 250, 0.30); }
+.dir-prose .rt-h-pink   { background: rgba(244, 114, 182, 0.30); }
+.dir-prose [class*="rt-b-"] {
+  display: inline-block; padding: 1px 9px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; line-height: 1.55; white-space: nowrap;
+}
+.dir-prose .rt-b-red    { background: rgba(220, 38, 38, 0.12);  color: #B91C1C; }
+.dir-prose .rt-b-orange { background: rgba(217, 119, 6, 0.14);  color: #B45309; }
+.dir-prose .rt-b-green  { background: rgba(21, 128, 61, 0.13);  color: #15803D; }
+.dir-prose .rt-b-blue   { background: rgba(37, 99, 235, 0.12);  color: #1D4ED8; }
+.dir-prose .rt-b-purple { background: rgba(124, 58, 237, 0.12); color: #6D28D9; }
+.dir-prose .rt-b-gray   { background: rgba(107, 114, 128, 0.15); color: #4B5563; }
+.dark .dir-prose .rt-b-red    { color: #F87171; }
+.dark .dir-prose .rt-b-orange { color: #FBBF24; }
+.dark .dir-prose .rt-b-green  { color: #4ADE80; }
+.dark .dir-prose .rt-b-blue   { color: #60A5FA; }
+.dark .dir-prose .rt-b-purple { color: #A78BFA; }
+.dark .dir-prose .rt-b-gray   { color: #9CA3AF; }
+
+/* Prescription-sheet rows are tight: same hierarchy, one step smaller, no section lines. */
+.rx-prose-tight .dir-prose h2 { font-size: 15px; padding-bottom: 0; border-bottom: none; margin: 12px 0 4px; }
+.rx-prose-tight .dir-prose h3 { font-size: 13.5px; margin: 10px 0 3px; }
+.rx-prose-tight .dir-prose h4 { margin: 8px 0 3px; }
+.rx-prose-tight .dir-prose h2:first-child, .rx-prose-tight .dir-prose h3:first-child,
+.rx-prose-tight .dir-prose h4:first-child { margin-top: 0; }
+.rx-prose-tight .dir-prose table { margin: 8px 0; }
+.rx-prose-tight .dir-prose hr { margin: 12px 0; }
