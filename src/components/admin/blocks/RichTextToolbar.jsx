@@ -49,7 +49,7 @@
  */
 
 import { useState, useEffect, useLayoutEffect, useRef } from 'react'
-import { Bold, Italic, Underline, Palette, Type, Eraser, List, ListOrdered, Paintbrush, ClipboardPaste, Highlighter, Tag, Heading, Table, Subscript, Superscript, Minus, Undo2, Redo2, Pill } from 'lucide-react'
+import { Bold, Italic, Underline, Palette, Type, Eraser, List, ListOrdered, Paintbrush, ClipboardPaste, Highlighter, Tag, Heading, Table, Minus, Undo2, Redo2, Pill } from 'lucide-react'
 import { MoleculeIcon } from '../../drugs/classes/ClassIcons'
 import TextLinkPicker from './TextLinkPicker'
 import { drugLinkMarkdown, classLinkMarkdown, linkEditorHtml } from '../../../lib/textLinks'
@@ -72,18 +72,19 @@ export const HIGHLIGHTS = [
   { key: 'pink',   label: 'Pink',   hex: '#F472B6' },
 ]
 
+// Each row of the heading menu is drawn the way that style looks in the text.
 export const HEADINGS = [
-  { level: 2, label: 'Heading' },
-  { level: 3, label: 'Sub-heading' },
-  { level: 4, label: 'Pill label' },
-  { level: null, label: 'Normal text' },
+  { level: 2, label: 'Heading', hint: 'section',
+    preview: { fontSize: 16, fontWeight: 700, lineHeight: 1.2, borderBottom: '1px solid var(--color-border)', paddingBottom: 2 } },
+  { level: 3, label: 'Sub-heading', hint: 'topic',
+    preview: { fontSize: 14, fontWeight: 600, lineHeight: 1.2 } },
+  { level: 4, label: 'Pill label', hint: 'track',
+    preview: { fontSize: 12, fontWeight: 600, lineHeight: 1.3, padding: '1px 9px', borderRadius: 999,
+      color: 'var(--color-accent, #2563EB)', background: 'color-mix(in srgb, var(--color-accent, #2563EB) 12%, transparent)' } },
+  { level: null, label: 'Normal text', hint: '',
+    preview: { fontSize: 13, fontWeight: 400, lineHeight: 1.2 } },
 ]
 
-export const SYMBOLS = [
-  '↑', '↓', '→', '←', '↔', '≥', '≤', '±', '×', '÷',
-  'µ', '°', '²', '³', '½', '≈', '≠', '‰', 'α', 'β',
-  'γ', 'Δ', 'Ω', '√', '∞', '•', '–', '—', '′', '″',
-]
 
 export const SIZES = [
   { key: 'sm', label: 'Small',  px: 12 },
@@ -707,7 +708,7 @@ const menuRowStyle = isActive => ({
 })
 
 export default function RichTextToolbar({ active = EMPTY_ACTIVE, onAction, disabled = false, painter, canUndo = false, canRedo = false }) {
-  const [menu, setMenu] = useState(null) // null | 'color' | 'size' | 'highlight' | 'badge' | 'heading' | 'symbol'
+  const [menu, setMenu] = useState(null) // null | 'color' | 'size' | 'highlight' | 'badge' | 'heading' | 'list'
   const wrapRef = useRef(null)
   const [picker, setPicker] = useState(null) // null | 'drug' | 'class'  (the link pop-up)
 
@@ -776,6 +777,31 @@ export default function RichTextToolbar({ active = EMPTY_ACTIVE, onAction, disab
     )
   }
 
+  const listActive = !!(active.list || active.olist)
+
+  // Colour dropdown button with the small colour bar under the icon.
+  function swatchButton(kind, label, Icon, hex, current, items, offLabel) {
+    return (
+      <div style={{ position: 'relative' }}>
+        <IconButton
+          label={label}
+          active={menu === kind || !!current}
+          disabled={disabled}
+          onClick={() => setMenu(menu === kind ? null : kind)}
+        >
+          <Icon size={16} />
+          {hex && (
+            <span style={{
+              position: 'absolute', bottom: 3, insetInline: 8, height: 3,
+              borderRadius: 2, backgroundColor: hex,
+            }} />
+          )}
+        </IconButton>
+        {menu === kind && swatchMenu(kind, items, current, offLabel)}
+      </div>
+    )
+  }
+
   return (
     <div
       ref={wrapRef}
@@ -783,8 +809,7 @@ export default function RichTextToolbar({ active = EMPTY_ACTIVE, onAction, disab
       aria-label="Text formatting"
       style={{
         display: 'flex',
-        alignItems: 'center',
-        flexWrap: 'wrap',
+        flexDirection: 'column',
         gap: 2,
         padding: 3,
         backgroundColor: 'var(--color-surface)',
@@ -792,239 +817,169 @@ export default function RichTextToolbar({ active = EMPTY_ACTIVE, onAction, disab
         borderRadius: 'var(--radius-md)',
       }}
     >
-      <IconButton label="Undo (Ctrl+Z)" disabled={disabled || !canUndo} onClick={() => pick({ type: 'undo' })}>
-        <Undo2 size={16} />
-      </IconButton>
-      <IconButton label="Redo" disabled={disabled || !canRedo} onClick={() => pick({ type: 'redo' })}>
-        <Redo2 size={16} />
-      </IconButton>
-
-      <Divider />
-
-      <IconButton label="Bold (Ctrl+B)" active={active.b} disabled={disabled} onClick={() => pick({ type: 'toggle', id: 'b' })}>
-        <Bold size={16} strokeWidth={2.4} />
-      </IconButton>
-      <IconButton label="Italic (Ctrl+I)" active={active.i} disabled={disabled} onClick={() => pick({ type: 'toggle', id: 'i' })}>
-        <Italic size={16} />
-      </IconButton>
-      <IconButton label="Underline (Ctrl+U)" active={active.u} disabled={disabled} onClick={() => pick({ type: 'toggle', id: 'u' })}>
-        <Underline size={16} />
-      </IconButton>
-      <IconButton label="Subscript (CO₂)" active={active.sub} disabled={disabled} onClick={() => pick({ type: 'toggle', id: 'sub' })}>
-        <Subscript size={16} />
-      </IconButton>
-      <IconButton label="Superscript (m²)" active={active.sup} disabled={disabled} onClick={() => pick({ type: 'toggle', id: 'sup' })}>
-        <Superscript size={16} />
-      </IconButton>
-
-      <Divider />
-
-      {/* Heading level */}
-      <div style={{ position: 'relative' }}>
-        <IconButton
-          label="Heading"
-          active={menu === 'heading' || !!active.heading}
-          disabled={disabled}
-          onClick={() => setMenu(menu === 'heading' ? null : 'heading')}
-        >
-          <Heading size={16} />
+      {/* Line 1: sections, left to right: History | Font | Paragraph | Insert | Format painter */}
+      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+        {/* History */}
+        <IconButton label="Undo (Ctrl+Z)" disabled={disabled || !canUndo} onClick={() => pick({ type: 'undo' })}>
+          <Undo2 size={16} />
         </IconButton>
-        {menu === 'heading' && (
-          <ClampedPopover width={160} onMouseDown={keepSelection}>
-            {HEADINGS.map(h => (
-              <button
-                key={h.label}
-                type="button"
-                onClick={() => pick({ type: 'heading', value: h.level })}
-                style={menuRowStyle((active.heading ?? null) === h.level)}
-              >
-                {h.label}
+        <IconButton label="Redo" disabled={disabled || !canRedo} onClick={() => pick({ type: 'redo' })}>
+          <Redo2 size={16} />
+        </IconButton>
+
+        <Divider />
+
+        {/* Font: bold, italic, underline, colour, highlighter, badge, size, clear */}
+        <IconButton label="Bold (Ctrl+B)" active={active.b} disabled={disabled} onClick={() => pick({ type: 'toggle', id: 'b' })}>
+          <Bold size={16} strokeWidth={2.4} />
+        </IconButton>
+        <IconButton label="Italic (Ctrl+I)" active={active.i} disabled={disabled} onClick={() => pick({ type: 'toggle', id: 'i' })}>
+          <Italic size={16} />
+        </IconButton>
+        <IconButton label="Underline (Ctrl+U)" active={active.u} disabled={disabled} onClick={() => pick({ type: 'toggle', id: 'u' })}>
+          <Underline size={16} />
+        </IconButton>
+        {swatchButton('color', 'Font color', Palette, colorHex, active.color, COLORS, 'Default color')}
+        {swatchButton('highlight', 'Highlighter', Highlighter, highlightHex, active.highlight, HIGHLIGHTS, 'No highlight')}
+        {swatchButton('badge', 'Badge (small tag)', Tag, badgeHex, active.badge, COLORS, 'No badge')}
+        <div style={{ position: 'relative' }}>
+          <IconButton
+            label="Font size"
+            active={menu === 'size' || !!active.size}
+            disabled={disabled}
+            onClick={() => setMenu(menu === 'size' ? null : 'size')}
+          >
+            <Type size={16} />
+          </IconButton>
+          {menu === 'size' && (
+            <ClampedPopover width={150} onMouseDown={keepSelection}>
+              {SIZES.map(sz => (
+                <button
+                  key={sz.label}
+                  type="button"
+                  onClick={() => pick({ type: 'size', value: sz.key })}
+                  style={menuRowStyle((active.size ?? null) === sz.key)}
+                >
+                  <span style={{ fontSize: sz.px, lineHeight: 1.2 }}>{sz.label}</span>
+                </button>
+              ))}
+            </ClampedPopover>
+          )}
+        </div>
+        <IconButton label="Clear formatting" disabled={disabled} onClick={() => pick({ type: 'clear' })}>
+          <Eraser size={16} />
+        </IconButton>
+
+        <Divider />
+
+        {/* Paragraph: heading style, list */}
+        <div style={{ position: 'relative' }}>
+          <IconButton
+            label="Heading style"
+            active={menu === 'heading' || !!active.heading}
+            disabled={disabled}
+            onClick={() => setMenu(menu === 'heading' ? null : 'heading')}
+          >
+            <Heading size={16} />
+          </IconButton>
+          {menu === 'heading' && (
+            <ClampedPopover width={210} onMouseDown={keepSelection}>
+              {HEADINGS.map(h => (
+                <button
+                  key={h.label}
+                  type="button"
+                  onClick={() => pick({ type: 'heading', value: h.level })}
+                  style={{ ...menuRowStyle((active.heading ?? null) === h.level), display: 'flex', alignItems: 'center', gap: 8 }}
+                >
+                  <span style={h.preview}>{h.label}</span>
+                  <span style={{ marginInlineStart: 'auto', fontSize: 11, color: 'var(--color-text-tertiary)' }}>{h.hint}</span>
+                </button>
+              ))}
+            </ClampedPopover>
+          )}
+        </div>
+        <div style={{ position: 'relative' }}>
+          <IconButton
+            label="List"
+            active={menu === 'list' || listActive}
+            disabled={disabled}
+            onClick={() => setMenu(menu === 'list' ? null : 'list')}
+          >
+            {active.olist ? <ListOrdered size={16} /> : <List size={16} />}
+          </IconButton>
+          {menu === 'list' && (
+            <ClampedPopover width={170} onMouseDown={keepSelection}>
+              <button type="button" onClick={() => pick({ type: 'list' })} style={{ ...menuRowStyle(!!active.list), display: 'flex', alignItems: 'center', gap: 8 }}>
+                <List size={15} /> Bullet list
               </button>
-            ))}
-          </ClampedPopover>
+              <button type="button" onClick={() => pick({ type: 'olist' })} style={{ ...menuRowStyle(!!active.olist), display: 'flex', alignItems: 'center', gap: 8 }}>
+                <ListOrdered size={15} /> Numbered list
+              </button>
+            </ClampedPopover>
+          )}
+        </div>
+
+        <Divider />
+
+        {/* Insert: table, divider, drug link, class link */}
+        <IconButton label="Add a table" disabled={disabled} onClick={() => pick({ type: 'table' })}>
+          <Table size={16} />
+        </IconButton>
+        <IconButton label="Divider line" disabled={disabled} onClick={() => pick({ type: 'divider' })}>
+          <Minus size={16} />
+        </IconButton>
+        <IconButton label="Link a drug" disabled={disabled} onClick={() => openPicker('drug')}>
+          <Pill size={16} />
+        </IconButton>
+        <IconButton label="Link a class or drug family" disabled={disabled} onClick={() => openPicker('class')}>
+          <MoleculeIcon size={17} />
+        </IconButton>
+        <TextLinkPicker kind={picker} onClose={() => setPicker(null)} onPick={handlePicked} />
+
+        {painter !== undefined && (
+          <>
+            <Divider />
+            {/* Format painter */}
+            <IconButton label="Copy format of the selected text" active={!!painter} disabled={disabled} onClick={() => pick({ type: 'copyFormat' })}>
+              <Paintbrush size={16} />
+            </IconButton>
+            <IconButton
+              label={painter ? `Paste format (${describePainter(painter)})` : 'Paste format (copy a format first)'}
+              disabled={disabled || !painter}
+              onClick={() => pick({ type: 'pasteFormat' })}
+            >
+              <ClipboardPaste size={16} />
+            </IconButton>
+            {painter && (
+              <span style={{
+                fontSize: 11, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-body)',
+                padding: '0 6px', whiteSpace: 'nowrap',
+              }}>
+                {describePainter(painter)}
+              </span>
+            )}
+          </>
         )}
       </div>
 
-      <IconButton label="Bullet list" active={active.list} disabled={disabled} onClick={() => pick({ type: 'list' })}>
-        <List size={16} />
-      </IconButton>
-      <IconButton label="Numbered list" active={active.olist} disabled={disabled} onClick={() => pick({ type: 'olist' })}>
-        <ListOrdered size={16} />
-      </IconButton>
-      <IconButton label="Add a table" disabled={disabled} onClick={() => pick({ type: 'table' })}>
-        <Table size={16} />
-      </IconButton>
-      <IconButton label="Divider line" disabled={disabled} onClick={() => pick({ type: 'divider' })}>
-        <Minus size={16} />
-      </IconButton>
+      {/* Line 2: table tools, only while the cursor is inside a table */}
       {active.inTable && (
-        <>
-          <Divider />
+        <div style={{
+          display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 2,
+          paddingTop: 3, borderTop: '1px solid var(--color-border)',
+        }}>
+          <span style={{
+            fontSize: 11, fontWeight: 700, color: 'var(--color-text-tertiary)',
+            fontFamily: 'var(--font-body)', padding: '0 6px', textTransform: 'uppercase', letterSpacing: '0.04em',
+          }}>
+            Table
+          </span>
           <TextButton label="Add a row below" disabled={disabled} onClick={() => pick({ type: 'tableOp', op: 'addRow' })}>+ Row</TextButton>
           <TextButton label="Add a column to the right" disabled={disabled} onClick={() => pick({ type: 'tableOp', op: 'addCol' })}>+ Col</TextButton>
           <TextButton label="Delete this row" disabled={disabled} onClick={() => pick({ type: 'tableOp', op: 'delRow' })}>− Row</TextButton>
           <TextButton label="Delete this column" disabled={disabled} onClick={() => pick({ type: 'tableOp', op: 'delCol' })}>− Col</TextButton>
           <TextButton label="Delete the whole table" disabled={disabled} onClick={() => pick({ type: 'tableOp', op: 'delTable' })}>Delete table</TextButton>
-        </>
-      )}
-
-      <Divider />
-
-      {/* Font color */}
-      <div style={{ position: 'relative' }}>
-        <IconButton
-          label="Font color"
-          active={menu === 'color' || !!active.color}
-          disabled={disabled}
-          onClick={() => setMenu(menu === 'color' ? null : 'color')}
-        >
-          <Palette size={16} />
-          {colorHex && (
-            <span style={{
-              position: 'absolute', bottom: 3, insetInline: 8, height: 3,
-              borderRadius: 2, backgroundColor: colorHex,
-            }} />
-          )}
-        </IconButton>
-        {menu === 'color' && swatchMenu('color', COLORS, active.color, 'Default color')}
-      </div>
-
-      {/* Highlighter */}
-      <div style={{ position: 'relative' }}>
-        <IconButton
-          label="Highlighter"
-          active={menu === 'highlight' || !!active.highlight}
-          disabled={disabled}
-          onClick={() => setMenu(menu === 'highlight' ? null : 'highlight')}
-        >
-          <Highlighter size={16} />
-          {highlightHex && (
-            <span style={{
-              position: 'absolute', bottom: 3, insetInline: 8, height: 3,
-              borderRadius: 2, backgroundColor: highlightHex,
-            }} />
-          )}
-        </IconButton>
-        {menu === 'highlight' && swatchMenu('highlight', HIGHLIGHTS, active.highlight, 'No highlight')}
-      </div>
-
-      {/* Badge (small coloured tag) */}
-      <div style={{ position: 'relative' }}>
-        <IconButton
-          label="Badge (small tag)"
-          active={menu === 'badge' || !!active.badge}
-          disabled={disabled}
-          onClick={() => setMenu(menu === 'badge' ? null : 'badge')}
-        >
-          <Tag size={16} />
-          {badgeHex && (
-            <span style={{
-              position: 'absolute', bottom: 3, insetInline: 8, height: 3,
-              borderRadius: 2, backgroundColor: badgeHex,
-            }} />
-          )}
-        </IconButton>
-        {menu === 'badge' && swatchMenu('badge', COLORS, active.badge, 'No badge')}
-      </div>
-
-      {/* Font size */}
-      <div style={{ position: 'relative' }}>
-        <IconButton
-          label="Font size"
-          active={menu === 'size' || !!active.size}
-          disabled={disabled}
-          onClick={() => setMenu(menu === 'size' ? null : 'size')}
-        >
-          <Type size={16} />
-        </IconButton>
-        {menu === 'size' && (
-          <ClampedPopover width={150} onMouseDown={keepSelection}>
-            {SIZES.map(s => (
-              <button
-                key={s.label}
-                type="button"
-                onClick={() => pick({ type: 'size', value: s.key })}
-                style={menuRowStyle((active.size ?? null) === s.key)}
-              >
-                <span style={{ fontSize: s.px, lineHeight: 1.2 }}>{s.label}</span>
-              </button>
-            ))}
-          </ClampedPopover>
-        )}
-      </div>
-
-      {/* Symbols */}
-      <div style={{ position: 'relative' }}>
-        <IconButton
-          label="Symbols (≥ ± ° µ ↑ ...)"
-          active={menu === 'symbol'}
-          disabled={disabled}
-          onClick={() => setMenu(menu === 'symbol' ? null : 'symbol')}
-        >
-          <span style={{ fontSize: 16, fontWeight: 600, lineHeight: 1 }}>Ω</span>
-        </IconButton>
-        {menu === 'symbol' && (
-          <ClampedPopover width={220} onMouseDown={keepSelection}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 2 }}>
-              {SYMBOLS.map(ch => (
-                <button
-                  key={ch}
-                  type="button"
-                  aria-label={`Insert ${ch}`}
-                  onClick={() => pick({ type: 'symbol', value: ch })}
-                  style={{
-                    height: 34, border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer',
-                    background: 'transparent', color: 'var(--color-text-primary)', fontSize: 16,
-                    fontFamily: 'var(--font-body)',
-                  }}
-                >
-                  {ch}
-                </button>
-              ))}
-            </div>
-          </ClampedPopover>
-        )}
-      </div>
-
-      <Divider />
-
-      {/* Drug link and class link (added only here, never by the AI) */}
-      <IconButton label="Link a drug" disabled={disabled} onClick={() => openPicker('drug')}>
-        <Pill size={16} />
-      </IconButton>
-      <IconButton label="Link a class or drug family" disabled={disabled} onClick={() => openPicker('class')}>
-        <MoleculeIcon size={17} />
-      </IconButton>
-      <TextLinkPicker kind={picker} onClose={() => setPicker(null)} onPick={handlePicked} />
-
-      <Divider />
-
-      <IconButton label="Clear formatting" disabled={disabled} onClick={() => pick({ type: 'clear' })}>
-        <Eraser size={16} />
-      </IconButton>
-
-      {painter !== undefined && (
-        <>
-          <Divider />
-          <IconButton label="Copy format of the selected text" active={!!painter} disabled={disabled} onClick={() => pick({ type: 'copyFormat' })}>
-            <Paintbrush size={16} />
-          </IconButton>
-          <IconButton
-            label={painter ? `Paste format (${describePainter(painter)})` : 'Paste format (copy a format first)'}
-            disabled={disabled || !painter}
-            onClick={() => pick({ type: 'pasteFormat' })}
-          >
-            <ClipboardPaste size={16} />
-          </IconButton>
-          {painter && (
-            <span style={{
-              fontSize: 11, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-body)',
-              padding: '0 6px', whiteSpace: 'nowrap',
-            }}>
-              {describePainter(painter)}
-            </span>
-          )}
-        </>
+        </div>
       )}
     </div>
   )

@@ -23,7 +23,7 @@
  */
 
 import { marked } from 'marked'
-import { getSheetDrugSuffix } from '../utils/drugTitleFormat'
+import { getSheetDrugSuffix, toTitleCase } from '../utils/drugTitleFormat'
 
 export const DRUG_PREFIX   = 'capsula:drug/'
 export const CLASS_PREFIX  = 'capsula:class/'
@@ -45,7 +45,8 @@ function safeLabel(s) {
 
 export function drugLinkMarkdown(drug) {
   const slug = drug?.slug || drug?.id
-  const name = safeLabel(drug?.tradenameClean || drug?.name || drug?.genericName)
+  // first letter of each word capital, the same as the drug block shows brand names
+  const name = toTitleCase(safeLabel(drug?.tradenameClean || drug?.name || drug?.genericName))
   if (!slug || !name) return ''
   const suffix = safeLabel(getSheetDrugSuffix({
     concentration: drug.concentration,

@@ -599,29 +599,32 @@ body {
 /* Drug links and class links (plan step 4). Saved as capsula:drug/..., capsula:class/... and
    capsula:family/... links, added only with the toolbar buttons. The same rules style them in
    the app, in the CMS preview and inside the editing box.
-   Drug link:  name in the drug block's bold, strength and form small and grey (a span inside the
-               link), a faint underline, no chevron.
-   Class link: its own colour (--color-class) with a small molecule icon, so it is easy to tell
-               from a drug link. A drug family link looks the same as a class link. */
+   Both look like a small tinted chip, so they stand out from the text and show they can be tapped.
+   Drug link:  blue (the app's tap colour), name bold, strength and form small and grey (a span
+               inside the link), no chevron.
+   Class link: violet (--color-class) with a small molecule icon, so it is easy to tell from a
+               drug link. A drug family link looks the same as a class link. */
 .dir-prose a[href^="capsula:"] {
   cursor: pointer;
-  text-decoration: underline;
-  text-decoration-thickness: 1px;
-  text-underline-offset: 3px;
+  text-decoration: none;
+  padding: 1px 6px;
+  border-radius: 6px;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
   -webkit-tap-highlight-color: transparent;
 }
 .dir-prose a[href^="capsula:drug/"] {
-  color: var(--color-text-primary);
-  text-decoration-color: color-mix(in srgb, var(--color-text-tertiary) 55%, transparent);
+  color: var(--color-accent, #2563EB);
+  background: color-mix(in srgb, var(--color-accent, #2563EB) 11%, transparent);
 }
 .dir-prose a[href^="capsula:drug/"] strong {
-  font-weight: 600;
+  font-weight: 700;
 }
 .dir-prose a[href^="capsula:class/"],
 .dir-prose a[href^="capsula:family/"] {
   color: var(--color-class);
   font-weight: 600;
-  text-decoration-color: color-mix(in srgb, var(--color-class) 40%, transparent);
+  background: color-mix(in srgb, var(--color-class) 11%, transparent);
 }
 .dir-prose a[href^="capsula:class/"]::before,
 .dir-prose a[href^="capsula:family/"]::before {
