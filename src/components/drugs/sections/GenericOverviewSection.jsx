@@ -795,6 +795,7 @@ export default function GenericOverviewSection({ drug, siblings = [], alternativ
         alternatives={alternatives}
         initialTab={sheetTab}
         onSelectBrand={onSelectBrand}
+        hideOtherInSimilar={genericMode}
       />}
 
       {drugClass && (

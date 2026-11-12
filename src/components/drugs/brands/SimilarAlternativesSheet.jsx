@@ -259,6 +259,7 @@ export default function SimilarAlternativesSheet({
   alternatives = [],
   initialTab = 'similar',
   onSelectBrand,
+  hideOtherInSimilar = false,   // generic page only: Similar tab title has no 'Other'
 }) {
   const [tab, setTab] = useState(initialTab)
   // Remembered picks per tab (a ref: no re-render needed, only read when a
@@ -397,6 +398,7 @@ export default function SimilarAlternativesSheet({
                   currentDrug={name === 'similar' ? currentDrug : null}
                   onTap={handleTap}
                   mode={name}
+                  hideOther={name === 'similar' && hideOtherInSimilar}
                   proGateForm
                   saved={savedFilters.current[name]}
                   onSave={picks => { savedFilters.current[name] = picks }}
