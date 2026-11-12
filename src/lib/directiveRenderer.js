@@ -21,7 +21,7 @@
  *
  * CARD INVENTORY (8 types — reduced from 12):
  *   Safety:   danger, warning, redflags, contraindications
- *   Dosing:   dose
+ *   Dosage:   dose
  *   Clinical: criteria, tip, pearls
  *
  * REMOVED (Phase 5 redesign):
@@ -42,8 +42,8 @@ export const DIRECTIVES = {
   warning:           { label: 'Warning',            cls: 'dir-card-warning' },
   redflags:          { label: 'Red Flags',          cls: 'dir-card-redflags' },
   contraindications: { label: 'Contraindications',  cls: 'dir-card-contraindications' },
-  // Dosing
-  dose:              { label: 'Dosing',             cls: 'dir-card-dose' },
+  // Dosage
+  dose:              { label: 'Dosage',             cls: 'dir-card-dose' },
   // Clinical
   criteria:          { label: 'Criteria',           cls: 'dir-card-criteria' },
   tip:               { label: 'Clinical Pearl',     cls: 'dir-card-tip' },
