@@ -39,6 +39,8 @@
  *   { type: 'divider' }                                   (a divider line after the current line)
  *   { type: 'undo' } / { type: 'redo' }                   (handled by the editor that owns the text history)
  *   { type: 'toggle', id: 'sub' | 'sup' }                 (subscript / superscript, saved as <sub> / <sup>)
+ *   { type: 'linkStart' }                                 (the editor remembers the cursor before the Drug / Class pop-up opens)
+ *   { type: 'link', markdown, html }                      (a drug link or class link, typed at the cursor, see textLinks.js)
  *   { type: 'copyFormat' }                                (remember the look of the selected text)
  *   { type: 'pasteFormat' }                               (give the selected text that look)
  *
@@ -47,7 +49,10 @@
  */
 
 import { useState, useEffect, useLayoutEffect, useRef } from 'react'
-import { Bold, Italic, Underline, Palette, Type, Eraser, List, ListOrdered, Paintbrush, ClipboardPaste, Highlighter, Tag, Heading, Table, Subscript, Superscript, Minus, Undo2, Redo2 } from 'lucide-react'
+import { Bold, Italic, Underline, Palette, Type, Eraser, List, ListOrdered, Paintbrush, ClipboardPaste, Highlighter, Tag, Heading, Table, Subscript, Superscript, Minus, Undo2, Redo2, Pill } from 'lucide-react'
+import { MoleculeIcon } from '../../drugs/classes/ClassIcons'
+import TextLinkPicker from './TextLinkPicker'
+import { drugLinkMarkdown, classLinkMarkdown, linkEditorHtml } from '../../../lib/textLinks'
 
 // ─── Choices ───────────────────────────────────────────────────────────────────
 
@@ -469,6 +474,13 @@ export function applyFormat(value, start, end, action) {
   if (action.type === 'table') return applyTable(value, end)
   if (action.type === 'divider') return applyDivider(value, end)
   if (action.type === 'tableOp') return applyTableOp(value, start, action.op)
+  if (action.type === 'linkStart') return null
+  if (action.type === 'link') {
+    // the saved link text goes at the cursor (replacing any selected text), then one space so typing can go on
+    const text = action.markdown + (/\s/.test(value.charAt(end)) ? '' : ' ')
+    const caret = start + text.length
+    return { value: value.slice(0, start) + text + value.slice(end), selStart: caret, selEnd: caret }
+  }
   if (action.type === 'symbol') {
     const caret = start + action.value.length
     return { value: value.slice(0, start) + action.value + value.slice(end), selStart: caret, selEnd: caret }
@@ -697,6 +709,20 @@ const menuRowStyle = isActive => ({
 export default function RichTextToolbar({ active = EMPTY_ACTIVE, onAction, disabled = false, painter, canUndo = false, canRedo = false }) {
   const [menu, setMenu] = useState(null) // null | 'color' | 'size' | 'highlight' | 'badge' | 'heading' | 'symbol'
   const wrapRef = useRef(null)
+  const [picker, setPicker] = useState(null) // null | 'drug' | 'class'  (the link pop-up)
+
+  function openPicker(kind) {
+    setMenu(null)
+    onAction({ type: 'linkStart' })
+    setPicker(kind)
+  }
+
+  function handlePicked(pick) {
+    const markdown = picker === 'drug' ? drugLinkMarkdown(pick) : classLinkMarkdown(pick?.className, pick?.familyName)
+    setPicker(null)
+    if (!markdown) return
+    onAction({ type: 'link', markdown, html: linkEditorHtml(markdown) })
+  }
 
   // Close an open menu when clicking anywhere outside the toolbar.
   useEffect(() => {
@@ -959,6 +985,17 @@ export default function RichTextToolbar({ active = EMPTY_ACTIVE, onAction, disab
           </ClampedPopover>
         )}
       </div>
+
+      <Divider />
+
+      {/* Drug link and class link (added only here, never by the AI) */}
+      <IconButton label="Link a drug" disabled={disabled} onClick={() => openPicker('drug')}>
+        <Pill size={16} />
+      </IconButton>
+      <IconButton label="Link a class or drug family" disabled={disabled} onClick={() => openPicker('class')}>
+        <MoleculeIcon size={17} />
+      </IconButton>
+      <TextLinkPicker kind={picker} onClose={() => setPicker(null)} onPick={handlePicked} />
 
       <Divider />
 

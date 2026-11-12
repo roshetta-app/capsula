@@ -596,6 +596,46 @@ body {
 .dir-prose .rt-s-sm { font-size: 12px; }
 .dir-prose .rt-s-lg { font-size: 18px; line-height: 1.4; }
 
+/* Drug links and class links (plan step 4). Saved as capsula:drug/..., capsula:class/... and
+   capsula:family/... links, added only with the toolbar buttons. The same rules style them in
+   the app, in the CMS preview and inside the editing box.
+   Drug link:  name in the drug block's bold, strength and form small and grey (a span inside the
+               link), a faint underline, no chevron.
+   Class link: its own colour (--color-class) with a small molecule icon, so it is easy to tell
+               from a drug link. A drug family link looks the same as a class link. */
+.dir-prose a[href^="capsula:"] {
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  -webkit-tap-highlight-color: transparent;
+}
+.dir-prose a[href^="capsula:drug/"] {
+  color: var(--color-text-primary);
+  text-decoration-color: color-mix(in srgb, var(--color-text-tertiary) 55%, transparent);
+}
+.dir-prose a[href^="capsula:drug/"] strong {
+  font-weight: 600;
+}
+.dir-prose a[href^="capsula:class/"],
+.dir-prose a[href^="capsula:family/"] {
+  color: var(--color-class);
+  font-weight: 600;
+  text-decoration-color: color-mix(in srgb, var(--color-class) 40%, transparent);
+}
+.dir-prose a[href^="capsula:class/"]::before,
+.dir-prose a[href^="capsula:family/"]::before {
+  content: "";
+  display: inline-block;
+  width: 1.1em;
+  height: 1.1em;
+  margin-inline-end: 0.2em;
+  vertical-align: -0.2em;
+  background-color: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='black' stroke-width='1.6'%3E%3Ccircle cx='12' cy='12' r='2.5'/%3E%3Cpath stroke-linejoin='round' d='m10 14l-3.5 3.5m4-7L6 6'/%3E%3Ccircle cx='17' cy='17' r='1.5'/%3E%3Ccircle cx='20' cy='12' r='1.5'/%3E%3Cpath stroke-linejoin='round' d='M18.5 12h-4m-.5 2l2 2'/%3E%3Ccircle cx='19' cy='5' r='2.5'/%3E%3Cpath stroke-linejoin='round' d='m17 7l-3 3'/%3E%3Ccircle cx='5' cy='5' r='1.5'/%3E%3Ccircle cx='5' cy='19' r='2.5'/%3E%3C/g%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='black' stroke-width='1.6'%3E%3Ccircle cx='12' cy='12' r='2.5'/%3E%3Cpath stroke-linejoin='round' d='m10 14l-3.5 3.5m4-7L6 6'/%3E%3Ccircle cx='17' cy='17' r='1.5'/%3E%3Ccircle cx='20' cy='12' r='1.5'/%3E%3Cpath stroke-linejoin='round' d='M18.5 12h-4m-.5 2l2 2'/%3E%3Ccircle cx='19' cy='5' r='2.5'/%3E%3Cpath stroke-linejoin='round' d='m17 7l-3 3'/%3E%3Ccircle cx='5' cy='5' r='1.5'/%3E%3Ccircle cx='5' cy='19' r='2.5'/%3E%3C/g%3E%3C/svg%3E") center / contain no-repeat;
+}
+
 /* ─── Heading hierarchy ───────────────────────────────────────────────────────── */
 
 /* ## → major section header: Diagnosis, Treatment, Investigations, etc. */

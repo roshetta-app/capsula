@@ -360,6 +360,8 @@ const EDITOR_CSS = `
 export default function RichTextEditorBox({ value, onChange, disabled = false, history, placeholder = 'Write here. Select text and use the toolbar.' }) {
   const elRef = useRef(null)
   const lastEmitted = useRef(null)
+  // Where the cursor was when the Drug / Class pop-up opened (the pop-up takes the focus).
+  const linkRangeRef = useRef(null)
   const [active, setActive] = useState(EMPTY_ACTIVE)
   const [painter, setPainter] = useState(null) // copied look: { b, i, u, color, size }
   const [empty, setEmpty] = useState(!(value ?? '').trim())
@@ -433,6 +435,29 @@ export default function RichTextEditorBox({ value, onChange, disabled = false, h
     if (!el || disabled) return
     if (action.type === 'undo') { history?.undo(); return }
     if (action.type === 'redo') { history?.redo(); return }
+    if (action.type === 'linkStart') {
+      linkRangeRef.current = selectionRangeIn(el)?.cloneRange() ?? null
+      return
+    }
+    if (action.type === 'link') {
+      el.focus()
+      const sel = window.getSelection()
+      const saved = linkRangeRef.current
+      linkRangeRef.current = null
+      const range = saved && el.contains(saved.commonAncestorContainer) ? saved : document.createRange()
+      if (range === saved) {
+        sel.removeAllRanges(); sel.addRange(range)
+      } else {
+        // no remembered cursor: put the link at the end of the text
+        range.selectNodeContents(el); range.collapse(false)
+        sel.removeAllRanges(); sel.addRange(range)
+      }
+      // one space after the link, outside it, so typing goes on as normal text
+      document.execCommand('insertHTML', false, `${action.html}&nbsp;`)
+      emit(true)
+      readActive()
+      return
+    }
     el.focus()
     try { document.execCommand('styleWithCSS', false, false) } catch { /* ignore */ }
     if (action.type === 'copyFormat') {
