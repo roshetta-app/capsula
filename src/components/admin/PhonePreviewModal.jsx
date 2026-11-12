@@ -22,7 +22,7 @@ import { PreviewModeContext } from '../../context/PreviewModeContext'
 import PrescriptionsTab from '../conditions/PrescriptionsTab'
 import ClinicalDataTab from '../conditions/ClinicalDataTab'
 
-const TABS = ['Treatment', 'Clinical']
+const TABS = ['Treatment', 'Review']
 
 // Editor rows -> the shape the app screens read (see mapConditions in queries.js).
 function toAppBlocks(blocks = []) {

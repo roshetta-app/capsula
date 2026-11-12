@@ -1271,6 +1271,10 @@ function AddRowButton({ label, color, onClick, disabled = false }) {
 // onTransferRows  — (targetGlobalIndex, newRows, removeIndices) => void; adds the
 //                   new rows to the end of the target sheet and, for a move, removes
 //                   the rows at removeIndices from this sheet, in one change
+// 2026-11-12: also used for the Rx-level list and the Review list (same rows, same bars,
+// same Select actions). otherSheets then holds every other list a row can be sent to
+// (sheets, Rx-level, Review); each entry is { globalIndex | type, label } and is handed
+// back whole to onTransferRows.
 export default function PrescriptionSheetEditor({ block, onChange, disabled = false, otherSheets = [], onTransferRows = null }) {
   const data  = block?.data ?? {}
   const label = data.label ?? ''
@@ -1301,7 +1305,7 @@ export default function PrescriptionSheetEditor({ block, onChange, disabled = fa
   }, [rows.length])
 
   function update(patch) {
-    onChange({ label, rows, ...patch })
+    onChange({ ...data, ...patch })
   }
 
   // ── Row mutations (shared hook — same logic the section's nested drugs[]
@@ -1402,7 +1406,7 @@ export default function PrescriptionSheetEditor({ block, onChange, disabled = fa
     if (!onTransferRows) return
     const isMove = sheetAction === 'move'
     const picked = selected.map(i => rows[i]).filter(Boolean)
-    onTransferRows(target.globalIndex, picked.map(cloneRowFresh), isMove ? selected : [])
+    onTransferRows(target, picked.map(cloneRowFresh), isMove ? selected : [])
     setNotice(`${isMove ? 'Moved' : 'Copied'} ${countText(picked.length)} to ${target.label}.`)
     setSelected([])
     resetBars()
@@ -1501,7 +1505,7 @@ export default function PrescriptionSheetEditor({ block, onChange, disabled = fa
           border: '1.5px dashed var(--color-border)',
           borderRadius: 'var(--radius-md)',
         }}>
-          No rows yet — add a drug, section, note, or text block below.
+          Nothing here yet — add a drug, section, note, text block, divider or image below.
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -1588,7 +1592,7 @@ export default function PrescriptionSheetEditor({ block, onChange, disabled = fa
               {panel === 'delete' ? `Delete ${countText(selected.length)}?`
                 : placing ? 'Tap where to put them'
                 : panel === 'move' ? `Move ${countText(selected.length)}`
-                : panel === 'sheet' ? `Send ${countText(selected.length)} to another sheet`
+                : panel === 'sheet' ? `Send ${countText(selected.length)} to another list`
                 : `${countText(selected.length)} selected`}
             </span>
             {panel === null && (
@@ -1618,7 +1622,7 @@ export default function PrescriptionSheetEditor({ block, onChange, disabled = fa
               </button>
               {canTransfer && (
                 <button type="button" onClick={() => setPanel('sheet')} style={actionBtn()}>
-                  <Send size={18} /><span>To sheet</span>
+                  <Send size={18} /><span>Send to</span>
                 </button>
               )}
               <button type="button" onClick={() => setPanel('delete')} style={actionBtn('danger')}>
@@ -1655,7 +1659,7 @@ export default function PrescriptionSheetEditor({ block, onChange, disabled = fa
             <button type="button" onClick={() => setPlacing(false)} style={barBtn(false)}>Cancel</button>
           )}
 
-          {/* Send to another sheet: choose copy or move once, then tap the sheet */}
+          {/* Send to another list: choose copy or move once, then tap the list */}
           {panel === 'sheet' && (
             <>
               <div style={{ display: 'flex', gap: 6 }}>
@@ -1672,7 +1676,7 @@ export default function PrescriptionSheetEditor({ block, onChange, disabled = fa
               </div>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {otherSheets.map(sheet => (
-                  <button key={sheet.globalIndex} type="button" onClick={() => transferSelected(sheet)} style={{ ...barBtn(false), flex: '1 1 40%' }}>
+                  <button key={sheet.globalIndex ?? sheet.type} type="button" onClick={() => transferSelected(sheet)} style={{ ...barBtn(false), flex: '1 1 40%' }}>
                     {sheetAction === 'copy' ? 'Copy to ' : 'Move to '}{sheet.label}
                   </button>
                 ))}

@@ -52,6 +52,7 @@ import SpecialtySelector from '../conditions/SpecialtySelector'
 import SpecialtiesBottomSheet from '../conditions/SpecialtiesBottomSheet'
 import { CollapseAllContext } from './CollapseAllContext'
 import { setPageTitle } from '../../utils/pageTitle'
+import { foldLegacyBlocks } from '../../utils/foldLegacyBlocks'
 
 // ─── Undo / Redo button ───────────────────────────────────────────────────────
 
@@ -547,9 +548,12 @@ export default function ConditionEditor() {
       }
       setForm(loadedForm)
 
-      const loadedBlocks = (data.condition_blocks ?? [])
-        .slice()
-        .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
+      // Older loose blocks are folded into the Rx-level and Review lists (2026-11-12).
+      const loadedBlocks = foldLegacyBlocks(
+        (data.condition_blocks ?? [])
+          .slice()
+          .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
+      )
       setBlocks(loadedBlocks)
 
       // Load existing condition tags

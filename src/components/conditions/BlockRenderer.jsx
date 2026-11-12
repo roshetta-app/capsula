@@ -39,6 +39,12 @@ export default function BlockRenderer({ block }) {
     case 'prescription_sheet':
       return <PrescriptionSheetBlock sheet={data} />
 
+    case 'rx_level':
+    case 'review':
+      // 2026-11-12: a list of rows built like a sheet's, drawn by the same code
+      // (drugs, sections, notes, text, dividers, images). No zigzag after it.
+      return <PrescriptionSheetBlock sheet={data} hasContentAfter={false} />
+
     case 'note_callout':
       return <NoteCallout text={data?.text} flavor={data?.flavor} variant="divider" flush />
 

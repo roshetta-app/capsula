@@ -62,11 +62,14 @@ export function getClinicalDataBlocks(allBlocks) {
     'list_section',
     'differential_dx',
     'table',
+    'review',
   ])
 
   const filtered = allBlocks
     .filter(b => {
       if (!CLINICAL_TYPES.has(b.blockType)) return false
+      // 2026-11-12: the Review list (rows built like a sheet's) shows when it has any
+      if (b.blockType === 'review') return (b.data?.rows ?? []).length > 0
       // divider with context 'rx' belongs to Rx tab
       if (b.blockType === 'divider' && b.data?.context === 'rx') return false
       // note_callout with empty text has no content
@@ -112,6 +115,8 @@ export function getRxBlocks(allBlocks) {
         // Empty rows array = no content (Section 3.3)
         return b.data?.rows?.length > 0
       }
+      // 2026-11-12: the Rx-level list (rows built like a sheet's) shows when it has any
+      if (b.blockType === 'rx_level') return (b.data?.rows ?? []).length > 0
       // Phase 2: image_gallery with context 'rx' appears in Rx tab
       if (b.blockType === 'image_gallery' && b.data?.context === 'rx') return true
       // Phase 2: free_text_post with context 'rx' appears in Rx tab

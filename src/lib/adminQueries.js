@@ -604,7 +604,7 @@ export async function saveConditionBlocks(conditionId, blocks) {
   // 3. Strip UI-only sentinel keys from each block's data
   function cleanData(blockType, rawData) {
     if (!rawData) return rawData
-    if (blockType === 'prescription_sheet') {
+    if (blockType === 'prescription_sheet' || blockType === 'rx_level' || blockType === 'review') {
       const cleanRows = (rawData.rows ?? []).map(row => {
         // eslint-disable-next-line no-unused-vars
         const { _isNew, _formulationMeta, ...cleanRow } = row
