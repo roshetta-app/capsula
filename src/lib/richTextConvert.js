@@ -151,6 +151,8 @@ function inlineNode(n, ctx) {
     case 'strong': case 'b': return wrapMarks(inlineOf(n, ctx), '**')
     case 'em': case 'i': return wrapMarks(inlineOf(n, ctx), '*')
     case 'u': return wrapMarks(inlineOf(n, ctx), '<u>', '</u>')
+    case 'sub': return wrapMarks(inlineOf(n, ctx), '<sub>', '</sub>')
+    case 'sup': return wrapMarks(inlineOf(n, ctx), '<sup>', '</sup>')
     case 'span': {
       const classes = Array.from(n.classList || []).filter(c => /^rt-[csbh]-[a-z]+$/.test(c))
       const inner = inlineOf(n, ctx)

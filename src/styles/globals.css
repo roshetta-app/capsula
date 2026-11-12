@@ -1214,6 +1214,8 @@ body {
 .dark .dir-prose .rt-b-blue   { color: #60A5FA; }
 .dark .dir-prose .rt-b-purple { color: #A78BFA; }
 .dark .dir-prose .rt-b-gray   { color: #9CA3AF; }
+/* Subscript / superscript (CO2, m2): smaller, and they do not push the line apart. */
+.dir-prose sub, .dir-prose sup { font-size: 0.75em; line-height: 0; }
 
 /* Prescription-sheet rows are tight: same hierarchy, one step smaller, no section lines. */
 .rx-prose-tight .dir-prose h2 { font-size: 15px; padding-bottom: 0; border-bottom: none; margin: 12px 0 4px; }

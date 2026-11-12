@@ -168,6 +168,80 @@ function pasteFormat(root, look) {
   applySpanClass(root, 'b', look.badge ?? null)
 }
 
+// The table cell the cursor is in, or null.
+function tableCellAt(root) {
+  const range = selectionRangeIn(root)
+  if (!range) return null
+  const n = range.startContainer
+  const host = n.nodeType === 3 ? n.parentElement : n
+  const cell = host?.closest?.('td, th')
+  return cell && root.contains(cell) ? cell : null
+}
+
+function newCell(tag) {
+  const c = document.createElement(tag)
+  c.appendChild(document.createElement('br'))
+  return c
+}
+
+function placeCaretIn(node) {
+  if (!node) return
+  const r = document.createRange()
+  r.selectNodeContents(node)
+  r.collapse(true)
+  const sel = window.getSelection()
+  sel.removeAllRanges()
+  sel.addRange(r)
+}
+
+// Add / delete a row or column of the table the cursor is in. Returns true when it did something.
+function tableOpDom(root, op) {
+  const cell = tableCellAt(root)
+  if (!cell) return false
+  const row = cell.parentElement
+  const table = cell.closest('table')
+  const rows = Array.from(table.rows)
+  const rIdx = rows.indexOf(row)
+  const cIdx = cell.cellIndex
+  const cols = row.cells.length
+  let focus = cell
+  if (op === 'delTable' || (op === 'delCol' && cols <= 1)) {
+    const after = table.nextElementSibling
+    table.remove()
+    if (!root.firstChild) root.appendChild(Object.assign(document.createElement('p'), { innerHTML: '<br>' }))
+    placeCaretIn(after || root.lastElementChild)
+    return true
+  }
+  if (op === 'addRow') {
+    const tr = document.createElement('tr')
+    for (let i = 0; i < cols; i += 1) tr.appendChild(newCell('td'))
+    if (rIdx === 0) {
+      let tb = table.tBodies[0]
+      if (!tb) { tb = document.createElement('tbody'); table.appendChild(tb) }
+      tb.insertBefore(tr, tb.firstChild)
+    } else {
+      row.parentNode.insertBefore(tr, row.nextSibling)
+    }
+    focus = tr.cells[Math.min(cIdx, tr.cells.length - 1)]
+  } else if (op === 'delRow') {
+    if (rIdx === 0) return false
+    const near = rows[rIdx + 1] || rows[rIdx - 1]
+    row.remove()
+    focus = near.cells[Math.min(cIdx, near.cells.length - 1)]
+  } else if (op === 'addCol') {
+    rows.forEach((r, i) => {
+      const ref = r.cells[cIdx]
+      r.insertBefore(newCell(i === 0 ? 'th' : 'td'), ref ? ref.nextSibling : null)
+    })
+    focus = row.cells[cIdx + 1]
+  } else if (op === 'delCol') {
+    rows.forEach(r => { if (r.cells[cIdx]) r.cells[cIdx].remove() })
+    focus = row.cells[Math.min(cIdx, row.cells.length - 1)]
+  } else return false
+  placeCaretIn(focus)
+  return true
+}
+
 function looksLikeMarkdown(t) {
   return /(^|\n)\s*(#{1,6} |[-*+] |\d+[.)] |> |:::|\|.*\|)/.test(t)
     || /(^|\n)\s*([-*_])(\s*\2){2,}\s*(\n|$)/.test(t)
@@ -283,7 +357,7 @@ const EDITOR_CSS = `
   font-family: var(--font-body); }
 `
 
-export default function RichTextEditorBox({ value, onChange, disabled = false, placeholder = 'Write here. Select text and use the toolbar.' }) {
+export default function RichTextEditorBox({ value, onChange, disabled = false, history, placeholder = 'Write here. Select text and use the toolbar.' }) {
   const elRef = useRef(null)
   const lastEmitted = useRef(null)
   const [active, setActive] = useState(EMPTY_ACTIVE)
@@ -302,14 +376,16 @@ export default function RichTextEditorBox({ value, onChange, disabled = false, p
     setEmpty(!(value ?? '').trim())
   }, [value])
 
-  const emit = useCallback(() => {
+  // step = true for a toolbar choice, a pasted block, a card ... (its own Undo step);
+  // typing is grouped into steps by the parent.
+  const emit = useCallback((step = false) => {
     const el = elRef.current
     if (!el) return
     applyAutoDir(el)   // new lines typed or pasted get their own direction
     const md = editorToMarkdown(el)
     lastEmitted.current = md
     setEmpty(!md.trim())
-    onChange(md)
+    onChange(md, { step: step === true })
   }, [onChange])
 
   // The look of the text at the cursor / selection, or null when the cursor is elsewhere.
@@ -325,7 +401,10 @@ export default function RichTextEditorBox({ value, onChange, disabled = false, p
       return c ? c.slice(prefix.length) : null
     }
     let b = false; let i = false; let u = false; let list = false; let olist = false
+    let sub = false; let sup = false
     try {
+      sub = document.queryCommandState('subscript')
+      sup = document.queryCommandState('superscript')
       b = document.queryCommandState('bold')
       i = document.queryCommandState('italic')
       u = document.queryCommandState('underline')
@@ -334,7 +413,8 @@ export default function RichTextEditorBox({ value, onChange, disabled = false, p
     } catch { /* not supported: buttons just stay unlit */ }
     const h = host?.closest?.('h2, h3, h4')
     const heading = h && el.contains(h) ? Number(h.tagName[1]) : null
-    return { b, i, u, color: find('rt-c-'), size: find('rt-s-'), highlight: find('rt-h-'), badge: find('rt-b-'), list, olist, heading }
+    const inTable = !!host?.closest?.('td, th')
+    return { b, i, u, sub, sup, color: find('rt-c-'), size: find('rt-s-'), highlight: find('rt-h-'), badge: find('rt-b-'), list, olist, heading, inTable }
   }, [])
 
   const readActive = useCallback(() => {
@@ -351,6 +431,8 @@ export default function RichTextEditorBox({ value, onChange, disabled = false, p
   function runAction(action) {
     const el = elRef.current
     if (!el || disabled) return
+    if (action.type === 'undo') { history?.undo(); return }
+    if (action.type === 'redo') { history?.redo(); return }
     el.focus()
     try { document.execCommand('styleWithCSS', false, false) } catch { /* ignore */ }
     if (action.type === 'copyFormat') {
@@ -363,7 +445,7 @@ export default function RichTextEditorBox({ value, onChange, disabled = false, p
       if (!painter) return
       pasteFormat(el, painter)
     } else if (action.type === 'toggle') {
-      document.execCommand({ b: 'bold', i: 'italic', u: 'underline' }[action.id])
+      document.execCommand({ b: 'bold', i: 'italic', u: 'underline', sub: 'subscript', sup: 'superscript' }[action.id])
     } else if (action.type === 'list') {
       document.execCommand('insertUnorderedList')
     } else if (action.type === 'color') {
@@ -384,6 +466,13 @@ export default function RichTextEditorBox({ value, onChange, disabled = false, p
     } else if (action.type === 'table') {
       insertTable()
       return
+    } else if (action.type === 'divider') {
+      insertDivider()
+      return
+    } else if (action.type === 'tableOp') {
+      if (!tableOpDom(el, action.op)) return
+    } else if (action.type === 'symbol') {
+      document.execCommand('insertText', false, action.value)
     } else if (action.type === 'clear') {
       document.execCommand('removeFormat')
       applySpanClass(el, 'c', null)
@@ -391,7 +480,7 @@ export default function RichTextEditorBox({ value, onChange, disabled = false, p
       applySpanClass(el, 'h', null)
       applySpanClass(el, 'b', null)
     }
-    emit()
+    emit(true)
     readActive()
   }
 
@@ -421,13 +510,13 @@ export default function RichTextEditorBox({ value, onChange, disabled = false, p
     const sel = window.getSelection()
     sel.removeAllRanges()
     sel.addRange(r)
-    emit()
+    emit(true)
   }
 
-  // A small starter table (2 columns, 2 rows) after the block the cursor is in.
-  function insertTable() {
+  // Puts a block (table, divider) after the block the cursor is in, with an empty
+  // line after it so the cursor can always get out. Inside a card it stays in the card.
+  function placeBlockAfterCursor(block) {
     const el = elRef.current
-    if (!el || disabled) return
     const range = selectionRangeIn(el)
     const host = range
       ? (range.startContainer.nodeType === 3 ? range.startContainer.parentElement : range.startContainer)
@@ -439,28 +528,42 @@ export default function RichTextEditorBox({ value, onChange, disabled = false, p
       while (anchor && anchor.parentNode !== container) anchor = anchor.parentNode
       if (anchor && !container.contains(anchor)) anchor = null
     }
+    const after = document.createElement('p')
+    after.appendChild(document.createElement('br'))
+    if (anchor) {
+      container.insertBefore(block, anchor.nextSibling)
+      container.insertBefore(after, block.nextSibling)
+    } else {
+      container.appendChild(block)
+      container.appendChild(after)
+    }
+    padCards(el)
+    return after
+  }
+
+  // A small starter table (2 columns, 2 rows) after the block the cursor is in.
+  function insertTable() {
+    const el = elRef.current
+    if (!el || disabled) return
+    el.focus()
     const tpl = document.createElement('template')
     tpl.innerHTML =
       '<table><thead><tr><th>Column 1</th><th>Column 2</th></tr></thead>' +
       '<tbody><tr><td><br></td><td><br></td></tr><tr><td><br></td><td><br></td></tr></tbody></table>'
     const table = tpl.content.firstElementChild
-    const after = document.createElement('p')
-    after.appendChild(document.createElement('br'))
-    if (anchor) {
-      container.insertBefore(table, anchor.nextSibling)
-      container.insertBefore(after, table.nextSibling)
-    } else {
-      container.appendChild(table)
-      container.appendChild(after)
-    }
-    padCards(el)
-    const firstCell = table.querySelector('th')
-    const r = document.createRange()
-    r.selectNodeContents(firstCell)
-    const sel = window.getSelection()
-    sel.removeAllRanges()
-    sel.addRange(r)
-    emit()
+    placeBlockAfterCursor(table)
+    placeCaretIn(table.querySelector('th'))
+    emit(true)
+    readActive()
+  }
+
+  function insertDivider() {
+    const el = elRef.current
+    if (!el || disabled) return
+    el.focus()
+    const after = placeBlockAfterCursor(document.createElement('hr'))
+    placeCaretIn(after)
+    emit(true)
     readActive()
   }
 
@@ -472,7 +575,7 @@ export default function RichTextEditorBox({ value, onChange, disabled = false, p
     if (card) {
       card.remove()
       padCards(elRef.current)
-      emit()
+      emit(true)
     }
   }
 
@@ -511,7 +614,7 @@ export default function RichTextEditorBox({ value, onChange, disabled = false, p
     }
     document.execCommand('insertHTML', false, html)
     padCards(elRef.current)
-    emit()
+    emit(true)
   }
 
   // Some ways of inserting text (the phone keyboard's clipboard strip, drag-and-drop)
@@ -537,6 +640,15 @@ export default function RichTextEditorBox({ value, onChange, disabled = false, p
     return () => el.removeEventListener('beforeinput', onBeforeInput)
   }, [])
 
+  // Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z (or Y) use the block's own history, so they also undo
+  // toolbar choices, which the browser's own undo does not know about.
+  function handleKeyDown(e) {
+    if (!history || !(e.ctrlKey || e.metaKey) || e.altKey) return
+    const k = e.key.toLowerCase()
+    if (k === 'z' && !e.shiftKey) { e.preventDefault(); history.undo() }
+    else if ((k === 'z' && e.shiftKey) || k === 'y') { e.preventDefault(); history.redo() }
+  }
+
   function handleFocus() {
     try { document.execCommand('defaultParagraphSeparator', false, 'p') } catch { /* ignore */ }
   }
@@ -546,7 +658,8 @@ export default function RichTextEditorBox({ value, onChange, disabled = false, p
       <style>{EDITOR_CSS}</style>
       <StickyBar style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
         <div style={{ flex: '1 1 auto', minWidth: 0 }}>
-          <RichTextToolbar active={active} onAction={runAction} disabled={disabled} painter={painter} />
+          <RichTextToolbar active={active} onAction={runAction} disabled={disabled} painter={painter}
+            canUndo={!!history?.canUndo} canRedo={!!history?.canRedo} />
         </div>
         <CardMenu onPick={insertCard} disabled={disabled} />
       </StickyBar>
@@ -561,7 +674,8 @@ export default function RichTextEditorBox({ value, onChange, disabled = false, p
           role="textbox"
           aria-multiline="true"
           aria-label="Text"
-          onInput={emit}
+          onInput={() => emit()}
+          onKeyDown={handleKeyDown}
           onClick={handleClick}
           onPaste={handlePaste}
           onFocus={handleFocus}

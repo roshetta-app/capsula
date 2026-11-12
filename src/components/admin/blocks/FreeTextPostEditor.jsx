@@ -368,9 +368,47 @@ export default function FreeTextPostEditor({ data, onChange, disabled = false })
       .catch(() => setAiPrompt(''))   // silent fail — button will show error on click
   }, [])
 
-  function handleChange(val) {
+  // One history for the whole block, shared by the Write box and the Code view, so Undo /
+  // Redo also take back toolbar choices. Typing is grouped: a pause of about 0.7 s starts
+  // a new step; a toolbar choice, a paste or a card is always its own step.
+  const hist = useRef({ past: [], future: [], cur: markdown, at: 0 })
+  hist.current.cur = markdown
+  const [, bumpHistory] = useState(0)
+
+  function handleChange(val, opts = {}) {
     setCleanNote(null)
+    const h = hist.current
+    if (val !== h.cur) {
+      const now = Date.now()
+      if (opts.step || !h.past.length || now - h.at > 700) {
+        h.past.push(h.cur)
+        if (h.past.length > 100) h.past.shift()
+      }
+      h.at = opts.step ? 0 : now
+      h.future = []
+      h.cur = val
+      bumpHistory(n => n + 1)
+    }
     onChange({ markdown: val })
+  }
+
+  function stepHistory(from, to) {
+    const h = hist.current
+    if (!h[from].length) return
+    const target = h[from].pop()
+    h[to].push(h.cur)
+    h.cur = target
+    h.at = 0
+    setCleanNote(null)
+    bumpHistory(n => n + 1)
+    onChange({ markdown: target })
+  }
+
+  const history = {
+    canUndo: hist.current.past.length > 0,
+    canRedo: hist.current.future.length > 0,
+    undo: () => stepHistory('past', 'future'),
+    redo: () => stepHistory('future', 'past'),
   }
 
   // Fixes tables with no divider line, lists stuck under a paragraph, bullets, and
@@ -382,7 +420,7 @@ export default function FreeTextPostEditor({ data, onChange, disabled = false })
       setCleanNote({ kind: 'none' })
       return
     }
-    handleChange(fixed)
+    handleChange(fixed, { step: true })
     if (viewMode === 'Write' && !canEditVisually(fixed)) {
       setModeRaw('Code')
       setCodeNote(true)
@@ -395,13 +433,13 @@ export default function FreeTextPostEditor({ data, onChange, disabled = false })
   function handleClearAll() {
     if (disabled || !markdown.trim()) return
     const before = markdown
-    handleChange('')
+    handleChange('', { step: true })
     setCleanNote({ kind: 'cleared', before })
   }
 
   function handleUndoCleanUp() {
     if (cleanNote?.kind !== 'done' && cleanNote?.kind !== 'cleared') return
-    handleChange(cleanNote.before)
+    handleChange(cleanNote.before, { step: true })
   }
 
   async function handleCopyPrompt() {
@@ -437,9 +475,11 @@ export default function FreeTextPostEditor({ data, onChange, disabled = false })
   function runFormat(action) {
     const el = textareaRef.current
     if (!el || disabled) return
+    if (action.type === 'undo') { history.undo(); return }
+    if (action.type === 'redo') { history.redo(); return }
     const res = applyFormat(el.value, el.selectionStart, el.selectionEnd, action)
     if (!res) return
-    handleChange(res.value)
+    handleChange(res.value, { step: true })
     requestAnimationFrame(() => {
       el.focus()
       el.setSelectionRange(res.selStart, res.selEnd)
@@ -480,8 +520,12 @@ export default function FreeTextPostEditor({ data, onChange, disabled = false })
     if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey && !e.nativeEvent?.isComposing) {
       if (handleEnterInList(e)) return
     }
-    if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return
-    const id = { b: 'b', i: 'i', u: 'u' }[e.key.toLowerCase()]
+    if (!(e.ctrlKey || e.metaKey) || e.altKey) return
+    const k = e.key.toLowerCase()
+    if (k === 'z' && !e.shiftKey) { e.preventDefault(); history.undo(); return }
+    if ((k === 'z' && e.shiftKey) || k === 'y') { e.preventDefault(); history.redo(); return }
+    if (e.shiftKey) return
+    const id = { b: 'b', i: 'i', u: 'u' }[k]
     if (!id) return
     e.preventDefault()
     runFormat({ type: 'toggle', id })
@@ -565,6 +609,7 @@ export default function FreeTextPostEditor({ data, onChange, disabled = false })
             value={markdown}
             onChange={handleChange}
             disabled={disabled}
+            history={history}
           />
         </div>
       )}
@@ -572,7 +617,8 @@ export default function FreeTextPostEditor({ data, onChange, disabled = false })
       {/* Code view: formatting toolbar for the plain text box */}
       {viewMode === 'Code' && (
         <StickyBar>
-          <RichTextToolbar active={active} onAction={runFormat} disabled={disabled} />
+          <RichTextToolbar active={active} onAction={runFormat} disabled={disabled}
+            canUndo={history.canUndo} canRedo={history.canRedo} />
         </StickyBar>
       )}
 

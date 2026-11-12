@@ -34,6 +34,11 @@
  *   { type: 'badge',     value: 'red' | ... | null }      (small coloured tag, null = off)
  *   { type: 'heading',   value: 2 | 3 | 4 | null }        (heading level of the line, null = normal text)
  *   { type: 'table' }                                     (adds a small table after the current line)
+ *   { type: 'tableOp', op: 'addRow' | 'delRow' | 'addCol' | 'delCol' | 'delTable' }   (cursor inside a table)
+ *   { type: 'symbol', value: '≥' }                        (types that symbol at the cursor)
+ *   { type: 'divider' }                                   (a divider line after the current line)
+ *   { type: 'undo' } / { type: 'redo' }                   (handled by the editor that owns the text history)
+ *   { type: 'toggle', id: 'sub' | 'sup' }                 (subscript / superscript, saved as <sub> / <sup>)
  *   { type: 'copyFormat' }                                (remember the look of the selected text)
  *   { type: 'pasteFormat' }                               (give the selected text that look)
  *
@@ -42,7 +47,7 @@
  */
 
 import { useState, useEffect, useLayoutEffect, useRef } from 'react'
-import { Bold, Italic, Underline, Palette, Type, Eraser, List, ListOrdered, Paintbrush, ClipboardPaste, Highlighter, Tag, Heading, Table } from 'lucide-react'
+import { Bold, Italic, Underline, Palette, Type, Eraser, List, ListOrdered, Paintbrush, ClipboardPaste, Highlighter, Tag, Heading, Table, Subscript, Superscript, Minus, Undo2, Redo2 } from 'lucide-react'
 
 // ─── Choices ───────────────────────────────────────────────────────────────────
 
@@ -69,6 +74,12 @@ export const HEADINGS = [
   { level: null, label: 'Normal text' },
 ]
 
+export const SYMBOLS = [
+  '↑', '↓', '→', '←', '↔', '≥', '≤', '±', '×', '÷',
+  'µ', '°', '²', '³', '½', '≈', '≠', '‰', 'α', 'β',
+  'γ', 'Δ', 'Ω', '√', '∞', '•', '–', '—', '′', '″',
+]
+
 export const SIZES = [
   { key: 'sm', label: 'Small',  px: 12 },
   { key: null, label: 'Normal', px: 14 },
@@ -89,7 +100,7 @@ function describePainter(f) {
   return parts.length ? parts.join(' · ') : 'Normal text'
 }
 
-export const EMPTY_ACTIVE = { b: false, i: false, u: false, color: null, size: null, highlight: null, badge: null, list: false, olist: false, heading: null }
+export const EMPTY_ACTIVE = { b: false, i: false, u: false, sub: false, sup: false, color: null, size: null, highlight: null, badge: null, list: false, olist: false, heading: null, inTable: false }
 
 // ─── Formatting engine ─────────────────────────────────────────────────────────
 
@@ -99,6 +110,8 @@ const TOKENS = [
   { id: 'b', o: '\\*\\*',                      c: '\\*\\*' },
   { id: 'i', o: '_',                           c: '_' },
   { id: 'u', o: '<u>',                         c: '<\\/u>' },
+  { id: 'sub', o: '<sub>',                      c: '<\\/sub>' },
+  { id: 'sup', o: '<sup>',                      c: '<\\/sup>' },
   { id: 'c', o: '<span class="rt-c-[a-z]+">',  c: '<\\/span>' },
   { id: 's', o: '<span class="rt-s-[a-z]+">',  c: '<\\/span>' },
   { id: 'hl', o: '<span class="rt-h-[a-z]+">',  c: '<\\/span>' },
@@ -116,6 +129,8 @@ function wrapperFor(action) {
   if (action.type === 'toggle') {
     if (action.id === 'b') return ['**', '**']
     if (action.id === 'i') return ['_', '_']
+    if (action.id === 'sub') return ['<sub>', '</sub>']
+    if (action.id === 'sup') return ['<sup>', '</sup>']
     return ['<u>', '</u>']
   }
   if (action.type === 'color') return [`<span class="rt-c-${action.value}">`, '</span>']
@@ -229,7 +244,7 @@ function getPieces(value, start, end) {
 
 function stripInline(t) {
   return t
-    .replace(/<\/?u>/g, '')
+    .replace(/<\/?(?:u|sub|sup)>/g, '')
     .replace(/<span class="rt-[csbh]-[a-z]+">/g, '')
     .replace(/<\/span>/g, '')
     .replace(/\*\*/g, '')
@@ -334,15 +349,115 @@ function headingLevelAt(value, start, end) {
 // A small starter table (2 columns, 2 rows) after the line the cursor is on.
 const TABLE_TEXT = '| Column 1 | Column 2 |\n| --- | --- |\n|  |  |\n|  |  |'
 
-function applyTable(value, end) {
+// Puts `text` as its own block after the line that holds `end`, with a blank line
+// on both sides. Returns the new text and where the block starts.
+function insertBlockAfterLine(value, end, text) {
   let lineEnd = value.indexOf('\n', end)
   if (lineEnd === -1) lineEnd = value.length
   const before = value.slice(0, lineEnd)
   const after = value.slice(lineEnd).replace(/^\n+/, '')
   const lead = before.trim() === '' ? '' : '\n\n'
-  const insertAt = before.length + lead.length
-  const out = before + lead + TABLE_TEXT + (after ? '\n\n' + after : '\n')
-  return { value: out, selStart: insertAt + 2, selEnd: insertAt + 10 }
+  const at = before.length + lead.length
+  return { value: before + lead + text + (after ? '\n\n' + after : '\n'), at }
+}
+
+function applyTable(value, end) {
+  const r = insertBlockAfterLine(value, end, TABLE_TEXT)
+  return { value: r.value, selStart: r.at + 2, selEnd: r.at + 10 }
+}
+
+function applyDivider(value, end) {
+  const r = insertBlockAfterLine(value, end, '---')
+  return { value: r.value, selStart: r.at + 3, selEnd: r.at + 3 }
+}
+
+// ─── Table rows and columns (code view) ────────────────────────────────────────
+function splitRow(line) {
+  let t = line.trim()
+  if (t.startsWith('|')) t = t.slice(1)
+  if (t.endsWith('|') && !t.endsWith('\\|')) t = t.slice(0, -1)
+  const cells = []
+  let cur = ''
+  for (let i = 0; i < t.length; i += 1) {
+    const ch = t[i]
+    if (ch === '\\' && t[i + 1] === '|') { cur += '\\|'; i += 1 }
+    else if (ch === '|') { cells.push(cur.trim()); cur = '' }
+    else cur += ch
+  }
+  cells.push(cur.trim())
+  return cells
+}
+
+const joinRow = cells => `| ${cells.join(' | ')} |`
+const isPipeLine = l => l != null && l.trim().startsWith('|')
+
+// The table the cursor is in: its lines, which line and column the cursor is on.
+function tableAt(value, pos) {
+  const lines = value.split('\n')
+  let off = 0
+  let idx = lines.length - 1
+  for (let i = 0; i < lines.length; i += 1) {
+    if (pos <= off + lines[i].length) { idx = i; break }
+    off += lines[i].length + 1
+  }
+  if (!isPipeLine(lines[idx])) return null
+  let a = idx
+  while (a > 0 && isPipeLine(lines[a - 1])) a -= 1
+  let b = idx
+  while (b < lines.length - 1 && isPipeLine(lines[b + 1])) b += 1
+  const sep = lines[a + 1]
+  if (!sep || !/^[\s|:-]+$/.test(sep) || !sep.includes('-')) return null
+  const cols = splitRow(lines[a]).length
+  const pipes = (lines[idx].slice(0, Math.max(0, pos - off)).match(/(^|[^\\])\|/g) || []).length
+  const col = Math.min(Math.max(0, pipes - 1), cols - 1)
+  return { lines, a, b, idx, col, cols }
+}
+
+function applyTableOp(value, start, op) {
+  const t = tableAt(value, start)
+  if (!t) return null
+  const { lines, a, b, idx, col, cols } = t
+  const rows = lines.slice(a, b + 1).map(splitRow).map(r => {
+    const x = r.slice(0, cols)
+    while (x.length < cols) x.push('')
+    return x
+  })
+  const r = idx - a
+  let next = rows
+  let caretRow = r
+  let caretCol = col
+  if (op === 'delTable' || (op === 'delCol' && cols <= 1)) {
+    const from = lines.slice(0, a)
+    const rest = lines.slice(b + 1)
+    while (from.length && from[from.length - 1].trim() === '') from.pop()
+    while (rest.length && rest[0].trim() === '') rest.shift()
+    const out = [...from, ...(from.length && rest.length ? [''] : []), ...rest].join('\n')
+    const caret = from.length ? from.join('\n').length + (rest.length ? 2 : 0) : 0
+    return { value: out, selStart: caret, selEnd: caret }
+  }
+  if (op === 'addRow') {
+    const at = r <= 1 ? 2 : r + 1
+    next = rows.map(x => x.slice())
+    next.splice(at, 0, Array(cols).fill(''))
+    caretRow = at
+  } else if (op === 'delRow') {
+    if (r <= 1) return null
+    next = rows.map(x => x.slice())
+    next.splice(r, 1)
+    caretRow = Math.min(r, next.length - 1)
+  } else if (op === 'addCol') {
+    next = rows.map((row, i) => { const x = row.slice(); x.splice(col + 1, 0, i === 1 ? '---' : ''); return x })
+    caretCol = col + 1
+  } else if (op === 'delCol') {
+    next = rows.map(row => { const x = row.slice(); x.splice(col, 1); return x })
+    caretCol = Math.min(col, cols - 2)
+  } else return null
+  const newLines = next.map(joinRow)
+  const out = [...lines.slice(0, a), ...newLines, ...lines.slice(b + 1)].join('\n')
+  const lineOffset = [...lines.slice(0, a), ...newLines.slice(0, caretRow)].reduce((n, l) => n + l.length + 1, 0)
+  const row = next[caretRow] || []
+  const caret = lineOffset + 2 + row.slice(0, caretCol).reduce((n, c) => n + c.length + 3, 0)
+  return { value: out, selStart: caret, selEnd: caret }
 }
 
 const SPAN_KIND = { color: 'c', size: 's', highlight: 'hl', badge: 'bd' }
@@ -352,6 +467,12 @@ export function applyFormat(value, start, end, action) {
   if (action.type === 'olist') return applyList(value, start, end, true)
   if (action.type === 'heading') return applyHeading(value, start, end, action.value)
   if (action.type === 'table') return applyTable(value, end)
+  if (action.type === 'divider') return applyDivider(value, end)
+  if (action.type === 'tableOp') return applyTableOp(value, start, action.op)
+  if (action.type === 'symbol') {
+    const caret = start + action.value.length
+    return { value: value.slice(0, start) + action.value + value.slice(end), selStart: caret, selEnd: caret }
+  }
   const ps = getPieces(value, start, end)
 
   // Nothing selected and no word under the cursor: open an empty pair to type in.
@@ -429,7 +550,8 @@ export function getActiveFormats(value, start, end) {
   const olist = isListActive(value, start, end, true)
   const heading = headingLevelAt(value, start, end)
   const ps = getPieces(value, start, end)
-  if (ps.caret || !ps.list.length) return { ...EMPTY_ACTIVE, list, olist, heading }
+  const inTable = !!tableAt(value, start)
+  if (ps.caret || !ps.list.length) return { ...EMPTY_ACTIVE, list, olist, heading, inTable }
   const perPiece = ps.list.map(([a, b]) => findLayers(value, a, b))
   const every = id => perPiece.every(l => !!firstLayer(l, id))
   const keyOf = (id, re) => {
@@ -440,6 +562,8 @@ export function getActiveFormats(value, start, end) {
     b: every('b'),
     i: every('i'),
     u: every('u'),
+    sub: every('sub'),
+    sup: every('sup'),
     color: keyOf('c', /rt-c-([a-z]+)/),
     size: keyOf('s', /rt-s-([a-z]+)/),
     highlight: keyOf('hl', /rt-h-([a-z]+)/),
@@ -447,6 +571,7 @@ export function getActiveFormats(value, start, end) {
     list,
     olist,
     heading,
+    inTable,
   }
 }
 
@@ -479,6 +604,27 @@ function IconButton({ label, onClick, active, disabled, children }) {
         color: active ? 'var(--color-accent)' : 'var(--color-text-secondary)',
         opacity: disabled ? 0.45 : 1,
         transition: 'background-color 0.12s ease, color 0.12s ease',
+      }}
+    >
+      {children}
+    </button>
+  )
+}
+
+function TextButton({ label, onClick, disabled, children }) {
+  return (
+    <button
+      type="button"
+      title={label}
+      aria-label={label}
+      disabled={disabled}
+      onMouseDown={keepSelection}
+      onClick={onClick}
+      style={{
+        height: 28, padding: '0 8px', border: 'none', borderRadius: 'var(--radius-sm)',
+        background: 'transparent', cursor: disabled ? 'default' : 'pointer',
+        color: 'var(--color-text-secondary)', fontSize: 12, fontWeight: 600,
+        fontFamily: 'var(--font-body)', whiteSpace: 'nowrap', opacity: disabled ? 0.45 : 1,
       }}
     >
       {children}
@@ -548,8 +694,8 @@ const menuRowStyle = isActive => ({
   fontWeight: isActive ? 600 : 400,
 })
 
-export default function RichTextToolbar({ active = EMPTY_ACTIVE, onAction, disabled = false, painter }) {
-  const [menu, setMenu] = useState(null) // null | 'color' | 'size' | 'highlight' | 'badge' | 'heading'
+export default function RichTextToolbar({ active = EMPTY_ACTIVE, onAction, disabled = false, painter, canUndo = false, canRedo = false }) {
+  const [menu, setMenu] = useState(null) // null | 'color' | 'size' | 'highlight' | 'badge' | 'heading' | 'symbol'
   const wrapRef = useRef(null)
 
   // Close an open menu when clicking anywhere outside the toolbar.
@@ -620,6 +766,15 @@ export default function RichTextToolbar({ active = EMPTY_ACTIVE, onAction, disab
         borderRadius: 'var(--radius-md)',
       }}
     >
+      <IconButton label="Undo (Ctrl+Z)" disabled={disabled || !canUndo} onClick={() => pick({ type: 'undo' })}>
+        <Undo2 size={16} />
+      </IconButton>
+      <IconButton label="Redo" disabled={disabled || !canRedo} onClick={() => pick({ type: 'redo' })}>
+        <Redo2 size={16} />
+      </IconButton>
+
+      <Divider />
+
       <IconButton label="Bold (Ctrl+B)" active={active.b} disabled={disabled} onClick={() => pick({ type: 'toggle', id: 'b' })}>
         <Bold size={16} strokeWidth={2.4} />
       </IconButton>
@@ -628,6 +783,12 @@ export default function RichTextToolbar({ active = EMPTY_ACTIVE, onAction, disab
       </IconButton>
       <IconButton label="Underline (Ctrl+U)" active={active.u} disabled={disabled} onClick={() => pick({ type: 'toggle', id: 'u' })}>
         <Underline size={16} />
+      </IconButton>
+      <IconButton label="Subscript (CO₂)" active={active.sub} disabled={disabled} onClick={() => pick({ type: 'toggle', id: 'sub' })}>
+        <Subscript size={16} />
+      </IconButton>
+      <IconButton label="Superscript (m²)" active={active.sup} disabled={disabled} onClick={() => pick({ type: 'toggle', id: 'sup' })}>
+        <Superscript size={16} />
       </IconButton>
 
       <Divider />
@@ -667,6 +828,19 @@ export default function RichTextToolbar({ active = EMPTY_ACTIVE, onAction, disab
       <IconButton label="Add a table" disabled={disabled} onClick={() => pick({ type: 'table' })}>
         <Table size={16} />
       </IconButton>
+      <IconButton label="Divider line" disabled={disabled} onClick={() => pick({ type: 'divider' })}>
+        <Minus size={16} />
+      </IconButton>
+      {active.inTable && (
+        <>
+          <Divider />
+          <TextButton label="Add a row below" disabled={disabled} onClick={() => pick({ type: 'tableOp', op: 'addRow' })}>+ Row</TextButton>
+          <TextButton label="Add a column to the right" disabled={disabled} onClick={() => pick({ type: 'tableOp', op: 'addCol' })}>+ Col</TextButton>
+          <TextButton label="Delete this row" disabled={disabled} onClick={() => pick({ type: 'tableOp', op: 'delRow' })}>− Row</TextButton>
+          <TextButton label="Delete this column" disabled={disabled} onClick={() => pick({ type: 'tableOp', op: 'delCol' })}>− Col</TextButton>
+          <TextButton label="Delete the whole table" disabled={disabled} onClick={() => pick({ type: 'tableOp', op: 'delTable' })}>Delete table</TextButton>
+        </>
+      )}
 
       <Divider />
 
@@ -749,6 +923,39 @@ export default function RichTextToolbar({ active = EMPTY_ACTIVE, onAction, disab
                 <span style={{ fontSize: s.px, lineHeight: 1.2 }}>{s.label}</span>
               </button>
             ))}
+          </ClampedPopover>
+        )}
+      </div>
+
+      {/* Symbols */}
+      <div style={{ position: 'relative' }}>
+        <IconButton
+          label="Symbols (≥ ± ° µ ↑ ...)"
+          active={menu === 'symbol'}
+          disabled={disabled}
+          onClick={() => setMenu(menu === 'symbol' ? null : 'symbol')}
+        >
+          <span style={{ fontSize: 16, fontWeight: 600, lineHeight: 1 }}>Ω</span>
+        </IconButton>
+        {menu === 'symbol' && (
+          <ClampedPopover width={220} onMouseDown={keepSelection}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 2 }}>
+              {SYMBOLS.map(ch => (
+                <button
+                  key={ch}
+                  type="button"
+                  aria-label={`Insert ${ch}`}
+                  onClick={() => pick({ type: 'symbol', value: ch })}
+                  style={{
+                    height: 34, border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer',
+                    background: 'transparent', color: 'var(--color-text-primary)', fontSize: 16,
+                    fontFamily: 'var(--font-body)',
+                  }}
+                >
+                  {ch}
+                </button>
+              ))}
+            </div>
           </ClampedPopover>
         )}
       </div>
