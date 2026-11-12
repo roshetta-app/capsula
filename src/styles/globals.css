@@ -1272,3 +1272,29 @@ body {
 .rx-prose-tight .dir-prose h4:first-child { margin-top: 0; }
 .rx-prose-tight .dir-prose table { margin: 8px 0; }
 .rx-prose-tight .dir-prose hr { margin: 12px 0; }
+
+/* ─── Tables inside cards (2026-11-13) ────────────────────────────────────────────
+   A table in a card now runs edge to edge of the card (the card's side padding no longer
+   squeezes it), with a clean header row and thin lines, the same on the app screen and in
+   the editor. Up to 3 columns: the table fills the full width. 4 or more columns: it keeps
+   a readable width per column and scrolls sideways, as tables outside cards do. */
+.dir-prose .dir-card table {
+  display: table; table-layout: auto;
+  width: calc(100% + 32px); max-width: none; margin: 10px -16px 0;
+  border: none; border-radius: 0;
+  border-top: 1px solid rgba(127, 127, 127, 0.28);
+  border-bottom: 1px solid rgba(127, 127, 127, 0.28);
+  font-size: 13.5px; line-height: 1.55;
+}
+.dir-prose .dir-card table:has(th:nth-child(4), td:nth-child(4)) {
+  display: block; overflow-x: auto; -webkit-overflow-scrolling: touch;
+}
+.dir-prose .dir-card th {
+  padding: 9px 12px; font-size: 12.5px; font-weight: 700; text-transform: none; letter-spacing: 0;
+  background: rgba(127, 127, 127, 0.10);
+  border-bottom: 1px solid rgba(127, 127, 127, 0.28);
+}
+.dir-prose .dir-card td { padding: 9px 12px; border-bottom: 1px solid rgba(127, 127, 127, 0.16); background: transparent; }
+.dir-prose .dir-card th + th, .dir-prose .dir-card td + td { border-inline-start: 1px solid rgba(127, 127, 127, 0.16); }
+.dir-prose .dir-card tbody tr:last-child td { border-bottom: none; }
+.dir-prose .dir-card tbody tr:nth-child(even) td { background: rgba(127, 127, 127, 0.05); }

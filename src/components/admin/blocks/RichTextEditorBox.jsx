@@ -151,21 +151,97 @@ function applySpanClass(root, kind, value) {
   return true
 }
 
+// Adds (on) or removes (off) a plain mark (<strong>, <em>, <u>) on the selected text or the
+// word at the cursor. Works on the text itself, wherever it sits (lists, table cells, cards,
+// links, headings), so it does not depend on the browser's own bold / italic command.
+function applyMark(root, names, make, on, skip) {
+  const range = selectionRangeIn(root)
+  if (!range) return false
+  if (range.collapsed && !expandCollapsedToWord(range)) return false
+  const pieces = textPiecesInRange(root, range)
+  if (!pieces.length) return false
+  for (const t of pieces) {
+    if (skip && skip(t)) continue
+    let guard = 0
+    for (;;) {
+      let a = t.parentElement
+      while (a && a !== root && !names.includes(a.tagName)) a = a.parentElement
+      const has = !!a && a !== root
+      if (on && !has) {
+        const w = document.createElement(make)
+        t.parentNode.insertBefore(w, t)
+        w.appendChild(t)
+        break
+      }
+      if (!on && has && guard < 6) {
+        isolate(t, a)
+        unwrap(a)
+        guard += 1
+        continue
+      }
+      break
+    }
+  }
+  const sel = window.getSelection()
+  const r = document.createRange()
+  r.setStartBefore(pieces[0])
+  r.setEndAfter(pieces[pieces.length - 1])
+  sel.removeAllRanges()
+  sel.addRange(r)
+  return true
+}
+
+// The first piece of text inside the selection (or the one the cursor is in).
+function firstTextOf(range) {
+  const start = range.startContainer
+  if (start.nodeType === 3 && (range.collapsed || range.startOffset < start.length)) return start
+  const top = range.commonAncestorContainer.nodeType === 3 ? range.commonAncestorContainer.parentNode : range.commonAncestorContainer
+  const walker = document.createTreeWalker(top, NodeFilter.SHOW_TEXT)
+  let n = walker.nextNode()
+  while (n) {
+    if (range.intersectsNode(n) && n.nodeValue.trim() && isEditableText(n)) return n
+    n = walker.nextNode()
+  }
+  return start.nodeType === 3 ? start : null
+}
+
+// The look of the selected text (or the word at the cursor), read from the text itself:
+// whatever it sits inside, only marks that were really applied count (a heading's own
+// bold is not copied).
+function readLook(root) {
+  const range = selectionRangeIn(root)
+  if (!range) return null
+  const node = firstTextOf(range)
+  const host = node ? node.parentElement : (range.startContainer.nodeType === 1 ? range.startContainer : null)
+  if (!host) return null
+  const inside = sel => { const x = host.closest(sel); return !!x && root.contains(x) && x !== root }
+  const find = prefix => {
+    const s = host.closest(`span[class*="${prefix}"]`)
+    const c = s && root.contains(s) ? Array.from(s.classList).find(x => x.startsWith(prefix)) : null
+    return c ? c.slice(prefix.length) : null
+  }
+  return {
+    b: inside('strong, b'), i: inside('em, i'), u: inside('u'),
+    color: find('rt-c-'), size: find('rt-s-'), highlight: find('rt-h-'), badge: find('rt-b-'),
+  }
+}
+
 // Gives the selected text (or the word at the cursor) the copied look: bold, italic,
-// underline, colour and size each end up exactly as copied, including "off".
+// underline, colour, size, highlight and badge each end up exactly as copied, including "off".
+// Returns true when it changed something.
 function pasteFormat(root, look) {
   const range = selectionRangeIn(root)
-  if (!range) return
-  if (range.collapsed && !expandCollapsedToWord(range)) return
-  for (const [flag, cmd] of [['b', 'bold'], ['i', 'italic'], ['u', 'underline']]) {
-    let on = false
-    try { on = document.queryCommandState(cmd) } catch { /* ignore */ }
-    if (on !== !!look[flag]) document.execCommand(cmd)
-  }
+  if (!range) return false
+  if (range.collapsed && !expandCollapsedToWord(range)) return false
+  const inHeading = t => !!t.parentElement?.closest('h1, h2, h3, h4, h5, h6, th')
+  applyMark(root, ['STRONG', 'B'], 'strong', !!look.b, inHeading) // a heading is bold by itself
+  applyMark(root, ['EM', 'I'], 'em', !!look.i)
+  applyMark(root, ['U'], 'u', !!look.u)
   applySpanClass(root, 'c', look.color)
   applySpanClass(root, 's', look.size)
   applySpanClass(root, 'h', look.highlight ?? null)
   applySpanClass(root, 'b', look.badge ?? null)
+  return true
 }
 
 // The table cell the cursor is in, or null.
@@ -345,6 +421,20 @@ const EDITOR_CSS = `
 .rt-editor .rt-card-body { outline: none; min-height: 1.6em; }
 .rt-editor .rt-card-body > :last-child { margin-bottom: 0; }
 .rt-editor .dir-card-header { display: flex; align-items: center; justify-content: flex-start; gap: 8px; }
+.rt-editor .rt-card-label { flex: none; }
+.rt-editor .rt-card-sep { flex: none; margin-inline-start: -2px; }
+.rt-editor .dir-card-header:has(.rt-card-title:empty) .rt-card-sep { display: none; }
+.rt-editor .rt-card-title { flex: 1 1 auto; min-width: 6ch; outline: none; cursor: text; padding: 2px 6px; border-radius: 4px;
+  -webkit-user-select: text; user-select: text; }
+.rt-editor .rt-card-title:hover, .rt-editor .rt-card-title:focus { background: rgba(127,127,127,0.14); }
+.rt-editor .rt-card-title:empty::before { content: attr(data-placeholder); opacity: 0.5; text-transform: none;
+  letter-spacing: 0; font-weight: 500; }
+.rt-editor .rt-card-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 8px; padding: 6px 8px;
+  border-radius: 8px; border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-text-primary);
+  font: 500 12.5px var(--font-body); text-transform: none; letter-spacing: 0; }
+.rt-editor .rt-card-confirm button { border: 1px solid var(--color-border); background: var(--color-bg); color: inherit;
+  border-radius: 6px; padding: 4px 10px; font: 600 12px var(--font-body); cursor: pointer; }
+.rt-editor .rt-card-confirm button.rt-confirm-danger { color: #B91C1C; border-color: #B91C1C; }
 .rt-editor .rt-card-remove { margin-inline-start: auto; border: none; background: none; cursor: pointer; font-size: 18px; line-height: 1;
   padding: 0 4px; color: var(--color-text-tertiary); }
 .rt-editor .rt-plain-card { position: relative; margin: 8px 0; padding: 6px 28px 2px 8px;
@@ -436,10 +526,16 @@ export default function RichTextEditorBox({ value, onChange, disabled = false, h
     if (action.type === 'undo') { history?.undo(); return }
     if (action.type === 'redo') { history?.redo(); return }
     if (action.type === 'clearAll') { history?.clearAll?.(); return }
+    // text in a card's title box is plain text: formatting choices do not apply there
+    const anchorNode = window.getSelection()?.anchorNode
+    const anchorEl = anchorNode ? (anchorNode.nodeType === 3 ? anchorNode.parentElement : anchorNode) : null
+    const inTitle = !!anchorEl?.closest?.('.rt-card-title') && el.contains(anchorEl)
+    if (action.type === 'cancelFormat') { setPainter(null); return }
     if (action.type === 'linkStart') {
-      linkRangeRef.current = selectionRangeIn(el)?.cloneRange() ?? null
+      linkRangeRef.current = inTitle ? null : (selectionRangeIn(el)?.cloneRange() ?? null)
       return
     }
+    if (inTitle && action.type !== 'copyFormat') return
     if (action.type === 'link') {
       el.focus()
       const sel = window.getSelection()
@@ -463,13 +559,15 @@ export default function RichTextEditorBox({ value, onChange, disabled = false, h
     try { document.execCommand('styleWithCSS', false, false) } catch { /* ignore */ }
     if (action.type === 'copyFormat') {
       // remember the look of the selected text; the text itself is not changed
-      const now = computeActive() ?? active
+      const now = readLook(el) ?? computeActive() ?? active
       setPainter({ b: !!now.b, i: !!now.i, u: !!now.u, color: now.color ?? null, size: now.size ?? null, highlight: now.highlight ?? null, badge: now.badge ?? null })
       return
     }
     if (action.type === 'pasteFormat') {
       if (!painter) return
-      pasteFormat(el, painter)
+      // one paste, then the painter is put away (copy again to paint again)
+      if (!pasteFormat(el, painter)) return
+      setPainter(null)
     } else if (action.type === 'toggle') {
       document.execCommand({ b: 'bold', i: 'italic', u: 'underline', sub: 'subscript', sup: 'superscript' }[action.id])
     } else if (action.type === 'list') {
@@ -593,20 +691,64 @@ export default function RichTextEditorBox({ value, onChange, disabled = false, h
     readActive()
   }
 
-  function handleClick(e) {
-    const btn = e.target.closest?.('[data-action="remove-card"]')
-    if (!btn || disabled) return
-    e.preventDefault()
-    const card = btn.closest('[data-card]')
-    if (card) {
+  // Removing a card: an empty card goes at once; a card with text asks whether to keep the
+  // text (only the card box goes) or delete the text too.
+  function dropCard(card, keepText) {
+    const root = elRef.current
+    if (keepText) {
+      const body = card.querySelector(':scope > .rt-card-body')
+      const frag = document.createDocumentFragment()
+      while (body && body.firstChild) frag.appendChild(body.firstChild)
+      card.replaceWith(frag)
+    } else {
       card.remove()
-      padCards(elRef.current)
-      emit(true)
+    }
+    padCards(root)
+    emit(true)
+  }
+
+  function handleClick(e) {
+    const btn = e.target.closest?.('[data-action]')
+    if (!btn || disabled) return
+    const card = btn.closest('[data-card]')
+    if (!card) return
+    const act = btn.getAttribute('data-action')
+    e.preventDefault()
+    if (act === 'remove-card') {
+      const body = card.querySelector(':scope > .rt-card-body')
+      const hasContent = !!body && (body.textContent.replace(/\u00a0/g, ' ').trim() !== '' || !!body.querySelector('table, hr, ul, ol'))
+      if (!hasContent) { dropCard(card, false); return }
+      if (card.querySelector(':scope > .rt-card-confirm')) return
+      const strip = document.createElement('div')
+      strip.className = 'rt-card-confirm'
+      strip.setAttribute('data-ui', '1')
+      strip.setAttribute('contenteditable', 'false')
+      strip.innerHTML =
+        '<span>Remove this card?</span>' +
+        '<button type="button" data-ui="1" data-action="card-keep">Keep the text</button>' +
+        '<button type="button" class="rt-confirm-danger" data-ui="1" data-action="card-all">Delete the text too</button>' +
+        '<button type="button" data-ui="1" data-action="card-cancel">Cancel</button>'
+      const header = card.querySelector(':scope > .dir-card-header')
+      if (header) header.after(strip)
+      else card.prepend(strip)
+    } else if (act === 'card-keep') {
+      dropCard(card, true)
+    } else if (act === 'card-all') {
+      dropCard(card, false)
+    } else if (act === 'card-cancel') {
+      card.querySelector(':scope > .rt-card-confirm')?.remove()
     }
   }
 
   function handlePaste(e) {
     if (disabled) return
+    if (e.target?.closest?.('.rt-card-title')) {
+      // a card title is one line of plain text
+      e.preventDefault()
+      const first = (e.clipboardData?.getData('text/plain') || '').split(/\r?\n/)[0]
+      if (first) document.execCommand('insertText', false, first)
+      return
+    }
     const text = e.clipboardData?.getData('text/plain')
     if (text == null) return
     e.preventDefault()
@@ -655,6 +797,17 @@ export default function RichTextEditorBox({ value, onChange, disabled = false, h
       const { insertSmartText: insert, disabled: off } = smartInsertRef.current
       if (off) return
       const kind = e.inputType
+      if (e.target?.closest?.('.rt-card-title')) {
+        // Enter or a multi-line insert in a card title: keep it to one line
+        if (kind === 'insertParagraph' || kind === 'insertLineBreak') { e.preventDefault(); return }
+        const t = e.dataTransfer?.getData('text/plain') ?? e.data
+        if (typeof t === 'string' && t.includes('\n')) {
+          e.preventDefault()
+          const first = t.split(/\r?\n/)[0]
+          if (first) document.execCommand('insertText', false, first)
+        }
+        return
+      }
       if (kind !== 'insertText' && kind !== 'insertFromPaste' && kind !== 'insertFromDrop'
         && kind !== 'insertReplacementText') return
       const text = e.dataTransfer?.getData('text/plain') ?? e.data
@@ -669,6 +822,12 @@ export default function RichTextEditorBox({ value, onChange, disabled = false, h
   // Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z (or Y) use the block's own history, so they also undo
   // toolbar choices, which the browser's own undo does not know about.
   function handleKeyDown(e) {
+    if (e.key === 'Enter' && e.target?.closest?.('.rt-card-title')) {
+      e.preventDefault()
+      const body = e.target.closest('[data-card]')?.querySelector(':scope > .rt-card-body')
+      if (body) { body.focus(); placeCaretIn(body.firstChild || body) }
+      return
+    }
     if (!history || !(e.ctrlKey || e.metaKey) || e.altKey) return
     const k = e.key.toLowerCase()
     if (k === 'z' && !e.shiftKey) { e.preventDefault(); history.undo() }

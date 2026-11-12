@@ -42,7 +42,8 @@
  *   { type: 'linkStart' }                                 (the editor remembers the cursor before the Drug / Class pop-up opens)
  *   { type: 'link', markdown, html }                      (a drug link or class link, typed at the cursor, see textLinks.js)
  *   { type: 'copyFormat' }                                (remember the look of the selected text)
- *   { type: 'pasteFormat' }                               (give the selected text that look)
+ *   { type: 'pasteFormat' }                               (give the selected text that look, once)
+ *   { type: 'cancelFormat' }                              (forget the copied look)
  *
  * The copy / paste format buttons only show when the parent passes the `painter`
  * prop (null = nothing copied yet, or an object { b, i, u, color, size }).
@@ -718,8 +719,8 @@ export default function RichTextToolbar({ active = EMPTY_ACTIVE, onAction, disab
     setPicker(kind)
   }
 
-  function handlePicked(pick) {
-    const markdown = picker === 'drug' ? drugLinkMarkdown(pick) : classLinkMarkdown(pick?.className, pick?.familyName)
+  function handlePicked(pick, opts) {
+    const markdown = picker === 'drug' ? drugLinkMarkdown(pick, opts) : classLinkMarkdown(pick?.className, pick?.familyName)
     setPicker(null)
     if (!markdown) return
     onAction({ type: 'link', markdown, html: linkEditorHtml(markdown) })
@@ -869,9 +870,36 @@ export default function RichTextToolbar({ active = EMPTY_ACTIVE, onAction, disab
             </ClampedPopover>
           )}
         </div>
-        <IconButton label="Clear formatting" disabled={disabled} onClick={() => pick({ type: 'clear' })}>
-          <Eraser size={16} />
-        </IconButton>
+        <div style={{ position: 'relative' }}>
+          <IconButton
+            label="Clear formatting"
+            active={menu === 'clear'}
+            disabled={disabled}
+            onClick={() => setMenu(menu === 'clear' ? null : 'clear')}
+          >
+            <Eraser size={16} />
+          </IconButton>
+          {menu === 'clear' && (
+            <ClampedPopover width={220} onMouseDown={keepSelection}>
+              <div style={{ padding: '2px 4px 8px', fontSize: 13, lineHeight: 1.4, fontFamily: 'var(--font-body)', color: 'var(--color-text-primary)' }}>
+                Remove all formatting (bold, colours, size, highlights, badges) from the selected text?
+              </div>
+              <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                <TextButton label="Cancel" onClick={() => setMenu(null)}>Cancel</TextButton>
+                <button
+                  type="button"
+                  onClick={() => pick({ type: 'clear' })}
+                  style={{
+                    height: 28, padding: '0 12px', border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer',
+                    background: 'var(--color-accent)', color: '#fff', fontSize: 12, fontWeight: 600, fontFamily: 'var(--font-body)',
+                  }}
+                >
+                  Clear
+                </button>
+              </div>
+            </ClampedPopover>
+          )}
+        </div>
 
         <Divider />
 
@@ -956,10 +984,13 @@ export default function RichTextToolbar({ active = EMPTY_ACTIVE, onAction, disab
             {painter && (
               <span style={{
                 fontSize: 11, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-body)',
-                padding: '0 6px', whiteSpace: 'nowrap',
+                padding: '0 2px 0 6px', whiteSpace: 'nowrap',
               }}>
                 {describePainter(painter)}
               </span>
+            )}
+            {painter && (
+              <TextButton label="Forget the copied format" onClick={() => pick({ type: 'cancelFormat' })}>✕</TextButton>
             )}
           </>
         )}

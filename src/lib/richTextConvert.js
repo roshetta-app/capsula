@@ -42,6 +42,21 @@ function escText(s) {
   return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
+// The header strip of a card in the editor: the type label (fixed), a title the writer can
+// edit right there, and the remove button. The strip is "UI" (never saved as text); the title
+// is read back from the title box when the text is saved.
+function cardHeaderHtml(cfg, title) {
+  return (
+    `<div class="dir-card-header" data-ui="1" contenteditable="false">` +
+    `<span class="rt-card-label">${escText(cfg.label)}</span>` +
+    `<span class="rt-card-sep">:</span>` +
+    `<span class="rt-card-title" contenteditable="true" spellcheck="true" data-placeholder="Add a title">${escText(title ?? '')}</span>` +
+    `<button type="button" class="rt-card-remove" data-ui="1" data-action="remove-card" contenteditable="false" aria-label="Remove card">×</button>` +
+    `</div>`
+  )
+}
+
+
 export function markdownToEditorHtml(raw) {
   const text = raw ?? ''
   if (!text.trim()) return '<p><br></p>'
@@ -56,10 +71,9 @@ export function markdownToEditorHtml(raw) {
       const cfg = DIRECTIVES[type.toLowerCase()]
       let inner = stripLooseListParagraphs(marked.parse(body.trim(), { breaks: true, gfm: true }))
       if (!inner.trim()) inner = '<p><br></p>'
-      const labelText = cfg ? (title ? `${cfg.label}: ${title}` : cfg.label) : ''
       const cls = cfg ? `dir-card ${cfg.cls}` : 'rt-plain-card'
       const header = cfg
-        ? `<div class="dir-card-header" data-ui="1" contenteditable="false">${escText(labelText)}<button type="button" class="rt-card-remove" data-ui="1" data-action="remove-card" contenteditable="false" aria-label="Remove card">×</button></div>`
+        ? cardHeaderHtml(cfg, title)
         : `<button type="button" class="rt-card-remove rt-card-remove-plain" data-ui="1" data-action="remove-card" contenteditable="false" aria-label="Remove block">×</button>`
       const html =
         `<div class="${cls}" data-card="${escAttr(type)}" data-title="${escAttr(title ?? '')}" dir="auto" contenteditable="false">` +
@@ -98,7 +112,7 @@ export function newCardHtml(type) {
   if (!cfg) return ''
   return (
     `<div class="dir-card ${cfg.cls}" data-card="${escAttr(type)}" data-title="" dir="auto" contenteditable="false">` +
-    `<div class="dir-card-header" data-ui="1" contenteditable="false">${escText(cfg.label)}<button type="button" class="rt-card-remove" data-ui="1" data-action="remove-card" contenteditable="false" aria-label="Remove card">×</button></div>` +
+    cardHeaderHtml(cfg, '') +
     `<div class="rt-card-body" contenteditable="true"><p><br></p></div></div>`
   )
 }
@@ -269,7 +283,8 @@ function tableToText(el, ctx) {
 
 function cardToText(el, ctx) {
   const type = el.getAttribute('data-card') || ''
-  const title = (el.getAttribute('data-title') || '').trim()
+  const titleBox = Array.from(el.children).find(c => c.classList && c.classList.contains('dir-card-header'))?.querySelector('.rt-card-title')
+  const title = (titleBox ? titleBox.textContent : (el.getAttribute('data-title') || '')).replace(NBSP, ' ').replace(/\s+/g, ' ').trim()
   const body = Array.from(el.children).find(c => c.classList && c.classList.contains('rt-card-body')) || el
   const inner = blocksOf(body, ctx).join('\n\n')
   return `:::${type}${title ? ` ${title}` : ''}\n${inner}\n:::`

@@ -88,18 +88,33 @@ function ClassPickerSearch({ onPick }) {
   )
 }
 
+// The "name only" choice is remembered while the page stays open, so several drugs in a row
+// can be added the same way.
+let rememberNameOnly = false
+
 export default function TextLinkPicker({ kind, onClose, onPick }) {
   // A fresh search every time the pop-up opens.
   const [openCount, setOpenCount] = useState(0)
+  const [nameOnly, setNameOnly] = useState(rememberNameOnly)
   useEffect(() => { if (kind) setOpenCount(n => n + 1) }, [kind])
+  function toggleNameOnly(v) { rememberNameOnly = v; setNameOnly(v) }
 
   if (!kind) return null
   const title = kind === 'drug' ? 'Link a drug' : 'Link a class or drug family'
 
   return createPortal(
     <Modal isOpen onClose={onClose} title={title} size="md">
+      {kind === 'drug' && (
+        <label style={{
+          display: 'flex', alignItems: 'center', gap: 8, margin: '0 0 var(--space-3)', fontSize: 13,
+          fontFamily: 'var(--font-body)', color: 'var(--color-text-primary)', cursor: 'pointer',
+        }}>
+          <input type="checkbox" checked={nameOnly} onChange={e => toggleNameOnly(e.target.checked)} />
+          Name only (leave out the strength and form)
+        </label>
+      )}
       {kind === 'drug'
-        ? <DrugPickerSearch key={openCount} mode="brand" onPick={onPick} />
+        ? <DrugPickerSearch key={openCount} mode="brand" onPick={drug => onPick(drug, { nameOnly })} />
         : <ClassPickerSearch key={openCount} onPick={onPick} />}
     </Modal>,
     document.body,
