@@ -70,13 +70,13 @@ function ContentsList({ items, current, title, onJump, onClose }) {
         padding: '2px 12px 12px 20px', flexShrink: 0,
         borderBottom: '1px solid var(--color-border)', fontFamily: 'var(--font-body)',
       }}>
-        <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <div dir="ltr" style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2, textAlign: 'left' }}>
           <span style={{ fontSize: 12.5, fontWeight: 400, color: 'var(--color-text-secondary)' }}>
             Contents
           </span>
           <span dir="auto" style={{
             fontSize: 21, fontWeight: 700, lineHeight: 1.25, color: 'var(--color-text-primary)',
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', unicodeBidi: 'plaintext',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', unicodeBidi: 'plaintext', textAlign: 'left',
           }}>
             {title?.trim() || 'This page'}
           </span>
@@ -111,7 +111,7 @@ function ContentsList({ items, current, title, onJump, onClose }) {
               data-current={isCurrent ? '1' : undefined}
               onClick={() => onJump(i)}
               style={{
-                display: 'flex', alignItems: 'stretch', gap: 6, width: '100%', textAlign: 'start',
+                display: 'flex', alignItems: 'stretch', gap: 6, width: '100%', textAlign: 'left',
                 padding: 0, border: 'none', background: 'transparent', cursor: 'pointer',
                 fontFamily: 'var(--font-body)', color: 'var(--color-text-primary)',
               }}
@@ -139,7 +139,7 @@ function ContentsList({ items, current, title, onJump, onClose }) {
                   : 'transparent',
               }}>
                 <span dir="auto" style={{
-                  flex: 1, minWidth: 0, overflowWrap: 'anywhere', unicodeBidi: 'plaintext',
+                  flex: 1, minWidth: 0, overflowWrap: 'anywhere', unicodeBidi: 'plaintext', textAlign: 'left',
                   fontSize: 15, lineHeight: 1.35, fontWeight: isCurrent ? 700 : 600,
                 }}>
                   {item.title || '—'}
