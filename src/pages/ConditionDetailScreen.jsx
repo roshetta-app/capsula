@@ -12,6 +12,7 @@ import { useDeepLinkParent } from '../hooks/useDeepLinkParent'
 import { useBackLabel } from '../hooks/useBackLabel'
 import PrescriptionsTab from '../components/conditions/PrescriptionsTab'
 import ClinicalDataTab from '../components/conditions/ClinicalDataTab'
+import SectionIndex from '../components/conditions/SectionIndex'
 import BottomNav from '../components/BottomNav'
 import { logUsageEvent } from '../analytics/usageEvents'
 import { SpecialtyIcon, useIsDark } from '../utils/specialtyIcon'
@@ -471,6 +472,13 @@ export default function ConditionDetailScreen() {
         </div>
       </div>
 
+      <SectionIndex
+        scrollBoxRef={scrollBoxRef}
+        resetKey={activeTab}
+        hidden={keyboardOpen}
+        bottomClearance={keyboardOpen ? '0px' : 'calc(60px + env(safe-area-inset-bottom))'}
+      />
+
       <BottomNav />
     </div>
   )
@@ -494,6 +502,7 @@ const simplePageStyle = {
 // availableHeight above) — overflow: hidden means this root itself never
 // scrolls, so window.scrollY can never move on this screen.
 const rootStyle = {
+  position: 'relative', // the Contents pill and sheet are placed inside this box
   display: 'flex',
   flexDirection: 'column',
   overflow: 'hidden',

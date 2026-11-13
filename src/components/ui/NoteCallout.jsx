@@ -68,6 +68,18 @@ export function NoteFlavorIcon({ flavor, size = 14 }) {
 // Arabic-leading text so the icon side can follow text direction.
 const ARABIC_RE = /[\u0600-\u06FF\u0750-\u077F]/
 
+// The first line of a note, without markdown marks: this is the heading's name in the
+// page's Contents list (see conditions/SectionIndex.jsx).
+function headingTitle(text) {
+  const first = String(text).split('\n').map(l => l.trim()).find(Boolean) || ''
+  return first
+    .replace(/^(#{1,6}\s+|[-*+]\s+|>\s*|\d+\.\s+)/, '')
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/[*_`~]/g, '')
+    .trim()
+    .slice(0, 120)
+}
+
 export default function NoteCallout({ text, flavor = 'info', variant = 'inline', isLast = false, flush = false }) {
   if (!text || !text.trim()) return null
 
@@ -156,7 +168,11 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
   const fill = `color-mix(in srgb, ${f.iconColor} 26%, var(--color-surface) 74%)`
 
   const bubble = (
-    <div style={{
+    <div
+      data-heading="1"
+      data-heading-flavor={flavor}
+      data-heading-title={headingTitle(text)}
+      style={{
       position: 'relative',
       // v11 (2026-11-13): no shadow, stronger tint (16% -> 26%) so a note reads as a section
       // marker, clearly different from the neutral drug rows.

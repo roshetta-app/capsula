@@ -16,11 +16,12 @@
  * router inside a router, so every open showed the "could not draw" message.
  * It now reuses the editor's router.
  */
-import { Component, useEffect, useMemo, useState } from 'react'
+import { Component, useEffect, useMemo, useRef, useState } from 'react'
 import { X, ArrowLeft } from 'lucide-react'
 import { PreviewModeContext } from '../../context/PreviewModeContext'
 import PrescriptionsTab from '../conditions/PrescriptionsTab'
 import ClinicalDataTab from '../conditions/ClinicalDataTab'
+import SectionIndex from '../conditions/SectionIndex'
 
 const TABS = ['Treatment', 'Review']
 
@@ -52,6 +53,7 @@ class PreviewBoundary extends Component {
 
 export default function PhonePreviewModal({ isOpen, onClose, name, blocks }) {
   const [tab, setTab] = useState(0)
+  const previewScrollRef = useRef(null)
   const appBlocks = useMemo(() => toAppBlocks(blocks), [blocks])
 
   useEffect(() => {
@@ -107,7 +109,7 @@ export default function PhonePreviewModal({ isOpen, onClose, name, blocks }) {
             backgroundColor: 'var(--color-bg)',
             border: '8px solid #111827', borderRadius: 36,
             boxShadow: '0 24px 64px rgba(0,0,0,0.4)',
-            overflow: 'hidden', display: 'flex', flexDirection: 'column',
+            overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative',
           }}
         >
           {/* Top of the screen: back arrow, name, tabs */}
@@ -150,7 +152,7 @@ export default function PhonePreviewModal({ isOpen, onClose, name, blocks }) {
           </div>
 
           {/* Scrolling content, same padding as the app */}
-          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden' }}>
+          <div ref={previewScrollRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden' }}>
             <div style={{ padding: 'var(--space-5) var(--space-6) var(--space-6)' }}>
               <PreviewBoundary resetKey={appBlocks}>
                 <PreviewModeContext.Provider value={true}>
@@ -161,6 +163,7 @@ export default function PhonePreviewModal({ isOpen, onClose, name, blocks }) {
               </PreviewBoundary>
             </div>
           </div>
+          <SectionIndex scrollBoxRef={previewScrollRef} resetKey={tab} />
         </div>
       </div>
     </div>
