@@ -202,6 +202,7 @@ export default function PrescriptionSheetBlock({ sheet, hasContentAfter = true }
             text={noteText}
             flavor={row.flavor ?? 'info'}
             flush
+            indexed
           />
         )
       }

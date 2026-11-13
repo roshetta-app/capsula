@@ -35,7 +35,7 @@
  * more margin since it stands alone between blocks rather than sitting
  * directly under prescription rows.
  */
-import { Stethoscope, Hand, Lightbulb } from 'lucide-react'
+import { Stethoscope, Hand, Lightbulb, ListTree } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkBreaks from 'remark-breaks'
 import { NOTE_FLAVORS, noteFlavorColor } from './noteFlavors'
@@ -80,7 +80,7 @@ function headingTitle(text) {
     .slice(0, 120)
 }
 
-export default function NoteCallout({ text, flavor = 'info', variant = 'inline', isLast = false, flush = false }) {
+export default function NoteCallout({ text, flavor = 'info', variant = 'inline', isLast = false, flush = false, indexed = false }) {
   if (!text || !text.trim()) return null
 
   const f = NOTE_FLAVORS[flavor] ?? NOTE_FLAVORS.info
@@ -169,9 +169,11 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
 
   const bubble = (
     <div
-      data-heading="1"
-      data-heading-flavor={flavor}
-      data-heading-title={headingTitle(text)}
+      {...(indexed ? {
+        'data-heading': '1',
+        'data-heading-flavor': flavor,
+        'data-heading-title': headingTitle(text),
+      } : {})}
       style={{
       position: 'relative',
       // v11 (2026-11-13): no shadow, stronger tint (16% -> 26%) so a note reads as a section
@@ -197,6 +199,20 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
               engines). dir stays on the inner text content. */}
           <Icon color={f.iconColor} size={16} offset={0} />
           {textContent}
+          {indexed && (
+            // Tap cue: shown only while the page has a Contents list (see globals.css).
+            <span
+              className="note-heading-tap"
+              aria-hidden="true"
+              style={{
+                width: 24, height: 24, flexShrink: 0, alignItems: 'center', justifyContent: 'center',
+                borderRadius: '50%', color: f.iconColor,
+                background: `color-mix(in srgb, ${f.iconColor} 16%, transparent)`,
+              }}
+            >
+              <ListTree size={14} strokeWidth={2.4} />
+            </span>
+          )}
         </div>
       </div>
       {/* Tail — curved hook, same fill as the bubble, bottom aligned with the

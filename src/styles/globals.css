@@ -141,7 +141,11 @@
      Kept near other surface tokens for easy comparison with Phase 5's
      section card variable (--color-section-bg, added in Phase 5). */
   --color-note-bg:          #F5F4F1;
-  --color-note-info:        #3B5170;   /* Info note: slate, distinct from blue accent, violet sections, green tip, amber warning */
+  /* The three note types, one clear hue each (2026-11-13): info = sky blue, warning = orange,
+     tip = green. All three stay apart from the violet section cards and the red danger tone. */
+  --color-note-info:        #0369A1;
+  --color-note-warning:     #EA580C;
+  --color-note-tip:         #15803D;
 
   /* Dose text — Phase 9 redesign, refined to slate/ink (option A from
      color review): cool near-black neutral, distinct in weight/tone from
@@ -299,7 +303,9 @@
   /* Note card — dark mode: slightly lifted from the dark surface,
      clearly visible but not bright or alert-colored. */
   --color-note-bg:          #262D3A;
-  --color-note-info:        #8FA9CF;   /* Info note slate, dark mode */
+  --color-note-info:        #38BDF8;   /* Note types, dark mode: lifted for contrast on dark cards */
+  --color-note-warning:     #FB923C;
+  --color-note-tip:         #4ADE80;
 
   /* Dose text — dark mode: light slate, mirrors the light-mode near-black
      ink at the equivalent gray-ramp stop. */
@@ -1312,3 +1318,15 @@ body {
 .dir-prose .dir-card th + th, .dir-prose .dir-card td + td { border-inline-start: 1px solid rgba(127, 127, 127, 0.16); }
 .dir-prose .dir-card tbody tr:last-child td { border-bottom: none; }
 .dir-prose .dir-card tbody tr:nth-child(even) td { background: rgba(127, 127, 127, 0.05); }
+
+/* ── Contents index (2026-11-13) ─────────────────────────────────────────────
+   Sheet headings only become tappable once the page has enough of them: the index
+   marks the scroll box with data-contents-active, which reveals the small list icon
+   on each heading and gives it a pointer cursor. */
+.note-heading-tap { display: none; }
+[data-contents-active] .note-heading-tap { display: flex; }
+[data-contents-active] [data-heading] { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+[data-contents-active] [data-heading]:active { opacity: 0.86; }
+
+@keyframes contents-sheet-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes contents-fade-in { from { opacity: 0; } to { opacity: 1; } }

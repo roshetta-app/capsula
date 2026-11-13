@@ -1,14 +1,17 @@
 /**
- * SectionIndex.jsx — the "Contents" pill and its bottom sheet for long pages.
+ * SectionIndex.jsx — the "Contents" pill and its bottom sheet for long prescription pages.
  *
- * 2026-11-13: every note (the coloured bubble, now called a Heading in the CMS) is a heading
- * that divides the page. This component finds them on the page by itself (each bubble carries
- * a data-heading mark, see NoteCallout.jsx), so it works for notes inside sheets, the Rx-level
- * list, the Review list and loose note blocks alike, with no tab-by-tab logic.
+ * 2026-11-13 (v2): the index lists ONLY the headings inside prescription sheets (the note rows
+ * a sheet carries, called Headings in the CMS). NoteCallout marks those with a data-heading
+ * attribute when the sheet passes 'indexed'; standalone note blocks do not carry the mark, so
+ * they are never listed.
  *
  * - Shows a small "Contents" pill only when the open tab has MIN_HEADINGS or more headings.
- * - Tapping the pill opens a bottom sheet: one row per heading (first line of its text, with
- *   its colour dot); the heading you are reading is highlighted. Tapping a row scrolls there.
+ * - While it is showing, the scroll box is marked data-contents-active, which reveals a small
+ *   list icon on every heading (see globals.css). Tapping a heading on the page opens the sheet
+ *   with that heading highlighted; the pill opens it on the heading you are reading.
+ * - The sheet is a timeline: the colour dots are joined by one continuous line, top to bottom.
+ *   Tapping a row scrolls the page to that heading and closes the sheet.
  * - Must sit inside a position: relative box that does not scroll, next to the scroll box.
  *
  * Props:
@@ -17,7 +20,7 @@
  *   bottomClearance  CSS length the bottom bar covers (so the pill and sheet sit above it)
  *   hidden           hide the pill (e.g. while the keyboard is open)
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { List, X } from 'lucide-react'
 import { noteFlavorColor } from '../ui/noteFlavors'
 
@@ -40,8 +43,9 @@ export default function SectionIndex({ scrollBoxRef, resetKey, bottomClearance =
   // The sheet remembers which tab it was opened on, so a tab switch closes it by itself.
   const [sheet, setSheet] = useState(null)
   const open = sheet !== null && sheet.key === resetKey
-  const setOpen = isOpen => setSheet(isOpen ? { key: resetKey } : null)
   const [current, setCurrent] = useState(0)
+  const listRef = useRef(null)
+  const enough = items.length >= MIN_HEADINGS
 
   // Keep the list in step with the page: a tab switch, a plan switch or a content load
   // changes the page, so look again (once per frame at most).
@@ -62,106 +66,198 @@ export default function SectionIndex({ scrollBoxRef, resetKey, bottomClearance =
     return () => { observer.disconnect(); cancelAnimationFrame(raf) }
   }, [scrollBoxRef, resetKey])
 
-  function openSheet() {
+  // The page's headings become tappable only while the list is long enough to show.
+  useEffect(() => {
     const box = scrollBoxRef.current
-    if (box) {
-      const edge = box.getBoundingClientRect().top + 24
-      const els = Array.from(box.querySelectorAll('[data-heading]'))
-      let idx = 0
-      els.forEach((el, i) => { if (el.getBoundingClientRect().top <= edge) idx = i })
-      setCurrent(idx)
-    }
-    setOpen(true)
+    if (!box || !enough) return undefined
+    box.setAttribute('data-contents-active', '1')
+    return () => box.removeAttribute('data-contents-active')
+  }, [scrollBoxRef, resetKey, enough])
+
+  function show(index) {
+    setCurrent(index)
+    setSheet({ key: resetKey })
   }
+
+  function readingIndex() {
+    const box = scrollBoxRef.current
+    if (!box) return 0
+    const edge = box.getBoundingClientRect().top + 24
+    const els = Array.from(box.querySelectorAll('[data-heading]'))
+    let idx = 0
+    els.forEach((el, i) => { if (el.getBoundingClientRect().top <= edge) idx = i })
+    return idx
+  }
+
+  // Tap on a heading in the page opens the sheet on that heading. Taps on links inside the
+  // heading, and the end of a text selection, are left alone.
+  useEffect(() => {
+    const box = scrollBoxRef.current
+    if (!box || !enough) return undefined
+    const onClick = e => {
+      const target = e.target instanceof Element ? e.target : null
+      if (!target || target.closest('a, button')) return
+      const el = target.closest('[data-heading]')
+      if (!el) return
+      const sel = window.getSelection && window.getSelection()
+      if (sel && String(sel).length > 0) return
+      const index = Array.from(box.querySelectorAll('[data-heading]')).indexOf(el)
+      if (index >= 0) { setCurrent(index); setSheet({ key: resetKey }) }
+    }
+    box.addEventListener('click', onClick)
+    return () => box.removeEventListener('click', onClick)
+  }, [scrollBoxRef, resetKey, enough])
+
+  // Bring the highlighted row into view when the sheet opens on a long list.
+  useEffect(() => {
+    if (!open || !listRef.current) return
+    const row = listRef.current.querySelector('[data-current="1"]')
+    if (row && row.scrollIntoView) row.scrollIntoView({ block: 'center' })
+  }, [open])
+
+  function close() { setSheet(null) }
 
   function jump(i) {
     const box = scrollBoxRef.current
     const el = box ? box.querySelectorAll('[data-heading]')[i] : null
-    setOpen(false)
+    close()
     if (!box || !el) return
     const top = el.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop - 12
     box.scrollTo({ top: Math.max(0, top), behavior: 'smooth' })
   }
 
-  if (items.length < MIN_HEADINGS) return null
+  if (!enough) return null
 
   return (
     <>
       {!open && !hidden && (
         <button
           type="button"
-          onClick={openSheet}
+          onClick={() => show(readingIndex())}
           aria-label="Contents of this page"
           style={{
             position: 'absolute', right: 16, bottom: `calc(${bottomClearance} + 12px)`, zIndex: 40,
-            display: 'flex', alignItems: 'center', gap: 6, height: 40, padding: '0 14px',
-            fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-body)',
-            color: 'var(--color-text-primary)', background: 'var(--color-surface)',
-            border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)',
-            boxShadow: '0 4px 14px rgba(0,0,0,0.14)', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', gap: 8, height: 42, padding: '0 8px 0 14px',
+            fontSize: 13, fontWeight: 700, fontFamily: 'var(--font-body)',
+            color: '#fff', background: 'var(--color-accent-solid)',
+            border: 'none', borderRadius: 'var(--radius-full)',
+            boxShadow: '0 6px 18px rgba(0,0,0,0.22)', cursor: 'pointer',
           }}
         >
-          <List size={16} /> Contents
+          <List size={16} strokeWidth={2.4} />
+          Contents
+          <span style={{
+            minWidth: 24, height: 24, padding: '0 6px', boxSizing: 'border-box',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            borderRadius: 'var(--radius-full)', background: 'rgba(255,255,255,0.22)',
+            fontSize: 12, fontWeight: 700,
+          }}>
+            {items.length}
+          </span>
         </button>
       )}
 
       {open && (
         <div
-          onClick={() => setOpen(false)}
-          style={{ position: 'absolute', inset: 0, zIndex: 60, background: 'rgba(0,0,0,0.35)' }}
+          onClick={close}
+          style={{
+            position: 'absolute', inset: 0, zIndex: 60, background: 'rgba(0,0,0,0.4)',
+            animation: 'contents-fade-in 160ms ease-out',
+          }}
         >
           <div
             role="dialog"
             aria-label="Contents"
             onClick={e => e.stopPropagation()}
             style={{
-              position: 'absolute', left: 0, right: 0, bottom: bottomClearance, maxHeight: '62%',
+              position: 'absolute', left: 0, right: 0, bottom: bottomClearance, maxHeight: '66%',
               display: 'flex', flexDirection: 'column',
-              background: 'var(--color-surface)', borderRadius: '22px 22px 0 0',
-              boxShadow: '0 -8px 28px rgba(0,0,0,0.18)', fontFamily: 'var(--font-body)',
+              background: 'var(--color-surface)', borderRadius: '24px 24px 0 0',
+              boxShadow: '0 -10px 32px rgba(0,0,0,0.22)', fontFamily: 'var(--font-body)',
+              animation: 'contents-sheet-up 220ms cubic-bezier(0.2, 0.8, 0.2, 1)',
             }}
           >
+            {/* Grab handle */}
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '8px 0 0', flexShrink: 0 }}>
+              <span style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--color-border)' }} />
+            </div>
+
             <div style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '14px 16px 8px', flexShrink: 0,
+              padding: '8px 12px 10px 20px', flexShrink: 0,
+              borderBottom: '1px solid var(--color-border)',
             }}>
-              <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text-primary)' }}>Contents</span>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                <span style={{ fontSize: 17, fontWeight: 800, color: 'var(--color-text-primary)' }}>Contents</span>
+                <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--color-text-secondary)' }}>
+                  {items.length} headings
+                </span>
+              </div>
               <button
                 type="button"
-                onClick={() => setOpen(false)}
+                onClick={close}
                 aria-label="Close contents"
                 style={{
-                  width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: 'none', border: 'none', borderRadius: 'var(--radius-full)',
+                  width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: 'var(--color-bg)', border: 'none', borderRadius: 'var(--radius-full)',
                   color: 'var(--color-text-secondary)', cursor: 'pointer',
                 }}
               >
                 <X size={18} />
               </button>
             </div>
-            <div style={{ overflowY: 'auto', padding: '0 8px 12px' }}>
-              {items.map((item, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => jump(i)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'start',
-                    padding: '11px 10px', border: 'none', borderRadius: 'var(--radius-md)', cursor: 'pointer',
-                    background: i === current ? 'var(--color-accent-light)' : 'transparent',
-                    fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: i === current ? 700 : 500,
-                    color: 'var(--color-text-primary)',
-                  }}
-                >
-                  <span style={{
-                    width: 10, height: 10, borderRadius: '50%', flexShrink: 0,
-                    background: noteFlavorColor(item.flavor),
-                  }} />
-                  <span dir="auto" style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere', unicodeBidi: 'plaintext' }}>
-                    {item.title || '—'}
-                  </span>
-                </button>
-              ))}
+
+            {/* The list is a timeline: dots on the left, one continuous line through them. */}
+            <div ref={listRef} dir="ltr" style={{ overflowY: 'auto', padding: '8px 10px 14px' }}>
+              {items.map((item, i) => {
+                const color = noteFlavorColor(item.flavor)
+                const isCurrent = i === current
+                const first = i === 0
+                const last = i === items.length - 1
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    data-current={isCurrent ? '1' : undefined}
+                    onClick={() => jump(i)}
+                    style={{
+                      display: 'flex', alignItems: 'stretch', gap: 6, width: '100%', textAlign: 'start',
+                      padding: 0, border: 'none', background: 'transparent', cursor: 'pointer',
+                      fontFamily: 'var(--font-body)', color: 'var(--color-text-primary)',
+                    }}
+                  >
+                    {/* Rail: the line runs the full height of the row so rows join into one stream */}
+                    <span style={{ position: 'relative', width: 28, flexShrink: 0 }}>
+                      <span style={{
+                        position: 'absolute', left: 13, width: 2,
+                        top: first ? '50%' : 0, bottom: last ? '50%' : 0,
+                        background: 'var(--color-border)',
+                      }} />
+                      <span style={{
+                        position: 'absolute', left: '50%', top: '50%',
+                        width: isCurrent ? 16 : 12, height: isCurrent ? 16 : 12, borderRadius: '50%',
+                        transform: 'translate(-50%, -50%)', background: color, boxSizing: 'border-box',
+                        border: '3px solid var(--color-surface)',
+                        boxShadow: isCurrent ? `0 0 0 2px ${color}` : 'none',
+                      }} />
+                    </span>
+                    <span style={{
+                      flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', margin: '3px 0',
+                      padding: '11px 12px', borderRadius: 'var(--radius-md)',
+                      background: isCurrent
+                        ? `color-mix(in srgb, ${color} 14%, var(--color-surface) 86%)`
+                        : 'transparent',
+                    }}>
+                      <span dir="auto" style={{
+                        flex: 1, minWidth: 0, overflowWrap: 'anywhere', unicodeBidi: 'plaintext',
+                        fontSize: 15, lineHeight: 1.35, fontWeight: isCurrent ? 700 : 600,
+                      }}>
+                        {item.title || '—'}
+                      </span>
+                    </span>
+                  </button>
+                )
+              })}
             </div>
           </div>
         </div>

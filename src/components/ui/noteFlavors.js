@@ -1,22 +1,21 @@
-// Bubble look per flavor. Every colour comes from the app's theme tokens, so
-// the icon and the tint follow light and dark mode automatically (the icon
-// used to keep its light-mode colour in dark mode). Warning has a stronger
-// tint so it stands apart from Info and Tip.
+// Bubble look per flavor. Every colour comes from the app's theme tokens (one dedicated
+// token per note type, see globals.css), so the icon, the tint and the Contents dots follow
+// light and dark mode automatically. Warning has a stronger tint so it stands apart.
 export const NOTE_FLAVORS = {
   info: {
     label: 'Info',
     iconColor: 'var(--color-note-info)',
-    bg: 'color-mix(in srgb, var(--color-note-info) 7%, var(--color-note-bg) 93%)',
+    bg: 'color-mix(in srgb, var(--color-note-info) 8%, var(--color-note-bg) 92%)',
   },
   warning: {
     label: 'Warning',
-    iconColor: 'var(--color-warning)',
-    bg: 'color-mix(in srgb, var(--color-warning) 13%, var(--color-note-bg) 87%)',
+    iconColor: 'var(--color-note-warning)',
+    bg: 'color-mix(in srgb, var(--color-note-warning) 14%, var(--color-note-bg) 86%)',
   },
   tip: {
     label: 'Tip',
-    iconColor: 'var(--color-success)',
-    bg: 'color-mix(in srgb, var(--color-success) 8%, var(--color-note-bg) 92%)',
+    iconColor: 'var(--color-note-tip)',
+    bg: 'color-mix(in srgb, var(--color-note-tip) 9%, var(--color-note-bg) 91%)',
   },
 }
 
