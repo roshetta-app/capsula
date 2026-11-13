@@ -208,3 +208,34 @@ test('the empty list for guests and loading is always the same object (screens d
   const b = viewFor({ userId: 'u9', authLoading: false, loaded: null }).roshettas;
   assert.equal(a, b);
 });
+
+test('a change made while the live list is loading is still on the list that gets shown', async () => {
+  const waiting = [];
+  const shown = [];
+  await loadRoshettas({
+    userId: 'u1', queue: waiting, readQueue: async () => waiting, readCache: async () => null,
+    fetchLive: async () => {
+      waiting.push(makeChange('create', 'during', { name: 'Made during load', description: '', rows: [], createdAt: T3 }));
+      return { data: [R('r1', 'A')], error: null };
+    },
+    getQueue: () => waiting, isOffline: () => false, isStale: () => false, show: s => shown.push(s),
+  });
+  assert.deepEqual(names(shown[shown.length - 1]).sort(), ['A', 'Made during load']);
+});
+
+test('a quiet reload (showCopy false) reads no copy, shows only the live list, and a failed refresh shows nothing', async () => {
+  let cacheReads = 0;
+  const shown = [];
+  const base = { userId: 'u1', queue: [], readQueue: async () => [], readCache: async () => { cacheReads++; return { data: [R('old', 'Old')] }; }, isStale: () => false, isOffline: () => false, show: s => shown.push(s), showCopy: false };
+  const ok = await loadRoshettas({ ...base, fetchLive: async () => ({ data: [R('r1', 'A')], error: null }) });
+  assert.equal(ok.live, true);
+  assert.equal(cacheReads, 0);
+  assert.equal(shown.length, 1);
+  assert.deepEqual(names(shown[0]), ['A']);
+  const bad = await loadRoshettas({ ...base, fetchLive: async () => ({ data: null, error: { message: 'x' } }) });
+  assert.equal(bad.live, false);
+  assert.equal(shown.length, 1);
+  const off = await loadRoshettas({ ...base, isOffline: () => true, fetchLive: async () => { throw new Error('should not be asked'); } });
+  assert.equal(off.live, false);
+  assert.equal(shown.length, 1);
+});

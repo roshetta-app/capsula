@@ -202,3 +202,34 @@ export async function runSync({ getQueue, update, send, canRun, onSent, roshetta
   }
   return result
 }
+
+// The things the person has to be told after a run, in plain words (the events
+// and the failed count that runSync returns). One text per kind; several
+// roshettas of one kind are counted. severe: true when something was lost, so
+// the message is shown as an error instead of a note.
+export function describeEvents(events = [], failed = 0) {
+  const messages = []
+  const by = kind => events.filter(e => e.kind === kind)
+  const quote = t => `\u201c${t}\u201d`
+
+  const gone = by('roshetta_gone')
+  if (gone.length === 1) messages.push(`${quote(gone[0].name || 'A roshetta')} was deleted on another device, so your changes to it were not saved.`)
+  else if (gone.length > 1) messages.push(`${gone.length} roshettas were deleted on another device, so your changes to them were not saved.`)
+
+  const full = by('roshetta_limit')
+  if (full.length === 1) messages.push(`${quote(full[0].name || 'A roshetta')} could not be saved because you have reached the limit of roshettas.`)
+  else if (full.length > 1) messages.push(`${full.length} roshettas could not be saved because you have reached the limit of roshettas.`)
+
+  const big = by('drug_limit')
+  if (big.length === 1) messages.push(`${quote(big[0].name || 'A roshetta')} could not be saved because it has too many drugs.`)
+  else if (big.length > 1) messages.push(`${big.length} roshettas could not be saved because they have too many drugs.`)
+
+  if (by('read_only').length > 0) {
+    messages.push('Your changes could not be saved because your roshettas are read only.')
+  }
+
+  if (failed > 0) messages.push(`${failed} change${failed === 1 ? '' : 's'} could not be saved.`)
+
+  const severe = events.length > 0 || failed > 0
+  return { messages, severe }
+}

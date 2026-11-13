@@ -15,7 +15,11 @@
  *   2. Offline: stay on the saved copy, or give an error when there is none.
  *   3. The live list from the server replaces it. If that fails, the saved
  *      copy stays and the failure is flagged (loadError).
- * Every list shown has the waiting changes laid over it.
+ * Every list shown has the waiting changes laid over it, as they are at the
+ * moment it is shown (a change made while the live list was loading is not lost).
+ * A reload that must not flash the older saved copy (after a send) passes
+ * showCopy: false: it reads no copy, shows nothing in between, and a failed
+ * refresh leaves the screen as it is.
  *
  * Every state handed to show() is complete:
  *   { roshettas, status: 'loading' | 'ready' | 'error', fromCache, loadError }
@@ -78,7 +82,10 @@ export async function fetchRoshettas(client, limit = x => x) {
 //   show        (state) => void
 //   onQueue     (list) => void   optional; called once, right after the waiting
 //                                list is read, so the hook can keep it
-export async function loadRoshettas({ userId, queue, readQueue, readCache, fetchLive, isOffline, isStale, show, onQueue }) {
+//   getQueue    () => list       optional; the waiting list as it is right now
+//                                (changes can be made during a load)
+//   showCopy    false for a quiet reload (see above); default true
+export async function loadRoshettas({ userId, queue, readQueue, readCache, fetchLive, isOffline, isStale, show, onQueue, getQueue, showCopy = true }) {
   let waiting = queue
   if (!waiting) {
     const saved = await readQueue(userId)
@@ -86,28 +93,32 @@ export async function loadRoshettas({ userId, queue, readQueue, readCache, fetch
     waiting = clearSending(Array.isArray(saved) ? saved : [])
     if (onQueue) onQueue(waiting)
   }
-  const withWaiting = list => applyQueue(list, waiting)
+  const withWaiting = list => applyQueue(list, (getQueue && getQueue()) || waiting)
 
-  const cached = await readCache(userId)
+  const cached = showCopy ? await readCache(userId) : null
   if (isStale()) return { stale: true }
   const hasCopy = !!cached && Array.isArray(cached.data)
-  if (hasCopy) {
-    show({ roshettas: withWaiting(cached.data), status: 'ready', fromCache: true, loadError: false })
-  } else {
-    show({ roshettas: [], status: 'loading', fromCache: false, loadError: false })
+  if (showCopy) {
+    if (hasCopy) {
+      show({ roshettas: withWaiting(cached.data), status: 'ready', fromCache: true, loadError: false })
+    } else {
+      show({ roshettas: [], status: 'loading', fromCache: false, loadError: false })
+    }
   }
 
-  if (isOffline()) {
-    show({ roshettas: hasCopy ? withWaiting(cached.data) : [], status: hasCopy ? 'ready' : 'error', fromCache: hasCopy, loadError: hasCopy })
+  // Nothing newer could be had: stay on the copy (or fail if there is none).
+  const keepWhatShows = () => {
+    if (showCopy) {
+      show({ roshettas: hasCopy ? withWaiting(cached.data) : [], status: hasCopy ? 'ready' : 'error', fromCache: hasCopy, loadError: hasCopy })
+    }
     return { stale: false, queue: waiting, live: false }
   }
+
+  if (isOffline()) return keepWhatShows()
 
   const { data, error } = await fetchLive()
   if (isStale()) return { stale: true }
-  if (error || !Array.isArray(data)) {
-    show({ roshettas: hasCopy ? withWaiting(cached.data) : [], status: hasCopy ? 'ready' : 'error', fromCache: hasCopy, loadError: hasCopy })
-    return { stale: false, queue: waiting, live: false }
-  }
+  if (error || !Array.isArray(data)) return keepWhatShows()
   show({ roshettas: newestChangedFirst(withWaiting(data)), status: 'ready', fromCache: false, loadError: false })
   return { stale: false, queue: waiting, live: true }
 }

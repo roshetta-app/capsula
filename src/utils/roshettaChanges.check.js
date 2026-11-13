@@ -290,3 +290,23 @@ test('dropRoshetta removes every waiting change for one roshetta', () => {
   const keep = save('r2', 'B', 1);
   assert.deepEqual(dropRoshetta([create('r1'), keep, del('r1')], 'r1'), [keep]);
 });
+
+test('summarizeQueue counts waiting and failed, lists the roshettas with something waiting and the failed changes', async () => {
+  const { summarizeQueue } = await import('./roshettaChanges.js');
+  const a = save('r1', 'A', 1); const b = failed(save('r2', 'B', 2)); const c = del('r3');
+  const s = summarizeQueue([a, b, c]);
+  assert.deepEqual([s.waiting, s.failed], [2, 1]);
+  assert.deepEqual(s.ids.sort(), ['r1', 'r2', 'r3']);
+  assert.deepEqual(s.failedList.map(x => x.id), [b.id]);
+  assert.deepEqual(summarizeQueue([]), { failed: 0, waiting: 0, ids: [], failedList: [] });
+});
+
+test('sameSummary is true only when nothing the screens show has changed', async () => {
+  const { summarizeQueue, sameSummary } = await import('./roshettaChanges.js');
+  const a = save('r1', 'A', 1); const b = failed(save('r2', 'B', 2));
+  assert.equal(sameSummary(summarizeQueue([a, b]), summarizeQueue([a, b])), true);
+  assert.equal(sameSummary(summarizeQueue([a, b]), summarizeQueue([a])), false);
+  assert.equal(sameSummary(summarizeQueue([a]), summarizeQueue([a, del('r2')])), false);
+  assert.equal(sameSummary(summarizeQueue([a]), summarizeQueue([del('r1')])), true, 'same count and same roshetta: nothing the screens show changed');
+  assert.equal(sameSummary(summarizeQueue([a, b]), summarizeQueue([b, a])), true);
+});

@@ -195,3 +195,26 @@ export function discardFailed(queue) {
 export function dropRoshetta(queue, roshettaId) {
   return queue.filter(c => c.roshettaId !== roshettaId)
 }
+
+// What the screens need to know about the list: how many changes are waiting
+// to be sent, how many the server refused (failed), which roshettas have
+// something waiting (the small mark on a roshetta), and the failed changes
+// themselves, oldest first, for the "could not be saved" sheet.
+export function summarizeQueue(queue) {
+  const failedList = queue.filter(c => c.failed)
+  return {
+    failed: failedList.length,
+    waiting: queue.length - failedList.length,
+    ids: Array.from(new Set(queue.map(c => c.roshettaId))),
+    failedList,
+  }
+}
+
+// True when two summaries say the same thing, so a screen can keep the old
+// object and not redraw for nothing.
+export function sameSummary(a, b) {
+  return a.failed === b.failed
+    && a.waiting === b.waiting
+    && a.ids.length === b.ids.length && a.ids.every(id => b.ids.includes(id))
+    && a.failedList.length === b.failedList.length && a.failedList.every((c, i) => c.id === b.failedList[i].id)
+}
