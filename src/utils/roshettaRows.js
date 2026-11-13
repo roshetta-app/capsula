@@ -3,7 +3,10 @@
 // plus optional 'or' / 'plus' partners sharing one dose text) and
 // 'plain_text' (a text block, drawn as plain text, never markdown or HTML).
 // This file has no screen code and no network calls.
-// Step 2.1a: sizes, counts and checks. Later steps add the row builders.
+// Step 2.1a: sizes, counts and checks. Step 2.1b: a new drug group.
+// Later steps add partners, moving and text blocks.
+
+import { newId } from './groupChanges.js';
 
 export const ROSHETTA_ROW_TYPES = {
   DRUG: 'drug',
@@ -102,4 +105,40 @@ export function checkRows(rows) {
     }
   }
   return { ok: reasons.size === 0, reasons: [...reasons] };
+}
+
+// A new drug group from a library drug (the flat drug the Add drugs search gives).
+// Only the name and identity fields are copied. Every library dose field is
+// left empty on purpose: library doses are not guaranteed accurate, so the
+// author types the dose themselves (plan decision 5). Returns a new object.
+export function newDrugGroup(libraryDrug, makeId = newId) {
+  if (!libraryDrug || !libraryDrug.id || !libraryDrug.name) {
+    throw new Error('newDrugGroup needs a library drug with an id and a name');
+  }
+  const d = libraryDrug;
+  return {
+    row_type: ROSHETTA_ROW_TYPES.DRUG,
+    id: makeId(),
+    brand_id: d.id,
+    brand_name: d.name,
+    generic_id: d.genericId ?? null,
+    generic_name: d.genericName ?? null,
+    formulation_id: d.formulationId ?? null,
+    concentration: d.concentration ?? null,
+    form: d.form ?? null,
+    route: d.route ?? null,
+    category: d.category ?? null,
+    dose: '',
+    dose_who: null,
+    dose_lines: [],
+    dose_max: null,
+    dose_max_population_id: null,
+    dose_library_base: null,
+    extra_populations: [],
+    shown_population: 0,
+    note: null,
+    drug_note: null,
+    source_flag: null,
+    alternatives: [],
+  };
 }

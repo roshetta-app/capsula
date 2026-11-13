@@ -16,6 +16,7 @@ import {
   checkDose,
   checkTextBlock,
   checkRows,
+  newDrugGroup,
 } from './roshettaRows.js';
 
 const drug = (partners = 0, dose = '') => ({
@@ -149,4 +150,83 @@ test('checkRows: several problems are all reported once each', () => {
     drug(0, 'a'.repeat(601)),
   ];
   assert.deepEqual(checkRows(rows).reasons.sort(), ['bad_row_type', 'dose_too_long']);
+});
+
+// ---- Step 2.1b: a new drug group from a library drug ----
+
+const libraryDrug = {
+  id: 'brand-1',
+  name: 'Augmentin 1 g',
+  formulationId: 'form-1',
+  concentration: '875/125 mg',
+  form: 'Tablet',
+  route: 'Oral',
+  genericId: 'gen-1',
+  genericName: 'Amoxicillin/Clavulanate',
+  category: 'Antibiotic',
+  // library dose fields must never be copied
+  dose: '1 g every 12 hours',
+  doseLines: [{ x: 1 }],
+  defaultDoseOverride: 'x',
+};
+
+test('newDrugGroup: copies only the name and identity fields', () => {
+  const row = newDrugGroup(libraryDrug, () => 'row-1');
+  assert.equal(row.row_type, 'drug');
+  assert.equal(row.id, 'row-1');
+  assert.equal(row.brand_id, 'brand-1');
+  assert.equal(row.brand_name, 'Augmentin 1 g');
+  assert.equal(row.generic_id, 'gen-1');
+  assert.equal(row.generic_name, 'Amoxicillin/Clavulanate');
+  assert.equal(row.formulation_id, 'form-1');
+  assert.equal(row.concentration, '875/125 mg');
+  assert.equal(row.form, 'Tablet');
+  assert.equal(row.route, 'Oral');
+  assert.equal(row.category, 'Antibiotic');
+});
+
+test('newDrugGroup: every library dose field is empty', () => {
+  const row = newDrugGroup(libraryDrug, () => 'row-1');
+  assert.equal(row.dose, '');
+  assert.equal(row.dose_who, null);
+  assert.deepEqual(row.dose_lines, []);
+  assert.equal(row.dose_max, null);
+  assert.equal(row.dose_max_population_id, null);
+  assert.equal(row.dose_library_base, null);
+  assert.deepEqual(row.extra_populations, []);
+  assert.equal(row.shown_population, 0);
+  assert.equal(row.note, null);
+  assert.equal(row.drug_note, null);
+  assert.equal(row.source_flag, null);
+  assert.deepEqual(row.alternatives, []);
+});
+
+test('newDrugGroup: counts as one drug and passes the row checks', () => {
+  const row = newDrugGroup(libraryDrug);
+  assert.equal(countDrugs([row]), 1);
+  assert.deepEqual(checkRows([row]), { ok: true, reasons: [] });
+  assert.ok(typeof row.id === 'string' && row.id.length > 10);
+});
+
+test('newDrugGroup: two new groups get different ids', () => {
+  assert.notEqual(newDrugGroup(libraryDrug).id, newDrugGroup(libraryDrug).id);
+});
+
+test('newDrugGroup: missing optional library fields become null, not undefined', () => {
+  const row = newDrugGroup({ id: 'b', name: 'X' });
+  for (const k of ['generic_id', 'generic_name', 'formulation_id', 'concentration', 'form', 'route', 'category']) {
+    assert.equal(row[k], null, k);
+  }
+});
+
+test('newDrugGroup: refuses a drug with no id or name', () => {
+  assert.throws(() => newDrugGroup(null));
+  assert.throws(() => newDrugGroup({ name: 'X' }));
+  assert.throws(() => newDrugGroup({ id: 'b' }));
+});
+
+test('newDrugGroup: does not change the library drug it was given', () => {
+  const before = JSON.stringify(libraryDrug);
+  newDrugGroup(libraryDrug);
+  assert.equal(JSON.stringify(libraryDrug), before);
 });
