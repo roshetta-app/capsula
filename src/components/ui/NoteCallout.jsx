@@ -35,7 +35,7 @@
  * more margin since it stands alone between blocks rather than sitting
  * directly under prescription rows.
  */
-import { Stethoscope, Hand, Lightbulb, ListTree } from 'lucide-react'
+import { Stethoscope, Hand, Lightbulb, List } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkBreaks from 'remark-breaks'
 import { NOTE_FLAVORS, noteFlavorColor } from './noteFlavors'
@@ -210,7 +210,7 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
                 background: `color-mix(in srgb, ${f.iconColor} 16%, transparent)`,
               }}
             >
-              <ListTree size={12} strokeWidth={2.4} />
+              <List size={12} strokeWidth={2.4} />
             </span>
           )}
         </div>

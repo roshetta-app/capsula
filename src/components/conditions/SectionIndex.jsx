@@ -71,14 +71,11 @@ function ContentsList({ items, current, title, onJump, onClose }) {
         borderBottom: '1px solid var(--color-border)', fontFamily: 'var(--font-body)',
       }}>
         <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <span style={{
-            fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase',
-            color: 'var(--color-text-secondary)',
-          }}>
+          <span style={{ fontSize: 12.5, fontWeight: 400, color: 'var(--color-text-secondary)' }}>
             Contents
           </span>
           <span dir="auto" style={{
-            fontSize: 17, fontWeight: 800, lineHeight: 1.25, color: 'var(--color-text-primary)',
+            fontSize: 21, fontWeight: 700, lineHeight: 1.25, color: 'var(--color-text-primary)',
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', unicodeBidi: 'plaintext',
           }}>
             {title?.trim() || 'This page'}
@@ -135,10 +132,10 @@ function ContentsList({ items, current, title, onJump, onClose }) {
                 }} />
               </span>
               <span style={{
-                flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', margin: '3px 0',
-                padding: '11px 12px', borderRadius: 'var(--radius-md)',
+                flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', margin: '2px 0',
+                padding: '7px 10px', borderRadius: 'var(--radius-md)',
                 background: isCurrent
-                  ? `color-mix(in srgb, ${color} 14%, var(--color-surface) 86%)`
+                  ? `color-mix(in srgb, ${color} 8%, var(--color-surface) 92%)`
                   : 'transparent',
               }}>
                 <span dir="auto" style={{
