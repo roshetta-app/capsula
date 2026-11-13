@@ -73,3 +73,16 @@ export const DRUG_GROUP_DRUGS_CAP_PRO = 100
 export function isDrugGroupsOn() {
   return DRUG_GROUPS_ENABLED
 }
+
+/**
+ * 2026-11-13 (Roshetta plan, step 2.2a): the roshetta limits (plan decision 8).
+ * Every drug counts, including the 'or' / 'plus' partners inside a group.
+ * The database refuses a 4th roshetta / 11th drug on a free account and a
+ * 101st roshetta / 31st drug on a Pro account (migration roshetta_stage1).
+ * Keep these numbers in step with the database. Sizes of names, doses and
+ * text blocks live in src/utils/roshettaRows.js.
+ */
+export const ROSHETTAS_CAP_FREE = 3
+export const ROSHETTA_DRUGS_CAP_FREE = 10
+export const ROSHETTAS_CAP_PRO = 100
+export const ROSHETTA_DRUGS_CAP_PRO = 30
