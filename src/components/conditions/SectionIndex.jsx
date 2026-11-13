@@ -6,10 +6,10 @@
  * attribute when the sheet passes 'indexed'; standalone note blocks do not carry the mark, so
  * they are never listed.
  *
- * - Shows a small "Contents" pill only when the open tab has MIN_HEADINGS or more headings.
+ * - Shows a small round Contents button (icon only) only when the open tab has MIN_HEADINGS or more headings.
  * - While it is showing, the scroll box is marked data-contents-active, which reveals a small
  *   list icon on every heading (see globals.css). Tapping a heading on the page opens the sheet
- *   with that heading highlighted; the pill opens it on the heading you are reading.
+ *   with that heading highlighted; the button opens it on the heading you are reading.
  * - The sheet is a timeline: the colour dots are joined by one continuous line, top to bottom.
  *   Tapping a row scrolls the page to that heading and closes the sheet.
  * - Must sit inside a position: relative box that does not scroll, next to the scroll box.
@@ -145,23 +145,13 @@ export default function SectionIndex({ scrollBoxRef, resetKey, bottomClearance =
           aria-label="Contents of this page"
           style={{
             position: 'absolute', right: 16, bottom: `calc(${bottomClearance} + 12px)`, zIndex: 40,
-            display: 'flex', alignItems: 'center', gap: 8, height: 42, padding: '0 8px 0 14px',
-            fontSize: 13, fontWeight: 700, fontFamily: 'var(--font-body)',
+            width: 46, height: 46, display: 'flex', alignItems: 'center', justifyContent: 'center',
             color: '#fff', background: 'var(--color-accent-solid)',
-            border: 'none', borderRadius: 'var(--radius-full)',
+            border: 'none', borderRadius: '50%', padding: 0,
             boxShadow: '0 6px 18px rgba(0,0,0,0.22)', cursor: 'pointer',
           }}
         >
-          <List size={16} strokeWidth={2.4} />
-          Contents
-          <span style={{
-            minWidth: 24, height: 24, padding: '0 6px', boxSizing: 'border-box',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            borderRadius: 'var(--radius-full)', background: 'rgba(255,255,255,0.22)',
-            fontSize: 12, fontWeight: 700,
-          }}>
-            {items.length}
-          </span>
+          <List size={20} strokeWidth={2.4} />
         </button>
       )}
 
