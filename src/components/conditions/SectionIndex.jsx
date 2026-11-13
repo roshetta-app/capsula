@@ -19,8 +19,9 @@
  *   resetKey         any value that changes when the content changes tab (closes the sheet)
  *   bottomClearance  CSS length the bottom bar covers (so the pill and sheet sit above it)
  *   hidden           hide the pill (e.g. while the keyboard is open)
+ *   title            the condition's name, shown at the top of the sheet
  */
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { List, X } from 'lucide-react'
 import { noteFlavorColor } from '../ui/noteFlavors'
 
@@ -38,7 +39,7 @@ function sameItems(a, b) {
   return a.every((x, i) => x.title === b[i].title && x.flavor === b[i].flavor)
 }
 
-export default function SectionIndex({ scrollBoxRef, resetKey, bottomClearance = '0px', hidden = false }) {
+export default function SectionIndex({ scrollBoxRef, resetKey, bottomClearance = '0px', hidden = false, title = '' }) {
   const [items, setItems] = useState([])
   // The sheet remembers which tab it was opened on, so a tab switch closes it by itself.
   const [sheet, setSheet] = useState(null)
@@ -108,11 +109,15 @@ export default function SectionIndex({ scrollBoxRef, resetKey, bottomClearance =
     return () => box.removeEventListener('click', onClick)
   }, [scrollBoxRef, resetKey, enough])
 
-  // Bring the highlighted row into view when the sheet opens on a long list.
-  useEffect(() => {
-    if (!open || !listRef.current) return
-    const row = listRef.current.querySelector('[data-current="1"]')
-    if (row && row.scrollIntoView) row.scrollIntoView({ block: 'center' })
+  // Centre the highlighted row inside the sheet's own list when it opens. This sets the list's
+  // scrollTop directly: scrollIntoView would also scroll every parent box (including the clipped
+  // screen root) and made the page behind the sheet jump up and back.
+  useLayoutEffect(() => {
+    const list = listRef.current
+    if (!open || !list) return
+    const row = list.querySelector('[data-current="1"]')
+    if (!row) return
+    list.scrollTop = Math.max(0, row.offsetTop - (list.clientHeight - row.offsetHeight) / 2)
   }, [open])
 
   function close() { setSheet(null) }
@@ -161,7 +166,7 @@ export default function SectionIndex({ scrollBoxRef, resetKey, bottomClearance =
         <div
           onClick={close}
           style={{
-            position: 'absolute', inset: 0, zIndex: 60, background: 'rgba(0,0,0,0.4)',
+            position: 'absolute', inset: 0, zIndex: 60, background: 'rgba(0,0,0,0.4)', overflow: 'hidden',
             animation: 'contents-fade-in 160ms ease-out',
           }}
         >
@@ -184,13 +189,21 @@ export default function SectionIndex({ scrollBoxRef, resetKey, bottomClearance =
 
             <div style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '8px 12px 10px 20px', flexShrink: 0,
+              padding: '6px 12px 12px 20px', flexShrink: 0, gap: 12,
               borderBottom: '1px solid var(--color-border)',
             }}>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                <span style={{ fontSize: 17, fontWeight: 800, color: 'var(--color-text-primary)' }}>Contents</span>
-                <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--color-text-secondary)' }}>
-                  {items.length} headings
+              <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <span style={{
+                  fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase',
+                  color: 'var(--color-text-secondary)',
+                }}>
+                  Contents
+                </span>
+                <span dir="auto" style={{
+                  fontSize: 17, fontWeight: 800, lineHeight: 1.25, color: 'var(--color-text-primary)',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', unicodeBidi: 'plaintext',
+                }}>
+                  {title?.trim() || 'This page'}
                 </span>
               </div>
               <button
@@ -208,7 +221,7 @@ export default function SectionIndex({ scrollBoxRef, resetKey, bottomClearance =
             </div>
 
             {/* The list is a timeline: dots on the left, one continuous line through them. */}
-            <div ref={listRef} dir="ltr" style={{ overflowY: 'auto', padding: '8px 10px 14px' }}>
+            <div ref={listRef} dir="ltr" style={{ position: 'relative', overflowY: 'auto', padding: '8px 10px 14px' }}>
               {items.map((item, i) => {
                 const color = noteFlavorColor(item.flavor)
                 const isCurrent = i === current

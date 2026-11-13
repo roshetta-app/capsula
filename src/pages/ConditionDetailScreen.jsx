@@ -475,6 +475,7 @@ export default function ConditionDetailScreen() {
       <SectionIndex
         scrollBoxRef={scrollBoxRef}
         resetKey={activeTab}
+        title={condition.name}
         hidden={keyboardOpen}
         bottomClearance={keyboardOpen ? '0px' : 'calc(60px + env(safe-area-inset-bottom))'}
       />
