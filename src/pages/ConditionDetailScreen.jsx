@@ -323,7 +323,7 @@ export default function ConditionDetailScreen() {
         }}>
           <WifiOff size={28} color="var(--color-text-tertiary)" />
           <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-text-secondary)' }}>
-            Couldn't load this condition
+            Couldn't load this topic
           </div>
           <div style={{ fontSize: 13 }}>
             Check your connection and try again
@@ -364,8 +364,8 @@ export default function ConditionDetailScreen() {
       <div style={simplePageStyle}>
         <DetailHeader onBack={handleBack} condition={null} activeTab={activeTab} setActiveTab={switchTab} />
         <div style={{ maxWidth: 680, margin: '0 auto', padding: 'var(--space-8) var(--space-6)', textAlign: 'center' }}>
-          <div style={{ fontSize: 15, color: 'var(--color-text-secondary)', marginBottom: 'var(--space-2)' }}>Condition not found</div>
-          <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)' }}>"{slug}" does not match any condition in the database.</div>
+          <div style={{ fontSize: 15, color: 'var(--color-text-secondary)', marginBottom: 'var(--space-2)' }}>Topic not found</div>
+          <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)' }}>"{slug}" does not match any topic in the database.</div>
         </div>
         <BottomNav />
       </div>
@@ -677,7 +677,7 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTa
               <button
                 onClick={onShare}
                 {...shareHandlers}
-                aria-label="Share this condition"
+                aria-label="Share this topic"
                 style={{
                   background: 'none', border: 'none', cursor: 'pointer', padding: 2,
                   color: 'var(--color-text-tertiary)',

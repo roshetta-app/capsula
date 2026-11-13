@@ -307,7 +307,7 @@ function friendlySaveError(err) {
     err?.code === '23505' &&
     (err?.message?.includes('conditions_slug_key') || err?.details?.includes('slug'))
   if (isSlugCollision) {
-    return 'Another condition already uses this name. Please choose a different name.'
+    return 'Another topic already uses this name. Please choose a different name.'
   }
   return err?.message ?? 'Save failed'
 }
@@ -534,7 +534,7 @@ export default function ConditionEditor() {
     async function load() {
       const { data, error: fetchErr } = await fetchConditionForEdit(id)
       if (fetchErr || !data) {
-        setError(fetchErr?.message ?? 'Condition not found')
+        setError(fetchErr?.message ?? 'Topic not found')
         setLoading(false)
         return
       }
@@ -625,7 +625,7 @@ export default function ConditionEditor() {
     // Save blocks (delete + insert) — always runs, even if blocks is empty
     const { error: blocksErr } = await saveConditionBlocks(conditionId, blocks)
     if (blocksErr) {
-      setError(blocksErr.message ?? 'Condition saved but blocks failed to save')
+      setError(blocksErr.message ?? 'Topic saved but blocks failed to save')
       setSaving(false)
       return
     }
@@ -633,7 +633,7 @@ export default function ConditionEditor() {
     // Sync tags — always runs (clears existing, inserts selected)
     const { error: tagsErr } = await syncConditionTags(conditionId, tags)
     if (tagsErr) {
-      setError(tagsErr.message ?? 'Condition saved but tags failed to save')
+      setError(tagsErr.message ?? 'Topic saved but tags failed to save')
       setSaving(false)
       return
     }
@@ -643,7 +643,7 @@ export default function ConditionEditor() {
 
     await refresh()
     setSaving(false)
-    toast.success('Condition saved')
+    toast.success('Topic saved')
 
     // For new conditions, redirect to edit URL so subsequent saves work correctly
     if (!isEdit && conditionId) {
@@ -688,7 +688,7 @@ export default function ConditionEditor() {
     <AdminPageHeader
       // Shows the condition's name as you type it; falls back to the old
       // wording while the name is still empty.
-      title={form.name.trim() || (isEdit ? 'Edit condition' : 'New condition')}
+      title={form.name.trim() || (isEdit ? 'Edit topic' : 'New topic')}
       sticky
       actions={
         <div className="cms-editor-bar" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
@@ -770,7 +770,7 @@ export default function ConditionEditor() {
             {/* ── Left column ── */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', minWidth: 0 }}>
               <div>
-                <FieldLabel required>Condition name</FieldLabel>
+                <FieldLabel required>Topic name</FieldLabel>
                 <TextInput
                   value={form.name}
                   onChange={v => patch('name', v)}
@@ -914,7 +914,7 @@ export default function ConditionEditor() {
         onConfirm={() => { patch('specialty_id', ''); setRemoveSpecialtyAsk(false) }}
         title="Remove specialty?"
         message={chosenSpecialty
-          ? `"${form.name.trim() || 'This condition'}" will have no specialty. It cannot be saved until you pick one.`
+          ? `"${form.name.trim() || 'This topic'}" will have no specialty. It cannot be saved until you pick one.`
           : ''}
         confirmLabel="Remove"
         confirmVariant="danger"

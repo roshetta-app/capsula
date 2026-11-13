@@ -391,7 +391,7 @@ const SLIDES = [
     id: 'favourites',
     image: favouritesIllustration,
     headline: 'Keep What Matters Close',
-    body: 'Save frequently used drugs and conditions to your favourites for instant access.',
+    body: 'Save frequently used drugs and topics to your favourites for instant access.',
   },
 ]
 

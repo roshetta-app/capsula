@@ -91,7 +91,7 @@ import { Search, X, SlidersHorizontal, ArrowLeft } from 'lucide-react'
 const SearchBar = forwardRef(function SearchBar({
   value,
   onChange,
-  placeholder = 'Search conditions or symptoms…',
+  placeholder = 'Search topics or symptoms…',
   onFilter,
   hasActiveFilters = false,
   filterDisabled = false,

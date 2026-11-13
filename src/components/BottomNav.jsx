@@ -346,7 +346,7 @@ export default function BottomNav() {
     // FavouritesScreen's own Conditions/Drugs tab bar, so "Conditions"
     // reads as the same icon everywhere in the app instead of House here
     // and BookOpen there.
-    { path: '/conditions', label: 'Conditions', Icon: BookOpen },
+    { path: '/conditions', label: 'Topics', Icon: BookOpen },
     { path: '/drugs',      label: 'Drugs',      Icon: Pill  },
     // Favourites gets its own red identity color + fills when active,
     // matching the heart used elsewhere for favourited state (title badge,

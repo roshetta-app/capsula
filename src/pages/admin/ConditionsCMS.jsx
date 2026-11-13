@@ -63,7 +63,7 @@ export default function ConditionsCMS() {
       const data = await fetchAllConditions(supabase)
       setConditions(data)
     } catch (err) {
-      toast.error(err.message ?? 'Failed to load conditions')
+      toast.error(err.message ?? 'Failed to load topics')
     } finally {
       setLoadingList(false)
     }
@@ -170,7 +170,7 @@ export default function ConditionsCMS() {
 
   return (
     <AdminPageHeader
-      title="Conditions"
+      title="Topics"
       actions={
         <button
           onClick={() => navigate('/admin/conditions/new')}
@@ -191,7 +191,7 @@ export default function ConditionsCMS() {
         <div style={{ marginBottom: 'var(--space-3)' }}>
           <input
             type="search"
-            placeholder="Search conditions…"
+            placeholder="Search topics…"
             value={query}
             onChange={e => setQuery(e.target.value)}
             style={{
@@ -224,7 +224,7 @@ export default function ConditionsCMS() {
           fontSize: 12, color: 'var(--color-text-tertiary)',
           fontFamily: 'var(--font-mono)', marginBottom: 'var(--space-3)',
         }}>
-          {loadingList ? 'Loading…' : `${filtered.length} condition${filtered.length !== 1 ? 's' : ''}`}
+          {loadingList ? 'Loading…' : `${filtered.length} topic${filtered.length !== 1 ? 's' : ''}`}
         </div>
 
         {/* List — app's cards, A–Z dividers when browsing, app's empty state */}
@@ -233,7 +233,7 @@ export default function ConditionsCMS() {
             textAlign: 'center', padding: 'var(--space-12) var(--space-4)',
             color: 'var(--color-text-tertiary)', fontSize: 14,
           }}>
-            No conditions yet. Click "Add New" to create one.
+            No topics yet. Click "Add New" to create one.
           </div>
         ) : filtered.length === 0 ? (
           <ConditionsEmptyState
@@ -277,7 +277,7 @@ export default function ConditionsCMS() {
         isOpen={Boolean(deleteTarget)}
         onClose={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
-        title="Delete condition?"
+        title="Delete topic?"
         message={
           deleteTarget
             ? `This will permanently delete "${deleteTarget.name}" including all its prescriptions and images. This cannot be undone.`
@@ -327,7 +327,7 @@ function CardControls({ isPublished, onTogglePublished, onDelete }) {
       />
       <button
         onClick={onDelete}
-        aria-label="Delete condition"
+        aria-label="Delete topic"
         style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           width: 34, height: 34, borderRadius: 'var(--radius-md)',

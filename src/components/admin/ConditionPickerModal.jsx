@@ -86,7 +86,7 @@ export default function ConditionPickerModal({ isOpen, onClose, onSelect }) {
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Pick a condition" size="md">
+    <Modal isOpen={isOpen} onClose={onClose} title="Pick a topic" size="md">
 
       {/* Search input — shared SearchBar component, same as DrugPickerModal */}
       <div style={{ marginBottom: 'var(--space-3)' }}>
@@ -94,7 +94,7 @@ export default function ConditionPickerModal({ isOpen, onClose, onSelect }) {
           ref={inputRef}
           value={query}
           onChange={setQuery}
-          placeholder="Search conditions…"
+          placeholder="Search topics…"
         />
       </div>
 
@@ -135,7 +135,7 @@ export default function ConditionPickerModal({ isOpen, onClose, onSelect }) {
             fontSize:  13,
             color:     'var(--color-text-tertiary)',
           }}>
-            {query.trim() ? `No conditions found for "${query}"` : 'Type to search conditions…'}
+            {query.trim() ? `No topics found for "${query}"` : 'Type to search topics…'}
           </div>
         )}
 
@@ -151,7 +151,7 @@ export default function ConditionPickerModal({ isOpen, onClose, onSelect }) {
         color:     'var(--color-text-tertiary)',
         textAlign: 'center',
       }}>
-        Select a condition to link this notification to it
+        Select a topic to link this notification to it
       </div>
     </Modal>
   )

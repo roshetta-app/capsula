@@ -57,7 +57,7 @@ const NAV_GROUPS = [
       { path: '/admin/drugs',      label: 'Drug Library',    faIcon: faCapsules },
       { path: '/admin/categories', label: 'Drug Categories', faIcon: faTags,        indent: true },
       { path: '/admin/class-keywords', label: 'Class keywords', faIcon: faMagnifyingGlass, indent: true },
-      { path: '/admin/conditions', label: 'Conditions',      faIcon: faNotesMedical },
+      { path: '/admin/conditions', label: 'Topics',      faIcon: faNotesMedical },
       { path: '/admin/specialties',label: 'Specialties',     faIcon: faStethoscope, indent: true },
     ],
   },

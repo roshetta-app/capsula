@@ -121,7 +121,7 @@ export default function PhonePreviewModal({ isOpen, onClose, name, blocks }) {
               fontSize: 22, fontWeight: 600, margin: '0 0 10px 0', lineHeight: 1.2,
               letterSpacing: '-0.4px', color: 'var(--color-text-primary)',
             }}>
-              {name?.trim() || 'Untitled condition'}
+              {name?.trim() || 'Untitled topic'}
             </h1>
             <div style={{ display: 'flex' }}>
               {TABS.map((label, i) => {

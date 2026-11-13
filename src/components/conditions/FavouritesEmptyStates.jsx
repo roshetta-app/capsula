@@ -297,7 +297,7 @@ export function NothingSavedEmptyState({ label, showSignIn }) {
         color:         'var(--color-text-primary)',
         marginBottom:  'var(--space-2)',
       }}>
-        {isConditions ? 'No favourite conditions yet' : 'No favourite drugs yet'}
+        {isConditions ? 'No favourite topics yet' : 'No favourite drugs yet'}
       </div>
 
       <div style={{
@@ -315,7 +315,7 @@ export function NothingSavedEmptyState({ label, showSignIn }) {
           style={{ display: 'inline-block', verticalAlign: 'middle', marginTop: -2, marginRight: 6 }}
         />
         {isConditions
-          ? <>Tap the heart on any condition<br />to save it here</>
+          ? <>Tap the heart on any topic<br />to save it here</>
           : <>Tap the heart on any drug<br />to save it here</>}
       </div>
 
@@ -334,7 +334,7 @@ export function NothingSavedEmptyState({ label, showSignIn }) {
           fullWidth
           onClick={() => navigate(isConditions ? '/conditions' : '/drugs')}
         >
-          {isConditions ? 'Browse conditions' : 'Browse drugs'}
+          {isConditions ? 'Browse topics' : 'Browse drugs'}
           <ArrowRight size={16} strokeWidth={2.5} />
         </EmptyStatePressableButton>
 

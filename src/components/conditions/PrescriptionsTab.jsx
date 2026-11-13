@@ -173,7 +173,7 @@ export default function PrescriptionsTab({ blocks, conditionId, activeIndex: act
           color: 'var(--color-text-tertiary)',
         }}>
           <div style={{ fontSize: 14, fontWeight: 500 }}>
-            No prescription available for this condition.
+            No prescription available for this topic.
           </div>
         </div>
       ) : (

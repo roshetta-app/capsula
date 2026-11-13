@@ -92,8 +92,8 @@ export default function ConditionsEmptyState({
         {isSearchEmpty
           ? <>No results for <em>"{query.trim()}"</em></>
           : isFilterEmpty
-            ? `No conditions in ${specialtyName}`
-            : 'No conditions found'
+            ? `No topics in ${specialtyName}`
+            : 'No topics found'
         }
       </div>
 

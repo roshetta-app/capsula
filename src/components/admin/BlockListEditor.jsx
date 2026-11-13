@@ -154,7 +154,7 @@ function SheetPickerBar({ sheets, activeIndex, onSelect, onAdd, onRemove, onRena
         onClose={() => setConfirmOpen(false)}
         onConfirm={() => { setConfirmOpen(false); onRemove() }}
         title="Remove sheet?"
-        message={`"${activeLabel}" and everything in it will be removed from this condition.`}
+        message={`"${activeLabel}" and everything in it will be removed from this topic.`}
         confirmLabel="Remove"
         confirmVariant="danger"
       />

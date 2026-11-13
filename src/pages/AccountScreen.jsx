@@ -1097,7 +1097,7 @@ export default function AccountScreen() {
                 </span>
               </div>
               <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.85)' }}>
-                Unlock the full drug &amp; condition library
+                Unlock the full drug &amp; topic library
               </div>
             </div>
             <ChevronRight size={18} color="#fff" style={{ flexShrink: 0 }} />

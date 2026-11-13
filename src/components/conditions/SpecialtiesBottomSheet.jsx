@@ -154,7 +154,7 @@ export default function SpecialtiesBottomSheet({
             size={18}
             color={resolveToken(FALLBACK_TOKEN, isDark).fg}
           />
-          All conditions
+          All topics
         </button>
         )}
 

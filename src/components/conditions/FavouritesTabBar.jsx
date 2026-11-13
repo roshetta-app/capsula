@@ -36,7 +36,7 @@ import { BookOpen, Pill } from 'lucide-react'
 export const FAVOURITES_TABS = [
   {
     key: 'conditions',
-    label: 'Conditions',
+    label: 'Topics',
     renderIcon: (color) => <BookOpen size={15} strokeWidth={1.8} color={color} />,
   },
   {

@@ -235,7 +235,7 @@ function ConditionsErrorState({ onRetry }) {
         <WifiOff size={28} color="var(--color-text-tertiary)" />
       </div>
       <div style={{ fontSize: 15, marginBottom: 4, color: 'var(--color-text-primary)' }}>
-        Couldn't load your conditions
+        Couldn't load your topics
       </div>
       <div style={{ fontSize: 13, marginBottom: 'var(--space-3)', color: 'var(--color-text-secondary)' }}>
         Check your connection and try again
@@ -517,7 +517,7 @@ function StickyLogoHeader({
             }}
           >
             <Search size={17} strokeWidth={2.1} color="var(--color-accent)" aria-hidden="true" style={{ flexShrink: 0 }} />
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Search conditions…</span>
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Search topics…</span>
           </button>
 
           {/* Specialty pill — flex:1 so it fills all space left of the search icon */}

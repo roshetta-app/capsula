@@ -24,7 +24,7 @@ import DawaaGateCard from '../../components/admin/DawaaGateCard'
 const STAT_CARDS = [
   { key: 'users',      label: 'Total Users',      faIcon: faUsers },
   { key: 'drugs',      label: 'Total Drugs',      faIcon: faCapsules },
-  { key: 'conditions', label: 'Total Conditions', faIcon: faNotesMedical },
+  { key: 'conditions', label: 'Total Topics', faIcon: faNotesMedical },
 ]
 
 export default function AdminSummary() {

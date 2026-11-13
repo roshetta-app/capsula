@@ -619,7 +619,7 @@ export default function SpecialtiesManager() {
     if (turningOff && specialty.conditionCount > 0) {
       setConfirmConfig({
         title:   'Deactivate Specialty?',
-        message: `All ${specialty.conditionCount} condition(s) in "${specialty.name_en}" will be moved to Uncategorized. Continue?`,
+        message: `All ${specialty.conditionCount} topic(s) in "${specialty.name_en}" will be moved to Uncategorized. Continue?`,
         onConfirm: () => doToggle(specialty, false),
       })
       setConfirmOpen(true)
@@ -639,7 +639,7 @@ export default function SpecialtiesManager() {
 
   function handleDelete(specialty) {
     if (specialty.conditionCount > 0) {
-      toast.error(`Cannot delete — ${specialty.conditionCount} condition(s) still assigned.`)
+      toast.error(`Cannot delete — ${specialty.conditionCount} topic(s) still assigned.`)
       return
     }
     setConfirmConfig({

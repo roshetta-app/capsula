@@ -235,7 +235,7 @@ export function useConditions() {
       syncGalleryPhotos(fresh, myAttempt)
     } catch (err) {
       if (attemptIdRef.current !== myAttempt) return
-      setError(err.message ?? 'Failed to load conditions')
+      setError(err.message ?? 'Failed to load topics')
       // Diagnostics-only addition (download-fail investigation, 2026-08-31)
       // — matches the same addition in useDrugs.js's fetchAndCache/
       // fetchColdStart. Previously this failure only ever surfaced as a

@@ -167,20 +167,20 @@ export default function UsageTab({ data }) {
 
       {/* Stat cards */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
-        <StatCard label="Condition Views"    value={totalConditionViews}    color="var(--color-accent)" />
-        <StatCard label="Condition Searches" value={totalConditionSearches} color="var(--color-primary)" />
+        <StatCard label="Topic Views"    value={totalConditionViews}    color="var(--color-accent)" />
+        <StatCard label="Topic Searches" value={totalConditionSearches} color="var(--color-primary)" />
         <StatCard label="Drug Views"         value={totalDrugViews}         color="var(--color-success)" />
         <StatCard label="Drug Searches"      value={totalDrugSearches}      color="var(--color-warning)" />
       </div>
 
       <RankedList
-        title="Top Viewed Conditions"
+        title="Top Viewed Topics"
         rows={topViewedConditions}
         color="var(--color-accent)"
         showBars
       />
       <RankedList
-        title="Top Searched Conditions"
+        title="Top Searched Topics"
         rows={topSearchedConditions}
         color="var(--color-primary)"
         showBars={false}

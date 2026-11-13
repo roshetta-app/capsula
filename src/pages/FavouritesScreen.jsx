@@ -949,7 +949,7 @@ export default function FavouritesScreen() {
   const heroSearchValue = activeTab === 'conditions' ? conditionQuery : drugQuery
   const heroSearchOnChange = activeTab === 'conditions' ? setConditionQuery : setDrugQuery
   const heroSearchPlaceholder = activeTab === 'conditions'
-    ? 'Search favourite conditions…'
+    ? 'Search favourite topics…'
     : 'Search favourite drugs…'
 
   // Condition removal confirms first — see ConfirmSheet below.
@@ -1706,7 +1706,7 @@ export default function FavouritesScreen() {
         onClose={() => setShowBulkConfirm(false)}
         onConfirm={handleConfirmBulkRemove}
         title="Remove favourites?"
-        message={`${selectedIds.size} favourite${selectedIds.size === 1 ? '' : 's'} will be removed from your saved ${activeTab === 'conditions' ? 'conditions' : 'drugs'}.`}
+        message={`${selectedIds.size} favourite${selectedIds.size === 1 ? '' : 's'} will be removed from your saved ${activeTab === 'conditions' ? 'topics' : 'drugs'}.`}
         confirmLabel="Remove"
         destructive
       />

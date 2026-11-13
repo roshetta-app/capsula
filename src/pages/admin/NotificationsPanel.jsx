@@ -513,7 +513,7 @@ export default function NotificationsPanel() {
             <textarea
               value={message}
               onChange={e => setMessage(e.target.value)}
-              placeholder="e.g. 15 new conditions added across Cardiology and Pulmonology."
+              placeholder="e.g. 15 new topics added across Cardiology and Pulmonology."
               maxLength={200}
               rows={3}
               style={{

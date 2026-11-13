@@ -18,7 +18,7 @@ function currentStep() {
 
 export function labelForPath(path) {
   if (!path) return null
-  if (path === '/' || path === '/conditions') return 'Conditions'
+  if (path === '/' || path === '/conditions') return 'Topics'
   if (path === '/drugs') return 'Drugs'
   if (path.startsWith('/drugs/category/')) return 'Category'
   if (path === '/drugs/browse/category') return 'Categories'
@@ -28,7 +28,7 @@ export function labelForPath(path) {
   if (path.startsWith('/drugs/group/') || path.startsWith('/g/')) return 'Group'
   if (path.startsWith('/drugs/generic/')) return 'Generic'
   if (path.startsWith('/drugs/')) return 'Drug'
-  if (path.startsWith('/conditions/')) return 'Condition'
+  if (path.startsWith('/conditions/')) return 'Topic'
   if (path === '/favourites') return 'Favourites'
   if (path === '/account') return 'Account'
   return null

@@ -259,7 +259,7 @@ export default function NotificationSheet({ isOpen, onClose }) {
               lineHeight: 1.55,
               color:      'var(--color-text-secondary)',
             }}>
-              You'll be notified the moment there's new drug or condition info.
+              You'll be notified the moment there's new drug or topic info.
             </p>
           </>
         ) : (
@@ -279,7 +279,7 @@ export default function NotificationSheet({ isOpen, onClose }) {
               lineHeight: 1.55,
               color:      'var(--color-text-secondary)',
             }}>
-              Get notified the moment there's new drug or condition info.
+              Get notified the moment there's new drug or topic info.
             </p>
           </>
         )}

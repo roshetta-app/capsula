@@ -205,7 +205,7 @@ export default function NotificationsBanner() {
             flex: 1, minWidth: 0, margin: 0,
             fontSize: 14, fontWeight: 500, color: '#1E293B', lineHeight: 1.4,
           }}>
-            Get notified the moment there's new drug or condition info.
+            Get notified the moment there's new drug or topic info.
           </p>
         </div>
 

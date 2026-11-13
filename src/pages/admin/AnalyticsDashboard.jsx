@@ -643,12 +643,12 @@ function exportCSV(activeTab, data) {
     const d = data.usage
     rows = [
       ['Metric', 'Value'],
-      ['Total Condition Views',    d.totalConditionViews],
-      ['Total Condition Searches', d.totalConditionSearches],
+      ['Total Topic Views',    d.totalConditionViews],
+      ['Total Topic Searches', d.totalConditionSearches],
       ['Total Drug Views',         d.totalDrugViews],
       ['Total Drug Searches',      d.totalDrugSearches],
       ['', ''],
-      ['Top Viewed Conditions', ''],
+      ['Top Viewed Topics', ''],
       ...d.topViewedConditions.map((r, i) => [`${i + 1}. ${r.name}`, r.count]),
       ['', ''],
       ['Top Viewed Drugs', ''],
@@ -660,16 +660,16 @@ function exportCSV(activeTab, data) {
     const { health, coverage, gaps } = data.quality
     rows = [
       ['Content Health', ''],
-      ['Total Conditions',          health.totalConditions],
-      ['Published Conditions',      health.publishedConditions],
-      ['Conditions Missing Def',    health.conditionsMissingDefinition],
+      ['Total Topics',          health.totalConditions],
+      ['Published Topics',      health.publishedConditions],
+      ['Topics Missing Def',    health.conditionsMissingDefinition],
       ['Total Generics',            health.totalGenerics],
       ['Generics With Brands',      health.genericsWithBrands],
       ['Generics With Doses',       health.genericsWithDoses],
       ['Formulations With No Dose', health.formulationsWithNoDose],
       ['', ''],
       ['Coverage by Specialty', ''],
-      ['Specialty', 'Total Conditions', 'Published', 'Publish Rate %'],
+      ['Specialty', 'Total Topics', 'Published', 'Publish Rate %'],
       ...coverage.specialtyCoverage.map(r => [
         r.specialty, r.total, r.published,
         r.total > 0 ? Math.round((r.published / r.total) * 100) : 0,

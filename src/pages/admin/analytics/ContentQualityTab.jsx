@@ -213,13 +213,13 @@ function ContentHealthSection({ data }) {
 
   if (noBrandsCount  > 0) flags.push(`${noBrandsCount} drug${noBrandsCount !== 1 ? 's' : ''} with no brands`)
   if (noDosesCount   > 0) flags.push(`${noDosesCount} drug${noDosesCount !== 1 ? 's' : ''} with no doses`)
-  if (noDefCount     > 0) flags.push(`${noDefCount} condition${noDefCount !== 1 ? 's' : ''} missing definition`)
+  if (noDefCount     > 0) flags.push(`${noDefCount} topic${noDefCount !== 1 ? 's' : ''} missing definition`)
   if (noFormDoseCount> 0) flags.push(`${noFormDoseCount} formulation${noFormDoseCount !== 1 ? 's' : ''} with no dose data`)
 
   const condIssues = []
   const unpubCount = totalConditions - publishedConditions
-  if (unpubCount  > 0) condIssues.push(`${unpubCount} unpublished or flagged condition${unpubCount !== 1 ? 's' : ''}`)
-  if (noDefCount  > 0) condIssues.push(`${noDefCount} condition${noDefCount !== 1 ? 's' : ''} missing definition`)
+  if (unpubCount  > 0) condIssues.push(`${unpubCount} unpublished or flagged topic${unpubCount !== 1 ? 's' : ''}`)
+  if (noDefCount  > 0) condIssues.push(`${noDefCount} topic${noDefCount !== 1 ? 's' : ''} missing definition`)
 
   const drugIssues = []
   if (noBrandsCount > 0) drugIssues.push(`${noBrandsCount} generic${noBrandsCount !== 1 ? 's' : ''} have no brands`)
@@ -285,7 +285,7 @@ function ContentHealthSection({ data }) {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
           <HealthRow
-            title="Conditions Health"
+            title="Topics Health"
             completeness={Math.round(condPublishRate)}
             issueCount={condIssues.length}
             issues={condIssues}
@@ -361,7 +361,7 @@ function CoverageTable({ rows }) {
 
       <div style={{ ...coverageGridStyle, backgroundColor: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)' }}>
         <span style={thStyle}>Specialty</span>
-        <span style={{ ...thStyle, textAlign: 'right' }}>Conditions</span>
+        <span style={{ ...thStyle, textAlign: 'right' }}>Topics</span>
         <span style={{ ...thStyle, textAlign: 'right' }}>Published</span>
         <span style={thStyle}>Publish Rate</span>
       </div>
@@ -516,7 +516,7 @@ function CoverageSection({ data }) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
           <StatCard label="Specialties"   value={totalSpecialties} color="var(--color-accent)" />
-          <StatCard label="Conditions"    value={totalConditions}  color="var(--color-primary)" />
+          <StatCard label="Topics"    value={totalConditions}  color="var(--color-primary)" />
           <StatCard label="Drugs"         value={totalGenerics}    color="var(--color-success)" />
           <StatCard label="Brands"        value={totalBrands}      color="var(--color-warning)" />
         </div>
@@ -654,7 +654,7 @@ function AiPromptButton({ drugRows, conditionRows }) {
 
   function buildPrompt() {
     const top10 = [
-      ...conditionRows.slice(0, 5).map(r => `"${r.term}" (conditions)`),
+      ...conditionRows.slice(0, 5).map(r => `"${r.term}" (topics)`),
       ...drugRows.slice(0, 5).map(r => `"${r.term}" (drugs)`),
     ].slice(0, 10)
 
@@ -662,7 +662,7 @@ function AiPromptButton({ drugRows, conditionRows }) {
       `I am building a medical reference app called Capsula for Egyptian GPs. ` +
       `Users searched for these terms and found nothing:\n\n` +
       top10.map((t, i) => `${i + 1}. ${t}`).join('\n') +
-      `\n\nSuggest which conditions or drugs I should add next, grouped by priority.`
+      `\n\nSuggest which topics or drugs I should add next, grouped by priority.`
     )
   }
 
@@ -733,7 +733,7 @@ function SearchGapsSection({ data }) {
           <AiPromptButton drugRows={drugGaps} conditionRows={conditionGaps} />
         </div>
 
-        <GapSection title="Condition Search — Zero Results" rows={conditionGaps} />
+        <GapSection title="Topic Search — Zero Results" rows={conditionGaps} />
         <GapSection title="Drug Library — Zero Results"     rows={drugGaps} />
       </div>
     </div>

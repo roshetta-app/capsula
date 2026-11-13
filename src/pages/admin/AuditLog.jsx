@@ -25,7 +25,7 @@ const ACTION_STYLES = {
 }
 
 const TABLE_LABELS = {
-  conditions:       'Conditions',
+  conditions:       'Topics',
   generics:         'Generics',
   formulations:     'Formulations',
   brands:           'Brands',

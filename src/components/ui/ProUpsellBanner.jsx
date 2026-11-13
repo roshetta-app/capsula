@@ -22,7 +22,7 @@ import { ChevronRight } from 'lucide-react'
 
 export default function ProUpsellBanner({
   onClick,
-  subtitle = 'Unlock the full drug & condition library',
+  subtitle = 'Unlock the full drug & topic library',
 }) {
   const interactive = !!onClick
 
