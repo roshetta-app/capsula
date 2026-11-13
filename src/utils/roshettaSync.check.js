@@ -369,3 +369,117 @@ test('changes added while sending are picked up in the same run', async () => {
   assert.equal(out.sent, 2);
   assert.equal(p.queue.length, 0);
 });
+
+// ── Step 2.3c: the cases that broke last time ───────────────────────────────
+
+test('reopening the app: a mark left by a closed app would block sending for ever, so it must be cleared first', async () => {
+  const s = fakeServer();
+  const stuck = { ...mkSave('r1', 'B'), sending: true };
+  const blockedPhone = fakePhone(s, [stuck]);
+  const out = await blockedPhone.run();
+  assert.equal(out.sent, 0);
+  assert.equal(blockedPhone.queue.length, 1);
+});
+
+test('reopening the app: after the mark is cleared the change is sent and the server has the content', async () => {
+  const s = fakeServer();
+  await sendChange(s.client, mkCreate('r1', 'A'));
+  const saved = [{ ...mkSave('r1', 'B', 1), sending: true }]; // the list as the closed app left it
+  const p = fakePhone(s, clearSending(saved));
+  const out = await p.run();
+  assert.equal(out.sent, 1);
+  assert.equal(s.rows.get('r1').name, 'B');
+  assert.equal(p.queue.length, 0);
+});
+
+test('reopening after the app was killed while a create was on its way: the create and the save behind it both go, in order', async () => {
+  const s = fakeServer();
+  const create = mkCreate('r1', 'A');
+  await sendChange(s.client, create); // the server took it, the phone never heard
+  const saved = [{ ...create, sending: true }, mkSave('r1', 'B', 1)];
+  const p = fakePhone(s, clearSending(saved));
+  const out = await p.run();
+  assert.equal(out.sent, 2);
+  assert.equal(out.failed, 0);
+  assert.deepEqual(s.log.filter(x => !x.startsWith('select')), ['insert:r1', 'insert:r1', 'update:r1']);
+  assert.equal(s.rows.get('r1').name, 'B');
+  assert.deepEqual(p.sentCount, []);
+});
+
+test('reopening after the app was killed while a delete was on its way: the delete is sent again and is no error', async () => {
+  const s = fakeServer();
+  await sendChange(s.client, mkCreate('r1'));
+  const del = mkDel('r1');
+  await sendChange(s.client, del); // the server took it, the phone never heard
+  const p = fakePhone(s, clearSending([{ ...del, sending: true }]));
+  const out = await p.run();
+  assert.equal(out.sent, 1);
+  assert.equal(out.failed, 0);
+  assert.equal(p.queue.length, 0);
+});
+
+test('last save wins on one phone: many offline saves are one request carrying the final content', async () => {
+  const s = fakeServer();
+  await sendChange(s.client, mkCreate('r1', 'A'));
+  s.log.length = 0;
+  let q = [];
+  for (let i = 1; i <= 6; i += 1) q = addChange(q, mkSave('r1', `Version ${i}`, 1));
+  assert.equal(q.length, 1);
+  const p = fakePhone(s, q);
+  await p.run();
+  assert.deepEqual(s.log, ['update:r1']);
+  assert.equal(s.rows.get('r1').name, 'Version 6');
+});
+
+test('last save wins on one phone: an edit made while the earlier save is on its way arrives after it', async () => {
+  const s = fakeServer();
+  await sendChange(s.client, mkCreate('r1', 'A'));
+  const p = fakePhone(s, addChange([], mkSave('r1', 'First', 1)));
+  let added = false;
+  const send = async c => {
+    if (!added) { added = true; p.queue = addChange(p.queue, mkSave('r1', 'Second', 1)); }
+    return sendChange(s.client, c);
+  };
+  const out = await p.run({ send });
+  assert.equal(out.sent, 2);
+  assert.equal(s.rows.get('r1').name, 'Second');
+});
+
+test('last save wins across two phones: whichever save reaches the server last is what stays', async () => {
+  const s = fakeServer();
+  await sendChange(s.client, mkCreate('r1', 'Start'));
+  const a = fakePhone(s, addChange([], mkSave('r1', 'From phone A', 1)));
+  const b = fakePhone(s, addChange([], mkSave('r1', 'From phone B', 1)));
+  await a.run();
+  await b.run();
+  assert.equal(s.rows.get('r1').name, 'From phone B');
+  const s2 = fakeServer();
+  await sendChange(s2.client, mkCreate('r1', 'Start'));
+  const a2 = fakePhone(s2, addChange([], mkSave('r1', 'From phone A', 1)));
+  const b2 = fakePhone(s2, addChange([], mkSave('r1', 'From phone B', 1)));
+  await b2.run();
+  await a2.run();
+  assert.equal(s2.rows.get('r1').name, 'From phone A');
+});
+
+test('two phones: a roshetta deleted on one phone makes the other phone\'s later save drop, with a message', async () => {
+  const s = fakeServer();
+  await sendChange(s.client, mkCreate('r1', 'Start'));
+  const a = fakePhone(s, addChange([], mkDel('r1')));
+  const b = fakePhone(s, addChange([], mkSave('r1', 'Edited offline', 1)));
+  await a.run();
+  const out = await b.run();
+  assert.equal(s.rows.has('r1'), false);
+  assert.equal(b.queue.length, 0);
+  assert.equal(out.events.length, 1);
+  assert.equal(out.events[0].kind, 'roshetta_gone');
+});
+
+test('two phones: a save that reaches the server after another phone\'s delete does not bring the roshetta back', async () => {
+  const s = fakeServer();
+  await sendChange(s.client, mkCreate('r1', 'Start'));
+  const b = fakePhone(s, addChange([], mkSave('r1', 'Edited', 1)));
+  await sendChange(s.client, mkDel('r1'));
+  await b.run();
+  assert.equal(s.rows.size, 0);
+});
