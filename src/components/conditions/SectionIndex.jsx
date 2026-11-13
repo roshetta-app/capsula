@@ -50,9 +50,18 @@ export default function SectionIndex({ scrollBoxRef, resetKey, bottomClearance =
 
   // Keep the list in step with the page: a tab switch, a plan switch or a content load
   // changes the page, so look again (once per frame at most).
-  useEffect(() => {
+  // The tap icons on the headings take room, so whether they show must be settled BEFORE the
+  // browser paints, or every heading resizes and rewraps a frame after the page appears (the
+  // flash seen on opening a page with headings). So the marker on the scroll box is set right
+  // here, synchronously: once on mount and again from the observer, which fires before paint.
+  // Only the list in the sheet (React state) updates a frame later, which moves nothing.
+  useLayoutEffect(() => {
     const box = scrollBoxRef.current
     if (!box) return undefined
+    const syncMarker = () => {
+      if (box.querySelectorAll('[data-heading]').length >= MIN_HEADINGS) box.setAttribute('data-contents-active', '1')
+      else box.removeAttribute('data-contents-active')
+    }
     let raf = 0
     const refresh = () => {
       cancelAnimationFrame(raf)
@@ -61,19 +70,13 @@ export default function SectionIndex({ scrollBoxRef, resetKey, bottomClearance =
         setItems(prev => (sameItems(prev, next) ? prev : next))
       })
     }
+    const onChange = () => { syncMarker(); refresh() }
+    syncMarker()
     refresh()
-    const observer = new MutationObserver(refresh)
+    const observer = new MutationObserver(onChange)
     observer.observe(box, { childList: true, subtree: true })
-    return () => { observer.disconnect(); cancelAnimationFrame(raf) }
+    return () => { observer.disconnect(); cancelAnimationFrame(raf); box.removeAttribute('data-contents-active') }
   }, [scrollBoxRef, resetKey])
-
-  // The page's headings become tappable only while the list is long enough to show.
-  useEffect(() => {
-    const box = scrollBoxRef.current
-    if (!box || !enough) return undefined
-    box.setAttribute('data-contents-active', '1')
-    return () => box.removeAttribute('data-contents-active')
-  }, [scrollBoxRef, resetKey, enough])
 
   function show(index) {
     setCurrent(index)

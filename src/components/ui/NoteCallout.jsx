@@ -205,12 +205,12 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
               className="note-heading-tap"
               aria-hidden="true"
               style={{
-                width: 24, height: 24, flexShrink: 0, alignItems: 'center', justifyContent: 'center',
+                width: 20, height: 20, flexShrink: 0, alignItems: 'center', justifyContent: 'center',
                 borderRadius: '50%', color: f.iconColor,
                 background: `color-mix(in srgb, ${f.iconColor} 16%, transparent)`,
               }}
             >
-              <ListTree size={14} strokeWidth={2.4} />
+              <ListTree size={12} strokeWidth={2.4} />
             </span>
           )}
         </div>
