@@ -12,6 +12,9 @@
  * appear, read through the page's own scroll), with the drug card unchanged and, in the
  * card's trailing slot, a round + to add the drug, or a tick when it is already in the group.
  * Tapping the card itself opens the drug page, as everywhere else.
+ *
+ * 2026-11-14 (Roshetta plan, step 5.2a): the optional `targetName` (default 'group') is the word in
+ * the spoken labels ("Add X to this roshetta"); the roshetta Add drug screen passes 'roshetta'.
  */
 
 import { useLayoutEffect, useRef, useState } from 'react'
@@ -29,7 +32,7 @@ function observeWindowOffsetThroughSheetLock(instance, cb) {
   })
 }
 
-function AddMark({ inGroup, onAdd, onRemove, name }) {
+function AddMark({ inGroup, onAdd, onRemove, name, targetName }) {
   const base = {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     width: 44, height: 44, borderRadius: '50%', flexShrink: 0, border: 'none', padding: 0,
@@ -42,7 +45,7 @@ function AddMark({ inGroup, onAdd, onRemove, name }) {
       <button
         onClick={e => { e.stopPropagation(); onRemove?.() }}
         onPointerDown={e => e.stopPropagation()}
-        aria-label={`${name} is in this group. Tap to remove it`}
+        aria-label={`${name} is in this ${targetName}. Tap to remove it`}
         style={{
           display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, minHeight: 44, padding: '0 8px',
           border: 'none', background: 'none', cursor: 'pointer',
@@ -59,7 +62,7 @@ function AddMark({ inGroup, onAdd, onRemove, name }) {
     <button
       onClick={e => { e.stopPropagation(); onAdd() }}
       onPointerDown={e => e.stopPropagation()}
-      aria-label={`Add ${name} to this group`}
+      aria-label={`Add ${name} to this ${targetName}`}
       style={{ ...base, cursor: 'pointer' }}
     >
       <span style={{
@@ -74,6 +77,7 @@ function AddMark({ inGroup, onAdd, onRemove, name }) {
 
 export default function AddDrugsResultList({
   drugs, inGroup, onAdd, onRemove, onOpen, categories, isDark, highlight = '', searchMode = 'brand', nameOf,
+  targetName = 'group',
 }) {
   const listRef = useRef(null)
   // Where the list starts on the page, measured once it is drawn (the count line above it
@@ -118,6 +122,7 @@ export default function AddDrugsResultList({
                 <AddMark
                   inGroup={inGroup.has(drug.id)}
                   name={nameOf(drug)}
+                  targetName={targetName}
                   onAdd={() => onAdd(drug)}
                   onRemove={() => onRemove?.(drug)}
                 />
