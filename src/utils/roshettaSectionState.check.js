@@ -1,7 +1,7 @@
 // Checks for roshettaSectionState.js (step 4.1d). Run with: node --test src/utils/roshettaSectionState.check.js
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { sectionState, newTapAnswer, countLine } from './roshettaSectionState.js';
+import { sectionState, newTapAnswer, countLine, showArea } from './roshettaSectionState.js';
 
 test('state: loading while the account or the list is loading, never for a guest list', () => {
   assert.equal(sectionState({ authLoading: true, isGuest: false, status: 'ready', count: 2 }), 'loading');
@@ -30,4 +30,12 @@ test('free count line: none for Pro or an empty list, "Full" at the cap', () => 
   assert.equal(countLine({ isPro: false, count: 1, cap: 3 }), '1 of 3 roshettas');
   assert.equal(countLine({ isPro: false, count: 3, cap: 3 }), '3 of 3 roshettas \u00b7 Full');
   assert.equal(countLine({ isPro: false, count: 4, cap: 3 }), '3 of 3 roshettas \u00b7 Full', 'a lapsed account over the limit');
+});
+
+test('the area shows on the Topics screen only with no search text and no specialty picked', () => {
+  assert.equal(showArea({ isSearching: false, activeSpecialty: 'all' }), true);
+  assert.equal(showArea({ isSearching: true, activeSpecialty: 'all' }), false);
+  assert.equal(showArea({ isSearching: false, activeSpecialty: 'cardiology' }), false);
+  assert.equal(showArea({ isSearching: true, activeSpecialty: 'cardiology' }), false);
+  assert.equal(showArea(), true);
 });

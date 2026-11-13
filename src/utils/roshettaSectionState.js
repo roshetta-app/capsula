@@ -8,6 +8,8 @@
  *       -> 'loading' | 'guest' | 'error' | 'empty' | 'list'
  *   newTapAnswer({ isGuest, isReadOnly, canCreate })
  *       -> 'signin' | 'readonly' | 'limit' | 'open'   what a tap on New roshetta does
+ *   showArea({ isSearching, activeSpecialty })
+ *       -> true when the area is drawn on the Topics screen (not while searching or filtering)
  *   countLine({ isPro, count, cap })
  *       -> '' | '2 of 3 roshettas' | '3 of 3 roshettas \u00b7 Full'   the free-plan line
  */
@@ -33,4 +35,10 @@ export function countLine({ isPro = false, count = 0, cap = 3 } = {}) {
   if (isPro || count < 1) return '';
   const word = cap === 1 ? 'roshetta' : 'roshettas';
   return count >= cap ? `${cap} of ${cap} ${word} \u00b7 Full` : `${count} of ${cap} ${word}`;
+}
+
+// Step 4.1e: the area sits above the topic list, so it goes away while the person is
+// searching or has picked a specialty ('all' means no filter).
+export function showArea({ isSearching = false, activeSpecialty = 'all' } = {}) {
+  return !isSearching && activeSpecialty === 'all';
 }
