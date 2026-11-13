@@ -1,12 +1,12 @@
 /**
  * src/components/roshettas/editor/DrugGroupCard.jsx
- * 2026-11-14 (Roshetta plan, step 5.1c, part 1): one drug group of a roshetta in the editor.
+ * 2026-11-14 (Roshetta plan, steps 5.1c and 5.1d): one drug group of a roshetta in the editor.
  * A card with a "Drug" title, move up, move down and delete buttons (44 px each), the drug name
  * lines (main drug first, then each or / plus partner with its tappable chip in front), a remove
- * button on every line, and the "Add or / plus drug" button.
- *
- * Part 2 (step 5.1d) adds the dose box, its counter and the line "Written by you. Not checked by
- * Capsula." under the name lines.
+ * button on every line, the "Add or / plus drug" button, and the dose box with its counter
+ * ("12/600") and the line "Written by you. Not checked by Capsula.". The dose is plain text,
+ * line breaks kept, it follows its own direction, and typing stops at 600 characters. One dose
+ * is shared by every drug of the group. No dose is ever filled in from the library.
  *
  * Props:
  *   row           the drug group row (a 'drug' row with its partners in `alternatives`)
@@ -14,12 +14,12 @@
  *   count         number            how many entries the roshetta has (for the move buttons)
  *   libraryIds    Set | null        brand ids in the drug library; null while the library is not
  *                                   loaded (then no drug is called "no longer available")
- *   onChange      (row) => void     the group after a chip switch or a drug removal
+ *   onChange      (row) => void     the group after a chip switch, a drug removal or typing a dose
  *   onAddPartner  () => void        "Add or / plus drug" (the editor opens the Add drug screen)
  *   onMoveUp      () => void
  *   onMoveDown    () => void
  *   onDelete      () => void        asks nothing itself; also called when the only drug is removed
- *   disabled      boolean           read only: chips, remove and add are locked, delete stays
+ *   disabled      boolean           read only: chips, remove, add and the dose box are locked, delete stays
  *
  * Not placed on any screen yet: the editor screen (Phase D) uses it.
  */
@@ -27,7 +27,7 @@
 import Icon from '../../ui/Icon'
 import EditorIconButton from './EditorIconButton'
 import JoinerChip from './JoinerChip'
-import { drugDetail, drugLines, removeDrugAction, switchChip } from '../../../utils/roshettaDrugLines'
+import { doseCounter, drugDetail, drugLines, removeDrugAction, switchChip, withDose } from '../../../utils/roshettaDrugLines'
 import { moveState } from '../../../utils/roshettaTextBlockText'
 
 const font = 'var(--font-body)'
@@ -108,6 +108,9 @@ export default function DrugGroupCard({
     else if (result.kind === 'delete_group') onDelete?.()
   }
 
+  const dose = typeof row?.dose === 'string' ? row.dose : ''
+  const doseId = `roshetta-dose-${row?.id ?? index}`
+
   return (
     <div
       style={{
@@ -161,6 +164,36 @@ export default function DrugGroupCard({
           Add or / plus drug
         </button>
       )}
+
+      <label
+        htmlFor={doseId}
+        style={{
+          display: 'block', marginTop: 8, marginBottom: 6,
+          fontSize: 13, fontWeight: 600, color: 'var(--color-text-secondary)', fontFamily: font,
+        }}
+      >
+        Dose
+      </label>
+      <textarea
+        id={doseId}
+        value={dose}
+        onChange={e => onChange?.(withDose(row, e.target.value))}
+        readOnly={disabled}
+        rows={3}
+        dir="auto"
+        placeholder="Write the dose, for example 500 mg every 8 hours"
+        style={{
+          width: '100%', boxSizing: 'border-box', resize: 'none',
+          fontSize: 15, fontWeight: 600, lineHeight: 1.4, textAlign: 'start',
+          color: 'var(--color-dose)', backgroundColor: 'var(--color-surface-muted)',
+          border: '1.5px solid transparent', borderRadius: 12, padding: '12px 14px',
+          fontFamily: font, outline: 'none',
+        }}
+      />
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 4, fontSize: 11, color: 'var(--color-text-secondary)', fontFamily: font }}>
+        <span>Written by you. Not checked by Capsula.</span>
+        <span style={{ flexShrink: 0 }}>{doseCounter(dose)}</span>
+      </div>
     </div>
   )
 }

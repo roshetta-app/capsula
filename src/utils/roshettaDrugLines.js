@@ -7,13 +7,16 @@
  *   drugDetail(line)               the grey line under a name (generic, strength, form)
  *   switchChip(row, partnerIndex)  the group with that chip switched, or null for a bad index
  *   removeDrugAction(row, pos)     what removing the drug at `pos` means for the editor
+ *   doseCounter(value)             "12/600", counted as people count (an emoji is one)
+ *   withDose(row, value)           the group with the typed dose (cut to the limit, line breaks kept)
  *
  * libraryIds is a Set of the brand ids in the drug library, or null / undefined while the library
  * is not loaded. A drug is only "no longer available" when the library IS loaded and its id is not
  * in it (plan assumption H and I): the roshetta keeps the name it had when the drug was added.
  */
 
-import { removeDrug, switchJoiner } from './roshettaRows.js';
+import { ROSHETTA_DOSE_MAX, removeDrug, switchJoiner } from './roshettaRows.js';
+import { countText, limitText } from './roshettaDetailsText.js';
 
 const NO_NAME = 'Unnamed drug';
 
@@ -71,4 +74,13 @@ export function removeDrugAction(row, position) {
   } catch {
     return { kind: 'none' };
   }
+}
+
+export function doseCounter(value) {
+  return `${countText(value)}/${ROSHETTA_DOSE_MAX}`;
+}
+
+// Only the dose text changes. The other dose fields stay as they are (empty on purpose, plan decision 5).
+export function withDose(row, value) {
+  return { ...row, dose: limitText(value, ROSHETTA_DOSE_MAX) };
 }

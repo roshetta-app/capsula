@@ -1,7 +1,7 @@
 // Checks for roshettaDrugLines.js (step 5.1c). Run with: node --test src/utils/roshettaDrugLines.check.js
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { drugLines, drugDetail, switchChip, removeDrugAction } from './roshettaDrugLines.js';
+import { drugLines, drugDetail, switchChip, removeDrugAction, doseCounter, withDose } from './roshettaDrugLines.js';
 import { newDrugGroup, addPartner } from './roshettaRows.js';
 
 const ids = (() => { let n = 0; return () => `row-${++n}`; })();
@@ -72,4 +72,25 @@ test('removeDrugAction: partner removed, main promotes the first partner, last d
   const single = newDrugGroup(lib('b1', 'Panadol'), ids);
   assert.deepEqual(removeDrugAction(single, 0), { kind: 'delete_group' });
   assert.deepEqual(removeDrugAction(row, 5), { kind: 'none' });
+});
+
+test('doseCounter: counts as people count and shows the limit of 600', () => {
+  assert.equal(doseCounter(''), '0/600');
+  assert.equal(doseCounter(undefined), '0/600');
+  assert.equal(doseCounter('500 mg\nevery 8 hours'), '20/600');
+  assert.equal(doseCounter('a\uD83D\uDE00b'), '3/600', 'an emoji is one');
+  assert.equal(doseCounter('x'.repeat(600)), '600/600');
+});
+
+test('withDose: keeps line breaks, stops at 600, never cuts an emoji, touches only the dose', () => {
+  const row = sample();
+  const typed = withDose(row, '500 mg\nevery 8 hours');
+  assert.equal(typed.dose, '500 mg\nevery 8 hours');
+  assert.equal(withDose(row, 'x'.repeat(650)).dose.length, 600);
+  assert.equal(Array.from(withDose(row, '\uD83D\uDE00'.repeat(601)).dose).length, 600);
+  assert.equal(withDose(row, null).dose, '');
+  assert.deepEqual({ ...typed, dose: row.dose }, row, 'every other field is unchanged');
+  assert.equal(row.dose, '', 'the original is not changed');
+  assert.deepEqual(typed.dose_lines, [], 'no library dose field is filled');
+  assert.equal(typed.dose_max, null);
 });
