@@ -4,7 +4,7 @@
 // 'plain_text' (a text block, drawn as plain text, never markdown or HTML).
 // This file has no screen code and no network calls.
 // Step 2.1a: sizes, counts and checks. Step 2.1b: a new drug group.
-// Later steps add partners, moving and text blocks.
+// Step 2.1c: 'or' / 'plus' partners. Later steps add moving and text blocks.
 
 import { newId } from './groupChanges.js';
 
@@ -107,18 +107,10 @@ export function checkRows(rows) {
   return { ok: reasons.size === 0, reasons: [...reasons] };
 }
 
-// A new drug group from a library drug (the flat drug the Add drugs search gives).
-// Only the name and identity fields are copied. Every library dose field is
-// left empty on purpose: library doses are not guaranteed accurate, so the
-// author types the dose themselves (plan decision 5). Returns a new object.
-export function newDrugGroup(libraryDrug, makeId = newId) {
-  if (!libraryDrug || !libraryDrug.id || !libraryDrug.name) {
-    throw new Error('newDrugGroup needs a library drug with an id and a name');
-  }
-  const d = libraryDrug;
+// The name and identity fields of a library drug (the flat drug the Add drugs
+// search gives), in the row field names. No dose field is ever copied.
+function identityFields(d) {
   return {
-    row_type: ROSHETTA_ROW_TYPES.DRUG,
-    id: makeId(),
     brand_id: d.id,
     brand_name: d.name,
     generic_id: d.genericId ?? null,
@@ -128,6 +120,28 @@ export function newDrugGroup(libraryDrug, makeId = newId) {
     form: d.form ?? null,
     route: d.route ?? null,
     category: d.category ?? null,
+  };
+}
+
+function assertLibraryDrug(d) {
+  if (!d || !d.id || !d.name) {
+    throw new Error('Needs a library drug with an id and a name');
+  }
+}
+
+function assertDrugRow(row) {
+  if (!isRow(row, ROSHETTA_ROW_TYPES.DRUG)) throw new Error('Not a drug row');
+}
+
+// A new drug group from a library drug. Every library dose field is left empty
+// on purpose: library doses are not guaranteed accurate, so the author types
+// the dose themselves (plan decision 5). Returns a new object.
+export function newDrugGroup(libraryDrug, makeId = newId) {
+  assertLibraryDrug(libraryDrug);
+  return {
+    row_type: ROSHETTA_ROW_TYPES.DRUG,
+    id: makeId(),
+    ...identityFields(libraryDrug),
     dose: '',
     dose_who: null,
     dose_lines: [],
@@ -140,5 +154,83 @@ export function newDrugGroup(libraryDrug, makeId = newId) {
     drug_note: null,
     source_flag: null,
     alternatives: [],
+  };
+}
+
+const JOINERS = ['or', 'and']; // 'and' is shown to people as 'plus'
+
+// Adds an 'or' / 'plus' partner at the end of a drug group. The partner shares
+// the main drug's dose text: it carries the main row's id as its group id and
+// has no dose of its own. Returns a new row.
+export function addPartner(row, libraryDrug, joiner = 'or') {
+  assertDrugRow(row);
+  assertLibraryDrug(libraryDrug);
+  if (!JOINERS.includes(joiner)) throw new Error('Joiner must be or / and');
+  const partner = {
+    ...identityFields(libraryDrug),
+    dose: null,
+    dose_who: null,
+    dose_lines: [],
+    note: null,
+    source_flag: null,
+    group_id: row.id,
+    group_note: null,
+    group_dose_max: null,
+    group_dose_max_population_id: null,
+    group_dose_library_base: null,
+    group_extra_populations: [],
+    group_shown_population: 0,
+    joiner,
+  };
+  return { ...row, alternatives: [...(row.alternatives ?? []), partner] };
+}
+
+function assertPartnerIndex(row, index) {
+  const n = row.alternatives?.length ?? 0;
+  if (!Number.isInteger(index) || index < 0 || index >= n) {
+    throw new Error('No such partner');
+  }
+}
+
+// Switches the chip in front of one partner between 'or' and 'plus'.
+// partnerIndex 0 is the chip between the main drug and the first partner.
+export function switchJoiner(row, partnerIndex) {
+  assertDrugRow(row);
+  assertPartnerIndex(row, partnerIndex);
+  const alternatives = row.alternatives.map((alt, i) =>
+    i === partnerIndex ? { ...alt, joiner: alt.joiner === 'and' ? 'or' : 'and' } : alt
+  );
+  return { ...row, alternatives };
+}
+
+// Removes one drug from a group. position 0 is the main drug, 1 and up are the
+// partners in order. Removing the main drug promotes the first partner; the
+// group keeps its id and its dose text. Returns null when the only drug is
+// removed (the caller deletes the whole group). Returns a new row.
+export function removeDrug(row, position) {
+  assertDrugRow(row);
+  const partners = row.alternatives ?? [];
+  if (!Number.isInteger(position) || position < 0 || position > partners.length) {
+    throw new Error('No such drug');
+  }
+  if (position > 0) {
+    return { ...row, alternatives: partners.filter((_, i) => i !== position - 1) };
+  }
+  if (partners.length === 0) return null;
+  const [first, ...rest] = partners;
+  return {
+    ...row,
+    ...identityFields({
+      id: first.brand_id,
+      name: first.brand_name,
+      genericId: first.generic_id,
+      genericName: first.generic_name,
+      formulationId: first.formulation_id,
+      concentration: first.concentration,
+      form: first.form,
+      route: first.route,
+      category: first.category,
+    }),
+    alternatives: rest,
   };
 }

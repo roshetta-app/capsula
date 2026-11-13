@@ -17,6 +17,9 @@ import {
   checkTextBlock,
   checkRows,
   newDrugGroup,
+  addPartner,
+  switchJoiner,
+  removeDrug,
 } from './roshettaRows.js';
 
 const drug = (partners = 0, dose = '') => ({
@@ -229,4 +232,134 @@ test('newDrugGroup: does not change the library drug it was given', () => {
   const before = JSON.stringify(libraryDrug);
   newDrugGroup(libraryDrug);
   assert.equal(JSON.stringify(libraryDrug), before);
+});
+
+// ---- Step 2.1c: partners, the chip, removing a drug ----
+
+const lib = (n) => ({
+  id: 'b' + n,
+  name: 'Drug ' + n,
+  genericId: 'g' + n,
+  genericName: 'Generic ' + n,
+  formulationId: 'f' + n,
+  concentration: n + ' mg',
+  form: 'Tablet',
+  route: 'Oral',
+  category: 'Cat',
+  doseLines: [{ x: n }],
+});
+
+const group = (n = 1) => ({ ...newDrugGroup(lib(n), () => 'main'), dose: '5 mg\nonce daily' });
+
+test('addPartner: adds an "or" partner that shares the main dose group', () => {
+  const row = addPartner(group(1), lib(2));
+  assert.equal(row.alternatives.length, 1);
+  const alt = row.alternatives[0];
+  assert.equal(alt.brand_id, 'b2');
+  assert.equal(alt.brand_name, 'Drug 2');
+  assert.equal(alt.generic_name, 'Generic 2');
+  assert.equal(alt.formulation_id, 'f2');
+  assert.equal(alt.joiner, 'or');
+  assert.equal(alt.group_id, 'main');
+  assert.equal(countDrugs([row]), 2);
+});
+
+test('addPartner: "and" (plus) joiner, and bad joiner refused', () => {
+  assert.equal(addPartner(group(), lib(2), 'and').alternatives[0].joiner, 'and');
+  assert.throws(() => addPartner(group(), lib(2), 'maybe'));
+});
+
+test('addPartner: partner carries no dose of its own and no library dose', () => {
+  const alt = addPartner(group(), lib(2)).alternatives[0];
+  assert.equal(alt.dose, null);
+  assert.equal(alt.dose_who, null);
+  assert.deepEqual(alt.dose_lines, []);
+  assert.equal(alt.note, null);
+  assert.equal(alt.group_note, null);
+  assert.equal(alt.group_dose_max, null);
+  assert.equal(alt.group_dose_max_population_id, null);
+  assert.equal(alt.group_dose_library_base, null);
+  assert.deepEqual(alt.group_extra_populations, []);
+  assert.equal(alt.group_shown_population, 0);
+  assert.equal(alt.source_flag, null);
+});
+
+test('addPartner: keeps the main row and dose, appends in order, never changes the input', () => {
+  const before = group();
+  const snap = JSON.stringify(before);
+  const one = addPartner(before, lib(2));
+  const two = addPartner(one, lib(3), 'and');
+  assert.equal(JSON.stringify(before), snap);
+  assert.equal(two.dose, '5 mg\nonce daily');
+  assert.deepEqual(two.alternatives.map((a) => a.brand_id), ['b2', 'b3']);
+  assert.deepEqual(two.alternatives.map((a) => a.joiner), ['or', 'and']);
+  assert.equal(countDrugs([two]), 3);
+});
+
+test('addPartner: refuses a bad library drug or a non-drug row', () => {
+  assert.throws(() => addPartner(group(), null));
+  assert.throws(() => addPartner(group(), { name: 'X' }));
+  assert.throws(() => addPartner({ row_type: 'plain_text', id: 't' }, lib(2)));
+});
+
+test('switchJoiner: flips or / and for one partner only', () => {
+  const row = addPartner(addPartner(group(), lib(2)), lib(3));
+  const a = switchJoiner(row, 0);
+  assert.deepEqual(a.alternatives.map((x) => x.joiner), ['and', 'or']);
+  const b = switchJoiner(a, 0);
+  assert.deepEqual(b.alternatives.map((x) => x.joiner), ['or', 'or']);
+  assert.deepEqual(row.alternatives.map((x) => x.joiner), ['or', 'or']);
+});
+
+test('switchJoiner: a wrong index is refused', () => {
+  const row = addPartner(group(), lib(2));
+  for (const i of [-1, 1, 1.5, '0', undefined]) assert.throws(() => switchJoiner(row, i));
+});
+
+test('removeDrug: removing a partner keeps the rest in order', () => {
+  const row = addPartner(addPartner(addPartner(group(), lib(2)), lib(3), 'and'), lib(4));
+  const out = removeDrug(row, 2);
+  assert.deepEqual(out.alternatives.map((a) => a.brand_id), ['b2', 'b4']);
+  assert.deepEqual(out.alternatives.map((a) => a.joiner), ['or', 'or']);
+  assert.equal(out.brand_id, 'b1');
+  assert.equal(out.dose, '5 mg\nonce daily');
+});
+
+test('removeDrug: removing the main drug promotes the first partner, dose and id stay', () => {
+  const row = addPartner(addPartner(group(), lib(2), 'and'), lib(3));
+  const out = removeDrug(row, 0);
+  assert.equal(out.id, 'main');
+  assert.equal(out.brand_id, 'b2');
+  assert.equal(out.brand_name, 'Drug 2');
+  assert.equal(out.generic_id, 'g2');
+  assert.equal(out.formulation_id, 'f2');
+  assert.equal(out.concentration, '2 mg');
+  assert.equal(out.dose, '5 mg\nonce daily');
+  assert.deepEqual(out.alternatives.map((a) => a.brand_id), ['b3']);
+  assert.equal(out.alternatives[0].group_id, 'main');
+  assert.equal(countDrugs([out]), 2);
+  for (const k of ['dose_who', 'dose_max', 'dose_max_population_id', 'dose_library_base', 'note', 'drug_note']) {
+    assert.equal(out[k], null, k);
+  }
+  assert.deepEqual(out.dose_lines, []);
+});
+
+test('removeDrug: removing the only drug returns null (the group is gone)', () => {
+  assert.equal(removeDrug(group(), 0), null);
+});
+
+test('removeDrug: a wrong position is refused and the input is never changed', () => {
+  const row = addPartner(group(), lib(2));
+  const snap = JSON.stringify(row);
+  for (const i of [-1, 2, 0.5, '1', undefined]) assert.throws(() => removeDrug(row, i));
+  removeDrug(row, 1);
+  removeDrug(row, 0);
+  assert.equal(JSON.stringify(row), snap);
+});
+
+test('after add, switch and remove the row still passes the row checks', () => {
+  let row = addPartner(group(), lib(2));
+  row = switchJoiner(row, 0);
+  row = removeDrug(row, 0);
+  assert.deepEqual(checkRows([row]), { ok: true, reasons: [] });
 });
