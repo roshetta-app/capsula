@@ -332,9 +332,16 @@ export function writeIconCache(url, svg) {
 // the server has not accepted yet. IDB_VERSION bumped 7 -> 8; the upgrade only
 // creates the missing store, so every other store and its data is untouched.
 
+// 2026-11-13 (Roshetta plan, step 2.2b): added a ninth and tenth store,
+// 'roshettas' (one saved copy of a signed-in user's roshettas, keyed
+// 'roshettas:<user id>') and 'roshetta-changes' (one saved list of waiting
+// changes per signed-in user, keyed 'changes:<user id>'), copied from the two
+// groups stores above. IDB_VERSION bumped 8 -> 9; the upgrade only creates the
+// missing stores, so every other store and its data is untouched.
+
 const IDB_NAME    = 'capsula-cache'
-const IDB_VERSION = 8
-const IDB_STORES  = ['drugs', 'conditions', 'photos', 'pending-note-photos', 'note-photos', 'drug-pictures', 'drug-groups', 'drug-group-changes']
+const IDB_VERSION = 9
+const IDB_STORES  = ['drugs', 'conditions', 'photos', 'pending-note-photos', 'note-photos', 'drug-pictures', 'drug-groups', 'drug-group-changes', 'roshettas', 'roshetta-changes']
 
 const DRUGS_STORE      = 'drugs'
 const DRUGS_KEY        = 'drugs'
@@ -346,6 +353,8 @@ const NOTE_PHOTOS_STORE = 'note-photos'
 const DRUG_PICTURES_STORE = 'drug-pictures'
 const DRUG_GROUPS_STORE = 'drug-groups'
 const DRUG_GROUP_CHANGES_STORE = 'drug-group-changes'
+const ROSHETTAS_STORE = 'roshettas'
+const ROSHETTA_CHANGES_STORE = 'roshetta-changes'
 
 function openCapsulaDB() {
   return new Promise((resolve, reject) => {
@@ -1045,4 +1054,134 @@ export async function readGroupChanges(userId) {
 
 export async function clearGroupChanges(userId) {
   await writeGroupChanges(userId, [])
+}
+
+// ── Roshettas saved copy (2026-11-13, roshetta plan step 2.2b) ───────────────
+// One record per signed-in user: { data, savedAt }. 'data' is whatever the
+// roshettas hook hands over (the person's roshettas with their rows). Every
+// function here fails quietly (reports to the crash log), like the groups
+// functions above.
+
+function roshettasKey(userId) {
+  return `roshettas:${userId}`
+}
+
+export async function writeRoshettasCache(userId, data) {
+  if (!userId) return
+  let db
+  try {
+    db = await openCapsulaDB()
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(ROSHETTAS_STORE, 'readwrite')
+      tx.objectStore(ROSHETTAS_STORE).put({ data, savedAt: new Date().toISOString() }, roshettasKey(userId))
+      tx.oncomplete = () => resolve()
+      tx.onerror    = () => reject(tx.error)
+    })
+  } catch (err) {
+    logCrash(err, 'utils/cache.js: writeRoshettasCache')
+  } finally {
+    db?.close()
+  }
+}
+
+/** Returns { data, savedAt } or null when nothing is saved for this user. */
+export async function readRoshettasCache(userId) {
+  if (!userId) return null
+  let db
+  try {
+    db = await openCapsulaDB()
+    const rec = await new Promise((resolve, reject) => {
+      const tx = db.transaction(ROSHETTAS_STORE, 'readonly')
+      const req = tx.objectStore(ROSHETTAS_STORE).get(roshettasKey(userId))
+      req.onsuccess = () => resolve(req.result)
+      req.onerror   = () => reject(req.error)
+    })
+    return rec ?? null
+  } catch (err) {
+    logCrash(err, 'utils/cache.js: readRoshettasCache')
+    return null
+  } finally {
+    db?.close()
+  }
+}
+
+export async function clearRoshettasCache(userId) {
+  if (!userId) return
+  let db
+  try {
+    db = await openCapsulaDB()
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(ROSHETTAS_STORE, 'readwrite')
+      tx.objectStore(ROSHETTAS_STORE).delete(roshettasKey(userId))
+      tx.oncomplete = () => resolve()
+      tx.onerror    = () => reject(tx.error)
+    })
+  } catch (err) {
+    logCrash(err, 'utils/cache.js: clearRoshettasCache')
+  } finally {
+    db?.close()
+  }
+}
+
+// ── Roshettas: waiting changes (2026-11-13, roshetta plan step 2.2b) ─────────
+// One record per signed-in user: the list of changes made on this phone that
+// the server has not accepted yet (see utils/roshettaChanges.js). Like the
+// groups list, a failed write matters: the person must not be told a change is
+// saved when it is not. So writeRoshettaChanges answers true or false, and an
+// empty list removes the record.
+
+function roshettaChangesKey(userId) {
+  return `changes:${userId}`
+}
+
+/** Returns true when the list was saved, false when it could not be. */
+export async function writeRoshettaChanges(userId, changes) {
+  if (!userId) return false
+  let db
+  try {
+    db = await openCapsulaDB()
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(ROSHETTA_CHANGES_STORE, 'readwrite')
+      const store = tx.objectStore(ROSHETTA_CHANGES_STORE)
+      if (Array.isArray(changes) && changes.length > 0) {
+        store.put({ changes, savedAt: new Date().toISOString() }, roshettaChangesKey(userId))
+      } else {
+        store.delete(roshettaChangesKey(userId))
+      }
+      tx.oncomplete = () => resolve()
+      tx.onerror    = () => reject(tx.error)
+      tx.onabort    = () => reject(tx.error)
+    })
+    return true
+  } catch (err) {
+    logCrash(err, 'utils/cache.js: writeRoshettaChanges')
+    return false
+  } finally {
+    db?.close()
+  }
+}
+
+/** Returns the waiting changes (oldest first), or [] when there are none or storage fails. */
+export async function readRoshettaChanges(userId) {
+  if (!userId) return []
+  let db
+  try {
+    db = await openCapsulaDB()
+    const rec = await new Promise((resolve, reject) => {
+      const tx = db.transaction(ROSHETTA_CHANGES_STORE, 'readonly')
+      const req = tx.objectStore(ROSHETTA_CHANGES_STORE).get(roshettaChangesKey(userId))
+      req.onsuccess = () => resolve(req.result)
+      req.onerror   = () => reject(req.error)
+    })
+    return Array.isArray(rec?.changes) ? rec.changes : []
+  } catch (err) {
+    logCrash(err, 'utils/cache.js: readRoshettaChanges')
+    return []
+  } finally {
+    db?.close()
+  }
+}
+
+export async function clearRoshettaChanges(userId) {
+  await writeRoshettaChanges(userId, [])
 }
