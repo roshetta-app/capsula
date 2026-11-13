@@ -1,0 +1,166 @@
+/**
+ * src/components/roshettas/editor/DrugGroupCard.jsx
+ * 2026-11-14 (Roshetta plan, step 5.1c, part 1): one drug group of a roshetta in the editor.
+ * A card with a "Drug" title, move up, move down and delete buttons (44 px each), the drug name
+ * lines (main drug first, then each or / plus partner with its tappable chip in front), a remove
+ * button on every line, and the "Add or / plus drug" button.
+ *
+ * Part 2 (step 5.1d) adds the dose box, its counter and the line "Written by you. Not checked by
+ * Capsula." under the name lines.
+ *
+ * Props:
+ *   row           the drug group row (a 'drug' row with its partners in `alternatives`)
+ *   index         number            its place among all the entries of the roshetta
+ *   count         number            how many entries the roshetta has (for the move buttons)
+ *   libraryIds    Set | null        brand ids in the drug library; null while the library is not
+ *                                   loaded (then no drug is called "no longer available")
+ *   onChange      (row) => void     the group after a chip switch or a drug removal
+ *   onAddPartner  () => void        "Add or / plus drug" (the editor opens the Add drug screen)
+ *   onMoveUp      () => void
+ *   onMoveDown    () => void
+ *   onDelete      () => void        asks nothing itself; also called when the only drug is removed
+ *   disabled      boolean           read only: chips, remove and add are locked, delete stays
+ *
+ * Not placed on any screen yet: the editor screen (Phase D) uses it.
+ */
+
+import Icon from '../../ui/Icon'
+import EditorIconButton from './EditorIconButton'
+import JoinerChip from './JoinerChip'
+import { drugDetail, drugLines, removeDrugAction, switchChip } from '../../../utils/roshettaDrugLines'
+import { moveState } from '../../../utils/roshettaTextBlockText'
+
+const font = 'var(--font-body)'
+
+function DrugLine({ line, disabled, onRemove }) {
+  const detail = drugDetail(line)
+  const gone = !line.available
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 44 }}>
+      <div style={{ flex: 1, minWidth: 0, padding: '6px 0' }}>
+        <div
+          dir="auto"
+          style={{
+            fontSize: 15, fontWeight: 600, lineHeight: 1.3, textAlign: 'start', overflowWrap: 'anywhere',
+            color: gone ? 'var(--color-text-secondary)' : 'var(--color-text-primary)', fontFamily: font,
+          }}
+        >
+          {line.name}
+        </div>
+        {detail && (
+          <div
+            dir="auto"
+            style={{
+              marginTop: 1, fontSize: 12.5, lineHeight: 1.3, textAlign: 'start', overflowWrap: 'anywhere',
+              color: 'var(--color-text-secondary)', fontFamily: font,
+            }}
+          >
+            {detail}
+          </div>
+        )}
+        {gone && (
+          <div style={{ marginTop: 2, fontSize: 12.5, lineHeight: 1.3, color: 'var(--color-text-secondary)', fontFamily: font }}>
+            No longer available
+          </div>
+        )}
+      </div>
+      {!disabled && (
+        <button
+          type="button"
+          onClick={onRemove}
+          aria-label={`Remove ${line.name}`}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+            width: 44, height: 44, padding: 0, background: 'none', border: 'none', cursor: 'pointer',
+            WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          <span
+            style={{
+              width: 32, height: 32, borderRadius: '50%',
+              backgroundColor: 'var(--color-danger-light)', color: 'var(--color-danger)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            <Icon name="Minus" size={18} />
+          </span>
+        </button>
+      )}
+    </div>
+  )
+}
+
+export default function DrugGroupCard({
+  row, index = 0, count = 1, libraryIds = null, onChange, onAddPartner, onMoveUp, onMoveDown, onDelete,
+  disabled = false,
+}) {
+  const lines = drugLines(row, libraryIds)
+  const { canUp, canDown } = moveState(index, count)
+
+  function switchAt(partnerIndex) {
+    const next = switchChip(row, partnerIndex)
+    if (next) onChange?.(next)
+  }
+
+  function removeAt(position) {
+    const result = removeDrugAction(row, position)
+    if (result.kind === 'change') onChange?.(result.row)
+    else if (result.kind === 'delete_group') onDelete?.()
+  }
+
+  return (
+    <div
+      style={{
+        backgroundColor: 'var(--color-surface)',
+        border: '1px solid var(--color-border)',
+        borderRadius: 'var(--radius-lg)',
+        padding: 'var(--space-2) var(--space-4) var(--space-3)',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            fontSize: 13, fontWeight: 600, color: 'var(--color-text-secondary)', fontFamily: font,
+          }}
+        >
+          <Icon name="Pill" size={15} />
+          {lines.length > 1 ? 'Drugs' : 'Drug'}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', marginRight: -10 }}>
+          <EditorIconButton label="Move up" name="ChevronUp" onClick={() => onMoveUp?.()} disabled={disabled || !canUp} />
+          <EditorIconButton label="Move down" name="ChevronDown" onClick={() => onMoveDown?.()} disabled={disabled || !canDown} />
+          <EditorIconButton label="Delete drug group" name="Trash2" onClick={() => onDelete?.()} danger />
+        </div>
+      </div>
+
+      <div>
+        {lines.map(line => (
+          <div key={`${line.position}-${line.id ?? ''}`}>
+            {line.joiner && (
+              <div style={{ display: 'flex', alignItems: 'center', minHeight: 44 }}>
+                <JoinerChip joiner={line.joiner} onSwitch={() => switchAt(line.position - 1)} disabled={disabled} />
+              </div>
+            )}
+            <DrugLine line={line} disabled={disabled} onRemove={() => removeAt(line.position)} />
+          </div>
+        ))}
+      </div>
+
+      {!disabled && (
+        <button
+          type="button"
+          onClick={() => onAddPartner?.()}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6, minHeight: 44, marginTop: 2, padding: 0,
+            background: 'none', border: 'none', cursor: 'pointer', WebkitTapHighlightColor: 'transparent',
+            fontSize: 14, fontWeight: 600, color: 'var(--color-accent-text)', fontFamily: font,
+          }}
+        >
+          <Icon name="Plus" size={16} />
+          Add or / plus drug
+        </button>
+      )}
+    </div>
+  )
+}

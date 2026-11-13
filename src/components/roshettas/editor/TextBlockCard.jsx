@@ -19,29 +19,10 @@
  */
 
 import Icon from '../../ui/Icon'
+import IconButton from './EditorIconButton'
 import { moveState, textBlockCounter, typedTextBlock } from '../../../utils/roshettaTextBlockText'
 
 const font = 'var(--font-body)'
-
-function IconButton({ label, name, onClick, disabled = false, danger = false }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      aria-label={label}
-      style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        width: 44, height: 44, padding: 0, background: 'none', border: 'none',
-        color: danger ? 'var(--color-danger)' : 'var(--color-text-secondary)',
-        opacity: disabled ? 0.35 : 1, cursor: disabled ? 'default' : 'pointer',
-        WebkitTapHighlightColor: 'transparent',
-      }}
-    >
-      <Icon name={name} size={20} />
-    </button>
-  )
-}
 
 export default function TextBlockCard({
   block, index = 0, count = 1, onChange, onMoveUp, onMoveDown, onDelete, disabled = false,
