@@ -35,7 +35,7 @@
  * more margin since it stands alone between blocks rather than sitting
  * directly under prescription rows.
  */
-import { Stethoscope, Hand, Lightbulb, List } from 'lucide-react'
+import { Stethoscope, Hand, Lightbulb, ChevronsUpDown } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkBreaks from 'remark-breaks'
 import { NOTE_FLAVORS, noteFlavorColor } from './noteFlavors'
@@ -205,12 +205,11 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
               className="note-heading-tap"
               aria-hidden="true"
               style={{
-                width: 20, height: 20, flexShrink: 0, alignItems: 'center', justifyContent: 'center',
-                borderRadius: '50%', color: f.iconColor,
-                background: `color-mix(in srgb, ${f.iconColor} 16%, transparent)`,
+                width: 18, height: 18, flexShrink: 0, alignItems: 'center', justifyContent: 'center',
+                color: f.iconColor, opacity: 0.85,
               }}
             >
-              <List size={12} strokeWidth={2.4} />
+              <ChevronsUpDown size={18} strokeWidth={2.4} />
             </span>
           )}
         </div>
