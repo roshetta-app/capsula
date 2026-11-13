@@ -141,9 +141,9 @@
      Kept near other surface tokens for easy comparison with Phase 5's
      section card variable (--color-section-bg, added in Phase 5). */
   --color-note-bg:          #F5F4F1;
-  /* The three note types, one clear hue each (2026-11-13): info = sky blue, warning = orange,
+  /* The three note types, one clear hue each (2026-11-13): info = cyan, warning = orange,
      tip = green. All three stay apart from the violet section cards and the red danger tone. */
-  --color-note-info:        #0369A1;
+  --color-note-info:        #0891B2;
   --color-note-warning:     #EA580C;
   --color-note-tip:         #15803D;
 
@@ -303,7 +303,7 @@
   /* Note card — dark mode: slightly lifted from the dark surface,
      clearly visible but not bright or alert-colored. */
   --color-note-bg:          #262D3A;
-  --color-note-info:        #38BDF8;   /* Note types, dark mode: lifted for contrast on dark cards */
+  --color-note-info:        #22D3EE;   /* Note types, dark mode: lifted for contrast on dark cards */
   --color-note-warning:     #FB923C;
   --color-note-tip:         #4ADE80;
 
