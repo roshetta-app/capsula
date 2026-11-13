@@ -234,3 +234,42 @@ export function removeDrug(row, position) {
     alternatives: rest,
   };
 }
+
+// A new text block (drawn as plain text, never markdown or HTML).
+export function newTextBlock(content = '', makeId = newId) {
+  if (typeof content !== 'string') throw new Error('Text block content must be text');
+  return { row_type: ROSHETTA_ROW_TYPES.PLAIN_TEXT, id: makeId(), content };
+}
+
+function assertEntryIndex(rows, index) {
+  if (!Array.isArray(rows)) throw new Error('Rows must be a list');
+  if (!Number.isInteger(index) || index < 0 || index >= rows.length) {
+    throw new Error('No such entry');
+  }
+}
+
+function swapped(rows, i, j) {
+  const out = [...rows];
+  [out[i], out[j]] = [out[j], out[i]];
+  return out;
+}
+
+// Moves an entry one place up. The first entry stays where it is.
+// Returns a new list.
+export function moveEntryUp(rows, index) {
+  assertEntryIndex(rows, index);
+  return index === 0 ? [...rows] : swapped(rows, index, index - 1);
+}
+
+// Moves an entry one place down. The last entry stays where it is.
+// Returns a new list.
+export function moveEntryDown(rows, index) {
+  assertEntryIndex(rows, index);
+  return index === rows.length - 1 ? [...rows] : swapped(rows, index, index + 1);
+}
+
+// Deletes one entry (a drug group goes with its partners). Returns a new list.
+export function deleteEntry(rows, index) {
+  assertEntryIndex(rows, index);
+  return rows.filter((_, i) => i !== index);
+}

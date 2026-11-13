@@ -20,6 +20,10 @@ import {
   addPartner,
   switchJoiner,
   removeDrug,
+  newTextBlock,
+  moveEntryUp,
+  moveEntryDown,
+  deleteEntry,
 } from './roshettaRows.js';
 
 const drug = (partners = 0, dose = '') => ({
@@ -362,4 +366,81 @@ test('after add, switch and remove the row still passes the row checks', () => {
   row = switchJoiner(row, 0);
   row = removeDrug(row, 0);
   assert.deepEqual(checkRows([row]), { ok: true, reasons: [] });
+});
+
+// ---- Step 2.1d: text blocks, moving and deleting entries ----
+
+test('newTextBlock: a plain_text row, empty by default, with its own id', () => {
+  const a = newTextBlock(undefined, () => 'tb-1');
+  assert.deepEqual(a, { row_type: 'plain_text', id: 'tb-1', content: '' });
+  const b = newTextBlock('Take with food');
+  assert.equal(b.content, 'Take with food');
+  assert.notEqual(newTextBlock().id, newTextBlock().id);
+  assert.deepEqual(checkRows([b]), { ok: true, reasons: [] });
+  assert.equal(countTextBlocks([b]), 1);
+});
+
+test('newTextBlock: content must be text', () => {
+  assert.throws(() => newTextBlock(5));
+  assert.throws(() => newTextBlock({}));
+});
+
+const entries = () => [
+  { row_type: 'drug', id: 'a', alternatives: [] },
+  { row_type: 'plain_text', id: 'b', content: '' },
+  { row_type: 'drug', id: 'c', alternatives: [] },
+];
+const ids = (rows) => rows.map((r) => r.id);
+
+test('moveEntryUp: swaps with the one above', () => {
+  assert.deepEqual(ids(moveEntryUp(entries(), 2)), ['a', 'c', 'b']);
+  assert.deepEqual(ids(moveEntryUp(entries(), 1)), ['b', 'a', 'c']);
+});
+
+test('moveEntryDown: swaps with the one below', () => {
+  assert.deepEqual(ids(moveEntryDown(entries(), 0)), ['b', 'a', 'c']);
+  assert.deepEqual(ids(moveEntryDown(entries(), 1)), ['a', 'c', 'b']);
+});
+
+test('moving past the top or bottom changes nothing', () => {
+  assert.deepEqual(ids(moveEntryUp(entries(), 0)), ['a', 'b', 'c']);
+  assert.deepEqual(ids(moveEntryDown(entries(), 2)), ['a', 'b', 'c']);
+});
+
+test('moving never changes the input and returns a new list', () => {
+  const rows = entries();
+  const snap = JSON.stringify(rows);
+  const out = moveEntryUp(rows, 1);
+  assert.notEqual(out, rows);
+  assert.equal(JSON.stringify(rows), snap);
+  assert.notEqual(moveEntryUp(rows, 0), rows);
+});
+
+test('moving: a wrong index is refused', () => {
+  for (const i of [-1, 3, 0.5, '1', undefined]) {
+    assert.throws(() => moveEntryUp(entries(), i));
+    assert.throws(() => moveEntryDown(entries(), i));
+  }
+  assert.throws(() => moveEntryUp(null, 0));
+});
+
+test('deleteEntry: removes one entry and keeps the order of the rest', () => {
+  assert.deepEqual(ids(deleteEntry(entries(), 1)), ['a', 'c']);
+  assert.deepEqual(ids(deleteEntry(entries(), 0)), ['b', 'c']);
+  assert.deepEqual(ids(deleteEntry(entries(), 2)), ['a', 'b']);
+});
+
+test('deleteEntry: wrong index refused, input untouched', () => {
+  const rows = entries();
+  const snap = JSON.stringify(rows);
+  for (const i of [-1, 3, 1.5, '0', undefined]) assert.throws(() => deleteEntry(rows, i));
+  deleteEntry(rows, 1);
+  assert.equal(JSON.stringify(rows), snap);
+});
+
+test('deleteEntry: deleting a drug group takes its partners with it', () => {
+  const g = addPartner(group(1), lib(2));
+  const out = deleteEntry([g, newTextBlock()], 0);
+  assert.equal(countDrugs(out), 0);
+  assert.equal(countTextBlocks(out), 1);
 });
