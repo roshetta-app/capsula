@@ -6,6 +6,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { makeChange, addChange, clearSending } from './roshettaChanges.js';
 import { REFUSAL, classifyError, sendChange, runSync } from './roshettaSync.js';
+import { afterRun } from './roshettaLimits.js';
 
 const rows = (n, drugs = 0) => [
   ...Array.from({ length: drugs }, (_, i) => ({ row_type: 'drug', name: `d${i}` })),
@@ -504,4 +505,29 @@ test('describeEvents: several roshettas of one kind are counted, a missing name 
   assert.deepEqual(describeEvents([], 0), { messages: [], severe: false });
   assert.equal(describeEvents([{ kind: 'read_only' }]).severe, true);
   assert.equal(describeEvents([], 2).severe, true);
+});
+
+test('a lapsed account that creates a roshetta is refused by the server and gets the limit sheet, with the name', async () => {
+  const s = fakeServer({ cap: 3 });
+  for (const id of ['a', 'b', 'c']) s.rows.set(id, { id, rows: [] });
+  const p = fakePhone(s, addChange([], mkCreate('late', 'Made while lapsed')));
+  const out = await p.run();
+  assert.equal(p.queue.length, 0);
+  const after = afterRun(out);
+  assert.deepEqual(after.sheet, { kind: 'roshettas', names: ['Made while lapsed'] });
+  assert.deepEqual(after.messages, []);
+});
+
+test('a lapsed account that saves is refused quietly by the server and gets the read only sheet; its delete still goes', async () => {
+  const s = fakeServer();
+  s.rows.set('r1', { id: 'r1', rows: [] }); s.rows.set('r2', { id: 'r2', rows: [] });
+  s.readOnly = true;
+  let q = addChange([], mkSave('r1', 'Edited'));
+  q = addChange(q, mkDel('r2'));
+  const p = fakePhone(s, q);
+  const out = await p.run();
+  const after = afterRun(out);
+  assert.equal(after.sheet.kind, 'readonly');
+  assert.equal(s.rows.has('r2'), false, 'the delete was sent and taken');
+  assert.equal(s.rows.get('r1').name, undefined, 'the save changed nothing');
 });

@@ -1,13 +1,13 @@
 /**
  * src/hooks/useRoshettas.js
  *
- * 2026-11-13 (Roshetta plan, steps 2.4a and 2.4b): keeps the signed-in
- * person's roshettas: load, create, save (the whole roshetta) and delete.
- * Limits and read only come in step 2.4c, and the hook is provided to the app
- * in 2.4d. The rules live in plain files that are checked without a screen
- * (utils/roshettaLoad.js, roshettaEdit.js, roshettaChanges.js,
- * roshettaSync.js); this file only passes the real database, saved copy,
- * phone storage and online signal in.
+ * 2026-11-13 (Roshetta plan, steps 2.4a to 2.4c): keeps the signed-in
+ * person's roshettas: load, create, save (the whole roshetta) and delete,
+ * with the limits and read only rules. The hook is provided to the app in
+ * step 2.4d. The rules live in plain files that are checked without a screen
+ * (utils/roshettaLoad.js, roshettaEdit.js, roshettaLimits.js,
+ * roshettaChanges.js, roshettaSync.js); this file only passes the real
+ * database, saved copy, phone storage and online signal in.
  *
  * Rules:
  *  - A guest has no roshettas: status 'ready', an empty list and isGuest true.
@@ -32,6 +32,16 @@
  *    overlap. No answer means stop and try later; a refusal is settled in plain
  *    words (a roshetta deleted on another device, a full list, too many drugs)
  *    or marked failed for Retry or Discard.
+ *  - Limits (step 2.4c, utils/roshettaLimits.js, numbers in constants/features.js,
+ *    also checked in the database): free 3 roshettas and 10 drugs in one, Pro 100
+ *    and 30. Reaching one answers reason 'limit' (list full) or 'drug_limit'. The
+ *    screens decide when to show the sheet, by calling showRoshettaLimit.
+ *  - Lapsed account (not Pro and over the free limits): isReadOnly is true.
+ *    Create and save answer reason 'read_only'; delete is always allowed. The
+ *    screens call showRoshettaReadOnly.
+ *  - When a send is refused for a limit or read only (also the roshetta limit a
+ *    lapsed account gets for a create), the hook opens the same sheet itself and
+ *    gives it the names of the roshettas that were not saved.
  *  - A guest's mutators answer { ok: false, reason: 'guest' } and save nothing
  *    (the screen asks to sign in).
  *
@@ -52,11 +62,20 @@
  *   createRoshetta       ({ name, description?, rows? }) => Promise<{ ok, reason?, roshetta?, queued? }>
  *   saveRoshetta         (id, { name?, description?, rows? }) => Promise<{ ok, reason?, queued? }>
  *   deleteRoshetta       (id) => Promise<{ ok, reason?, roshetta?, index?, queued? }>
- *   reasons: guest, not_loaded, invalid, missing, error
+ *   reasons: guest, not_loaded, read_only, limit, drug_limit, invalid, missing, error
+ *   isReadOnly           boolean
+ *   canCreateRoshetta    boolean (false when at the limit or read only)
+ *   roshettaCap, roshettaDrugCap   the limits for this account (for "7 of 10 drugs")
+ *   roshettaLimit        { open, kind, isPro, names }  the sheet state ('roshettas' | 'drugs' | 'readonly');
+ *                        names: roshettas a send could not save (may be empty)
+ *   showRoshettaLimit    (kind, names?) => void  opens the sheet (Free: with Upgrade; Pro: with OK)
+ *   showRoshettaReadOnly () => void              opens the sheet with the read only message (not a limit hit)
+ *   dismissRoshettaLimit () => void
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from './useAuth'
+import { useIsPro } from './useIsPro'
 import { useOnlineStatus } from './useOnlineStatus'
 import { useToast } from '../context/ToastContext'
 import { supabase } from '../lib/supabase'
@@ -64,8 +83,9 @@ import { logUsageEvent } from '../analytics/usageEvents'
 import { readRoshettasCache, writeRoshettasCache, clearRoshettasCache, readRoshettaChanges, writeRoshettaChanges } from '../utils/cache'
 import { loadRoshettas, fetchRoshettas, withTimeLimit, viewFor } from '../utils/roshettaLoad'
 import { summarizeQueue, sameSummary, nextToSend, retryFailed, discardFailed } from '../utils/roshettaChanges'
-import { runSync, sendChange, describeEvents } from '../utils/roshettaSync'
+import { runSync, sendChange } from '../utils/roshettaSync'
 import { prepareCreate, prepareSave, prepareDelete, commitChange } from '../utils/roshettaEdit'
+import { isReadOnly as listIsReadOnly, canCreate, roshettaCap, roshettaDrugCap, tapRefusal, rowsRefusal, afterRun } from '../utils/roshettaLimits'
 
 const NO_SUMMARY = { userId: null, failed: 0, waiting: 0, ids: [], failedList: [] }
 
@@ -73,6 +93,7 @@ export function useRoshettas() {
   const { user, loading: authLoading } = useAuth()
   const { isOnline } = useOnlineStatus()
   const { toast } = useToast()
+  const isPro = useIsPro()
 
   // The last state a load showed, with whose it is. Set by loads and changes only.
   const [loaded, setLoaded] = useState(null)
@@ -88,10 +109,30 @@ export function useRoshettas() {
   useEffect(() => { userRef.current = user }, [user])
   const onlineRef = useRef(isOnline)
   useEffect(() => { onlineRef.current = isOnline }, [isOnline])
+  const isProRef = useRef(isPro)
+  useEffect(() => { isProRef.current = isPro }, [isPro])
   const isOffline = useCallback(
     () => onlineRef.current === false || (typeof navigator !== 'undefined' && navigator.onLine === false),
     [],
   )
+
+  // Limit sheet. The kind is kept after closing so the text stays put while it slides away.
+  const [roshettaLimit, setRoshettaLimit] = useState({ open: false, kind: 'roshettas', isPro: false, names: [] })
+  const showRoshettaLimit = useCallback((kind, names = []) => {
+    const k = kind === 'drugs' ? 'drugs' : 'roshettas'
+    // Analytics: every limit hit goes through here, so it is logged once, here.
+    // Only a fixed label (free_roshettas, free_drugs, pro_roshettas, pro_drugs).
+    logUsageEvent('roshetta_limit_hit', null, `${isProRef.current ? 'pro' : 'free'}_${k}`)
+    setRoshettaLimit({ open: true, kind: k, isPro: !!isProRef.current, names })
+  }, [])
+  // A tap refused because the account is read only (lapsed). Same sheet, read only
+  // wording. Not logged as a limit hit.
+  const showRoshettaReadOnly = useCallback(() => {
+    setRoshettaLimit({ open: true, kind: 'readonly', isPro: false, names: [] })
+  }, [])
+  const dismissRoshettaLimit = useCallback(() => {
+    setRoshettaLimit(l => ({ ...l, open: false }))
+  }, [])
 
   // Everything the changes work on, kept in one place so they build on each
   // other: whose it is, the waiting list (null until read), the list on screen,
@@ -200,17 +241,22 @@ export function useRoshettas() {
     }
 
     // Tell the person in plain words: one message for the whole run.
-    const { messages, severe } = describeEvents(result.events, result.failed)
+    // A refusal for a limit or read only opens the sheet; the rest is told in words.
+    const { sheet, messages, severe, success } = afterRun(result)
+    if (sheet) {
+      if (sheet.kind === 'readonly') showRoshettaReadOnly()
+      else showRoshettaLimit(sheet.kind, sheet.names)
+    }
     if (messages.length > 0) {
       const text = messages.join(' ')
       if (severe) toast.error(text, 7000)
       else toast.info(text, 6000)
-    } else if (result.sent > 0) {
+    } else if (success) {
       toast.success('Your offline changes are saved.')
     }
     // Something reached the server or was settled: show the real list again.
     if (result.sent > 0 || result.failed > 0 || result.events.length > 0) load(u, { quiet: true })
-  }, [isOffline, updateQueueFor, toast, load])
+  }, [isOffline, updateQueueFor, toast, load, showRoshettaLimit, showRoshettaReadOnly])
   useEffect(() => { syncRef.current = syncQueue }, [syncQueue])
 
   // Back online, back on screen, and a gentle retry while changes are waiting.
@@ -270,6 +316,7 @@ export function useRoshettas() {
 
   // Keep the saved copy in step with the live list.
   const { roshettas, status, fromCache } = view
+  const readOnly = listIsReadOnly(roshettas, isPro)
   useEffect(() => {
     if (!userId || status !== 'ready' || fromCache) return
     writeRoshettasCache(userId, roshettas)
@@ -304,8 +351,11 @@ export function useRoshettas() {
   const createRoshetta = useCallback(async (fields = {}) => {
     const refused = refuseChange()
     if (refused) return refused
+    const blocked = tapRefusal('create', holderRef.current.list, isProRef.current)
+    if (blocked) return { ok: false, reason: blocked }
     const made = prepareCreate(fields)
     if (!made.ok) return made
+    if (rowsRefusal(made.change.data.rows, isProRef.current)) return { ok: false, reason: 'drug_limit' }
     if (!(await commit(made.change))) return { ok: false, reason: 'error' }
     return { ok: true, queued: true, roshetta: holderRef.current.list.find(r => r.id === made.id) }
   }, [refuseChange, commit])
@@ -313,16 +363,21 @@ export function useRoshettas() {
   const saveRoshetta = useCallback(async (id, changes = {}) => {
     const refused = refuseChange()
     if (refused) return refused
+    const blocked = tapRefusal('save', holderRef.current.list, isProRef.current)
+    if (blocked) return { ok: false, reason: blocked }
     const made = prepareSave(holderRef.current.list, id, changes)
     if (!made.ok) return made
+    if (rowsRefusal(made.change.data.rows, isProRef.current)) return { ok: false, reason: 'drug_limit' }
     if (!(await commit(made.change))) return { ok: false, reason: 'error' }
     return { ok: true, queued: true }
   }, [refuseChange, commit])
 
-  // Always allowed for the signed-in owner (also when read only, step 2.4c).
+  // Always allowed for the signed-in owner, also when read only (tapRefusal gives no refusal for delete).
   const deleteRoshetta = useCallback(async (id) => {
     const refused = refuseChange()
     if (refused) return refused
+    const blocked = tapRefusal('delete', holderRef.current.list, isProRef.current)
+    if (blocked) return { ok: false, reason: blocked }
     const made = prepareDelete(holderRef.current.list, id)
     if (!made.ok) return made
     if (!(await commit(made.change))) return { ok: false, reason: 'error' }
@@ -346,5 +401,13 @@ export function useRoshettas() {
     createRoshetta,
     saveRoshetta,
     deleteRoshetta,
+    isReadOnly: readOnly,
+    canCreateRoshetta: canCreate(roshettas, isPro),
+    roshettaCap: roshettaCap(isPro),
+    roshettaDrugCap: roshettaDrugCap(isPro),
+    roshettaLimit,
+    showRoshettaLimit,
+    showRoshettaReadOnly,
+    dismissRoshettaLimit,
   }
 }
