@@ -65,6 +65,10 @@ const NAME_LINE_HEIGHT = 1.3
  *                        string and rendered via NoteCallout in flat inline row style
  *                        (optional row.flavor: 'info' | 'warning' | 'tip'; defaults to 'info')
  *   free_text          — { content }        — rendered via FreeTextPostBlock (markdown prose)
+ *   plain_text         — 2026-11-13 (Roshetta plan, step 3.1b). { content } — the
+ *                        person's own text on a roshetta, drawn as PLAIN text:
+ *                        no markdown, no HTML, no drug links, line breaks kept.
+ *                        Condition pages never contain this row type.
  *
  * PHASE 7 (2026-06-21): removed support for the legacy `section_header`,
  * `drug_library`, and `drug_freetext` row types. No persisted data of these
@@ -115,8 +119,13 @@ const NAME_LINE_HEIGHT = 1.3
  *                     nothing after it reads as a dead-end decoration.
  *                     Defaults to true (prior always-on behavior) so any
  *                     other call site is unaffected.
+ *   keepDoseLineBreaks  boolean — 2026-11-13 (Roshetta plan, step 3.1a). When true,
+ *                     a hand-typed dose keeps its line breaks (a roshetta dose
+ *                     is a text box). Defaults to false, so condition pages
+ *                     (where a single line break has always run together)
+ *                     look exactly as before.
  */
-export default function PrescriptionSheetBlock({ sheet, hasContentAfter = true }) {
+export default function PrescriptionSheetBlock({ sheet, hasContentAfter = true, keepDoseLineBreaks = false }) {
   const realNavigate = useNavigate()
   // In the CMS phone preview, tapping a drug must not leave the editor.
   const inPreview = useContext(PreviewModeContext)
@@ -179,6 +188,7 @@ export default function PrescriptionSheetBlock({ sheet, hasContentAfter = true }
             formulation={formulation}
             drugs={drugs}
             navigate={navigate}
+            keepDoseLineBreaks={keepDoseLineBreaks}
             dividerType={
               nextRow?.row_type === 'drug' ? 'drug'
               : nextRow?.row_type === 'note' ? 'note'
@@ -224,6 +234,28 @@ export default function PrescriptionSheetBlock({ sheet, hasContentAfter = true }
             <FreeTextPostBlock
               block={{ id: row.id ?? key, blockType: 'free_text_post', data: { title: row.title ?? '', markdown: row.content ?? '' } }}
             />
+          </div>
+        )
+
+      case 'plain_text':
+        // 2026-11-13 (Roshetta step 3.1b): the person's own text, drawn as plain
+        // React text (never markdown or HTML), line breaks kept, long words
+        // wrapped. An empty one renders nothing and takes no gap (see ROW_KIND).
+        if (!(row.content ?? '').trim()) return null
+        return (
+          <div
+            key={row.id ?? key}
+            dir="auto"
+            style={{
+              fontSize: 14,
+              lineHeight: 1.6,
+              color: 'var(--color-text-primary)',
+              whiteSpace: 'pre-wrap',
+              overflowWrap: 'anywhere',
+              unicodeBidi: 'plaintext',
+            }}
+          >
+            {row.content}
           </div>
         )
 
@@ -273,7 +305,7 @@ export default function PrescriptionSheetBlock({ sheet, hasContentAfter = true }
   // empty text blocks render nothing, so they take no gap either. A divider
   // at the very start or end of the sheet has nothing to divide and is
   // skipped.
-  const ROW_KIND = { drug: 'drug', note: 'note', free_text: 'text', divider: 'divider', image: 'gallery' }
+  const ROW_KIND = { drug: 'drug', note: 'note', free_text: 'text', plain_text: 'text', divider: 'divider', image: 'gallery' }
   const entries = []
   segments.forEach((segment, segIdx) => {
     // Inside a section, drug rows stack tight (their own dividers space them).
@@ -519,7 +551,7 @@ function buildFormulationClusters(row, drugs, mainFormulation) {
   })
 }
 
-function UnifiedDrugRow({ row, formulation, drugs, navigate, dividerType }) {
+function UnifiedDrugRow({ row, formulation, drugs, navigate, dividerType, keepDoseLineBreaks = false }) {
   const clusters = buildFormulationClusters(row, drugs, formulation)
 
   // TAP FEEDBACK (2026-08-09): tracks which unit (by uIdx) is currently
@@ -660,7 +692,7 @@ function UnifiedDrugRow({ row, formulation, drugs, navigate, dividerType }) {
                   the drug name column rather than flush with the Rx/or rail. */}
               {isLastMemberOfCluster && (
                 <div style={{ paddingInlineStart: RX_RAIL_WIDTH + RX_RAIL_GAP }}>
-                  <ClusterDoses cluster={cluster} />
+                  <ClusterDoses cluster={cluster} keepBreaks={keepDoseLineBreaks} />
                   {cluster.note && <RowNote note={cluster.note} />}
                 </div>
               )}
@@ -674,7 +706,7 @@ function UnifiedDrugRow({ row, formulation, drugs, navigate, dividerType }) {
 
 // ClusterDoses — the dose block under a drug. Only the population the admin
 // picked is shown (see buildFormulationClusters), so there are no tabs here.
-function ClusterDoses({ cluster }) {
+function ClusterDoses({ cluster, keepBreaks = false }) {
   return cluster.doseLines?.length > 0
     ? (
       <>
@@ -684,7 +716,7 @@ function ClusterDoses({ cluster }) {
         {cluster.doseMax && <MaxDoseLine text={cluster.doseMax} />}
       </>
     )
-    : cluster.dose && <DoseLine text={cluster.dose} />
+    : cluster.dose && <DoseLine text={cluster.dose} keepBreaks={keepBreaks} />
 }
 
 // ─── Left rail pieces ─────────────────────────────────────────────────────────
@@ -831,7 +863,7 @@ const ARABIC_RE_DOSE = /[\u0600-\u06FF\u0750-\u077F]/
 // title/instruction. Mirrors the note field that already worked on
 // formulations.doses_structured (Practical Doses) but was never carried
 // through to dose_lines until now. Omitted entirely when absent.
-function DoseLine({ title, text, note }) {
+function DoseLine({ title, text, note, keepBreaks = false }) {
   const isArabic = ARABIC_RE_DOSE.test(text?.trim().charAt(0)) || ARABIC_RE_DOSE.test(text ?? '')
   const noteIsArabic = ARABIC_RE_DOSE.test(note?.trim().charAt(0)) || ARABIC_RE_DOSE.test(note ?? '')
   return (
@@ -851,6 +883,8 @@ function DoseLine({ title, text, note }) {
         fontWeight: 500,
         color: 'var(--color-dose)',
         lineHeight: 1.5,
+        // 2026-11-13 (Roshetta step 3.1a): only when asked; off = no change.
+        ...(keepBreaks ? { whiteSpace: 'pre-line' } : null),
       }}>
         {text}
       </span>
