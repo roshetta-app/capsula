@@ -153,14 +153,13 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
   // covers it, so bubble and tail read as one smooth shape.
   // Full width, always. Icon side follows the text direction (Arabic: right).
   const radius = isArabic ? '20px 20px 0px 20px' : '20px 20px 20px 0px'
-  const fill = `color-mix(in srgb, ${f.iconColor} 16%, var(--color-surface) 84%)`
+  const fill = `color-mix(in srgb, ${f.iconColor} 26%, var(--color-surface) 74%)`
 
   const bubble = (
     <div style={{
       position: 'relative',
-      // Soft lift + hairline edge. drop-shadow follows the real silhouette,
-      // so the tail gets the same shadow as the bubble (no seam).
-      filter: 'drop-shadow(0 1px 3px rgba(16, 24, 40, 0.05)) drop-shadow(0 0 0.5px rgba(16, 24, 40, 0.08))',
+      // v11 (2026-11-13): no shadow, stronger tint (16% -> 26%) so a note reads as a section
+      // marker, clearly different from the neutral drug rows.
     }}>
       <div style={{
         width: '100%',

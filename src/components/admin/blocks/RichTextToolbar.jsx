@@ -708,7 +708,41 @@ const menuRowStyle = isActive => ({
   fontWeight: isActive ? 600 : 400,
 })
 
-export default function RichTextToolbar({ active = EMPTY_ACTIVE, onAction, disabled = false, painter, canUndo = false, canRedo = false, canClear = false }) {
+// The two link buttons (a drug, a class / drug family) in their own bordered box, the same
+// look as the Card button. 2026-11-13: the visual editor shows this box next to Card; the
+// code view still gets the same two buttons inside its toolbar (showLinkButtons below).
+export function LinkInsertGroup({ onAction, disabled = false }) {
+  const [picker, setPicker] = useState(null) // null | 'drug' | 'class'
+
+  function openPicker(kind) {
+    onAction({ type: 'linkStart' })
+    setPicker(kind)
+  }
+
+  function handlePicked(pick, opts) {
+    const markdown = picker === 'drug' ? drugLinkMarkdown(pick, opts) : classLinkMarkdown(pick?.className, pick?.familyName)
+    setPicker(null)
+    if (!markdown) return
+    onAction({ type: 'link', markdown, html: linkEditorHtml(markdown) })
+  }
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 2, height: 32, padding: '0 2px', flexShrink: 0,
+      background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)',
+    }}>
+      <IconButton label="Link a drug" disabled={disabled} onClick={() => openPicker('drug')}>
+        <Pill size={16} />
+      </IconButton>
+      <IconButton label="Link a class or drug family" disabled={disabled} onClick={() => openPicker('class')}>
+        <MoleculeIcon size={17} />
+      </IconButton>
+      <TextLinkPicker kind={picker} onClose={() => setPicker(null)} onPick={handlePicked} />
+    </div>
+  )
+}
+
+export default function RichTextToolbar({ active = EMPTY_ACTIVE, onAction, disabled = false, painter, canUndo = false, canRedo = false, canClear = false, showLinkButtons = true }) {
   const [menu, setMenu] = useState(null) // null | 'color' | 'size' | 'highlight' | 'badge' | 'heading' | 'list'
   const wrapRef = useRef(null)
   const [picker, setPicker] = useState(null) // null | 'drug' | 'class'  (the link pop-up)
@@ -959,13 +993,17 @@ export default function RichTextToolbar({ active = EMPTY_ACTIVE, onAction, disab
         <IconButton label="Divider line" disabled={disabled} onClick={() => pick({ type: 'divider' })}>
           <Minus size={16} />
         </IconButton>
-        <IconButton label="Link a drug" disabled={disabled} onClick={() => openPicker('drug')}>
-          <Pill size={16} />
-        </IconButton>
-        <IconButton label="Link a class or drug family" disabled={disabled} onClick={() => openPicker('class')}>
-          <MoleculeIcon size={17} />
-        </IconButton>
-        <TextLinkPicker kind={picker} onClose={() => setPicker(null)} onPick={handlePicked} />
+        {showLinkButtons && (
+          <>
+            <IconButton label="Link a drug" disabled={disabled} onClick={() => openPicker('drug')}>
+              <Pill size={16} />
+            </IconButton>
+            <IconButton label="Link a class or drug family" disabled={disabled} onClick={() => openPicker('class')}>
+              <MoleculeIcon size={17} />
+            </IconButton>
+            <TextLinkPicker kind={picker} onClose={() => setPicker(null)} onPick={handlePicked} />
+          </>
+        )}
 
         {painter !== undefined && (
           <>

@@ -23,7 +23,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react'
 import { LayoutPanelTop } from 'lucide-react'
-import RichTextToolbar, { EMPTY_ACTIVE } from './RichTextToolbar'
+import RichTextToolbar, { LinkInsertGroup, EMPTY_ACTIVE } from './RichTextToolbar'
 import StickyBar from './StickyBar'
 import { markdownToEditorHtml, editorToMarkdown, newCardHtml, padCards } from '../../../lib/richTextConvert'
 import { applyAutoDir } from '../../../lib/autoDir'
@@ -866,8 +866,10 @@ export default function RichTextEditorBox({ value, onChange, disabled = false, h
       <StickyBar style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
         <div style={{ flex: '1 1 auto', minWidth: 0 }}>
           <RichTextToolbar active={active} onAction={runAction} disabled={disabled} painter={painter}
-            canUndo={!!history?.canUndo} canRedo={!!history?.canRedo} canClear={!!history?.canClear} />
+            canUndo={!!history?.canUndo} canRedo={!!history?.canRedo} canClear={!!history?.canClear}
+            showLinkButtons={false} />
         </div>
+        <LinkInsertGroup onAction={runAction} disabled={disabled} />
         <CardMenu onPick={insertCard} disabled={disabled} />
       </StickyBar>
       <div style={{ position: 'relative' }}>
