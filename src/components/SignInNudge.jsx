@@ -46,6 +46,9 @@
  * 2026-10-21 (step 13.3): the groups sheet also opens for a Pro account at its
  * limit and for a refused read only tap (isPro and kind 'readonly' come from groupLimit).
  *
+ * 2026-11-14 (Roshetta plan, step 4.1d): also mounts RoshettaLimitSheet, opened by the
+ * roshettas hook (roshettasApi.roshettaLimit, closed by dismissRoshettaLimit).
+ *
  * Props: none — reads everything it needs from context.
  */
 
@@ -56,6 +59,7 @@ import { useNotesSignInContext } from '../context/NotesSignInContext'
 import AccountSheet from './ui/AccountSheet'
 import FavouriteLimitSheet from './ui/FavouriteLimitSheet'
 import GroupLimitSheet from './drugs/groups/GroupLimitSheet'
+import RoshettaLimitSheet from './roshettas/RoshettaLimitSheet'
 
 export default function SignInNudge() {
   const { user, signInWithGoogle, signOut } = useAuth()
@@ -68,6 +72,7 @@ export default function SignInNudge() {
     dismissGroupLimit,
     waitingCount = 0,
     failedCount = 0,
+    roshettasApi,
   } = useFavouritesContext()
   const { pendingNoteConditionId, dismissNoteSignIn } = useNotesSignInContext()
 
@@ -112,6 +117,13 @@ export default function SignInNudge() {
         kind={groupLimit?.kind}
         isPro={!!groupLimit?.isPro}
         onClose={dismissGroupLimit}
+      />
+      <RoshettaLimitSheet
+        isOpen={!!roshettasApi?.roshettaLimit?.open}
+        kind={roshettasApi?.roshettaLimit?.kind}
+        isPro={!!roshettasApi?.roshettaLimit?.isPro}
+        names={roshettasApi?.roshettaLimit?.names}
+        onClose={() => roshettasApi?.dismissRoshettaLimit?.()}
       />
     </>
   )
