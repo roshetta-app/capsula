@@ -153,6 +153,7 @@
  * List rendering modes:
  *   My roshettas (2026-11-14, roshetta plan step 4.1e): the RoshettasSection sits just above
  *   the list header; it is hidden while isSearching or while a specialty is picked.
+ *   Step 4.2a: a tap on a roshetta row (or a roshetta just made) opens its page (/roshetta/:id).
  *   isSearching (query >= 1)  → flat list with highlight, no dividers
  *   sortMode === 'recent'     → flat list in recency order, no dividers
  *   sortMode === 'az'         → grouped by letter with AlphabetSectionDividers
@@ -1043,7 +1044,7 @@ export default function ConditionsScreen() {
 
         {/* My roshettas (roshetta plan, step 4.1e): above the list header; hidden while
             searching or while a specialty is picked. */}
-        {showRoshettaArea({ isSearching, activeSpecialty }) && <RoshettasSection />}
+        {showRoshettaArea({ isSearching, activeSpecialty }) && <RoshettasSection onOpenRoshetta={r => navigate(ROUTES.ROSHETTA(r.id))} />}
 
         {/* 5. Count + sort row — in A-Z mode, the first letter is shown inline on the left */}
         <div ref={listHeaderRef}>

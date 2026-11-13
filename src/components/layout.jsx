@@ -35,8 +35,11 @@ const HEADER_SUPPRESSED_ROUTES = ['/', '/conditions', '/favourites', '/drugs', '
  * measured-height/internal-scroll-box setup ConditionDetailScreen uses to
  * protect its tab strip, so there's nothing here for that machinery to
  * protect.
+ *
+ * 2026-11-14 (Roshetta plan, step 4.2a): added '/roshetta/' — the roshetta page
+ * draws its own Back row, same as the drug group page under '/drugs/'.
  */
-const HEADER_SUPPRESSED_PREFIXES = ['/conditions/', '/drugs/']
+const HEADER_SUPPRESSED_PREFIXES = ['/conditions/', '/drugs/', '/roshetta/']
 
 /**
  * Route prefixes whose screens size and scroll themselves internally.
