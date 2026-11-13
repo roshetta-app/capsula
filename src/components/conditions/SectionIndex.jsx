@@ -12,7 +12,11 @@
  *   with that heading highlighted; the button opens it on the heading you are reading.
  * - The sheet is a timeline: the colour dots are joined by one continuous line, top to bottom.
  *   Tapping a row scrolls the page to that heading and closes the sheet.
- * - Must sit inside a position: relative box that does not scroll, next to the scroll box.
+ * - In the app the sheet is the shared SheetShell (back button closes it, drag down dismisses it,
+ *   same look as every other sheet). The CMS phone preview passes 'inline' and gets a sheet drawn
+ *   inside the phone frame instead, because SheetShell draws over the whole page. Both show the
+ *   same list (ContentsList below).
+ * - The button must sit inside a position: relative box that does not scroll, next to the scroll box.
  *
  * Props:
  *   scrollBoxRef     ref of the box that actually scrolls
@@ -20,10 +24,12 @@
  *   bottomClearance  CSS length the bottom bar covers (so the pill and sheet sit above it)
  *   hidden           hide the pill (e.g. while the keyboard is open)
  *   title            the condition's name, shown at the top of the sheet
+ *   inline           draw the sheet inside the parent box instead of SheetShell (CMS phone preview)
  */
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useState } from 'react'
 import { List, X } from 'lucide-react'
 import { noteFlavorColor } from '../ui/noteFlavors'
+import SheetShell from '../ui/SheetShell'
 
 const MIN_HEADINGS = 3
 
@@ -39,13 +45,123 @@ function sameItems(a, b) {
   return a.every((x, i) => x.title === b[i].title && x.flavor === b[i].flavor)
 }
 
-export default function SectionIndex({ scrollBoxRef, resetKey, bottomClearance = '0px', hidden = false, title = '' }) {
+// Centres the highlighted row inside the sheet's own list. Sets the list's scrollTop directly:
+// scrollIntoView would also scroll every parent box and made the page behind jump up and back.
+function centreCurrent(list) {
+  const row = list.querySelector('[data-current="1"]')
+  if (!row) return
+  list.scrollTop = Math.max(0, row.offsetTop - (list.clientHeight - row.offsetHeight) / 2)
+}
+
+// The sheet's content (header + timeline list), shared by SheetShell and the inline sheet.
+// The list is a timeline: dots on the left, one continuous line through them.
+function ContentsList({ items, current, title, onJump, onClose }) {
+  const setListEl = useCallback(node => {
+    if (!node) return
+    centreCurrent(node)
+    // Once more next frame, in case the sheet was still sizing itself when the list mounted.
+    requestAnimationFrame(() => centreCurrent(node))
+  }, [])
+
+  return (
+    <>
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+        padding: '2px 12px 12px 20px', flexShrink: 0,
+        borderBottom: '1px solid var(--color-border)', fontFamily: 'var(--font-body)',
+      }}>
+        <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <span style={{
+            fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase',
+            color: 'var(--color-text-secondary)',
+          }}>
+            Contents
+          </span>
+          <span dir="auto" style={{
+            fontSize: 17, fontWeight: 800, lineHeight: 1.25, color: 'var(--color-text-primary)',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', unicodeBidi: 'plaintext',
+          }}>
+            {title?.trim() || 'This page'}
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close contents"
+          style={{
+            width: 34, height: 34, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'var(--color-bg)', border: 'none', borderRadius: 'var(--radius-full)',
+            color: 'var(--color-text-secondary)', cursor: 'pointer',
+          }}
+        >
+          <X size={18} />
+        </button>
+      </div>
+
+      <div ref={setListEl} dir="ltr" style={{
+        position: 'relative', flex: 1, minHeight: 0, overflowY: 'auto', padding: '8px 10px 14px',
+        fontFamily: 'var(--font-body)',
+      }}>
+        {items.map((item, i) => {
+          const color = noteFlavorColor(item.flavor)
+          const isCurrent = i === current
+          const first = i === 0
+          const last = i === items.length - 1
+          return (
+            <button
+              key={i}
+              type="button"
+              data-current={isCurrent ? '1' : undefined}
+              onClick={() => onJump(i)}
+              style={{
+                display: 'flex', alignItems: 'stretch', gap: 6, width: '100%', textAlign: 'start',
+                padding: 0, border: 'none', background: 'transparent', cursor: 'pointer',
+                fontFamily: 'var(--font-body)', color: 'var(--color-text-primary)',
+              }}
+            >
+              {/* Rail: the line runs the full height of the row so rows join into one stream */}
+              <span style={{ position: 'relative', width: 28, flexShrink: 0 }}>
+                <span style={{
+                  position: 'absolute', left: 13, width: 2,
+                  top: first ? '50%' : 0, bottom: last ? '50%' : 0,
+                  background: 'var(--color-border)',
+                }} />
+                <span style={{
+                  position: 'absolute', left: '50%', top: '50%',
+                  width: isCurrent ? 16 : 12, height: isCurrent ? 16 : 12, borderRadius: '50%',
+                  transform: 'translate(-50%, -50%)', background: color, boxSizing: 'border-box',
+                  border: '3px solid var(--color-surface)',
+                  boxShadow: isCurrent ? `0 0 0 2px ${color}` : 'none',
+                }} />
+              </span>
+              <span style={{
+                flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', margin: '3px 0',
+                padding: '11px 12px', borderRadius: 'var(--radius-md)',
+                background: isCurrent
+                  ? `color-mix(in srgb, ${color} 14%, var(--color-surface) 86%)`
+                  : 'transparent',
+              }}>
+                <span dir="auto" style={{
+                  flex: 1, minWidth: 0, overflowWrap: 'anywhere', unicodeBidi: 'plaintext',
+                  fontSize: 15, lineHeight: 1.35, fontWeight: isCurrent ? 700 : 600,
+                }}>
+                  {item.title || '—'}
+                </span>
+              </span>
+            </button>
+          )
+        })}
+      </div>
+    </>
+  )
+}
+
+export default function SectionIndex({ scrollBoxRef, resetKey, bottomClearance = '0px', hidden = false, title = '', inline = false }) {
   const [items, setItems] = useState([])
   // The sheet remembers which tab it was opened on, so a tab switch closes it by itself.
   const [sheet, setSheet] = useState(null)
   const open = sheet !== null && sheet.key === resetKey
   const [current, setCurrent] = useState(0)
-  const listRef = useRef(null)
   const enough = items.length >= MIN_HEADINGS
 
   // Keep the list in step with the page: a tab switch, a plan switch or a content load
@@ -112,17 +228,6 @@ export default function SectionIndex({ scrollBoxRef, resetKey, bottomClearance =
     return () => box.removeEventListener('click', onClick)
   }, [scrollBoxRef, resetKey, enough])
 
-  // Centre the highlighted row inside the sheet's own list when it opens. This sets the list's
-  // scrollTop directly: scrollIntoView would also scroll every parent box (including the clipped
-  // screen root) and made the page behind the sheet jump up and back.
-  useLayoutEffect(() => {
-    const list = listRef.current
-    if (!open || !list) return
-    const row = list.querySelector('[data-current="1"]')
-    if (!row) return
-    list.scrollTop = Math.max(0, row.offsetTop - (list.clientHeight - row.offsetHeight) / 2)
-  }, [open])
-
   function close() { setSheet(null) }
 
   function jump(i) {
@@ -155,118 +260,39 @@ export default function SectionIndex({ scrollBoxRef, resetKey, bottomClearance =
         </button>
       )}
 
-      {open && (
-        <div
-          onClick={close}
-          style={{
-            position: 'absolute', inset: 0, zIndex: 60, background: 'rgba(0,0,0,0.4)', overflow: 'hidden',
-            animation: 'contents-fade-in 160ms ease-out',
-          }}
-        >
+      {inline ? (
+        open && (
           <div
-            role="dialog"
-            aria-label="Contents"
-            onClick={e => e.stopPropagation()}
+            onClick={close}
             style={{
-              position: 'absolute', left: 0, right: 0, bottom: bottomClearance, maxHeight: '66%',
-              display: 'flex', flexDirection: 'column',
-              background: 'var(--color-surface)', borderRadius: '24px 24px 0 0',
-              boxShadow: '0 -10px 32px rgba(0,0,0,0.22)', fontFamily: 'var(--font-body)',
-              animation: 'contents-sheet-up 220ms cubic-bezier(0.2, 0.8, 0.2, 1)',
+              position: 'absolute', inset: 0, zIndex: 60, background: 'rgba(0,0,0,0.4)', overflow: 'hidden',
+              animation: 'contents-fade-in 160ms ease-out',
             }}
           >
-            {/* Grab handle */}
-            <div style={{ display: 'flex', justifyContent: 'center', padding: '8px 0 0', flexShrink: 0 }}>
-              <span style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--color-border)' }} />
-            </div>
-
-            <div style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '6px 12px 12px 20px', flexShrink: 0, gap: 12,
-              borderBottom: '1px solid var(--color-border)',
-            }}>
-              <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <span style={{
-                  fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase',
-                  color: 'var(--color-text-secondary)',
-                }}>
-                  Contents
-                </span>
-                <span dir="auto" style={{
-                  fontSize: 17, fontWeight: 800, lineHeight: 1.25, color: 'var(--color-text-primary)',
-                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', unicodeBidi: 'plaintext',
-                }}>
-                  {title?.trim() || 'This page'}
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={close}
-                aria-label="Close contents"
-                style={{
-                  width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: 'var(--color-bg)', border: 'none', borderRadius: 'var(--radius-full)',
-                  color: 'var(--color-text-secondary)', cursor: 'pointer',
-                }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* The list is a timeline: dots on the left, one continuous line through them. */}
-            <div ref={listRef} dir="ltr" style={{ position: 'relative', overflowY: 'auto', padding: '8px 10px 14px' }}>
-              {items.map((item, i) => {
-                const color = noteFlavorColor(item.flavor)
-                const isCurrent = i === current
-                const first = i === 0
-                const last = i === items.length - 1
-                return (
-                  <button
-                    key={i}
-                    type="button"
-                    data-current={isCurrent ? '1' : undefined}
-                    onClick={() => jump(i)}
-                    style={{
-                      display: 'flex', alignItems: 'stretch', gap: 6, width: '100%', textAlign: 'start',
-                      padding: 0, border: 'none', background: 'transparent', cursor: 'pointer',
-                      fontFamily: 'var(--font-body)', color: 'var(--color-text-primary)',
-                    }}
-                  >
-                    {/* Rail: the line runs the full height of the row so rows join into one stream */}
-                    <span style={{ position: 'relative', width: 28, flexShrink: 0 }}>
-                      <span style={{
-                        position: 'absolute', left: 13, width: 2,
-                        top: first ? '50%' : 0, bottom: last ? '50%' : 0,
-                        background: 'var(--color-border)',
-                      }} />
-                      <span style={{
-                        position: 'absolute', left: '50%', top: '50%',
-                        width: isCurrent ? 16 : 12, height: isCurrent ? 16 : 12, borderRadius: '50%',
-                        transform: 'translate(-50%, -50%)', background: color, boxSizing: 'border-box',
-                        border: '3px solid var(--color-surface)',
-                        boxShadow: isCurrent ? `0 0 0 2px ${color}` : 'none',
-                      }} />
-                    </span>
-                    <span style={{
-                      flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', margin: '3px 0',
-                      padding: '11px 12px', borderRadius: 'var(--radius-md)',
-                      background: isCurrent
-                        ? `color-mix(in srgb, ${color} 14%, var(--color-surface) 86%)`
-                        : 'transparent',
-                    }}>
-                      <span dir="auto" style={{
-                        flex: 1, minWidth: 0, overflowWrap: 'anywhere', unicodeBidi: 'plaintext',
-                        fontSize: 15, lineHeight: 1.35, fontWeight: isCurrent ? 700 : 600,
-                      }}>
-                        {item.title || '—'}
-                      </span>
-                    </span>
-                  </button>
-                )
-              })}
+            <div
+              role="dialog"
+              aria-label="Contents"
+              onClick={e => e.stopPropagation()}
+              style={{
+                position: 'absolute', left: 0, right: 0, bottom: bottomClearance, maxHeight: '66%',
+                display: 'flex', flexDirection: 'column',
+                background: 'var(--color-surface)', borderRadius: '16px 16px 0 0',
+                boxShadow: '0 -10px 32px rgba(0,0,0,0.22)',
+                animation: 'contents-sheet-up 220ms cubic-bezier(0.2, 0.8, 0.2, 1)',
+              }}
+            >
+              <div aria-hidden="true" style={{
+                width: 40, height: 4, borderRadius: 2, background: 'var(--color-border)',
+                margin: 'var(--space-5) auto var(--space-4)', flexShrink: 0,
+              }} />
+              <ContentsList items={items} current={current} title={title} onJump={jump} onClose={close} />
             </div>
           </div>
-        </div>
+        )
+      ) : (
+        <SheetShell isOpen={open} onClose={close} ariaLabel="Contents" maxHeight="70dvh">
+          <ContentsList items={items} current={current} title={title} onJump={jump} onClose={close} />
+        </SheetShell>
       )}
     </>
   )

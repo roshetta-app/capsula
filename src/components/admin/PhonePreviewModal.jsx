@@ -163,7 +163,7 @@ export default function PhonePreviewModal({ isOpen, onClose, name, blocks }) {
               </PreviewBoundary>
             </div>
           </div>
-          <SectionIndex scrollBoxRef={previewScrollRef} resetKey={tab} title={name} />
+          <SectionIndex scrollBoxRef={previewScrollRef} resetKey={tab} title={name} inline />
         </div>
       </div>
     </div>
