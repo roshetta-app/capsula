@@ -31,7 +31,9 @@
  * The bar then says "Saved 10 of 14 drugs. Upgrade to Pro to keep all of them." (a Pro account
  * is not told to upgrade). The drug limit sheet is no longer opened for this case.
  *
- * Not here yet: the analytics events (6.3).
+ * 2026-11-14 (step 6.3): two analytics events, never a code, name or text: 'shared_roshetta_open'
+ * once per link when the roshetta really shows (Try again or coming back online does not count
+ * it twice) and 'shared_roshetta_save' when a copy is saved (the new roshetta's id).
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -48,6 +50,7 @@ import { markScreenMounted } from '../hooks/useDeepLinkParent'
 import { fetchSharedRoshetta } from '../utils/sharedRoshetta'
 import { sharedPageState, sharedProblemText } from '../utils/roshettaSharedPageState'
 import { copyFields, trimToDrugCap, savedCopyMessage, saveSignInId, isRoshettaSaveRequest, saveCopyAnswer, showSaveBar } from '../utils/roshettaSaveCopy'
+import { logUsageEvent } from '../analytics/usageEvents'
 import { ROUTES } from '../router'
 
 const PROBLEM_ICONS = { unavailable: FileX, offline: WifiOff, error: CircleAlert }
@@ -131,6 +134,15 @@ function SharedRoshettaBody({ code }) {
     return () => { cancelled = true }
   }, [code, attempt])
 
+  // Analytics (step 6.3): one 'shared_roshetta_open' per link opened, when the roshetta really
+  // shows. No code, name or text is sent.
+  const openLoggedFor = useRef(null)
+  useEffect(() => {
+    if (result.status !== 'ok' || openLoggedFor.current === code) return
+    openLoggedFor.current = code
+    logUsageEvent('shared_roshetta_open')
+  }, [result.status, code])
+
   const retry = useCallback(() => {
     setResult({ status: 'loading' })
     setAttempt(n => n + 1)
@@ -177,6 +189,7 @@ function SharedRoshettaBody({ code }) {
     savingRef.current = false
     const r = saveCopyAnswer(answer)
     if (r.kind === 'saved') {
+      logUsageEvent('shared_roshetta_save', r.roshetta ? r.roshetta.id : null)
       setSaveState({ phase: 'saved', roshettaId: r.roshetta ? r.roshetta.id : null, saved: kept.saved, total: kept.total })
       return
     }
