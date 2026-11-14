@@ -35,6 +35,7 @@
  *                                 (entity_id = the new group's id)
  *   roshetta_create            — a roshetta was created (entity_id = roshetta id; sent
  *                                 once, when the server takes it; no name or text)
+ *   roshetta_share_create      — a roshetta share link was made (entity_id = roshetta id; no name or text)
  *   roshetta_limit_hit         — a roshetta limit was reached; entity_name is
  *                                 free_roshettas, free_drugs, pro_roshettas or pro_drugs
  *   group_limit_hit            — a group limit was reached; entity_name is
@@ -59,7 +60,7 @@ import { getDeviceId, getSessionId, getPlatform, getCurrentUserId } from './devi
 /**
  * Log a usage event to Supabase.
  *
- * @param {'condition_view'|'drug_view'|'condition_search'|'drug_search'|'drug_search_near_miss'|'drug_search_filter_masked'|'group_create'|'group_drug_add'|'group_share_create'|'shared_group_open'|'shared_group_save'|'group_limit_hit'|'roshetta_create'|'roshetta_limit_hit'} eventType
+ * @param {'condition_view'|'drug_view'|'condition_search'|'drug_search'|'drug_search_near_miss'|'drug_search_filter_masked'|'group_create'|'group_drug_add'|'group_share_create'|'shared_group_open'|'shared_group_save'|'group_limit_hit'|'roshetta_create'|'roshetta_share_create'|'roshetta_limit_hit'} eventType
  * @param {string|null} entityId   — UUID of the entity, or null for search events
  * @param {string|null} entityName — Name snapshot at time of event
  * @param {'brand'|'generic'|null} [mode] — Brand/Generic mode, for drug-search

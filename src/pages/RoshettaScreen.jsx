@@ -9,7 +9,8 @@
  * "Delete roshetta" (asks first, then goes back to Topics); the one status line of the
  * groups wording sits under the Back row (saving, waiting, offline, changes that could not
  * be saved, with Try again); and a fixed Edit and Share bar sits just above the bottom tab
- * bar. Share is only drawn for now (sharing comes later). 2026-11-14 (step 5.3a): Edit opens
+ * bar. 2026-11-14 (step 6.1b): Share opens the share sheet, and the delete question adds
+ * "Its share link will stop working too." when the roshetta has a live link. 2026-11-14 (step 5.3a): Edit opens
  * the editor, /roshetta/:id/edit. The extras show only while a roshetta is shown (pageControls).
  *
  * The roshetta comes from the person's own list (useRoshettas, through the favourites
@@ -33,6 +34,7 @@ import ConfirmSheet from '../components/ui/ConfirmSheet'
 import Icon from '../components/ui/Icon'
 import GroupStateMessage from '../components/drugs/groups/GroupStateMessage'
 import RoshettaDisclaimer from '../components/roshettas/RoshettaDisclaimer'
+import ShareRoshettaSheet from '../components/roshettas/ShareRoshettaSheet'
 import PrescriptionSheetBlock from '../components/conditions/PrescriptionSheetBlock'
 import { shimmer } from '../components/drugs/home/shimmer'
 import { useFavouritesContext } from '../context/FavouritesContext'
@@ -68,12 +70,16 @@ export default function RoshettaScreen() {
   const {
     roshettas = [], roshettasStatus = 'loading', isGuest = false, reloadRoshettas,
     waitingCount = 0, failedCount = 0, syncState = 'idle', retryFailedChanges, deleteRoshetta,
+    waitingRoshettaIds = [], getRoshettaShareCode,
   } = roshettasApi ?? {}
   const { loading: authLoading, signInWithGoogle } = useAuth()
   const { isOnline } = useOnlineStatus()
 
   const [menuOpen, setMenuOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
+  // The live share code (null = not shared or not known), so the delete question can say the link stops working.
+  const [shareCode, setShareCode] = useState(null)
   // The roshetta as it was when Delete was confirmed: kept on screen while the delete runs.
   const [snapshot, setSnapshot] = useState(null)
   const menuRef = useRef(null)
@@ -88,6 +94,15 @@ export default function RoshettaScreen() {
   const line = controls.statusLine
     ? syncStatusLine({ online: isOnline, failedCount, waitingCount, syncState })
     : null
+
+  // Learn once per roshetta whether it has a live link (online only; unknown counts as not shared).
+  const roshettaId = roshetta?.id
+  useEffect(() => {
+    if (!roshettaId || !getRoshettaShareCode) return undefined
+    let cancelled = false
+    getRoshettaShareCode(roshettaId).then(r => { if (!cancelled && r?.ok) setShareCode(r.code ?? null) }, () => {})
+    return () => { cancelled = true }
+  }, [roshettaId, getRoshettaShareCode])
 
   // The menu closes on a tap outside it and on Escape.
   useEffect(() => {
@@ -211,7 +226,7 @@ export default function RoshettaScreen() {
     WebkitTapHighlightColor: 'transparent',
   }
 
-  // Edit opens the editor; Share is drawn only (it comes later).
+  // Edit opens the editor; Share opens the share sheet.
   // Fixed just above the bottom tab bar (60 px plus the phone's bottom safe area).
   const actionBar = controls.bar ? (
     <div
@@ -233,6 +248,7 @@ export default function RoshettaScreen() {
         </button>
         <button
           type="button"
+          onClick={() => setShareOpen(true)}
           style={{ ...barButton, backgroundColor: 'var(--color-surface)', color: 'var(--color-accent-text)', border: '1px solid var(--color-border)' }}
         >
           <Icon name="Share2" size={16} />
@@ -339,12 +355,19 @@ export default function RoshettaScreen() {
       {topRow}
       {content}
       {actionBar}
+      <ShareRoshettaSheet
+        isOpen={shareOpen}
+        onClose={() => setShareOpen(false)}
+        roshetta={roshetta}
+        waiting={waitingRoshettaIds.includes(id)}
+        onShareChange={setShareCode}
+      />
       <ConfirmSheet
         isOpen={deleteOpen}
         onClose={() => setDeleteOpen(false)}
         onConfirm={handleDelete}
         title="Delete roshetta?"
-        message={`"${roshetta?.name ?? ''}" and everything in it will be deleted. This can't be undone.`}
+        message={`"${roshetta?.name ?? ''}" and everything in it will be deleted. This can't be undone.${shareCode ? ' Its share link will stop working too.' : ''}`}
         confirmLabel="Delete"
         confirmingLabel="Deleting…"
         destructive

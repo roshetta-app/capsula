@@ -63,6 +63,11 @@
  *   saveRoshetta         (id, { name?, description?, rows? }) => Promise<{ ok, reason?, queued? }>
  *   deleteRoshetta       (id) => Promise<{ ok, reason?, roshetta?, index?, queued? }>
  *   reasons: guest, not_loaded, read_only, limit, drug_limit, invalid, missing, error
+ *   getRoshettaShareCode (id) => Promise<{ ok, code?, reason? }>   (step 6.1b) the live share code, null when not shared
+ *   createRoshettaShare  (id) => Promise<{ ok, code?, reason? }>    makes the link (the database makes the code)
+ *   stopRoshettaSharing  (id) => Promise<{ ok, reason? }>           the link stops working at once
+ *   share reasons: guest, offline, not_loaded, missing, not_sent (the roshetta is still waiting to be
+ *   created on the server), read_only, refused, error. Sharing needs internet; nothing is queued.
  *   isReadOnly           boolean
  *   canCreateRoshetta    boolean (false when at the limit or read only)
  *   roshettaCap, roshettaDrugCap   the limits for this account (for "7 of 10 drugs")
@@ -85,6 +90,7 @@ import { loadRoshettas, fetchRoshettas, withTimeLimit, viewFor } from '../utils/
 import { summarizeQueue, sameSummary, nextToSend, retryFailed, discardFailed } from '../utils/roshettaChanges'
 import { runSync, sendChange } from '../utils/roshettaSync'
 import { prepareCreate, prepareSave, prepareDelete, commitChange } from '../utils/roshettaEdit'
+import { readShareCode, createShare, removeShare } from '../utils/roshettaShare'
 import { isReadOnly as listIsReadOnly, canCreate, roshettaCap, roshettaDrugCap, tapRefusal, rowsRefusal, afterRun } from '../utils/roshettaLimits'
 
 const NO_SUMMARY = { userId: null, failed: 0, waiting: 0, ids: [], failedList: [] }
@@ -384,6 +390,43 @@ export function useRoshettas() {
     return { ok: true, queued: true, roshetta: made.roshetta, index: made.index }
   }, [refuseChange, commit])
 
+  // ── Sharing (step 6.1b) ───────────────────────────────────────────────────
+  // The share code lives only in roshetta_shares, so a phone never keeps a stale
+  // copy of it. Needs internet and answers reason 'offline' without a toast (the
+  // share sheet shows its own line). A roshetta made offline has no server copy
+  // yet, so it cannot be shared until it is sent.
+  const getRoshettaShareCode = useCallback(async (id) => {
+    if (!userRef.current) return { ok: false, reason: 'guest' }
+    if (isOffline()) return { ok: false, reason: 'offline' }
+    return readShareCode(supabase, id, withTimeLimit)
+  }, [isOffline])
+
+  const createRoshettaShare = useCallback(async (id) => {
+    if (userRef.current && isOffline()) return { ok: false, reason: 'offline' }
+    const refused = refuseChange()
+    if (refused) return refused
+    const h = holderRef.current
+    if (!h.list.some(r => r.id === id)) return { ok: false, reason: 'missing' }
+    if (h.queue.some(c => c.type === 'create' && c.roshettaId === id)) return { ok: false, reason: 'not_sent' }
+    if (listIsReadOnly(h.list, isProRef.current)) return { ok: false, reason: 'read_only' }
+    const made = await createShare(supabase, id, withTimeLimit)
+    if (made.ok) {
+      // Analytics: only a link that was really made now, not one found again. Id only.
+      if (made.created) logUsageEvent('roshetta_share_create', id)
+      return { ok: true, code: made.code }
+    }
+    if (made.reason !== 'offline') toast.error("Couldn't create the link. Check your connection and try again.")
+    return made
+  }, [refuseChange, isOffline, toast])
+
+  // Allowed for a read only account too (like delete): turning a link off is never refused.
+  const stopRoshettaSharing = useCallback(async (id) => {
+    if (userRef.current && isOffline()) return { ok: false, reason: 'offline' }
+    const refused = refuseChange()
+    if (refused) return refused
+    return removeShare(supabase, id, withTimeLimit)
+  }, [refuseChange, isOffline])
+
   return {
     roshettas,
     roshettasStatus: status,
@@ -401,6 +444,9 @@ export function useRoshettas() {
     createRoshetta,
     saveRoshetta,
     deleteRoshetta,
+    getRoshettaShareCode,
+    createRoshettaShare,
+    stopRoshettaSharing,
     isReadOnly: readOnly,
     canCreateRoshetta: canCreate(roshettas, isPro),
     roshettaCap: roshettaCap(isPro),
