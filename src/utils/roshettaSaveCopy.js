@@ -17,6 +17,38 @@ export function copyFields(roshetta) {
   }
 }
 
+// Step 6.2d: a roshetta with more drugs than the account may keep. Keeps the first drugs in
+// order (every drug counts, partners too) up to the cap. A group that fits only in part keeps
+// its main drug and the first partners that fit; a group with no room left is left out. Text
+// blocks are always kept. Answers { rows, saved, total } (drug counts), so the page can say
+// "Saved 10 of 14 drugs". A missing or invalid cap trims nothing.
+export function trimToDrugCap(rows, cap) {
+  const list = Array.isArray(rows) ? rows : []
+  const count = (r) => 1 + (Array.isArray(r.alternatives) ? r.alternatives.length : 0)
+  const isDrug = (r) => !!r && r.row_type === 'drug'
+  const total = list.reduce((n, r) => n + (isDrug(r) ? count(r) : 0), 0)
+  if (!(typeof cap === 'number' && cap >= 0) || total <= cap) return { rows: list, saved: total, total }
+  let left = cap
+  const kept = []
+  for (const r of list) {
+    if (!isDrug(r)) { kept.push(r); continue }
+    if (left <= 0) continue
+    const need = count(r)
+    if (need <= left) { kept.push(r); left -= need; continue }
+    kept.push({ ...r, alternatives: (r.alternatives || []).slice(0, left - 1) })
+    left = 0
+  }
+  return { rows: kept, saved: cap, total }
+}
+
+// The line in the bar after a save. Everything was kept: the plain line. Only part was kept:
+// "Saved 10 of 14 drugs." plus, for a free account, the way to keep all of them.
+export function savedCopyMessage(saved, total, isPro) {
+  if (!(total > saved)) return 'Saved to your roshettas'
+  const base = `Saved ${saved} of ${total} drugs.`
+  return isPro ? base : `${base} Upgrade to Pro to keep all of them.`
+}
+
 // The request a signed-out person leaves behind while signing in. It rides on the groups
 // sign-in prompt ('groups' type), with an id the sign-in sheet recognises by its prefix.
 export const SAVE_SIGN_IN_PREFIX = 'rsave:'

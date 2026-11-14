@@ -26,8 +26,12 @@
  * The roshetta limit, drug limit and read only messages open the same sheets as the rest of
  * roshettas; any other refusal is one line in the bar with Save still there to try again.
  *
- * Not here yet: keeping only part of a roshetta that is over the drug limit (6.2d; for now the
- * drug limit sheet opens and nothing is saved) and the analytics events (6.3).
+ * 2026-11-14 (step 6.2d): a roshetta with more drugs than the account may keep is saved in
+ * part: the first drugs in order up to the account's limit (partners count), all text blocks.
+ * The bar then says "Saved 10 of 14 drugs. Upgrade to Pro to keep all of them." (a Pro account
+ * is not told to upgrade). The drug limit sheet is no longer opened for this case.
+ *
+ * Not here yet: the analytics events (6.3).
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -38,11 +42,12 @@ import PrescriptionSheetBlock from '../components/conditions/PrescriptionSheetBl
 import GroupStateMessage from '../components/drugs/groups/GroupStateMessage'
 import { shimmer } from '../components/drugs/home/shimmer'
 import { useAuth } from '../hooks/useAuth'
+import { useIsPro } from '../hooks/useIsPro'
 import { useFavouritesContext } from '../context/FavouritesContext'
 import { markScreenMounted } from '../hooks/useDeepLinkParent'
 import { fetchSharedRoshetta } from '../utils/sharedRoshetta'
 import { sharedPageState, sharedProblemText } from '../utils/roshettaSharedPageState'
-import { copyFields, saveSignInId, isRoshettaSaveRequest, saveCopyAnswer, showSaveBar } from '../utils/roshettaSaveCopy'
+import { copyFields, trimToDrugCap, savedCopyMessage, saveSignInId, isRoshettaSaveRequest, saveCopyAnswer, showSaveBar } from '../utils/roshettaSaveCopy'
 import { ROUTES } from '../router'
 
 const PROBLEM_ICONS = { unavailable: FileX, offline: WifiOff, error: CircleAlert }
@@ -144,8 +149,9 @@ function SharedRoshettaBody({ code }) {
   // ── Save a copy (step 6.2c) ───────────────────────────────────────────────
   const { user, loading: authLoading } = useAuth()
   const { promptSignIn, pendingFavourite, roshettasApi } = useFavouritesContext()
-  const { roshettasStatus, createRoshetta, showRoshettaLimit, showRoshettaReadOnly } = roshettasApi
-  // { phase: 'idle' | 'saving' | 'saved', roshettaId? }
+  const { roshettasStatus, createRoshetta, roshettaDrugCap, showRoshettaLimit, showRoshettaReadOnly } = roshettasApi
+  const isPro = useIsPro()
+  // { phase: 'idle' | 'saving' | 'saved', roshettaId?, saved?, total? }
   const [saveState, setSaveState] = useState({ phase: 'idle' })
   const savingRef = useRef(false)
   // A refused save, shown as one line in the bar (null when there is none).
@@ -159,16 +165,19 @@ function SharedRoshettaBody({ code }) {
     savingRef.current = true
     setNotice(null)
     setSaveState({ phase: 'saving' })
+    // Over the account's drug limit: keep the first drugs (step 6.2d) and say so afterwards.
+    const fields = copyFields(result.roshetta)
+    const kept = trimToDrugCap(fields.rows, roshettaDrugCap)
     let answer
     try {
-      answer = await createRoshetta(copyFields(result.roshetta))
+      answer = await createRoshetta({ ...fields, rows: kept.rows })
     } catch {
       answer = { ok: false, reason: 'error' }
     }
     savingRef.current = false
     const r = saveCopyAnswer(answer)
     if (r.kind === 'saved') {
-      setSaveState({ phase: 'saved', roshettaId: r.roshetta ? r.roshetta.id : null })
+      setSaveState({ phase: 'saved', roshettaId: r.roshetta ? r.roshetta.id : null, saved: kept.saved, total: kept.total })
       return
     }
     setSaveState({ phase: 'idle' })
@@ -178,7 +187,7 @@ function SharedRoshettaBody({ code }) {
     } else if (r.kind === 'notice') {
       setNotice(r.message)
     }
-  }, [result, createRoshetta, showRoshettaLimit, showRoshettaReadOnly])
+  }, [result, createRoshetta, roshettaDrugCap, showRoshettaLimit, showRoshettaReadOnly])
 
   function handleSaveTap() {
     if (authLoading || saveState.phase !== 'idle') return
@@ -351,7 +360,7 @@ function SharedRoshettaBody({ code }) {
               <span style={{ display: 'flex', alignItems: 'flex-start', gap: 8, minWidth: 0 }}>
                 <Check size={18} strokeWidth={2.6} color="var(--color-success)" aria-hidden="true" style={{ flexShrink: 0, marginTop: 1 }} />
                 <span role="status" style={{ fontSize: 14, lineHeight: 1.4, color: 'var(--color-text-primary)' }}>
-                  Saved to your roshettas
+                  {savedCopyMessage(saveState.saved, saveState.total, isPro)}
                 </span>
               </span>
               {saveState.roshettaId && (
