@@ -43,6 +43,7 @@ import { useAuth } from '../hooks/useAuth'
 import { useToast } from '../context/ToastContext'
 import { useDeepLinkParent } from '../hooks/useDeepLinkParent'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
+import { useKeyboardOpen } from '../hooks/useKeyboardOpen'
 import { pageRoshetta } from '../utils/roshettaPageState'
 import { addPartnerQuery } from '../utils/roshettaAddDrugState'
 import {
@@ -84,6 +85,7 @@ export default function RoshettaEditorScreen() {
   } = roshettasApi ?? {}
   const { loading: authLoading, signInWithGoogle } = useAuth()
   const { isOnline } = useOnlineStatus()
+  const keyboardOpen = useKeyboardOpen()   // the Add drug / Add text bar hides while the keyboard is up
   const { toast } = useToast()
 
   const roshetta = pageRoshetta(roshettas, id)
@@ -299,7 +301,7 @@ export default function RoshettaEditorScreen() {
   }
 
   const counts = barCounts(rows, roshettaDrugCap)
-  const showBar = (state === 'empty' || state === 'ready') && !locked
+  const showBar = (state === 'empty' || state === 'ready') && !locked && !keyboardOpen
   const barButton = {
     flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
     minHeight: 48, padding: '8px 12px', borderRadius: 24, boxSizing: 'border-box', cursor: 'pointer',
