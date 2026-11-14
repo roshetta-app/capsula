@@ -51,7 +51,7 @@ export default function TextBlockCard({
           <Icon name="FileText" size={15} />
           Text
         </label>
-        <div style={{ display: 'flex', alignItems: 'center', marginRight: -10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', marginInlineEnd: -10 }}>
           <IconButton label="Move up" name="ChevronUp" onClick={() => onMoveUp?.()} disabled={disabled || !canUp} />
           <IconButton label="Move down" name="ChevronDown" onClick={() => onMoveDown?.()} disabled={disabled || !canDown} />
           <IconButton label="Delete text" name="Trash2" onClick={() => onDelete?.()} danger />

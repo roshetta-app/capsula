@@ -184,7 +184,7 @@ export default function RoshettaScreen() {
         <div
           role="menu"
           style={{
-            position: 'absolute', top: 40, right: 0, zIndex: 10, minWidth: 180,
+            position: 'absolute', top: 40, insetInlineEnd: 0, zIndex: 10, minWidth: 180,
             backgroundColor: 'var(--color-surface)',
             border: '1px solid var(--color-border)',
             borderRadius: 'var(--radius-sm)',
@@ -367,7 +367,7 @@ export default function RoshettaScreen() {
         onClose={() => setDeleteOpen(false)}
         onConfirm={handleDelete}
         title="Delete roshetta?"
-        message={`"${roshetta?.name ?? ''}" and everything in it will be deleted. This can't be undone.${shareCode ? ' Its share link will stop working too.' : ''}`}
+        message={`"\u2068${roshetta?.name ?? ''}\u2069" and everything in it will be deleted. This can't be undone.${shareCode ? ' Its share link will stop working too.' : ''}`}
         confirmLabel="Delete"
         confirmingLabel="Deleting…"
         destructive

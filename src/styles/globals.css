@@ -512,6 +512,9 @@ body {
   background-color: var(--color-border);
   border-radius: var(--radius-sm);
 }
+@media (prefers-reduced-motion: reduce) {
+  @keyframes shimmer { from { opacity: 0.7; } to { opacity: 0.7; } }
+}
 
 /* ─── Safe area padding utility (PWA bottom nav) ─────────────────────────────── */
 .pb-safe {

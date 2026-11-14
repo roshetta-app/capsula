@@ -130,7 +130,7 @@ export default function DrugGroupCard({
           <Icon name="Pill" size={15} />
           {lines.length > 1 ? 'Drugs' : 'Drug'}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', marginRight: -10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', marginInlineEnd: -10 }}>
           <EditorIconButton label="Move up" name="ChevronUp" onClick={() => onMoveUp?.()} disabled={disabled || !canUp} />
           <EditorIconButton label="Move down" name="ChevronDown" onClick={() => onMoveDown?.()} disabled={disabled || !canDown} />
           <EditorIconButton label="Delete drug group" name="Trash2" onClick={() => onDelete?.()} danger />

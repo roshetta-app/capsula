@@ -43,7 +43,9 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 // drug_groups (2026-10-18, Drugs groups plan step 2.5): a person's groups. Their drugs
 // (drug_group_items) and share links (drug_group_shares) are removed with them
 // automatically, so only drug_groups needs listing here.
-const USER_ID_TABLES = ['favourites', 'notes', 'push_tokens', 'recently_viewed', 'drug_groups']
+// roshettas (2026-11-14, Roshetta plan, step 7.4): a person's roshettas. Their share links
+// (roshetta_shares) are removed with them automatically, so only roshettas needs listing here.
+const USER_ID_TABLES = ['favourites', 'notes', 'push_tokens', 'recently_viewed', 'drug_groups', 'roshettas']
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {

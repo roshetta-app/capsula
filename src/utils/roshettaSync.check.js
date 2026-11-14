@@ -487,7 +487,7 @@ test('two phones: a save that reaches the server after another phone\'s delete d
 
 test('describeEvents: plain words for one roshetta of each kind, and the failed count', async () => {
   const { describeEvents } = await import('./roshettaSync.js');
-  const q = t => `\u201c${t}\u201d`;
+  const q = t => `\u201c\u2068${t}\u2069\u201d`;
   const one = k => describeEvents([{ kind: k, roshettaId: 'r', name: 'Chest pain' }]).messages;
   assert.deepEqual(one('roshetta_gone'), [`${q('Chest pain')} was deleted on another device, so your changes to it were not saved.`]);
   assert.deepEqual(one('roshetta_limit'), [`${q('Chest pain')} could not be saved because you have reached the limit of roshettas.`]);
@@ -501,7 +501,7 @@ test('describeEvents: several roshettas of one kind are counted, a missing name 
   const { describeEvents } = await import('./roshettaSync.js');
   const two = describeEvents([{ kind: 'roshetta_gone', name: 'A' }, { kind: 'roshetta_gone', name: 'B' }]).messages;
   assert.deepEqual(two, ['2 roshettas were deleted on another device, so your changes to them were not saved.']);
-  assert.match(describeEvents([{ kind: 'drug_limit' }]).messages[0], /^\u201cA roshetta\u201d could not be saved/);
+  assert.match(describeEvents([{ kind: 'drug_limit' }]).messages[0], /^\u201c\u2068A roshetta\u2069\u201d could not be saved/);
   assert.deepEqual(describeEvents([], 0), { messages: [], severe: false });
   assert.equal(describeEvents([{ kind: 'read_only' }]).severe, true);
   assert.equal(describeEvents([], 2).severe, true);

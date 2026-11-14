@@ -210,7 +210,7 @@ export async function runSync({ getQueue, update, send, canRun, onSent, roshetta
 export function describeEvents(events = [], failed = 0) {
   const messages = []
   const by = kind => events.filter(e => e.kind === kind)
-  const quote = t => `\u201c${t}\u201d`
+  const quote = t => `\u201c\u2068${t}\u2069\u201d`
 
   const gone = by('roshetta_gone')
   if (gone.length === 1) messages.push(`${quote(gone[0].name || 'A roshetta')} was deleted on another device, so your changes to it were not saved.`)
