@@ -393,7 +393,7 @@ function SharedRoshettaBody({ code }) {
           ) : (
             <>
               {notice && (
-                <div style={{ marginBottom: 'var(--space-2)' }}>
+                <div role="alert" style={{ marginBottom: 'var(--space-2)' }}>
                   <GroupStateMessage variant="banner" tone="warning" title={notice} />
                 </div>
               )}

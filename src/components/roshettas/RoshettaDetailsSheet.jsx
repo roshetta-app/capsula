@@ -62,7 +62,7 @@ const FIELD_STYLE = {
 }
 
 const COUNTER_STYLE = {
-  marginTop: 4, textAlign: 'end', fontSize: 11,
+  marginTop: 4, textAlign: 'end', fontSize: 12,
   color: 'var(--color-text-secondary)', fontFamily: 'var(--font-body)',
 }
 

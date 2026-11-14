@@ -221,7 +221,7 @@ export default function RoshettaScreen() {
 
   const barButton = {
     flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-    height: 48, borderRadius: 24, boxSizing: 'border-box', cursor: 'pointer',
+    minHeight: 48, padding: '8px 12px', borderRadius: 24, boxSizing: 'border-box', cursor: 'pointer',
     fontSize: 15, fontWeight: 600, fontFamily: font,
     WebkitTapHighlightColor: 'transparent',
   }

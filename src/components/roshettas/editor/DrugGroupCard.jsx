@@ -190,7 +190,7 @@ export default function DrugGroupCard({
           fontFamily: font, outline: 'none',
         }}
       />
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 4, fontSize: 11, color: 'var(--color-text-secondary)', fontFamily: font }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 4, fontSize: 12, color: 'var(--color-text-secondary)', fontFamily: font }}>
         <span>Written by you. Not checked by Capsula.</span>
         <span style={{ flexShrink: 0 }}>{doseCounter(dose)}</span>
       </div>

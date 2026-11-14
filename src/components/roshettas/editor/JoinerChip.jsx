@@ -22,7 +22,7 @@ export default function JoinerChip({ joiner, onSwitch, disabled = false }) {
   const pill = (
     <span
       style={{
-        height: 26, minWidth: 34, boxSizing: 'border-box', padding: isPlus ? '0 8px' : '0 12px',
+        minHeight: 26, minWidth: 34, boxSizing: 'border-box', padding: isPlus ? '0 8px' : '0 12px',
         borderRadius: 999, whiteSpace: 'nowrap',
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         backgroundColor: `color-mix(in srgb, ${tone} 15%, transparent)`,

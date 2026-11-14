@@ -76,7 +76,7 @@ export default function TextBlockCard({
       />
       <div
         style={{
-          marginTop: 4, textAlign: 'end', fontSize: 11,
+          marginTop: 4, textAlign: 'end', fontSize: 12,
           color: 'var(--color-text-secondary)', fontFamily: font,
         }}
       >
