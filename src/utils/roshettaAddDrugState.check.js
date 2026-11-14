@@ -1,7 +1,7 @@
 // Checks for roshettaAddDrugState.js (step 5.2a). Run with: node --test src/utils/roshettaAddDrugState.check.js
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { addDrugTarget, addPartnerQuery, addDrugState, addDrugHint, addGroupRows, addGroupAnswer } from './roshettaAddDrugState.js';
+import { addDrugTarget, addPartnerQuery, addDrugState, addDrugHint, addGroupRows, addPartnerRows, addGroupAnswer } from './roshettaAddDrugState.js';
 
 test('addDrugTarget: no query is a new group, ?partner= is a partner of that group', () => {
   assert.deepEqual(addDrugTarget(''), { kind: 'group' });
@@ -65,4 +65,28 @@ test('addGroupAnswer: every answer of saving has one plain meaning', () => {
   assert.equal(addGroupAnswer({ ok: false, reason: 'error' }), 'silent');
   for (const r of ['invalid', 'not_loaded', 'limit', 'whatever']) assert.equal(addGroupAnswer({ ok: false, reason: r }), 'failed');
   assert.equal(addGroupAnswer(undefined), 'failed');
+});
+
+test('addPartnerRows: an or partner at the end of the right group, nothing else changes', () => {
+  const g1 = addGroupRows([], { id: 'b1', name: 'Panadol' })[0];
+  const g2 = addGroupRows([], { id: 'b2', name: 'Brufen' })[0];
+  const before = [g1, g2];
+  const made = addPartnerRows(before, g2.id, { id: 'b3', name: 'Cataflam' });
+  assert.equal(made.ok, true);
+  assert.equal(made.rows[0], g1);
+  assert.equal(made.rows[1].alternatives.length, 1);
+  assert.equal(made.rows[1].alternatives[0].brand_name, 'Cataflam');
+  assert.equal(made.rows[1].alternatives[0].joiner, 'or');
+  assert.equal(made.rows[1].alternatives[0].group_id, g2.id);
+  assert.equal(before[1].alternatives.length, 0);
+  const again = addPartnerRows(made.rows, g2.id, { id: 'b4', name: 'Voltaren' });
+  assert.equal(again.rows[1].alternatives.length, 2);
+});
+
+test('addPartnerRows: a missing group or an unusable drug is refused', () => {
+  const rows = addGroupRows([], { id: 'b1', name: 'Panadol' });
+  assert.deepEqual(addPartnerRows(rows, 'nope', { id: 'b2', name: 'X' }), { ok: false, reason: 'no_group' });
+  assert.deepEqual(addPartnerRows([{ row_type: 'plain_text', id: 'x', content: '' }], 'x', { id: 'b2', name: 'X' }), { ok: false, reason: 'no_group' });
+  assert.deepEqual(addPartnerRows(rows, rows[0].id, { name: 'no id' }), { ok: false, reason: 'bad_drug' });
+  assert.deepEqual(addPartnerRows(undefined, 'a', { id: 'b2', name: 'X' }), { ok: false, reason: 'no_group' });
 });

@@ -14,12 +14,15 @@
  *   addPartnerQuery(rowId)      the query part the editor adds to the address for a partner
  *   addGroupRows(rows, drug)    2026-11-14 (step 5.2b): the roshetta's rows with one new drug group
  *                               at the end (library doses left empty), or null if the drug is not usable
+ *   addPartnerRows(rows, rowId, drug)  2026-11-14 (step 5.2c): { ok: true, rows } with the drug added as an
+ *                               'or' partner at the end of that drug group (the person can switch it to
+ *                               'plus' on the chip), or { ok: false, reason: 'no_group' | 'bad_drug' }
  *   addGroupAnswer(result)      what the screen does with the answer of saving: 'done' | 'drugs_full'
  *                               | 'read_only' | 'sign_in' | 'gone' | 'silent' | 'failed'
  */
 
 import { pageState } from './roshettaPageState.js';
-import { newDrugGroup } from './roshettaRows.js';
+import { newDrugGroup, addPartner, ROSHETTA_ROW_TYPES } from './roshettaRows.js';
 
 export function addDrugTarget(search) {
   const text = typeof search === 'string' ? search : '';
@@ -52,6 +55,19 @@ export function addGroupRows(rows, drug) {
     return [...list, newDrugGroup(drug)];
   } catch {
     return null;
+  }
+}
+
+export function addPartnerRows(rows, rowId, drug) {
+  const list = Array.isArray(rows) ? rows : [];
+  const at = list.findIndex(r => r && r.row_type === ROSHETTA_ROW_TYPES.DRUG && r.id === rowId);
+  if (at < 0) return { ok: false, reason: 'no_group' };
+  try {
+    const next = [...list];
+    next[at] = addPartner(list[at], drug, 'or');
+    return { ok: true, rows: next };
+  } catch {
+    return { ok: false, reason: 'bad_drug' };
   }
 }
 

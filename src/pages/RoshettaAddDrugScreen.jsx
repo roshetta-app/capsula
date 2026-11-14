@@ -17,7 +17,9 @@
  * Step 5.2a draws the screen and its states. Step 5.2b: choosing a drug for a new drug group saves
  * the roshetta with that drug group at the end (the dose left empty), says so in a short message
  * and goes back to the editor; a full roshetta or a read only account opens the limit sheet instead
- * and nothing is added. Adding a partner is step 5.2c (choosing still only remembers the search).
+ * and nothing is added. Step 5.2c: with "?partner=<group id>" the chosen drug is added as an "or"
+ * partner at the end of that group instead (the chip switches it to "plus"); if that group is gone
+ * the person is told and goes back.
  *
  * States: loading, signed out ("Sign in to add drugs"), could not load ("Try again"), not found
  * (deleted on another device), read only (lapsed account), and the search.
@@ -48,7 +50,7 @@ import { useSearchHistory } from '../hooks/useSearchHistory'
 import { useDeepLinkParent } from '../hooks/useDeepLinkParent'
 import { useIsDark } from '../utils/specialtyIcon'
 import { pageRoshetta } from '../utils/roshettaPageState'
-import { addDrugHint, addDrugState, addDrugTarget, addGroupAnswer, addGroupRows } from '../utils/roshettaAddDrugState'
+import { addDrugHint, addDrugState, addDrugTarget, addGroupAnswer, addGroupRows, addPartnerRows } from '../utils/roshettaAddDrugState'
 import { ROUTES } from '../router'
 
 // Class does not exist in this search (one shared settings object, so the hook sees no change).
@@ -212,13 +214,23 @@ export default function RoshettaAddDrugScreen() {
   function goBack() {
     navigate(-1)
   }
-  // Step 5.2b adds a new drug group; step 5.2c (an or / plus partner) will add the partner here.
-  // Until then a partner choice only remembers the search, as the groups screen does.
+  // Step 5.2b adds a new drug group; step 5.2c adds an or / plus partner to the group in the address.
   const addingRef = useRef(false)
   async function handleChoose(drug) {
     if (hasQuery) addSearch(savedName(drug), mode)
-    if (target.kind !== 'group' || addingRef.current || !roshetta) return
-    const rows = addGroupRows(roshetta.rows, drug)
+    if (addingRef.current || !roshetta) return
+    let rows
+    if (target.kind === 'partner') {
+      const made = addPartnerRows(roshetta.rows, target.rowId, drug)
+      if (!made.ok && made.reason === 'no_group') {
+        toast.error("This drug group isn't available")
+        goBack()
+        return
+      }
+      rows = made.ok ? made.rows : null
+    } else {
+      rows = addGroupRows(roshetta.rows, drug)
+    }
     if (!rows) { toast.error("Couldn't add this drug. Try again."); return }
     addingRef.current = true
     try {
