@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   editorState, editorHint, changeEntry, addTextRows, libraryIdSet,
   AUTOSAVE_DELAY_MS, saveAnswer, saveRefused, saveStatus,
+  moveEntryById, deleteEntryById, deleteNeedsQuestion, deleteQuestion,
 } from './roshettaEditorState.js';
 
 test('editorState: loading, guest, error and missing come first; no cards is empty, cards is ready', () => {
@@ -96,4 +97,38 @@ test('saveStatus: a refused save or a failed change says Couldn\'t save and beat
   assert.deepEqual(saveStatus({ touched: true, refused: true }), warn);
   assert.deepEqual(saveStatus({ failedHere: true }), warn);
   assert.deepEqual(saveStatus({ touched: true, typing: true, saving: true, waitingHere: true, refused: true }), warn);
+});
+
+test('moveEntryById: moves one place by id, never past the ends, never changes the old list', () => {
+  const rows = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
+  assert.deepEqual(moveEntryById(rows, 'b', 'up').map(r => r.id), ['b', 'a', 'c']);
+  assert.deepEqual(moveEntryById(rows, 'b', 'down').map(r => r.id), ['a', 'c', 'b']);
+  assert.deepEqual(moveEntryById(rows, 'a', 'up').map(r => r.id), ['a', 'b', 'c']);
+  assert.deepEqual(moveEntryById(rows, 'c', 'down').map(r => r.id), ['a', 'b', 'c']);
+  assert.equal(moveEntryById(rows, 'zzz', 'up'), rows);
+  assert.deepEqual(rows.map(r => r.id), ['a', 'b', 'c']);
+  assert.deepEqual(moveEntryById(undefined, 'a', 'up'), []);
+});
+
+test('deleteEntryById: removes only that entry; an unknown id changes nothing', () => {
+  const rows = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
+  assert.deepEqual(deleteEntryById(rows, 'b').map(r => r.id), ['a', 'c']);
+  assert.deepEqual(deleteEntryById([{ id: 'a' }], 'a'), []);
+  assert.equal(deleteEntryById(rows, 'zzz'), rows);
+  assert.equal(rows.length, 3);
+});
+
+test('deleteNeedsQuestion: only a card with something typed asks first', () => {
+  assert.equal(deleteNeedsQuestion({ row_type: 'drug', dose: '1 tab' }), true);
+  assert.equal(deleteNeedsQuestion({ row_type: 'drug', dose: '  ' }), false);
+  assert.equal(deleteNeedsQuestion({ row_type: 'drug', dose: null }), false);
+  assert.equal(deleteNeedsQuestion({ row_type: 'plain_text', content: 'Take with food.' }), true);
+  assert.equal(deleteNeedsQuestion({ row_type: 'plain_text', content: '' }), false);
+  assert.equal(deleteNeedsQuestion(undefined), false);
+});
+
+test('deleteQuestion: plain words for a drug group and for a text', () => {
+  assert.equal(deleteQuestion({ row_type: 'drug' }).title, 'Delete this drug group?');
+  assert.equal(deleteQuestion({ row_type: 'plain_text' }).title, 'Delete this text?');
+  assert.ok(deleteQuestion({ row_type: 'drug' }).message.length > 10);
 });

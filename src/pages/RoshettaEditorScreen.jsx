@@ -12,8 +12,13 @@
  * Saving, Waiting to save, Saved or Couldn't save (decisions in utils/roshettaEditorState.js). A save
  * the limits refuse opens the same sheets as the Add drug screen.
  *
+ * Up, down and delete (step 5.3c): move up and down swap a card with its neighbour, delete removes it;
+ * all three are changes like any other, so they autosave. A card with something typed in it asks
+ * first ("Delete this drug group?" / "Delete this text?"), an empty one goes at once. Removing the
+ * last drug of a group deletes the group by the same rule. On a read only roshetta delete opens the
+ * read only sheet.
+ *
  * What it does not do yet:
- *   - the up, down and delete buttons on the cards (step 5.3c; they are drawn but do nothing yet);
  *   - the counts in the bar and the limit messages for text blocks and entries (step 5.3d; until then
  *     an eleventh text block or a forty-first entry is refused by the save and the word says
  *     Couldn't save).
@@ -27,6 +32,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import Icon from '../components/ui/Icon'
+import ConfirmSheet from '../components/ui/ConfirmSheet'
 import GroupStateMessage from '../components/drugs/groups/GroupStateMessage'
 import DrugGroupCard from '../components/roshettas/editor/DrugGroupCard'
 import TextBlockCard from '../components/roshettas/editor/TextBlockCard'
@@ -39,7 +45,8 @@ import { useOnlineStatus } from '../hooks/useOnlineStatus'
 import { pageRoshetta } from '../utils/roshettaPageState'
 import { addPartnerQuery } from '../utils/roshettaAddDrugState'
 import {
-  AUTOSAVE_DELAY_MS, addTextRows, changeEntry, editorHint, editorState, libraryIdSet, saveAnswer, saveRefused, saveStatus,
+  AUTOSAVE_DELAY_MS, addTextRows, changeEntry, deleteEntryById, deleteNeedsQuestion, deleteQuestion, editorHint, editorState,
+  libraryIdSet, moveEntryById, saveAnswer, saveRefused, saveStatus,
 } from '../utils/roshettaEditorState'
 import { ROSHETTA_ROW_TYPES } from '../utils/roshettaRows'
 import { ROUTES } from '../router'
@@ -160,6 +167,26 @@ export default function RoshettaEditorScreen() {
     edit(changeEntry(latestRows.current ?? rows, entryId, entry))
   }
 
+  function move(entryId, dir) {
+    edit(moveEntryById(latestRows.current ?? rows, entryId, dir))
+  }
+
+  // Delete: a card with something typed asks first; an empty one goes at once.
+  const [askDeleteId, setAskDeleteId] = useState(null)
+  function requestDelete(row) {
+    if (locked) {
+      showRoshettaReadOnly?.()
+      return
+    }
+    if (deleteNeedsQuestion(row)) setAskDeleteId(row.id)
+    else edit(deleteEntryById(latestRows.current ?? rows, row.id))
+  }
+  function confirmDelete() {
+    edit(deleteEntryById(latestRows.current ?? rows, askDeleteId))
+  }
+  const askDeleteRow = askDeleteId ? rows.find(r => r?.id === askDeleteId) : null
+  const question = askDeleteRow ? deleteQuestion(askDeleteRow) : null
+
   const status = saveStatus({
     touched, typing, saving: saving > 0, refused,
     online: isOnline,
@@ -231,6 +258,9 @@ export default function RoshettaEditorScreen() {
                 libraryIds={libraryIds}
                 onChange={next => change(row.id, next)}
                 onAddPartner={() => navigate(ROUTES.ROSHETTA_ADD(id) + addPartnerQuery(row.id))}
+                onMoveUp={() => move(row.id, 'up')}
+                onMoveDown={() => move(row.id, 'down')}
+                onDelete={() => requestDelete(row)}
                 disabled={locked}
               />
             )
@@ -243,6 +273,9 @@ export default function RoshettaEditorScreen() {
                 index={index}
                 count={rows.length}
                 onChange={text => change(row.id, { ...row, content: text })}
+                onMoveUp={() => move(row.id, 'up')}
+                onMoveDown={() => move(row.id, 'down')}
+                onDelete={() => requestDelete(row)}
                 disabled={locked}
               />
             )
@@ -312,6 +345,15 @@ export default function RoshettaEditorScreen() {
       )}
       {content}
       {addBar}
+      <ConfirmSheet
+        isOpen={!!askDeleteRow}
+        onClose={() => setAskDeleteId(null)}
+        onConfirm={confirmDelete}
+        title={question?.title ?? ''}
+        message={question?.message ?? ''}
+        confirmLabel="Delete"
+        destructive
+      />
     </div>
   )
 }

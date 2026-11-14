@@ -22,10 +22,18 @@
  *   saveRefused(answer)      true for every answer except 'saved'
  *   saveStatus({...})        the one status word at the top: { word, tone } or null (nothing to say)
  *                            Saving | Waiting to save | Saved | Couldn't save
+ *
+ * 2026-11-14 (step 5.3c, up, down and delete on the cards):
+ *   moveEntryById(rows, id, dir)  the rows with the entry moved one place ('up' | 'down'); a new list,
+ *                            the same rows when the id is not there or the entry is already at the end
+ *   deleteEntryById(rows, id)     the rows without that entry (a drug group goes with its partners)
+ *   deleteNeedsQuestion(row)      true when the card holds something typed (a dose or a text), so the
+ *                            screen asks before deleting; an empty card goes at once
+ *   deleteQuestion(row)           { title, message } of that question
  */
 
 import { pageState } from './roshettaPageState.js';
-import { newTextBlock } from './roshettaRows.js';
+import { ROSHETTA_ROW_TYPES, deleteEntry, moveEntryDown, moveEntryUp, newTextBlock } from './roshettaRows.js';
 
 export function editorState({
   authLoading = false, isGuest = false, status = 'loading', found = false, rowCount = 0, listCount = 0,
@@ -92,4 +100,36 @@ export function saveStatus({
   }
   if (touched) return { word: 'Saved', tone: 'neutral' };
   return null;
+}
+
+function indexOfId(rows, id) {
+  return Array.isArray(rows) ? rows.findIndex(r => r && r.id === id) : -1;
+}
+
+export function moveEntryById(rows, id, dir) {
+  const list = Array.isArray(rows) ? rows : [];
+  const index = indexOfId(list, id);
+  if (index < 0) return list;
+  return dir === 'up' ? moveEntryUp(list, index) : moveEntryDown(list, index);
+}
+
+export function deleteEntryById(rows, id) {
+  const list = Array.isArray(rows) ? rows : [];
+  const index = indexOfId(list, id);
+  return index < 0 ? list : deleteEntry(list, index);
+}
+
+function typedOf(row) {
+  const text = row?.row_type === ROSHETTA_ROW_TYPES.DRUG ? row.dose : row?.content;
+  return typeof text === 'string' && text.trim() !== '';
+}
+
+export function deleteNeedsQuestion(row) {
+  return typedOf(row);
+}
+
+export function deleteQuestion(row) {
+  return row?.row_type === ROSHETTA_ROW_TYPES.DRUG
+    ? { title: 'Delete this drug group?', message: 'The drug and its dose will be removed from this roshetta.' }
+    : { title: 'Delete this text?', message: 'The text will be removed from this roshetta.' };
 }
