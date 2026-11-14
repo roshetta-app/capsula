@@ -9,8 +9,8 @@
  * "Delete roshetta" (asks first, then goes back to Topics); the one status line of the
  * groups wording sits under the Back row (saving, waiting, offline, changes that could not
  * be saved, with Try again); and a fixed Edit and Share bar sits just above the bottom tab
- * bar. Edit and Share are only drawn for now: a tap opens nothing (the editor is Phase D,
- * sharing comes later). The extras show only while a roshetta is shown (pageControls).
+ * bar. Share is only drawn for now (sharing comes later). 2026-11-14 (step 5.3a): Edit opens
+ * the editor, /roshetta/:id/edit. The extras show only while a roshetta is shown (pageControls).
  *
  * The roshetta comes from the person's own list (useRoshettas, through the favourites
  * context), so it also opens from the saved copy while offline. Everything the author typed
@@ -211,7 +211,7 @@ export default function RoshettaScreen() {
     WebkitTapHighlightColor: 'transparent',
   }
 
-  // Edit and Share: drawn only; a tap opens nothing yet (Edit is Phase D, Share comes later).
+  // Edit opens the editor; Share is drawn only (it comes later).
   // Fixed just above the bottom tab bar (60 px plus the phone's bottom safe area).
   const actionBar = controls.bar ? (
     <div
@@ -225,6 +225,7 @@ export default function RoshettaScreen() {
       <div style={{ maxWidth: 680, margin: '0 auto', padding: '10px var(--page-gutter)', display: 'flex', gap: 10, boxSizing: 'border-box' }}>
         <button
           type="button"
+          onClick={() => navigate(ROUTES.ROSHETTA_EDIT(id))}
           style={{ ...barButton, backgroundColor: 'var(--color-accent-solid)', color: '#fff', border: 'none' }}
         >
           <Icon name="Pencil" size={16} />
