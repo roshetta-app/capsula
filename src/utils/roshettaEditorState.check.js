@@ -1,7 +1,10 @@
 // Checks for roshettaEditorState.js (step 5.3a). Run with: node --test src/utils/roshettaEditorState.check.js
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { editorState, editorHint, changeEntry, addTextRows, libraryIdSet } from './roshettaEditorState.js';
+import {
+  editorState, editorHint, changeEntry, addTextRows, libraryIdSet,
+  AUTOSAVE_DELAY_MS, saveAnswer, saveRefused, saveStatus,
+} from './roshettaEditorState.js';
 
 test('editorState: loading, guest, error and missing come first; no cards is empty, cards is ready', () => {
   assert.equal(editorState({ authLoading: true }), 'loading');
@@ -48,4 +51,49 @@ test('libraryIdSet: null while the library is not loaded, otherwise the brand id
   const set = libraryIdSet([{ id: 1 }, { id: 'b' }, {}], false);
   assert.ok(set.has(1) && set.has('b'));
   assert.equal(set.size, 2);
+});
+
+test('AUTOSAVE_DELAY_MS: a short wait, long enough for a word to be typed', () => {
+  assert.ok(AUTOSAVE_DELAY_MS >= 500 && AUTOSAVE_DELAY_MS <= 1500);
+});
+
+test('saveAnswer: reads the saving answer like the Add drug screen; only saved is not refused', () => {
+  assert.equal(saveAnswer({ ok: true, queued: true }), 'saved');
+  assert.equal(saveAnswer({ ok: false, reason: 'drug_limit' }), 'drugs_full');
+  assert.equal(saveAnswer({ ok: false, reason: 'read_only' }), 'read_only');
+  assert.equal(saveAnswer({ ok: false, reason: 'guest' }), 'sign_in');
+  assert.equal(saveAnswer({ ok: false, reason: 'missing' }), 'gone');
+  assert.equal(saveAnswer({ ok: false, reason: 'error' }), 'silent');
+  assert.equal(saveAnswer({ ok: false, reason: 'invalid' }), 'failed');
+  assert.equal(saveAnswer({ ok: false, reason: 'not_loaded' }), 'failed');
+  assert.equal(saveAnswer(undefined), 'failed');
+  assert.equal(saveRefused('saved'), false);
+  for (const a of ['drugs_full', 'read_only', 'sign_in', 'gone', 'silent', 'failed']) assert.equal(saveRefused(a), true);
+});
+
+test('saveStatus: nothing to say until something is changed or waiting', () => {
+  assert.equal(saveStatus({}), null);
+  assert.equal(saveStatus(), null);
+  assert.equal(saveStatus({ online: false }), null);
+});
+
+test('saveStatus: Saving while typing or while a save runs, then Saved', () => {
+  assert.deepEqual(saveStatus({ touched: true, typing: true }), { word: 'Saving', tone: 'neutral' });
+  assert.deepEqual(saveStatus({ touched: true, saving: true }), { word: 'Saving', tone: 'neutral' });
+  assert.deepEqual(saveStatus({ touched: true }), { word: 'Saved', tone: 'neutral' });
+});
+
+test('saveStatus: a change that is on the phone but not sent says Waiting to save, Saving while it is sent', () => {
+  assert.equal(saveStatus({ touched: true, waitingHere: true, online: false }).word, 'Waiting to save');
+  assert.equal(saveStatus({ touched: true, waitingHere: true, online: true, syncState: 'idle' }).word, 'Waiting to save');
+  assert.equal(saveStatus({ touched: true, waitingHere: true, online: true, syncState: 'syncing' }).word, 'Saving');
+  assert.equal(saveStatus({ waitingHere: true, online: false }).word, 'Waiting to save');
+  assert.equal(saveStatus({ touched: true, waitingHere: true, syncState: 'syncing', online: false }).word, 'Waiting to save');
+});
+
+test('saveStatus: a refused save or a failed change says Couldn\'t save and beats every other word', () => {
+  const warn = { word: "Couldn't save", tone: 'warning' };
+  assert.deepEqual(saveStatus({ touched: true, refused: true }), warn);
+  assert.deepEqual(saveStatus({ failedHere: true }), warn);
+  assert.deepEqual(saveStatus({ touched: true, typing: true, saving: true, waitingHere: true, refused: true }), warn);
 });

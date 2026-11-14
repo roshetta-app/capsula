@@ -5,12 +5,18 @@
  * text block (TextBlockCard), and a fixed bar with Add drug (opens the Add drug screen) and Add text
  * (adds an empty text block at the end). While there are no cards a short hint is shown.
  *
- * This is the shell. What it does not do yet:
- *   - saving what is typed or changed (autosave and the status word are step 5.3b; until then the
- *     changes live on this screen only and are lost when it is left, except what the Add drug
- *     screen saves itself);
+ * Autosave (step 5.3b): every change (typing, the chip, Add text) is saved on its own 800 ms after
+ * the last change, as the whole roshetta, through saveRoshetta (so it is saved on the phone first and
+ * sent when online). Leaving the screen, opening the Add drug screen, or the app going to the
+ * background saves at once what is still waiting for the short pause. A small word at the top says
+ * Saving, Waiting to save, Saved or Couldn't save (decisions in utils/roshettaEditorState.js). A save
+ * the limits refuse opens the same sheets as the Add drug screen.
+ *
+ * What it does not do yet:
  *   - the up, down and delete buttons on the cards (step 5.3c; they are drawn but do nothing yet);
- *   - the counts in the bar and the limit messages for text blocks and entries (step 5.3d).
+ *   - the counts in the bar and the limit messages for text blocks and entries (step 5.3d; until then
+ *     an eleventh text block or a forty-first entry is refused by the save and the word says
+ *     Couldn't save).
  *
  * Read only (lapsed account): the cards are locked and the add bar is not drawn.
  *
@@ -18,7 +24,7 @@
  * not found (deleted on another device), empty, and the cards.
  */
 
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import Icon from '../components/ui/Icon'
 import GroupStateMessage from '../components/drugs/groups/GroupStateMessage'
@@ -29,9 +35,12 @@ import { useDrugContext } from '../context/DrugContext'
 import { useFavouritesContext } from '../context/FavouritesContext'
 import { useAuth } from '../hooks/useAuth'
 import { useDeepLinkParent } from '../hooks/useDeepLinkParent'
+import { useOnlineStatus } from '../hooks/useOnlineStatus'
 import { pageRoshetta } from '../utils/roshettaPageState'
 import { addPartnerQuery } from '../utils/roshettaAddDrugState'
-import { addTextRows, changeEntry, editorHint, editorState, libraryIdSet } from '../utils/roshettaEditorState'
+import {
+  AUTOSAVE_DELAY_MS, addTextRows, changeEntry, editorHint, editorState, libraryIdSet, saveAnswer, saveRefused, saveStatus,
+} from '../utils/roshettaEditorState'
 import { ROSHETTA_ROW_TYPES } from '../utils/roshettaRows'
 import { ROUTES } from '../router'
 
@@ -62,8 +71,11 @@ export default function RoshettaEditorScreen() {
   const { roshettasApi } = useFavouritesContext()
   const {
     roshettas = [], roshettasStatus = 'loading', isGuest = false, isReadOnly = false, reloadRoshettas,
+    saveRoshetta, showRoshettaLimit, showRoshettaReadOnly,
+    waitingRoshettaIds = [], failedList = [], syncState = 'idle',
   } = roshettasApi ?? {}
   const { loading: authLoading, signInWithGoogle } = useAuth()
+  const { isOnline } = useOnlineStatus()
 
   const roshetta = pageRoshetta(roshettas, id)
   // The cards edit this working copy; until something is changed the saved rows are shown.
@@ -76,9 +88,85 @@ export default function RoshettaEditorScreen() {
   const libraryIds = useMemo(() => libraryIdSet(drugs, drugsLoading), [drugs, drugsLoading])
   const locked = !!isReadOnly
 
-  function change(entryId, entry) {
-    setWorkingRows(changeEntry(rows, entryId, entry))
+  // ── Autosave ──────────────────────────────────────────────────────────────
+  const [touched, setTouched] = useState(false)   // something was changed on this screen
+  const [typing, setTyping] = useState(false)     // changed, and the short pause is not over
+  const [saving, setSaving] = useState(0)         // saves being put on the phone right now
+  const [refused, setRefused] = useState(false)   // the last save was refused
+  const latestRows = useRef(null)                 // the rows as last changed
+  const waitingSave = useRef(false)               // changed and not yet handed to the saving
+  const timer = useRef(null)
+  const mounted = useRef(true)
+  const live = useRef({})                         // what a save needs, kept current for the exit save
+  useEffect(() => {
+    live.current = { id, saveRoshetta, showRoshettaLimit, showRoshettaReadOnly }
+  })
+
+  const flush = useCallback(async () => {
+    if (timer.current) {
+      clearTimeout(timer.current)
+      timer.current = null
+    }
+    if (!waitingSave.current) return
+    waitingSave.current = false
+    const { id: roshettaId, saveRoshetta: save, showRoshettaLimit: openLimit, showRoshettaReadOnly: openReadOnly } = live.current
+    if (mounted.current) {
+      setTyping(false)
+      setSaving(n => n + 1)
+    }
+    let res
+    try {
+      res = await save?.(roshettaId, { rows: latestRows.current })
+    } catch {
+      res = null
+    }
+    const answer = saveAnswer(res)
+    if (answer === 'drugs_full') openLimit?.('drugs')
+    else if (answer === 'read_only') openReadOnly?.()
+    if (mounted.current) {
+      setSaving(n => n - 1)
+      setRefused(saveRefused(answer))
+    }
+  }, [])
+
+  // Going to the background, closing the page or leaving this screen saves what is still waiting.
+  useEffect(() => {
+    mounted.current = true
+    function onHide() {
+      if (document.visibilityState === 'hidden') flush()
+    }
+    document.addEventListener('visibilitychange', onHide)
+    window.addEventListener('pagehide', flush)
+    return () => {
+      document.removeEventListener('visibilitychange', onHide)
+      window.removeEventListener('pagehide', flush)
+      mounted.current = false
+      flush()
+    }
+  }, [flush])
+
+  function edit(nextRows) {
+    if (locked) return
+    latestRows.current = nextRows
+    waitingSave.current = true
+    setWorkingRows(nextRows)
+    setTouched(true)
+    setTyping(true)
+    if (timer.current) clearTimeout(timer.current)
+    timer.current = setTimeout(flush, AUTOSAVE_DELAY_MS)
   }
+
+  function change(entryId, entry) {
+    edit(changeEntry(latestRows.current ?? rows, entryId, entry))
+  }
+
+  const status = saveStatus({
+    touched, typing, saving: saving > 0, refused,
+    online: isOnline,
+    waitingHere: waitingRoshettaIds.includes(id),
+    failedHere: failedList.some(c => c.roshettaId === id),
+    syncState,
+  })
 
   const backButton = (
     <button
@@ -192,7 +280,7 @@ export default function RoshettaEditorScreen() {
         </button>
         <button
           type="button"
-          onClick={() => setWorkingRows(addTextRows(rows))}
+          onClick={() => edit(addTextRows(latestRows.current ?? rows))}
           style={{ ...barButton, backgroundColor: 'var(--color-surface)', color: 'var(--color-accent-text)', border: '1px solid var(--color-border)' }}
         >
           <Icon name="Type" size={16} />
@@ -204,8 +292,18 @@ export default function RoshettaEditorScreen() {
 
   return (
     <div style={{ padding: 'var(--space-3) 0', paddingBottom: showBar ? BAR_ROOM : 'var(--space-4)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 'var(--space-3)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)', marginBottom: 'var(--space-3)' }}>
         {backButton}
+        <span
+          role="status"
+          aria-live="polite"
+          style={{
+            fontSize: 13, fontWeight: 500, fontFamily: font,
+            color: status?.tone === 'warning' ? 'var(--color-danger)' : 'var(--color-text-secondary)',
+          }}
+        >
+          {(state === 'empty' || state === 'ready') && status ? status.word : ''}
+        </span>
       </div>
       {roshetta?.name && (state === 'empty' || state === 'ready') && (
         <h1 dir="auto" style={{ margin: '0 0 var(--space-3)', fontSize: 20, fontWeight: 700, lineHeight: 1.3, color: 'var(--color-text-primary)', fontFamily: font, overflowWrap: 'anywhere' }}>
