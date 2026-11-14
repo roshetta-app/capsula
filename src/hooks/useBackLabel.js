@@ -26,6 +26,7 @@ export function labelForPath(path) {
   if (path === '/drugs/browse/groups') return 'My groups'
   if (/^\/drugs\/group\/[^/]+\/add$/.test(path)) return 'Add drugs'
   if (path.startsWith('/drugs/group/') || path.startsWith('/g/')) return 'Group'
+  if (path.startsWith('/r/')) return 'Roshetta'
   if (path.startsWith('/drugs/generic/')) return 'Generic'
   if (path.startsWith('/drugs/')) return 'Drug'
   if (path.startsWith('/conditions/')) return 'Topic'

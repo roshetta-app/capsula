@@ -22,10 +22,11 @@ import OnboardingScreen from '../../screens/OnboardingScreen'
 // 2026-10-19 (Drug groups plan, step 8.2): a shared group link (/g/<code>) is a
 // public page. Someone who only wants to look at the group does not get the
 // welcome screen, and nothing is downloaded for them (the drug library starts
-// from the welcome screen's last slide). The welcome screen appears when they
+// from the welcome screen's last slide). 2026-11-14 (Roshetta plan, step 6.2b): a shared
+// roshetta link (/r/<code>) is public in the same way. The welcome screen appears when they
 // go on into the app (Open Capsula, or opening a drug).
 function isPublicSharedPage(pathname) {
-  return pathname.startsWith('/g/')
+  return pathname.startsWith('/g/') || pathname.startsWith('/r/')
 }
 
 export default function OnboardingGate({ children }) {
