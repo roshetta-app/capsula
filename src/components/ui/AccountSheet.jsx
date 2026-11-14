@@ -97,11 +97,12 @@
  *                                 signed-out copy only; everything else
  *                                 about the sheet is unchanged. Defaults
  *                                 to false.
- *   groupContext        false | 'groups' | 'save' — 'groups' when a drug
+ *   groupContext        false | 'groups' | 'save' | 'roshetta-save' — 'groups' when a drug
  *                                 groups tap is why this sheet is open
  *                                 ("Keep your drug groups"), 'save' when a guest
  *                                 tapped Save on a shared group ("Save this
- *                                 group"). Swaps the signed-out copy only.
+ *                                 group"; 'roshetta-save' (step 6.2c) when a guest tapped Save a copy on a
+ *                                 shared roshetta). Swaps the signed-out copy only.
  *                                 Defaults to false. (2026-10-19, restored
  *                                 from step 7.2 and extended at step 8.3.)
  *   noteContext         boolean — true when a pending note sign-in
@@ -305,7 +306,9 @@ export default function AccountSheet({
                 ? 'Save this to Favourites'
                 : display.groupContext === 'save'
                   ? 'Save this group'
-                  : display.groupContext
+                  : display.groupContext === 'roshetta-save'
+                    ? 'Save this roshetta'
+                    : display.groupContext
                     ? 'Sign in to create groups'
                     : display.noteContext
                       ? 'Add your notes'
@@ -321,7 +324,9 @@ export default function AccountSheet({
                 ? 'Sign in to save it and access it on any device.'
                 : display.groupContext === 'save'
                   ? 'Sign in to save a copy to your groups and open it on any device.'
-                  : display.groupContext
+                  : display.groupContext === 'roshetta-save'
+                    ? 'Sign in to save a copy to your roshettas and open it on any device.'
+                    : display.groupContext
                     ? 'Your groups are saved to your account and available on any device.'
                     : display.noteContext
                       ? 'Sign in to add notes and access them everywhere.'

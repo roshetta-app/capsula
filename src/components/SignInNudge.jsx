@@ -91,7 +91,8 @@ export default function SignInNudge() {
   // wording. A guest Save on a shared group remembers 'save:<link code>'.
   const groupsTap = pendingFavourite?.type === 'groups'
   const groupContext = groupsTap
-    ? (String(pendingFavourite.id).startsWith('save:') ? 'save' : 'groups')
+    ? (String(pendingFavourite.id).startsWith('save:') ? 'save'
+      : String(pendingFavourite.id).startsWith('rsave:') ? 'roshetta-save' : 'groups')
     : false
 
   return (

@@ -17,18 +17,32 @@
  * one message), offline (Try again, and it tries by itself when the phone is back online),
  * could not open (Try again), a roshetta with nothing in it, and the roshetta.
  *
- * Not here yet: the "Save a copy" bar (6.2c, 6.2d) and the analytics events (6.3).
+ * 2026-11-14 (step 6.2c): the Save a copy bar, fixed at the bottom while the roshetta shows.
+ * It makes the viewer's own NEW roshetta (same name, description and rows; not linked to this
+ * one, nothing about the owner) through the roshettas hook, so it is saved on the phone first
+ * and sent when online. A guest is asked to sign in first: the page remembers the link (the
+ * sign-in prompt keeps 'rsave:<code>') and finishes the save by itself once signed in; closing
+ * the sign-in sheet cancels it. After saving the bar says "Saved to your roshettas" with View.
+ * The roshetta limit, drug limit and read only messages open the same sheets as the rest of
+ * roshettas; any other refusal is one line in the bar with Save still there to try again.
+ *
+ * Not here yet: keeping only part of a roshetta that is over the drug limit (6.2d; for now the
+ * drug limit sheet opens and nothing is saved) and the analytics events (6.3).
  */
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
-import { FileX, WifiOff, CircleAlert } from 'lucide-react'
+import { FileX, WifiOff, CircleAlert, Check } from 'lucide-react'
 import RoshettaDisclaimer from '../components/roshettas/RoshettaDisclaimer'
 import PrescriptionSheetBlock from '../components/conditions/PrescriptionSheetBlock'
+import GroupStateMessage from '../components/drugs/groups/GroupStateMessage'
 import { shimmer } from '../components/drugs/home/shimmer'
+import { useAuth } from '../hooks/useAuth'
+import { useFavouritesContext } from '../context/FavouritesContext'
 import { markScreenMounted } from '../hooks/useDeepLinkParent'
 import { fetchSharedRoshetta } from '../utils/sharedRoshetta'
 import { sharedPageState, sharedProblemText } from '../utils/roshettaSharedPageState'
+import { copyFields, saveSignInId, isRoshettaSaveRequest, saveCopyAnswer, showSaveBar } from '../utils/roshettaSaveCopy'
 import { ROUTES } from '../router'
 
 const PROBLEM_ICONS = { unavailable: FileX, offline: WifiOff, error: CircleAlert }
@@ -126,6 +140,75 @@ function SharedRoshettaBody({ code }) {
 
   const state = sharedPageState(result)
   const isProblem = state === 'unavailable' || state === 'offline' || state === 'error'
+
+  // ── Save a copy (step 6.2c) ───────────────────────────────────────────────
+  const { user, loading: authLoading } = useAuth()
+  const { promptSignIn, pendingFavourite, roshettasApi } = useFavouritesContext()
+  const { roshettasStatus, createRoshetta, showRoshettaLimit, showRoshettaReadOnly } = roshettasApi
+  // { phase: 'idle' | 'saving' | 'saved', roshettaId? }
+  const [saveState, setSaveState] = useState({ phase: 'idle' })
+  const savingRef = useRef(false)
+  // A refused save, shown as one line in the bar (null when there is none).
+  const [notice, setNotice] = useState(null)
+  // A guest tapped Save and is signing in. Also true after a sign-in that reloaded the page,
+  // because the prompt keeps the request.
+  const armedRef = useRef(isRoshettaSaveRequest(pendingFavourite, code))
+
+  const runSave = useCallback(async () => {
+    if (savingRef.current || result.status !== 'ok') return
+    savingRef.current = true
+    setNotice(null)
+    setSaveState({ phase: 'saving' })
+    let answer
+    try {
+      answer = await createRoshetta(copyFields(result.roshetta))
+    } catch {
+      answer = { ok: false, reason: 'error' }
+    }
+    savingRef.current = false
+    const r = saveCopyAnswer(answer)
+    if (r.kind === 'saved') {
+      setSaveState({ phase: 'saved', roshettaId: r.roshetta ? r.roshetta.id : null })
+      return
+    }
+    setSaveState({ phase: 'idle' })
+    if (r.kind === 'sheet') {
+      if (r.sheet === 'readonly') showRoshettaReadOnly()
+      else showRoshettaLimit(r.sheet)
+    } else if (r.kind === 'notice') {
+      setNotice(r.message)
+    }
+  }, [result, createRoshetta, showRoshettaLimit, showRoshettaReadOnly])
+
+  function handleSaveTap() {
+    if (authLoading || saveState.phase !== 'idle') return
+    if (!user) {
+      armedRef.current = true
+      promptSignIn('groups', saveSignInId(code))
+      return
+    }
+    runSave()
+  }
+
+  // Finish a save that waited for sign-in, or cancel it when the sign-in sheet was closed
+  // without signing in.
+  useEffect(() => {
+    if (!armedRef.current || authLoading) return undefined
+    if (!user) {
+      if (!pendingFavourite) armedRef.current = false
+      return undefined
+    }
+    if (roshettasStatus === 'loading' || result.status !== 'ok') return undefined
+    // Started on the next tick, so the save's own state change is not made inside this effect.
+    const t = setTimeout(() => {
+      armedRef.current = false
+      runSave()
+    }, 0)
+    return () => clearTimeout(t)
+  }, [authLoading, user, pendingFavourite, roshettasStatus, result.status, runSave])
+
+  const showSave = showSaveBar(state)
+  const saveBusy = saveState.phase === 'saving' || authLoading || (!!user && roshettasStatus === 'loading')
 
   const backButton = (
     <button
@@ -248,13 +331,67 @@ function SharedRoshettaBody({ code }) {
       '--page-gutter': 'var(--space-4)',
       maxWidth: 680, margin: '0 auto',
       minHeight: '100dvh', display: 'flex', flexDirection: 'column',
-      padding: `calc(var(--space-3) + env(safe-area-inset-top, 0px)) var(--page-gutter) calc(var(--space-4) + env(safe-area-inset-bottom, 0px))`,
+      padding: `calc(var(--space-3) + env(safe-area-inset-top, 0px)) var(--page-gutter) ${showSave ? '0' : 'calc(var(--space-4) + env(safe-area-inset-bottom, 0px))'}`,
     }}>
       {isProblem ? (canGoBack && <div style={{ minHeight: 44, display: 'flex', alignItems: 'center' }}>{backButton}</div>) : topBar}
       <div style={{
-        flex: '1 0 auto',
+        flex: '1 0 auto', paddingBottom: showSave ? 'var(--space-4)' : 0,
         ...(isProblem ? { display: 'flex', flexDirection: 'column' } : null),
       }}>{content}</div>
+      {showSave && (
+        <div style={{
+          position: 'sticky', bottom: 0, zIndex: 5,
+          margin: '0 calc(-1 * var(--page-gutter))',
+          padding: 'var(--space-3) var(--page-gutter) calc(var(--space-3) + env(safe-area-inset-bottom, 0px))',
+          backgroundColor: 'var(--color-surface)', borderTop: '1px solid var(--color-border)',
+          fontFamily: 'var(--font-body)',
+        }}>
+          {saveState.phase === 'saved' ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)' }}>
+              <span style={{ display: 'flex', alignItems: 'flex-start', gap: 8, minWidth: 0 }}>
+                <Check size={18} strokeWidth={2.6} color="var(--color-success)" aria-hidden="true" style={{ flexShrink: 0, marginTop: 1 }} />
+                <span role="status" style={{ fontSize: 14, lineHeight: 1.4, color: 'var(--color-text-primary)' }}>
+                  Saved to your roshettas
+                </span>
+              </span>
+              {saveState.roshettaId && (
+                <button
+                  onClick={() => navigate(ROUTES.ROSHETTA(saveState.roshettaId))}
+                  style={{
+                    flexShrink: 0, minHeight: 44, border: 'none', cursor: 'pointer', padding: '0 20px',
+                    borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-accent-solid)', color: '#fff',
+                    fontSize: 14, fontWeight: 600, fontFamily: 'var(--font-body)',
+                    WebkitTapHighlightColor: 'transparent', outline: 'none',
+                  }}
+                >
+                  View
+                </button>
+              )}
+            </div>
+          ) : (
+            <>
+              {notice && (
+                <div style={{ marginBottom: 'var(--space-2)' }}>
+                  <GroupStateMessage variant="banner" tone="warning" title={notice} />
+                </div>
+              )}
+              <button
+                onClick={handleSaveTap}
+                disabled={saveBusy}
+                style={{
+                  display: 'block', width: '100%', minHeight: 48, border: 'none', padding: '0 16px',
+                  borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-accent-solid)', color: '#fff',
+                  fontSize: 15, fontWeight: 600, fontFamily: 'var(--font-body)',
+                  cursor: saveBusy ? 'default' : 'pointer', opacity: saveBusy ? 0.6 : 1,
+                  WebkitTapHighlightColor: 'transparent', outline: 'none',
+                }}
+              >
+                {saveState.phase === 'saving' ? 'Saving\u2026' : 'Save a copy'}
+              </button>
+            </>
+          )}
+        </div>
+      )}
     </div>
   )
 }
