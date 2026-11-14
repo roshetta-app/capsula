@@ -14,8 +14,10 @@
  * What is chosen for: no query part = a new drug group; "?partner=<group id>" = an or / plus
  * partner for that group (utils/roshettaAddDrugState.js).
  *
- * Step 5.2a draws the screen and its states. Choosing a drug only remembers the search for now;
- * adding the drug group is step 5.2b and adding a partner is step 5.2c.
+ * Step 5.2a draws the screen and its states. Step 5.2b: choosing a drug for a new drug group saves
+ * the roshetta with that drug group at the end (the dose left empty), says so in a short message
+ * and goes back to the editor; a full roshetta or a read only account opens the limit sheet instead
+ * and nothing is added. Adding a partner is step 5.2c (choosing still only remembers the search).
  *
  * States: loading, signed out ("Sign in to add drugs"), could not load ("Try again"), not found
  * (deleted on another device), read only (lapsed account), and the search.
@@ -46,7 +48,7 @@ import { useSearchHistory } from '../hooks/useSearchHistory'
 import { useDeepLinkParent } from '../hooks/useDeepLinkParent'
 import { useIsDark } from '../utils/specialtyIcon'
 import { pageRoshetta } from '../utils/roshettaPageState'
-import { addDrugHint, addDrugState, addDrugTarget } from '../utils/roshettaAddDrugState'
+import { addDrugHint, addDrugState, addDrugTarget, addGroupAnswer, addGroupRows } from '../utils/roshettaAddDrugState'
 import { ROUTES } from '../router'
 
 // Class does not exist in this search (one shared settings object, so the hook sees no change).
@@ -83,6 +85,7 @@ export default function RoshettaAddDrugScreen() {
   const { roshettasApi } = useFavouritesContext()
   const {
     roshettas = [], roshettasStatus = 'loading', isGuest = false, isReadOnly = false, reloadRoshettas,
+    saveRoshetta, showRoshettaLimit, showRoshettaReadOnly,
   } = roshettasApi ?? {}
   const { loading: authLoading, signInWithGoogle } = useAuth()
   const isDark = useIsDark()
@@ -209,10 +212,28 @@ export default function RoshettaAddDrugScreen() {
   function goBack() {
     navigate(-1)
   }
-  // Step 5.2b (a new drug group) and step 5.2c (an or / plus partner) add the chosen drug here.
-  // For now the search is only remembered, as the groups screen does when a drug is added.
-  function handleChoose(drug) {
+  // Step 5.2b adds a new drug group; step 5.2c (an or / plus partner) will add the partner here.
+  // Until then a partner choice only remembers the search, as the groups screen does.
+  const addingRef = useRef(false)
+  async function handleChoose(drug) {
     if (hasQuery) addSearch(savedName(drug), mode)
+    if (target.kind !== 'group' || addingRef.current || !roshetta) return
+    const rows = addGroupRows(roshetta.rows, drug)
+    if (!rows) { toast.error("Couldn't add this drug. Try again."); return }
+    addingRef.current = true
+    try {
+      const answer = addGroupAnswer(await saveRoshetta?.(id, { rows }))
+      if (answer === 'done') {
+        toast.success(`Added ${drug.name}`)
+        goBack()
+      } else if (answer === 'drugs_full') showRoshettaLimit?.('drugs')
+      else if (answer === 'read_only') showRoshettaReadOnly?.()
+      else if (answer === 'sign_in') toast.error('Sign in to add drugs')
+      else if (answer === 'gone') toast.error("This roshetta isn't available")
+      else if (answer === 'failed') toast.error("Couldn't add this drug. Try again.")
+    } finally {
+      addingRef.current = false
+    }
   }
   function handleOpen(drug) {
     if (hasQuery) addSearch(savedName(drug), mode)

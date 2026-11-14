@@ -12,9 +12,14 @@
  *                               | 'readonly' | 'search'
  *   addDrugHint(target, name)   the one plain line above the results
  *   addPartnerQuery(rowId)      the query part the editor adds to the address for a partner
+ *   addGroupRows(rows, drug)    2026-11-14 (step 5.2b): the roshetta's rows with one new drug group
+ *                               at the end (library doses left empty), or null if the drug is not usable
+ *   addGroupAnswer(result)      what the screen does with the answer of saving: 'done' | 'drugs_full'
+ *                               | 'read_only' | 'sign_in' | 'gone' | 'silent' | 'failed'
  */
 
 import { pageState } from './roshettaPageState.js';
+import { newDrugGroup } from './roshettaRows.js';
 
 export function addDrugTarget(search) {
   const text = typeof search === 'string' ? search : '';
@@ -39,4 +44,26 @@ export function addDrugHint(target, name) {
   return target?.kind === 'partner'
     ? `Choose an or / plus drug for ${who}`
     : `Choose a drug to add to ${who}`;
+}
+
+export function addGroupRows(rows, drug) {
+  const list = Array.isArray(rows) ? rows : [];
+  try {
+    return [...list, newDrugGroup(drug)];
+  } catch {
+    return null;
+  }
+}
+
+// The saving answers { ok, reason? }. 'silent' = the saving already showed its own message.
+export function addGroupAnswer(result) {
+  if (result?.ok) return 'done';
+  switch (result?.reason) {
+    case 'drug_limit': return 'drugs_full';
+    case 'read_only': return 'read_only';
+    case 'guest': return 'sign_in';
+    case 'missing': return 'gone';
+    case 'error': return 'silent';
+    default: return 'failed';
+  }
 }
