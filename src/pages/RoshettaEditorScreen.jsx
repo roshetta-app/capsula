@@ -18,10 +18,10 @@
  * last drug of a group deletes the group by the same rule. On a read only roshetta delete opens the
  * read only sheet.
  *
- * What it does not do yet:
- *   - the counts in the bar and the limit messages for text blocks and entries (step 5.3d; until then
- *     an eleventh text block or a forty-first entry is refused by the save and the word says
- *     Couldn't save).
+ * Counts and limits (step 5.3d): the bar shows "7 of 10 drugs" and "1 of 10 text blocks". The limits
+ * are checked at the tap, before anything changes: a full roshetta (drug limit) opens the drug limit
+ * sheet from Add drug and from "Add or / plus drug"; ten text blocks or forty cards give a plain
+ * message instead (decisions in utils/roshettaEditorState.js). The database stays the real guard.
  *
  * Read only (lapsed account): the cards are locked and the add bar is not drawn.
  *
@@ -40,20 +40,21 @@ import { shimmer } from '../components/drugs/home/shimmer'
 import { useDrugContext } from '../context/DrugContext'
 import { useFavouritesContext } from '../context/FavouritesContext'
 import { useAuth } from '../hooks/useAuth'
+import { useToast } from '../context/ToastContext'
 import { useDeepLinkParent } from '../hooks/useDeepLinkParent'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
 import { pageRoshetta } from '../utils/roshettaPageState'
 import { addPartnerQuery } from '../utils/roshettaAddDrugState'
 import {
-  AUTOSAVE_DELAY_MS, addTextRows, changeEntry, deleteEntryById, deleteNeedsQuestion, deleteQuestion, editorHint, editorState,
+  AUTOSAVE_DELAY_MS, addRefusal, addTextRows, barCounts, limitMessage, changeEntry, deleteEntryById, deleteNeedsQuestion, deleteQuestion, editorHint, editorState,
   libraryIdSet, moveEntryById, saveAnswer, saveRefused, saveStatus,
 } from '../utils/roshettaEditorState'
 import { ROSHETTA_ROW_TYPES } from '../utils/roshettaRows'
 import { ROUTES } from '../router'
 
 const font = 'var(--font-body)'
-// Room under the cards for the fixed add bar (10 + 48 + 10 + 1) and the bottom tab bar (60).
-const BAR_ROOM = 'calc(69px + 60px + env(safe-area-inset-bottom) + var(--space-4))'
+// Room under the cards for the fixed add bar (counts line 26 + 10 + 48 + 10 + 1) and the bottom tab bar (60).
+const BAR_ROOM = 'calc(95px + 60px + env(safe-area-inset-bottom) + var(--space-4))'
 
 function SkeletonCards() {
   return (
@@ -78,11 +79,12 @@ export default function RoshettaEditorScreen() {
   const { roshettasApi } = useFavouritesContext()
   const {
     roshettas = [], roshettasStatus = 'loading', isGuest = false, isReadOnly = false, reloadRoshettas,
-    saveRoshetta, showRoshettaLimit, showRoshettaReadOnly,
+    saveRoshetta, showRoshettaLimit, showRoshettaReadOnly, roshettaDrugCap = 10,
     waitingRoshettaIds = [], failedList = [], syncState = 'idle',
   } = roshettasApi ?? {}
   const { loading: authLoading, signInWithGoogle } = useAuth()
   const { isOnline } = useOnlineStatus()
+  const { toast } = useToast()
 
   const roshetta = pageRoshetta(roshettas, id)
   // The cards edit this working copy; until something is changed the saved rows are shown.
@@ -171,6 +173,16 @@ export default function RoshettaEditorScreen() {
     edit(moveEntryById(latestRows.current ?? rows, entryId, dir))
   }
 
+  // A tap that adds something is checked first: the drug limit opens its sheet, the others say why.
+  // Returns true when the tap may go on.
+  function mayAdd(kind) {
+    const why = addRefusal(kind, latestRows.current ?? rows, roshettaDrugCap)
+    if (!why) return true
+    if (why === 'drugs') showRoshettaLimit?.('drugs')
+    else toast.error(limitMessage(why))
+    return false
+  }
+
   // Delete: a card with something typed asks first; an empty one goes at once.
   const [askDeleteId, setAskDeleteId] = useState(null)
   function requestDelete(row) {
@@ -257,7 +269,7 @@ export default function RoshettaEditorScreen() {
                 count={rows.length}
                 libraryIds={libraryIds}
                 onChange={next => change(row.id, next)}
-                onAddPartner={() => navigate(ROUTES.ROSHETTA_ADD(id) + addPartnerQuery(row.id))}
+                onAddPartner={() => { if (mayAdd('partner')) navigate(ROUTES.ROSHETTA_ADD(id) + addPartnerQuery(row.id)) }}
                 onMoveUp={() => move(row.id, 'up')}
                 onMoveDown={() => move(row.id, 'down')}
                 onDelete={() => requestDelete(row)}
@@ -286,6 +298,7 @@ export default function RoshettaEditorScreen() {
     )
   }
 
+  const counts = barCounts(rows, roshettaDrugCap)
   const showBar = (state === 'empty' || state === 'ready') && !locked
   const barButton = {
     flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
@@ -302,10 +315,14 @@ export default function RoshettaEditorScreen() {
         borderTop: '1px solid var(--color-border)',
       }}
     >
-      <div style={{ maxWidth: 680, margin: '0 auto', padding: '10px var(--page-gutter)', display: 'flex', gap: 10, boxSizing: 'border-box' }}>
+      <div style={{ maxWidth: 680, margin: '0 auto', padding: '8px var(--page-gutter) 0', display: 'flex', justifyContent: 'center', gap: 16, boxSizing: 'border-box', fontSize: 13, fontFamily: font, lineHeight: '18px' }}>
+        <span style={{ color: counts.drugsFull ? 'var(--color-text-primary)' : 'var(--color-text-secondary)', fontWeight: counts.drugsFull ? 600 : 400 }}>{counts.drugs}</span>
+        <span style={{ color: counts.textsFull ? 'var(--color-text-primary)' : 'var(--color-text-secondary)', fontWeight: counts.textsFull ? 600 : 400 }}>{counts.texts}</span>
+      </div>
+      <div style={{ maxWidth: 680, margin: '0 auto', padding: '8px var(--page-gutter) 10px', display: 'flex', gap: 10, boxSizing: 'border-box' }}>
         <button
           type="button"
-          onClick={() => navigate(ROUTES.ROSHETTA_ADD(id))}
+          onClick={() => { if (mayAdd('drug')) navigate(ROUTES.ROSHETTA_ADD(id)) }}
           style={{ ...barButton, backgroundColor: 'var(--color-accent-solid)', color: '#fff', border: 'none' }}
         >
           <Icon name="Plus" size={16} />
@@ -313,7 +330,7 @@ export default function RoshettaEditorScreen() {
         </button>
         <button
           type="button"
-          onClick={() => edit(addTextRows(latestRows.current ?? rows))}
+          onClick={() => { if (mayAdd('text')) edit(addTextRows(latestRows.current ?? rows)) }}
           style={{ ...barButton, backgroundColor: 'var(--color-surface)', color: 'var(--color-accent-text)', border: '1px solid var(--color-border)' }}
         >
           <Icon name="Type" size={16} />

@@ -30,10 +30,20 @@
  *   deleteNeedsQuestion(row)      true when the card holds something typed (a dose or a text), so the
  *                            screen asks before deleting; an empty card goes at once
  *   deleteQuestion(row)           { title, message } of that question
+ *
+ * 2026-11-14 (step 5.3d, counts and limit messages):
+ *   barCounts(rows, drugCap)      { drugs, texts, drugsFull, textsFull }: the two count phrases of the
+ *                            bottom bar ("7 of 10 drugs", "1 of 10 text blocks") and whether each is full
+ *   addRefusal(kind, rows, drugCap)  why a tap on Add drug ('drug'), on "Add or / plus drug" ('partner')
+ *                            or on Add text ('text') cannot go on: 'drugs' (the drug limit, the screen
+ *                            opens the drug limit sheet), 'texts', 'entries' (a plain message), or null
+ *   limitMessage(reason)     the plain message for 'texts' and 'entries' (null for anything else)
  */
 
 import { pageState } from './roshettaPageState.js';
-import { ROSHETTA_ROW_TYPES, deleteEntry, moveEntryDown, moveEntryUp, newTextBlock } from './roshettaRows.js';
+import {
+  ROSHETTA_MAX_ENTRIES, ROSHETTA_MAX_TEXT_BLOCKS, ROSHETTA_ROW_TYPES, countDrugs, countEntries, countTextBlocks, deleteEntry, moveEntryDown, moveEntryUp, newTextBlock,
+} from './roshettaRows.js';
 
 export function editorState({
   authLoading = false, isGuest = false, status = 'loading', found = false, rowCount = 0, listCount = 0,
@@ -132,4 +142,31 @@ export function deleteQuestion(row) {
   return row?.row_type === ROSHETTA_ROW_TYPES.DRUG
     ? { title: 'Delete this drug group?', message: 'The drug and its dose will be removed from this roshetta.' }
     : { title: 'Delete this text?', message: 'The text will be removed from this roshetta.' };
+}
+
+export function barCounts(rows, drugCap) {
+  const drugs = countDrugs(rows);
+  const texts = countTextBlocks(rows);
+  return {
+    drugs: `${drugs} of ${drugCap} ${drugCap === 1 ? 'drug' : 'drugs'}`,
+    texts: `${texts} of ${ROSHETTA_MAX_TEXT_BLOCKS} text blocks`,
+    drugsFull: drugs >= drugCap,
+    textsFull: texts >= ROSHETTA_MAX_TEXT_BLOCKS,
+  };
+}
+
+// A partner adds a drug but no card, so only the drug limit can stop it. Entries are checked first
+// for a card that is added (a drug group or a text) because the same limit would refuse the save.
+export function addRefusal(kind, rows, drugCap) {
+  if (kind === 'partner') return countDrugs(rows) >= drugCap ? 'drugs' : null;
+  if (countEntries(rows) >= ROSHETTA_MAX_ENTRIES) return 'entries';
+  if (kind === 'drug') return countDrugs(rows) >= drugCap ? 'drugs' : null;
+  if (kind === 'text') return countTextBlocks(rows) >= ROSHETTA_MAX_TEXT_BLOCKS ? 'texts' : null;
+  return null;
+}
+
+export function limitMessage(reason) {
+  if (reason === 'texts') return `A roshetta can have up to ${ROSHETTA_MAX_TEXT_BLOCKS} text blocks.`;
+  if (reason === 'entries') return `A roshetta can have up to ${ROSHETTA_MAX_ENTRIES} cards. Delete one to add another.`;
+  return null;
 }

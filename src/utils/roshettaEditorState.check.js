@@ -5,6 +5,7 @@ import {
   editorState, editorHint, changeEntry, addTextRows, libraryIdSet,
   AUTOSAVE_DELAY_MS, saveAnswer, saveRefused, saveStatus,
   moveEntryById, deleteEntryById, deleteNeedsQuestion, deleteQuestion,
+  barCounts, addRefusal, limitMessage,
 } from './roshettaEditorState.js';
 
 test('editorState: loading, guest, error and missing come first; no cards is empty, cards is ready', () => {
@@ -131,4 +132,40 @@ test('deleteQuestion: plain words for a drug group and for a text', () => {
   assert.equal(deleteQuestion({ row_type: 'drug' }).title, 'Delete this drug group?');
   assert.equal(deleteQuestion({ row_type: 'plain_text' }).title, 'Delete this text?');
   assert.ok(deleteQuestion({ row_type: 'drug' }).message.length > 10);
+});
+
+const drugRow = (n, partners = 0) => ({ row_type: 'drug', id: 'd' + n, alternatives: Array.from({ length: partners }, () => ({})) });
+const textRow = n => ({ row_type: 'plain_text', id: 't' + n, content: '' });
+
+test('barCounts: counts every drug including partners, and whether each is full', () => {
+  const rows = [drugRow(1, 2), drugRow(2), textRow(1)];
+  assert.deepEqual(barCounts(rows, 10), { drugs: '4 of 10 drugs', texts: '1 of 10 text blocks', drugsFull: false, textsFull: false });
+  assert.equal(barCounts([drugRow(1, 9)], 10).drugsFull, true);
+  assert.equal(barCounts(Array.from({ length: 10 }, (_, i) => textRow(i)), 30).textsFull, true);
+  assert.equal(barCounts([], 30).drugs, '0 of 30 drugs');
+  assert.equal(barCounts(undefined, 10).texts, '0 of 10 text blocks');
+});
+
+test('addRefusal: drug limit, text limit and entry limit, each at the tap', () => {
+  const full = [drugRow(1, 9)];
+  assert.equal(addRefusal('drug', full, 10), 'drugs');
+  assert.equal(addRefusal('partner', full, 10), 'drugs');
+  assert.equal(addRefusal('drug', [drugRow(1, 8)], 10), null);
+  assert.equal(addRefusal('partner', [drugRow(1, 8)], 10), null);
+  const texts = Array.from({ length: 10 }, (_, i) => textRow(i));
+  assert.equal(addRefusal('text', texts, 10), 'texts');
+  assert.equal(addRefusal('text', texts.slice(1), 10), null);
+  assert.equal(addRefusal('drug', texts, 10), null);
+  const forty = [...Array.from({ length: 30 }, (_, i) => drugRow(i)), ...Array.from({ length: 10 }, (_, i) => textRow(i))];
+  assert.equal(addRefusal('text', forty, 100), 'entries');
+  assert.equal(addRefusal('drug', forty, 100), 'entries');
+  assert.equal(addRefusal('partner', forty, 100), null);
+  assert.equal(addRefusal('text', [], 10), null);
+});
+
+test('limitMessage: plain words for text blocks and entries only', () => {
+  assert.equal(limitMessage('texts'), 'A roshetta can have up to 10 text blocks.');
+  assert.equal(limitMessage('entries'), 'A roshetta can have up to 40 cards. Delete one to add another.');
+  assert.equal(limitMessage('drugs'), null);
+  assert.equal(limitMessage(null), null);
 });
