@@ -49,7 +49,7 @@ export function saveFailureMessage(reason, isPro) {
     case 'invalid':
       return 'Check the name and description, then try again.';
     case 'missing':
-      return 'This roshetta is no longer here. It may have been deleted on another device.';
+      return "This roshetta isn't available. It may have been deleted on another device.";
     default:
       return "Couldn't save your roshetta. Try again.";
   }

@@ -19,9 +19,9 @@ test('editorState: loading, guest, error and missing come first; no cards is emp
 });
 
 test('editorHint: one plain line, a different one when the roshetta cannot be changed', () => {
-  assert.equal(editorHint(false), 'Add a drug or a text to start this roshetta.');
+  assert.equal(editorHint(false), 'Add a drug or some text to start this roshetta.');
   assert.equal(editorHint(true), 'This roshetta is empty.');
-  assert.equal(editorHint(), 'Add a drug or a text to start this roshetta.');
+  assert.equal(editorHint(), 'Add a drug or some text to start this roshetta.');
 });
 
 test('changeEntry: replaces only the entry with that id, never changes the old list', () => {

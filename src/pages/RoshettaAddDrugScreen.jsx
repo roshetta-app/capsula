@@ -281,7 +281,7 @@ export default function RoshettaAddDrugScreen() {
     message = (
       <GroupStateMessage
         title="Your roshettas are read only"
-        body="Delete a roshetta or upgrade to change it."
+        body="Delete a roshetta or upgrade to edit."
         actionLabel="Back to roshetta"
         onAction={() => navigate(ROUTES.ROSHETTA(id), { replace: true })}
       />

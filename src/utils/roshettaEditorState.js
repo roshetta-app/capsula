@@ -54,7 +54,7 @@ export function editorState({
 export function editorHint(locked = false) {
   return locked
     ? 'This roshetta is empty.'
-    : 'Add a drug or a text to start this roshetta.';
+    : 'Add a drug or some text to start this roshetta.';
 }
 
 export function changeEntry(rows, id, entry) {

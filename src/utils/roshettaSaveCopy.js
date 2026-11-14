@@ -59,7 +59,7 @@ export function isRoshettaSaveRequest(pending, code) {
 
 export const SAVE_NOT_LOADED_MESSAGE = 'Your roshettas are still loading. Try again in a moment.'
 export const SAVE_ERROR_MESSAGE = "Couldn't save this roshetta. Try again."
-export const SAVE_READ_ONLY_MESSAGE = 'Your roshettas are read only. Delete one or upgrade to save more.'
+export const SAVE_READ_ONLY_MESSAGE = 'Your roshettas are read only. Delete a roshetta or upgrade to save a copy.'
 
 // What the page does with the hook's answer to createRoshetta:
 //   { kind: 'saved', roshetta }       show Saved with View
