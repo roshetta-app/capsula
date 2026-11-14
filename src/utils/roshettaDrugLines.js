@@ -4,7 +4,10 @@
  * kept in a plain file so they are checked without a screen (roshettaDrugLines.check.js).
  *
  *   drugLines(row, libraryIds)     the name lines of a drug group, main drug first, then partners
- *   drugDetail(line)               the grey line under a name (generic, strength, form)
+ *   cleanBrandName(name, strength) the brand name without the strength and pack the library adds
+ *                                  ("Tussistop 60mg \u2014 20 Tablets" -> "Tussistop")
+ *   drugDetail(line)               the grey line under a name: the generic name only, first letter capital
+ *   sheetRowsForDisplay(rows)      the rows with clean brand names, for the sheet viewer
  *   switchChip(row, partnerIndex)  the group with that chip switched, or null for a bad index
  *   removeDrugAction(row, pos)     what removing the drug at `pos` means for the editor
  *   doseCounter(value)             "12/600", counted as people count (an emoji is one)
@@ -24,6 +27,28 @@ function textOrNull(value) {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
+// The library's full name is "Brand strength \u2014 pack"; a topic drug block shows the clean brand name,
+// then the strength and form after it. Older roshettas saved the full name, so it is cut here at read
+// time; a name that is already clean comes back unchanged.
+export function cleanBrandName(name, concentration) {
+  const full = textOrNull(name);
+  if (!full) return null;
+  const cut = full.search(/\s[\u2014\u2013]\s/);
+  let clean = (cut > 0 ? full.slice(0, cut) : full).trim();
+  const strength = textOrNull(concentration);
+  if (strength) {
+    const pattern = strength.replace(/\s+/g, '').split('')
+      .map(c => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\s*');
+    clean = clean.replace(new RegExp(`\\s*${pattern}\\s*$`, 'i'), '').trim();
+  }
+  return clean || full;
+}
+
+function sentenceCase(value) {
+  const text = textOrNull(value);
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : null;
+}
+
 function lineFrom(source, position, joiner, libraryIds) {
   const id = source?.brand_id ?? null;
   const available = libraryIds instanceof Set ? libraryIds.has(id) : true;
@@ -31,6 +56,8 @@ function lineFrom(source, position, joiner, libraryIds) {
     position,
     id,
     name: textOrNull(source?.brand_name) ?? NO_NAME,
+    // What the screens show: the clean brand name (the strength and form are drawn after it).
+    shownName: cleanBrandName(source?.brand_name, source?.concentration) ?? NO_NAME,
     genericName: textOrNull(source?.generic_name),
     concentration: textOrNull(source?.concentration),
     form: textOrNull(source?.form),
@@ -52,7 +79,19 @@ export function drugLines(row, libraryIds) {
 
 export function drugDetail(line) {
   if (!line) return '';
-  return [line.genericName, line.concentration, line.form].filter(Boolean).join(' \u00B7 ');
+  return sentenceCase(line.genericName) ?? '';
+}
+
+// The rows of a roshetta for the sheet viewer: every drug (and partner) with its clean brand name.
+export function sheetRowsForDisplay(rows) {
+  if (!Array.isArray(rows)) return rows;
+  const tidy = d => (d && typeof d === 'object' && typeof d.brand_name === 'string'
+    ? { ...d, brand_name: cleanBrandName(d.brand_name, d.concentration) ?? d.brand_name }
+    : d);
+  return rows.map(row => {
+    const next = tidy(row);
+    return next && Array.isArray(next.alternatives) ? { ...next, alternatives: next.alternatives.map(tidy) } : next;
+  });
 }
 
 export function switchChip(row, partnerIndex) {

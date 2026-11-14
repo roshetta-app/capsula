@@ -29,11 +29,14 @@ import EditorIconButton from './EditorIconButton'
 import JoinerChip from './JoinerChip'
 import { doseCounter, drugDetail, drugLines, removeDrugAction, switchChip, withDose } from '../../../utils/roshettaDrugLines'
 import { moveState } from '../../../utils/roshettaTextBlockText'
+import { getSheetDrugSuffix, toTitleCase } from '../../../utils/drugTitleFormat'
 
 const font = 'var(--font-body)'
 
 function DrugLine({ line, disabled, onRemove }) {
   const detail = drugDetail(line)
+  // Written like a topic drug block: the brand name, then the strength and form ("60mg - Tab.").
+  const suffix = getSheetDrugSuffix({ concentration: line.concentration, form: line.form, tradenameClean: line.shownName })
   const gone = !line.available
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 44 }}>
@@ -45,13 +48,22 @@ function DrugLine({ line, disabled, onRemove }) {
             color: gone ? 'var(--color-text-secondary)' : 'var(--color-text-primary)', fontFamily: font,
           }}
         >
-          {line.name}
+          {toTitleCase(line.shownName)}
+          {suffix && (
+            <span style={{
+              marginInlineStart: 5, fontSize: 12, fontWeight: 500,
+              color: 'color-mix(in srgb, var(--color-text-primary) 70%, var(--color-text-secondary) 30%)',
+            }}>
+              {suffix}
+            </span>
+          )}
         </div>
         {detail && (
           <div
             dir="auto"
             style={{
-              marginTop: 1, fontSize: 12.5, lineHeight: 1.3, textAlign: 'start', overflowWrap: 'anywhere',
+              marginTop: 1, fontSize: 12.5, lineHeight: 1.3, textAlign: 'start',
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
               color: 'var(--color-text-secondary)', fontFamily: font,
             }}
           >

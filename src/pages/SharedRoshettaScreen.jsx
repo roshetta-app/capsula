@@ -48,6 +48,7 @@ import { useIsPro } from '../hooks/useIsPro'
 import { useFavouritesContext } from '../context/FavouritesContext'
 import { markScreenMounted } from '../hooks/useDeepLinkParent'
 import { fetchSharedRoshetta } from '../utils/sharedRoshetta'
+import { sheetRowsForDisplay } from '../utils/roshettaDrugLines'
 import { sharedPageState, sharedProblemText } from '../utils/roshettaSharedPageState'
 import { copyFields, trimToDrugCap, savedCopyMessage, saveSignInId, isRoshettaSaveRequest, saveCopyAnswer, showSaveBar } from '../utils/roshettaSaveCopy'
 import { logUsageEvent } from '../analytics/usageEvents'
@@ -339,7 +340,7 @@ function SharedRoshettaBody({ code }) {
             border: '1px solid var(--color-border)',
             borderRadius: 'var(--radius-lg)',
           }}>
-            <PrescriptionSheetBlock sheet={{ rows: roshetta.rows }} hasContentAfter={false} keepDoseLineBreaks />
+            <PrescriptionSheetBlock sheet={{ rows: sheetRowsForDisplay(roshetta.rows) }} hasContentAfter={false} keepDoseLineBreaks />
           </div>
         )}
       </>

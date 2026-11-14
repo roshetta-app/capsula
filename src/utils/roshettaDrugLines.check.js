@@ -1,7 +1,7 @@
 // Checks for roshettaDrugLines.js (step 5.1c). Run with: node --test src/utils/roshettaDrugLines.check.js
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { drugLines, drugDetail, switchChip, removeDrugAction, doseCounter, withDose } from './roshettaDrugLines.js';
+import { drugLines, drugDetail, cleanBrandName, sheetRowsForDisplay, switchChip, removeDrugAction, doseCounter, withDose } from './roshettaDrugLines.js';
 import { newDrugGroup, addPartner } from './roshettaRows.js';
 
 const ids = (() => { let n = 0; return () => `row-${++n}`; })();
@@ -39,10 +39,11 @@ test('drugLines: a missing name gets a plain stand-in, an unknown joiner counts 
   assert.equal(lines[1].joiner, 'or');
 });
 
-test('drugDetail: generic, strength and form joined, empty parts left out', () => {
+test('drugDetail: the generic name only, first letter capital, empty when there is none', () => {
   const lines = drugLines(sample(), null);
-  assert.equal(drugDetail(lines[0]), 'Paracetamol \u00B7 500 mg \u00B7 Tablet');
+  assert.equal(drugDetail(lines[0]), 'Paracetamol');
   assert.equal(drugDetail(lines[1]), 'Ibuprofen');
+  assert.equal(drugDetail({ genericName: 'soy isoflavone' }), 'Soy isoflavone');
   assert.equal(drugDetail(lines[2]), '');
   assert.equal(drugDetail(null), '');
 });
@@ -93,4 +94,34 @@ test('withDose: keeps line breaks, stops at 600, never cuts an emoji, touches on
   assert.equal(row.dose, '', 'the original is not changed');
   assert.deepEqual(typed.dose_lines, [], 'no library dose field is filled');
   assert.equal(typed.dose_max, null);
+});
+
+test('cleanBrandName: the library full name loses the strength and pack, a clean name is left alone', () => {
+  assert.equal(cleanBrandName('Tussistop 60mg \u2014 20 Tablets', '60mg'), 'Tussistop');
+  assert.equal(cleanBrandName('Pro-S \u2014 20 Film-Coated Tablets', null), 'Pro-S');
+  assert.equal(cleanBrandName('Notussil 4mg/ml \u2014 60 Ml Suspension', '4mg/ml'), 'Notussil');
+  assert.equal(cleanBrandName('Doliprane 500 mg', '500mg'), 'Doliprane');
+  assert.equal(cleanBrandName('Doliprane', '500mg'), 'Doliprane');
+  assert.equal(cleanBrandName('  ', '500mg'), null);
+  assert.equal(cleanBrandName(null, null), null);
+});
+
+test('drugLines: shownName is the clean brand name, name keeps what was saved', () => {
+  const row = { row_type: 'drug', id: 'x', brand_id: 'b1', brand_name: 'Tussistop 60mg \u2014 20 Tablets', concentration: '60mg', form: 'tablet' };
+  const [line] = drugLines(row, null);
+  assert.equal(line.name, 'Tussistop 60mg \u2014 20 Tablets');
+  assert.equal(line.shownName, 'Tussistop');
+});
+
+test('sheetRowsForDisplay: clean names for the drug and its partners, other rows untouched', () => {
+  const text = { row_type: 'plain_text', id: 't', content: 'Rest' };
+  const row = { row_type: 'drug', id: 'x', brand_name: 'Tussistop 60mg \u2014 20 Tablets', concentration: '60mg', dose: 'd',
+    alternatives: [{ brand_name: 'Pro-S \u2014 20 Film-Coated Tablets', joiner: 'or' }] };
+  const out = sheetRowsForDisplay([row, text]);
+  assert.equal(out[0].brand_name, 'Tussistop');
+  assert.equal(out[0].alternatives[0].brand_name, 'Pro-S');
+  assert.equal(out[0].dose, 'd');
+  assert.equal(out[1], text);
+  assert.equal(row.brand_name, 'Tussistop 60mg \u2014 20 Tablets');
+  assert.equal(sheetRowsForDisplay(null), null);
 });

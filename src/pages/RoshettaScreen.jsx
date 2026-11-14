@@ -42,6 +42,7 @@ import { useAuth } from '../hooks/useAuth'
 import { useDeepLinkParent } from '../hooks/useDeepLinkParent'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
 import { syncStatusLine } from '../utils/groupSyncStatus'
+import { sheetRowsForDisplay } from '../utils/roshettaDrugLines'
 import { pageRoshetta, pageState, pageControls, deleteOutcome, shownRoshetta } from '../utils/roshettaPageState'
 import { ROUTES } from '../router'
 
@@ -342,7 +343,7 @@ export default function RoshettaScreen() {
               borderRadius: 'var(--radius-lg)',
             }}
           >
-            <PrescriptionSheetBlock sheet={{ rows }} hasContentAfter={false} keepDoseLineBreaks />
+            <PrescriptionSheetBlock sheet={{ rows: sheetRowsForDisplay(rows) }} hasContentAfter={false} keepDoseLineBreaks />
           </div>
         )}
       </>
