@@ -77,11 +77,14 @@ export function sheetForEvents(events = []) {
 // of what was not saved, so the plain-words message for those events is left out
 // (it would be said twice). Everything else is still told in words.
 //   -> { sheet, messages, severe, success }
-//      success: true when the only news is that waiting changes went through
+//      success: true when the only news is that changes made while offline went through
+//      (wasOffline). A change made online and sent at once is not news: no note (2026-11-14 fix:
+//      the note used to show after every online autosave and read as if the phone were offline).
+//      wasOffline defaults to true so a caller that does not track it keeps the old answer.
 const SHEET_KINDS = ['roshetta_limit', 'drug_limit', 'read_only']
-export function afterRun({ events = [], failed = 0, sent = 0 } = {}) {
+export function afterRun({ events = [], failed = 0, sent = 0 } = {}, { wasOffline = true } = {}) {
   const sheet = sheetForEvents(events)
   const told = sheet ? events.filter(e => !SHEET_KINDS.includes(e.kind)) : events
   const { messages, severe } = describeEvents(told, failed)
-  return { sheet, messages, severe, success: sent > 0 && messages.length === 0 && !sheet }
+  return { sheet, messages, severe, success: wasOffline && sent > 0 && messages.length === 0 && !sheet }
 }

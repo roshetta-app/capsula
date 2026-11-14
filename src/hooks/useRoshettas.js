@@ -115,6 +115,9 @@ export function useRoshettas() {
   useEffect(() => { userRef.current = user }, [user])
   const onlineRef = useRef(isOnline)
   useEffect(() => { onlineRef.current = isOnline }, [isOnline])
+  // True once a change was made while the phone was offline; cleared when the waiting list is
+  // empty again. Only then does "Your offline changes are saved." make sense.
+  const offlineEditRef = useRef(false)
   const isProRef = useRef(isPro)
   useEffect(() => { isProRef.current = isPro }, [isPro])
   const isOffline = useCallback(
@@ -248,7 +251,9 @@ export function useRoshettas() {
 
     // Tell the person in plain words: one message for the whole run.
     // A refusal for a limit or read only opens the sheet; the rest is told in words.
-    const { sheet, messages, severe, success } = afterRun(result)
+    const wasOffline = offlineEditRef.current
+    if (holderRef.current.queue.length === 0) offlineEditRef.current = false
+    const { sheet, messages, severe, success } = afterRun(result, { wasOffline })
     if (sheet) {
       if (sheet.kind === 'readonly') showRoshettaReadOnly()
       else showRoshettaLimit(sheet.kind, sheet.names)
@@ -350,7 +355,8 @@ export function useRoshettas() {
       toast.error("Couldn't save this change on your phone. Reconnect and try again.")
       return false
     }
-    if (!isOffline()) syncRef.current?.()
+    if (isOffline()) offlineEditRef.current = true
+    else syncRef.current?.()
     return true
   }, [persistQueue, showList, toast, isOffline])
 

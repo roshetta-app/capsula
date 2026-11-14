@@ -103,3 +103,9 @@ test('afterRun: only a limit means a sheet and no message at all; nothing wrong 
   assert.equal(nothing.success, false);
   assert.deepEqual(afterRun(), { sheet: null, messages: [], severe: false, success: false });
 });
+
+test('afterRun: the offline success note only when the changes were made offline', () => {
+  assert.equal(afterRun({ events: [], failed: 0, sent: 1 }, { wasOffline: false }).success, false, 'an online autosave is not news');
+  assert.equal(afterRun({ events: [], failed: 0, sent: 1 }, { wasOffline: true }).success, true);
+  assert.equal(afterRun({ events: [{ kind: 'roshetta_gone', name: 'B' }], sent: 1 }, { wasOffline: false }).messages.length, 1, 'real news is still told');
+});

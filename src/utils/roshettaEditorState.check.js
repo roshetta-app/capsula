@@ -87,7 +87,7 @@ test('saveStatus: Saving while typing or while a save runs, then Saved', () => {
 
 test('saveStatus: a change that is on the phone but not sent says Waiting to save, Saving while it is sent', () => {
   assert.equal(saveStatus({ touched: true, waitingHere: true, online: false }).word, 'Waiting to save');
-  assert.equal(saveStatus({ touched: true, waitingHere: true, online: true, syncState: 'idle' }).word, 'Waiting to save');
+  assert.equal(saveStatus({ touched: true, waitingHere: true, online: true, syncState: 'idle' }).word, 'Saving', 'online: never says Waiting to save');
   assert.equal(saveStatus({ touched: true, waitingHere: true, online: true, syncState: 'syncing' }).word, 'Saving');
   assert.equal(saveStatus({ waitingHere: true, online: false }).word, 'Waiting to save');
   assert.equal(saveStatus({ touched: true, waitingHere: true, syncState: 'syncing', online: false }).word, 'Waiting to save');

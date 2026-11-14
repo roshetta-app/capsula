@@ -99,12 +99,14 @@ export function saveRefused(answer) {
 // touched      something was changed on this screen
 export function saveStatus({
   touched = false, typing = false, saving = false, refused = false,
-  online = true, waitingHere = false, failedHere = false, syncState = 'idle',
+  online = true, waitingHere = false, failedHere = false,
 } = {}) {
   if (failedHere || refused) return { word: "Couldn't save", tone: 'warning' };
   if (typing || saving) return { word: 'Saving', tone: 'neutral' };
   if (waitingHere) {
-    return online && syncState === 'syncing'
+    // Online, the send starts at once (or is being retried), so it is Saving. Waiting to save
+    // is only said when the phone really is offline (2026-11-14 fix: it showed online too).
+    return online
       ? { word: 'Saving', tone: 'neutral' }
       : { word: 'Waiting to save', tone: 'neutral' };
   }
