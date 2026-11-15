@@ -39,6 +39,7 @@ import PrescriptionSheetBlock from '../components/conditions/PrescriptionSheetBl
 import { shimmer } from '../components/drugs/home/shimmer'
 import { useFavouritesContext } from '../context/FavouritesContext'
 import { useAuth } from '../hooks/useAuth'
+import { useBackLabel } from '../hooks/useBackLabel'
 import { useDeepLinkParent } from '../hooks/useDeepLinkParent'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
 import { syncStatusLine } from '../utils/groupSyncStatus'
@@ -66,6 +67,7 @@ export default function RoshettaScreen() {
   const { id } = useParams()
   // Back goes to the real previous screen; opened straight from a link, the Topics screen is put behind it first.
   useDeepLinkParent(ROUTES.CONDITIONS)
+  const backLabel = useBackLabel() || 'Topics'
 
   const { roshettasApi } = useFavouritesContext()
   const {
@@ -148,7 +150,7 @@ export default function RoshettaScreen() {
     <button
       type="button"
       onClick={() => navigate(-1)}
-      aria-label="Back to Topics"
+      aria-label={`Back to ${backLabel}`}
       style={{
         display: 'flex', alignItems: 'center', gap: 6,
         background: 'none', border: 'none', cursor: 'pointer',
@@ -160,7 +162,7 @@ export default function RoshettaScreen() {
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <polyline points="15 18 9 12 15 6" />
       </svg>
-      Topics
+      {backLabel}
     </button>
   )
 

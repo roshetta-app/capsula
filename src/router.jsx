@@ -67,6 +67,7 @@ import AddDrugsToGroupScreen from './pages/AddDrugsToGroupScreen'
 import SharedGroupScreen     from './pages/SharedGroupScreen'
 import SharedRoshettaScreen  from './pages/SharedRoshettaScreen'
 import RoshettaScreen        from './pages/RoshettaScreen'
+import RoshettasListScreen   from './pages/RoshettasListScreen'
 import RoshettaAddDrugScreen from './pages/RoshettaAddDrugScreen'
 import RoshettaEditorScreen from './pages/RoshettaEditorScreen'
 import DrugDetailScreen      from './pages/DrugDetailScreen'
@@ -123,6 +124,8 @@ export const ROUTES = {
   // from a share link. No sign-in needed.
   SHARED_GROUP:          (code) => `/g/${code}`,
   SHARED_ROSHETTA:       (code) => `/r/${code}`,
+  // 2026-11-14 (Roshetta plan, step 8.2): all of a person's roshettas, with search and sort.
+  ROSHETTAS:             '/roshettas',
   // 2026-11-14 (Roshetta plan, step 4.2a): a person's own roshetta page.
   ROSHETTA:              (id) => `/roshetta/${id}`,
   // 2026-11-14 (Roshetta plan, step 5.2a): the Add drug screen of a roshetta.
@@ -181,6 +184,7 @@ export function PublicRoutes() {
         <Route path="/drugs/browse/groups"            element={<DrugGroupsScreen />} />
         <Route path="/drugs/group/:groupId"           element={<DrugGroupScreen />} />
         <Route path="/drugs/group/:groupId/add"       element={<AddDrugsToGroupScreen />} />
+        <Route path="/roshettas"                      element={<RoshettasListScreen />} />
         <Route path="/roshetta/:id"                   element={<RoshettaScreen />} />
         <Route path="/roshetta/:id/add"               element={<RoshettaAddDrugScreen />} />
         <Route path="/roshetta/:id/edit"              element={<RoshettaEditorScreen />} />

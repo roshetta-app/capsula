@@ -1,65 +1,57 @@
-/**
- * src/components/roshettas/RoshettaRow.jsx
- * 2026-11-13 (Roshetta plan, step 4.1a): one roshetta as a row in the My roshettas
- * card. One tap opens it. At least 64 px high so it is easy to hit.
- *
- * Shows the name (one line, cut with "..." when long) and under it the drug count
- * and when it was last changed ("3 drugs, changed today", words in
- * utils/roshettaRowText.js). A small cloud mark sits on the right while changes
- * to this roshetta are saved on the phone and not yet sent, then a chevron.
- *
- * The row has no box of its own: the section draws the card around the rows.
- * Colours come from the app's own variables, light and dark.
- *
- * Props:
- *   roshetta     { id, name, rows, updatedAt }
- *   waiting      true when this roshetta has changes waiting to be sent
- *   showDivider  true -> a thin line under the row (every row but the last)
- *   now          optional Date, only so the wording can be drawn at a fixed time
- *   onOpen       tap handler
- */
+// One roshetta in a list (the shelf on Topics and the See all screen). Phase G step 8.1.
+// Same anatomy as a topic row: icon tile, name, small line, date and chevron on the right.
+// The small line is a preview of the drug names; "Waiting" shows when changes are not saved yet.
 
 import { useState } from 'react'
-import { ChevronRight } from 'lucide-react'
+import { FileText } from 'lucide-react'
 import { WaitingMark } from '../drugs/groups/GroupTile'
 import { rowSummary } from '../../utils/roshettaRowText'
+import { drugPreviewText, shortDateText } from '../../utils/roshettaShelfText'
 
 export default function RoshettaRow({ roshetta, waiting = false, showDivider = false, now, onOpen }) {
   const [pressed, setPressed] = useState(false)
   const name = roshetta?.name ?? ''
-  const summary = rowSummary(roshetta, now)
-  const soft = 'color-mix(in srgb, var(--color-text-primary) 72%, transparent)'
+  const preview = drugPreviewText(roshetta?.rows)
+  const date = shortDateText(roshetta?.updatedAt, now)
 
   return (
     <div
       onClick={onOpen}
       role="button"
       tabIndex={0}
-      aria-label={`${name}, ${summary}${waiting ? ', waiting to save' : ''}`}
+      aria-label={`${name}, ${rowSummary(roshetta, now)}${waiting ? ', waiting to save' : ''}`}
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen?.() } }}
       onPointerDown={() => setPressed(true)}
       onPointerUp={() => setPressed(false)}
       onPointerLeave={() => setPressed(false)}
       onPointerCancel={() => setPressed(false)}
       style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
-        padding: '12px 14px', minHeight: 64, boxSizing: 'border-box',
-        borderBottom: showDivider ? '1px solid var(--color-border)' : 'none',
-        cursor: 'pointer',
-        outline: 'none',
-        WebkitTapHighlightColor: 'transparent',
-        opacity: pressed ? 0.8 : 1,
-        transition: 'opacity var(--motion-fast) var(--ease-settle)',
+        display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
+        padding: '12px 16px', minHeight: 56, boxSizing: 'border-box',
+        borderBottom: showDivider ? '1px solid var(--color-border-subtle)' : 'none',
+        cursor: 'pointer', outline: 'none', WebkitTapHighlightColor: 'transparent',
+        backgroundColor: pressed ? 'var(--color-surface-muted)' : 'transparent',
+        transform: pressed ? 'scale(0.99)' : 'scale(1)',
+        transition: 'background-color var(--motion-fast) var(--ease-settle), transform var(--motion-fast) var(--ease-settle)',
       }}
     >
+      <div
+        aria-hidden="true"
+        style={{
+          width: 32, height: 32, flexShrink: 0, borderRadius: 10,
+          backgroundColor: 'var(--color-accent-light)', color: 'var(--color-accent)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}
+      >
+        <FileText size={16} strokeWidth={2} />
+      </div>
+
       <div style={{ flex: 1, minWidth: 0 }}>
         <div
           dir="auto"
           style={{
-            textAlign: 'start',
-            fontSize: 15, fontWeight: 700, lineHeight: 1.3,
-            color: 'var(--color-text-primary)',
-            fontFamily: 'var(--font-body)',
+            textAlign: 'start', fontSize: 16, fontWeight: 600, lineHeight: 1.3,
+            color: 'var(--color-text-primary)', fontFamily: 'var(--font-body)',
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           }}
         >
@@ -67,18 +59,29 @@ export default function RoshettaRow({ roshetta, waiting = false, showDivider = f
         </div>
         <div
           style={{
-            marginTop: 2, fontSize: 12, lineHeight: 1.4, color: soft,
+            marginTop: 2, fontSize: 12, lineHeight: 1.4, color: 'var(--color-text-secondary)',
             fontFamily: 'var(--font-body)',
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           }}
         >
-          {summary}
+          {preview}
         </div>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3, flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {date && (
+            <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-body)' }}>{date}</span>
+          )}
+          <svg
+            width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+            strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
+            style={{ color: 'var(--color-text-tertiary)', opacity: 0.5, flexShrink: 0 }}
+          >
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </div>
         {waiting && <WaitingMark />}
-        <ChevronRight size={18} strokeWidth={2} color={soft} aria-hidden="true" />
       </div>
     </div>
   )

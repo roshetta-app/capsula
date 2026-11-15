@@ -1044,7 +1044,18 @@ export default function ConditionsScreen() {
 
         {/* My roshettas (roshetta plan, step 4.1e): above the list header; hidden while
             searching or while a specialty is picked. */}
-        {showRoshettaArea({ isSearching, activeSpecialty }) && <RoshettasSection onOpenRoshetta={r => navigate(ROUTES.ROSHETTA(r.id))} />}
+        {showRoshettaArea({ isSearching, activeSpecialty }) && (
+          <>
+            <RoshettasSection
+              onOpenRoshetta={r => navigate(ROUTES.ROSHETTA(r.id))}
+              onSeeAll={() => navigate(ROUTES.ROSHETTAS)}
+            />
+            {/* The topic list gets its own label, so the letter and the sort link below belong to it. */}
+            <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-text-primary)', fontFamily: 'var(--font-body)', minHeight: 44, display: 'flex', alignItems: 'center' }}>
+              Topics
+            </div>
+          </>
+        )}
 
         {/* 5. Count + sort row — in A-Z mode, the first letter is shown inline on the left */}
         <div ref={listHeaderRef}>
