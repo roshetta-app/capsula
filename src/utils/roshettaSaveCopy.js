@@ -3,18 +3,21 @@
  * 2026-11-14 (Roshetta plan, step 6.2c): the plain rules behind "Save a copy" on the shared
  * roshetta page (SharedRoshettaScreen.jsx), so they can be checked without a screen.
  *
- * The copy is a NEW roshetta of the viewer's own: same name, description and rows, not
+ * The copy is a NEW roshetta of the viewer's own: same name, description, rows and specialty, not
  * linked to the shared one, nothing about the owner. It goes through the hook's
  * createRoshetta, so it is saved on the phone first and sent when online.
  */
 
-// What the copy is made from. Only name, description and rows are taken.
+// What the copy is made from. Only name, description, rows and the specialty are taken
+// (assumption J: the copy keeps the specialty; a shared roshetta without one makes a copy without one).
 export function copyFields(roshetta) {
-  return {
+  const fields = {
     name: roshetta.name,
     description: roshetta.description || '',
     rows: Array.isArray(roshetta.rows) ? roshetta.rows : [],
   }
+  if (typeof roshetta.specialtyId === 'string' && roshetta.specialtyId) fields.specialtyId = roshetta.specialtyId
+  return fields
 }
 
 // Step 6.2d: a roshetta with more drugs than the account may keep. Keeps the first drugs in

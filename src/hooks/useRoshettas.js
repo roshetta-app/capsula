@@ -46,7 +46,7 @@
  *    (the screen asks to sign in).
  *
  * Returns:
- *   roshettas            { id, name, description, rows, createdAt, updatedAt }[]  newest changed first
+ *   roshettas            { id, name, description, rows, specialtyId, createdAt, updatedAt }[]  newest changed first
  *   roshettasStatus      'loading' | 'ready' | 'error'
  *   roshettasFromCache   true while the list shown is the saved copy
  *   roshettasLoadError   true when the last refresh failed (with a saved copy still shown)
@@ -59,8 +59,8 @@
  *   syncState            'idle' | 'syncing' | 'saved' ('saved' shows for 3 seconds after a send)
  *   retryFailedChanges   () => Promise<void>   tries the failed changes again
  *   discardFailedChanges () => Promise<void>   drops them and shows the server's roshettas
- *   createRoshetta       ({ name, description?, rows? }) => Promise<{ ok, reason?, roshetta?, queued? }>
- *   saveRoshetta         (id, { name?, description?, rows? }) => Promise<{ ok, reason?, queued? }>
+ *   createRoshetta       ({ name, description?, rows?, specialtyId? }) => Promise<{ ok, reason?, roshetta?, queued? }>
+ *   saveRoshetta         (id, { name?, description?, rows?, specialtyId? }) => Promise<{ ok, reason?, queued? }>
  *   deleteRoshetta       (id) => Promise<{ ok, reason?, roshetta?, index?, queued? }>
  *   reasons: guest, not_loaded, read_only, limit, drug_limit, invalid, missing, error
  *   getRoshettaShareCode (id) => Promise<{ ok, code?, reason? }>   (step 6.1b) the live share code, null when not shared

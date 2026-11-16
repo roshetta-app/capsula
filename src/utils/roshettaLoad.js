@@ -31,7 +31,7 @@
 
 import { applyQueue, clearSending, newestChangedFirst } from './roshettaChanges.js'
 
-export const ROSHETTA_COLUMNS = 'id, name, description, rows, created_at, updated_at'
+export const ROSHETTA_COLUMNS = 'id, name, description, rows, specialty_id, created_at, updated_at'
 export const REQUEST_TIMEOUT_MS = 8000
 
 const TIMEOUT_ERROR = { code: 'request_timeout', message: 'request_timeout' }
@@ -43,6 +43,7 @@ export function mapRoshettaRow(r) {
     name: r.name,
     description: r.description ?? '',
     rows: Array.isArray(r.rows) ? r.rows : [],
+    specialtyId: typeof r.specialty_id === 'string' && r.specialty_id ? r.specialty_id : null,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   }

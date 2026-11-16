@@ -60,6 +60,18 @@ export function classifyError(error, status) {
   return { kind: 'refused', reason: REFUSAL.ERROR }
 }
 
+// The specialty column is sent only when the change carries one (an old waiting change has none,
+// and must not wipe what the server holds). null clears it.
+function specialtyField(data) {
+  return data.specialtyId === undefined ? {} : { specialty_id: data.specialtyId }
+}
+
+// The server refused because the specialty no longer exists (foreign key on specialty_id).
+function specialtyGone(error) {
+  if (!error || String(error.code ?? '') !== '23503') return false
+  return /specialty/i.test(`${error.message ?? ''} ${error.details ?? ''}`)
+}
+
 function toResult(res) {
   const c = classifyError(res?.error, res?.status)
   if (c.kind === 'ok') return { status: 'done', counted: true }
@@ -77,21 +89,36 @@ export async function sendChange(client, change, limit = x => x) {
   try {
     switch (type) {
       case 'create': {
-        const res = await limit(client.from('roshettas').insert({
+        const row = {
           id: roshettaId,
           name: data.name,
           description: data.description ?? '',
           rows: data.rows ?? [],
           created_at: data.createdAt,
-        }))
+          ...specialtyField(data),
+        }
+        let res = await limit(client.from('roshettas').insert(row))
+        if (specialtyGone(res?.error) && 'specialty_id' in row) {
+          // The specialty was removed by an admin while this waited: make the roshetta without it.
+          const without = { ...row }
+          delete without.specialty_id
+          res = await limit(client.from('roshettas').insert(without))
+        }
         return toResult(res)
       }
       case 'save': {
-        const res = await limit(client.from('roshettas').update({
+        const fields = {
           name: data.name,
           description: data.description ?? '',
           rows: data.rows ?? [],
-        }).eq('id', roshettaId).select('id'))
+          ...specialtyField(data),
+        }
+        let res = await limit(client.from('roshettas').update(fields).eq('id', roshettaId).select('id'))
+        if (specialtyGone(res?.error) && 'specialty_id' in fields) {
+          const without = { ...fields }
+          delete without.specialty_id
+          res = await limit(client.from('roshettas').update(without).eq('id', roshettaId).select('id'))
+        }
         const out = toResult(res)
         if (out.status !== 'done') return out
         if (Array.isArray(res.data) && res.data.length === 0) {

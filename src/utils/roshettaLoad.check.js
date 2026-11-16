@@ -30,7 +30,7 @@ const names = (s) => s.roshettas.map(r => r.name);
 
 test('mapRoshettaRow renames the columns and fills gaps', () => {
   const r = mapRoshettaRow({ id: 'a', name: 'N', description: null, rows: null, created_at: T1, updated_at: T2 });
-  assert.deepEqual(r, { id: 'a', name: 'N', description: '', rows: [], createdAt: T1, updatedAt: T2 });
+  assert.deepEqual(r, { id: 'a', name: 'N', description: '', rows: [], specialtyId: null, createdAt: T1, updatedAt: T2 });
   assert.deepEqual(mapRoshettaRow(dbRow('b', 'B')).rows, txt('B'));
 });
 
@@ -55,10 +55,10 @@ test('fetchRoshettas asks the roshettas table for the right columns, newest chan
   } };
   const out = await fetchRoshettas(client, x => x);
   assert.equal(seen.table, 'roshettas');
-  assert.equal(seen.cols, 'id, name, description, rows, created_at, updated_at');
+  assert.equal(seen.cols, 'id, name, description, rows, specialty_id, created_at, updated_at');
   assert.deepEqual(seen.order, ['updated_at', { ascending: false }]);
   assert.equal(out.error, null);
-  assert.deepEqual(out.data, [{ id: 'r1', name: 'Chest pain', description: 'd', rows: txt('Chest pain'), createdAt: T1, updatedAt: T1 }]);
+  assert.deepEqual(out.data, [{ id: 'r1', name: 'Chest pain', description: 'd', rows: txt('Chest pain'), specialtyId: null, createdAt: T1, updatedAt: T1 }]);
 });
 
 test('fetchRoshettas hands the error on and gives no data', async () => {

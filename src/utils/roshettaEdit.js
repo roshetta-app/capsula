@@ -22,7 +22,8 @@ import { applyChange, addChange, makeChange, newId } from './roshettaChanges.js'
 import { checkName, checkDescription, checkRows } from './roshettaRows.js'
 
 // The text fields, trimmed and checked. Returns { ok: true, fields } or { ok: false, reason, detail }.
-function cleanFields({ name, description, rows }) {
+// specialtyId: left out (undefined) = not touched; null = none; text = the chosen specialty.
+function cleanFields({ name, description, rows, specialtyId }) {
   const n = checkName(name)
   if (!n.ok) return { ok: false, reason: 'invalid', detail: `name_${n.reason}` }
   const text = description === undefined || description === null ? '' : description
@@ -30,13 +31,19 @@ function cleanFields({ name, description, rows }) {
   if (!d.ok) return { ok: false, reason: 'invalid', detail: `description_${d.reason}` }
   const r = checkRows(rows)
   if (!r.ok) return { ok: false, reason: 'invalid', detail: r.reasons[0] }
-  return { ok: true, fields: { name: name.trim(), description: text.trim(), rows } }
+  const fields = { name: name.trim(), description: text.trim(), rows }
+  if (specialtyId !== undefined) {
+    const okId = specialtyId === null || (typeof specialtyId === 'string' && specialtyId.length > 0 && specialtyId.length <= 64)
+    if (!okId) return { ok: false, reason: 'invalid', detail: 'specialty_invalid' }
+    fields.specialtyId = specialtyId
+  }
+  return { ok: true, fields }
 }
 
 // New roshetta. The id is made here, so it can be changed again before it
 // reaches the server, and sending it twice makes only one roshetta.
-export function prepareCreate({ name, description = '', rows = [] } = {}, { makeId = newId, now = () => new Date().toISOString() } = {}) {
-  const clean = cleanFields({ name, description, rows })
+export function prepareCreate({ name, description = '', rows = [], specialtyId } = {}, { makeId = newId, now = () => new Date().toISOString() } = {}) {
+  const clean = cleanFields({ name, description, rows, specialtyId })
   if (!clean.ok) return clean
   const id = makeId()
   return { ok: true, id, change: makeChange('create', id, { ...clean.fields, createdAt: now() }) }
@@ -50,6 +57,7 @@ export function prepareSave(list, id, changes = {}) {
     name: changes.name !== undefined ? changes.name : current.name,
     description: changes.description !== undefined ? changes.description : current.description,
     rows: changes.rows !== undefined ? changes.rows : current.rows,
+    specialtyId: changes.specialtyId !== undefined ? changes.specialtyId : current.specialtyId,
   })
   if (!clean.ok) return clean
   return { ok: true, change: makeChange('save', id, clean.fields) }

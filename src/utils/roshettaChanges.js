@@ -10,8 +10,9 @@
  *
  * A change is one small thing the person did:
  *   { id, type, roshettaId, data, at, sending? }
- *   type 'create'  data { name, description, rows, createdAt }
- *   type 'save'    data { name, description, rows }   the WHOLE roshetta
+ *   type 'create'  data { name, description, rows, createdAt, specialtyId? }
+ *   type 'save'    data { name, description, rows, specialtyId? }   the WHOLE roshetta
+ *                  (specialtyId: left out = the server keeps its value; null = none)
  *   type 'delete'  data {}
  * A roshetta is one document, so a save always carries all of it, and a later
  * save simply replaces an earlier one that has not been sent yet (plan
@@ -59,6 +60,7 @@ export function applyChange(roshettas, change) {
         name: data.name,
         description: data.description ?? '',
         rows: data.rows ?? [],
+        ...(data.specialtyId !== undefined ? { specialtyId: data.specialtyId } : {}),
         createdAt: data.createdAt ?? change.at,
         updatedAt: change.at,
       }
@@ -68,7 +70,7 @@ export function applyChange(roshettas, change) {
       if (!roshettas.some(r => r.id === roshettaId)) return roshettas
       return newestChangedFirst(roshettas.map(r => (
         r.id === roshettaId
-          ? { ...r, name: data.name, description: data.description ?? '', rows: data.rows ?? [], updatedAt: change.at }
+          ? { ...r, name: data.name, description: data.description ?? '', rows: data.rows ?? [], ...(data.specialtyId !== undefined ? { specialtyId: data.specialtyId } : {}), updatedAt: change.at }
           : r
       )))
     }
