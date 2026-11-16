@@ -157,13 +157,14 @@
 
 import { useState, useEffect, useRef }  from 'react'
 import { useLocation, useNavigate }     from 'react-router-dom'
-import { BookOpen, Pill, Heart, User }  from 'lucide-react'
+import { House, BookOpen, Pill, Heart, User } from 'lucide-react'
 import { Capacitor }                    from '@capacitor/core'
 import { App as CapacitorApp }          from '@capacitor/app'
 import { useKeyboardOpen }              from '../hooks/useKeyboardOpen'
 import { useBackToTop }                 from '../hooks/useBackToTop'
 import { useAuth }                      from '../hooks/useAuth'
 import { isAnyBackCloseOpen, isSheetLayerPress, isSheetClosePress } from '../hooks/useBackClose'
+import { isTabActive, isExactTabScreen, isTopScreen, backTarget } from '../utils/homePaths'
 
 // ─── BottomNav ────────────────────────────────────────────────────────────────
 
@@ -190,14 +191,10 @@ export default function BottomNav() {
     locationRef.current = location
   }, [location])
 
+  // Phase H 9.3a: the tab rules live in src/utils/homePaths.js. Home is lit for "/" only,
+  // Topics for "/conditions" and below it.
   function isActive(tabPath, pathname = location.pathname) {
-    if (tabPath === '/conditions') {
-      return pathname === '/' ||
-             pathname === '/conditions' ||
-             pathname.startsWith('/conditions/')
-    }
-    return pathname === tabPath ||
-           pathname.startsWith(tabPath + '/')
+    return isTabActive(tabPath, pathname)
   }
 
   // Distinct from isActive above: true only when the user is already on
@@ -205,10 +202,7 @@ export default function BottomNav() {
   // it. Drives whether a tap scrolls to top (already there) or navigates
   // (still needs to land on the list first).
   function isExactScreen(tabPath) {
-    if (tabPath === '/conditions') {
-      return location.pathname === '/' || location.pathname === '/conditions'
-    }
-    return location.pathname === tabPath
+    return isExactTabScreen(tabPath, location.pathname)
   }
 
   // Phase 4's back handler should only be active while standing on the
@@ -230,12 +224,7 @@ export default function BottomNav() {
   // to that item's list. Restricted to an exact match against the four
   // top-level tab screens so it switches off completely the moment you
   // step into anything underneath them.
-  const backHandlerActive =
-    (isExactScreen('/conditions') ||
-     isExactScreen('/drugs') ||
-     isExactScreen('/favourites') ||
-     isExactScreen('/account')) &&
-    !keyboardOpen
+  const backHandlerActive = isTopScreen(location.pathname) && !keyboardOpen
 
   function handleTabTap(path) {
     if (isExactScreen(path)) {
@@ -259,12 +248,14 @@ export default function BottomNav() {
       // step aside so it isn't also treated as a tab-level back.
       if (isAnyBackCloseOpen()) return true
 
-      if (!isActive('/conditions', locationRef.current.pathname)) {
-        navigate('/conditions', { replace: true })
+      // Phase H 9.3a: Back from Topics, Drugs, Favourites or Account goes to Home.
+      const target = backTarget(locationRef.current.pathname)
+      if (target) {
+        navigate(target, { replace: true })
         return true
       }
 
-      // Already on Conditions — back-button UX simplification (this
+      // Already on Home — back-button UX simplification (this
       // session): let back behave normally instead of arming a "press
       // again to exit" prompt. Exits the app on native; on web/PWA there's
       // no in-app "exit," so the press that already moved history back one
@@ -342,6 +333,7 @@ export default function BottomNav() {
   if (keyboardOpen) return null
 
   const TABS = [
+    { path: '/',            label: 'Home',       Icon: House },
     // BookOpen — matches the Conditions tab icon already used inside
     // FavouritesScreen's own Conditions/Drugs tab bar, so "Conditions"
     // reads as the same icon everywhere in the app instead of House here

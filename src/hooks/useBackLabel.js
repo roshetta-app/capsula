@@ -8,6 +8,7 @@
  */
 import { useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
+import { labelForPath } from '../utils/homePaths'
 
 const pathsByStep = new Map()
 
@@ -16,25 +17,7 @@ function currentStep() {
   return typeof idx === 'number' ? idx : 0
 }
 
-export function labelForPath(path) {
-  if (!path) return null
-  if (path === '/' || path === '/conditions') return 'Topics'
-  if (path === '/drugs') return 'Drugs'
-  if (path.startsWith('/drugs/category/')) return 'Category'
-  if (path === '/drugs/browse/category') return 'Categories'
-  if (path === '/drugs/browse/class') return 'Classes'
-  if (path === '/drugs/browse/groups') return 'My groups'
-  if (/^\/drugs\/group\/[^/]+\/add$/.test(path)) return 'Add drugs'
-  if (path.startsWith('/drugs/group/') || path.startsWith('/g/')) return 'Group'
-  if (path.startsWith('/r/')) return 'Roshetta'
-  if (path === '/roshettas') return 'My roshettas'
-  if (path.startsWith('/drugs/generic/')) return 'Generic'
-  if (path.startsWith('/drugs/')) return 'Drug'
-  if (path.startsWith('/conditions/')) return 'Topic'
-  if (path === '/favourites') return 'Favourites'
-  if (path === '/account') return 'Account'
-  return null
-}
+export { labelForPath }
 
 export function BackLabelTracker() {
   const location = useLocation()

@@ -6,7 +6,7 @@
  * same viewer the topic pages use, with line breaks kept in doses.
  *
  * 2026-11-14 (step 4.2b): a "more" button at the top right opens a small menu with
- * "Delete roshetta" (asks first, then goes back to Topics); the one status line of the
+ * "Delete roshetta" (asks first, then goes back to Home); the one status line of the
  * groups wording sits under the Back row (saving, waiting, offline, changes that could not
  * be saved, with Try again); and a fixed Edit and Share bar sits just above the bottom tab
  * bar. 2026-11-14 (step 6.1b): Share opens the share sheet, and the delete question adds
@@ -65,9 +65,9 @@ function PageSkeleton() {
 export default function RoshettaScreen() {
   const navigate = useNavigate()
   const { id } = useParams()
-  // Back goes to the real previous screen; opened straight from a link, the Topics screen is put behind it first.
-  useDeepLinkParent(ROUTES.CONDITIONS)
-  const backLabel = useBackLabel() || 'Topics'
+  // Back goes to the real previous screen; opened straight from a link, the Home screen is put behind it first.
+  useDeepLinkParent(ROUTES.HOME)
+  const backLabel = useBackLabel() || 'Home'
 
   const { roshettasApi } = useFavouritesContext()
   const {
@@ -124,8 +124,8 @@ export default function RoshettaScreen() {
     }
   }, [menuOpen])
 
-  function goTopics() {
-    navigate(ROUTES.CONDITIONS, { replace: true })
+  function goHome() {
+    navigate(ROUTES.HOME, { replace: true })
   }
 
   // The delete question. Throws on failure so the question stays open (ConfirmSheet shows its
@@ -143,7 +143,7 @@ export default function RoshettaScreen() {
       setSnapshot(null)
       throw new Error(res?.reason ?? 'error')
     }
-    goTopics()
+    goHome()
   }
 
   const backButton = (
@@ -282,8 +282,8 @@ export default function RoshettaScreen() {
       <GroupStateMessage
         title="This roshetta isn't available"
         body="It may have been deleted on another device."
-        actionLabel="Back to Topics"
-        onAction={goTopics}
+        actionLabel="Back to Home"
+        onAction={goHome}
       />
     )
   } else {

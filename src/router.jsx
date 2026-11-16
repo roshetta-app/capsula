@@ -100,11 +100,13 @@ import UsersManager         from './pages/admin/UsersManager'
 import ReleasesManager      from './pages/admin/ReleasesManager'
 import GatesManager         from './pages/admin/GatesManager'
 import HomeCardManager      from './pages/admin/HomeCardManager'
+import HomeScreen           from './pages/HomeScreen'
 
 // ─── Route path constants ─────────────────────────────────────────────────────
 
 export const ROUTES = {
   // Public
+  HOME:              '/',
   CONDITIONS:        '/conditions',
   CONDITION_DETAIL:  (slug) => `/conditions/${slug}`,
   DRUGS:             '/drugs',
@@ -177,7 +179,7 @@ export function PublicRoutes() {
           padding for these routes internally (see HEADER_SUPPRESSED_ROUTES
           in layout.jsx), so nothing else needed to change here. */}
       <Route element={<Layout><Outlet /></Layout>}>
-        <Route path="/"                    element={<ConditionsScreen />} />
+        <Route path="/"                    element={<HomeScreen />} />
         <Route path="/conditions"          element={<ConditionsScreen />} />
         <Route path="/drugs"                        element={<DrugsScreen />} />
         <Route path="/drugs/category/:categorySlug"  element={<DrugsScreen />} />

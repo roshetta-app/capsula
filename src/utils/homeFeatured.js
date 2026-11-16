@@ -105,3 +105,34 @@ export function cleanTagline(text) {
   if (t.length > TAGLINE_MAX) return { value: null, error: `Keep it to ${TAGLINE_MAX} characters or fewer` }
   return { value: t, error: null }
 }
+
+// ─── Home screen side (step 9.3) ─────────────────────────────────────────────
+// The public table rows carry ids only. Titles, labels and links come from the library saved on the
+// phone (topics and drugs), so the card also works offline. An item missing from the saved library
+// gets no joined row and so cannot show.
+
+// Turns plain table rows into items shaped like the CMS list, using the saved library.
+export function resolveFromLibrary(rows, conditions, drugs) {
+  const topicById = new Map((Array.isArray(conditions) ? conditions : []).map(c => [c.id, c]))
+  const drugById  = new Map((Array.isArray(drugs) ? drugs : []).map(d => [d.id, d]))
+  return (Array.isArray(rows) ? rows : []).map(row => {
+    if (row.kind === 'brand') {
+      const d = drugById.get(row.brand_id)
+      return {
+        ...row, conditions: null,
+        brands: d ? {
+          id: d.id, slug: d.slug, tradename_clean: d.tradenameClean, is_published: true,
+          formulations: { is_published: true, generics: { class: d.class ?? null, is_published: true } },
+        } : null,
+      }
+    }
+    const c = topicById.get(row.condition_id)
+    return {
+      ...row, brands: null,
+      conditions: c ? {
+        id: c.id, slug: c.slug, name: c.name, is_published: true,
+        specialties: c.specialtyName ? { name_en: c.specialtyName } : null,
+      } : null,
+    }
+  })
+}

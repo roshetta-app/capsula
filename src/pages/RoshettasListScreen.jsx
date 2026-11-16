@@ -31,8 +31,8 @@ const LABEL_STYLE = {
 
 export default function RoshettasListScreen() {
   const navigate = useNavigate()
-  useDeepLinkParent(ROUTES.CONDITIONS)
-  const backLabel = useBackLabel() || 'Topics'
+  useDeepLinkParent(ROUTES.HOME)
+  const backLabel = useBackLabel() || 'Home'
   const { roshettasApi } = useFavouritesContext()
   const {
     roshettas = [], roshettasStatus = 'loading', roshettasLoadError = false, isGuest = false,

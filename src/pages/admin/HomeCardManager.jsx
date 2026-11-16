@@ -10,36 +10,22 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Plus, Trash2, Stethoscope, Pill } from 'lucide-react'
+import { Plus, Trash2 } from 'lucide-react'
 import AdminPageHeader from '../../components/admin/AdminPageHeader'
 import Modal from '../../components/admin/Modal'
 import ConfirmModal from '../../components/admin/ConfirmModal'
+import FeaturedCardView from '../../components/home/FeaturedCardView'
 import {
   listHomeFeatured, addHomeFeatured, updateHomeFeaturedTagline, setHomeFeaturedActive,
   removeHomeFeatured, searchTopicsForHomeCard, searchBrandsForHomeCard,
 } from '../../lib/adminQueries'
 import {
-  TAGLINE_MAX, cardTitle, cardLabel, cardLine, cardButton, blockedReason, summaryText, cleanTagline,
+  TAGLINE_MAX, cardTitle, cardLine, blockedReason, summaryText, cleanTagline,
   countSummary,
 } from '../../utils/homeFeatured'
 
-// ─── Preview of the card as it will look on Home ────────────────────────────
-
-function CardPreview({ item }) {
-  const Icon = item.kind === 'brand' ? Pill : Stethoscope
-  return (
-    <div style={styles.card}>
-      <div style={styles.cardShape} aria-hidden="true" />
-      <Icon size={44} style={styles.cardIcon} aria-hidden="true" />
-      <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 6, maxWidth: '78%' }}>
-        <span dir="auto" style={styles.cardLabel}>{cardLabel(item)}</span>
-        <span dir="auto" style={styles.cardTitle}>{cardTitle(item) || 'Title'}</span>
-        <span dir="auto" style={styles.cardLine}>{cardLine(item)}</span>
-        <span style={styles.cardPill}>{cardButton(item)}</span>
-      </div>
-    </div>
-  )
-}
+// The preview is the same card Home draws (src/components/home/FeaturedCardView.jsx), just not tappable.
+const CardPreview = FeaturedCardView
 
 // ─── Add sheet ──────────────────────────────────────────────────────────────
 
@@ -400,22 +386,5 @@ const styles = {
     padding: 'var(--space-2) var(--space-4)', borderRadius: 'var(--radius-sm)', border: 'none',
     backgroundColor: 'var(--color-accent-solid)', color: '#fff',
     fontSize: 14, fontWeight: 600, fontFamily: 'var(--font-body)', cursor: 'pointer',
-  },
-  // The card preview: one solid blue block, as approved in 9.0.
-  card: {
-    position: 'relative', overflow: 'hidden', minHeight: 150, borderRadius: 16, padding: 16,
-    backgroundColor: 'var(--color-accent-solid)', color: '#fff', fontFamily: 'var(--font-body)',
-  },
-  cardShape: {
-    position: 'absolute', insetInlineEnd: -40, top: -40, width: 150, height: 150,
-    borderRadius: '50%', backgroundColor: 'rgba(255,255,255,0.12)',
-  },
-  cardIcon: { position: 'absolute', insetInlineEnd: 18, bottom: 18, color: 'rgba(255,255,255,0.7)' },
-  cardLabel: { fontSize: 12, fontWeight: 500, opacity: 0.85 },
-  cardTitle: { fontSize: 22, fontWeight: 500, lineHeight: 1.25, overflowWrap: 'anywhere' },
-  cardLine:  { fontSize: 13, opacity: 0.9, overflowWrap: 'anywhere' },
-  cardPill: {
-    alignSelf: 'flex-start', marginTop: 6, padding: '8px 16px', borderRadius: 999,
-    backgroundColor: '#fff', color: 'var(--color-accent-solid)', fontSize: 13, fontWeight: 600,
   },
 }

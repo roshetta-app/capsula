@@ -273,8 +273,8 @@ export default function RoshettaAddDrugScreen() {
       <GroupStateMessage
         title="This roshetta isn't available"
         body="It may have been deleted on another device."
-        actionLabel="Back to Topics"
-        onAction={() => navigate(ROUTES.CONDITIONS, { replace: true })}
+        actionLabel="Back to Home"
+        onAction={() => navigate(ROUTES.HOME, { replace: true })}
       />
     )
   } else if (screenState === 'readonly') {

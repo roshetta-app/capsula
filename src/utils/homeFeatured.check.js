@@ -81,3 +81,28 @@ test('short line input: trimmed, blank means none, over the limit is refused', (
   assert.equal(cleanTagline('x'.repeat(TAGLINE_MAX)).error, null)
   assert.ok(cleanTagline('x'.repeat(TAGLINE_MAX + 1)).error)
 })
+
+import { resolveFromLibrary } from './homeFeatured.js'
+
+test('Home: rows are matched to the saved library; a missing item gets no joined row and cannot show', () => {
+  const rows = [
+    { id: 'r1', kind: 'condition', condition_id: 'c1', brand_id: null, tagline: null, is_active: true },
+    { id: 'r2', kind: 'brand', condition_id: null, brand_id: 'b1', tagline: 'Gut motility', is_active: true },
+    { id: 'r3', kind: 'condition', condition_id: 'gone', brand_id: null, tagline: null, is_active: true },
+    { id: 'r4', kind: 'brand', condition_id: null, brand_id: 'gone', tagline: null, is_active: true },
+  ]
+  const conditions = [{ id: 'c1', slug: 'acute-cholecystitis', name: 'Acute Cholecystitis', specialtyName: 'Gastroenterology' }]
+  const drugs = [{ id: 'b1', slug: 'motinorm-10', tradenameClean: 'Motinorm', class: 'Prokinetic' }]
+  const items = resolveFromLibrary(rows, conditions, drugs)
+  assert.equal(cardTitle(items[0]), 'Acute Cholecystitis')
+  assert.equal(cardLabel(items[0]), 'Topic \u00b7 Gastroenterology')
+  assert.equal(cardPath(items[0]), '/conditions/acute-cholecystitis')
+  assert.equal(cardTitle(items[1]), 'Motinorm')
+  assert.equal(cardLabel(items[1]), 'Drug \u00b7 Prokinetic')
+  assert.equal(cardLine(items[1]), 'Gut motility')
+  assert.equal(cardPath(items[1]), '/drugs/motinorm-10')
+  assert.deepEqual(items.map(canShow), [true, true, false, false])
+  assert.deepEqual(resolveFromLibrary(undefined, undefined, undefined), [])
+  assert.equal(resolveFromLibrary([{ id: 'x', kind: 'condition', condition_id: 'c1', is_active: true }], conditions, [])[0].conditions.specialties.name_en, 'Gastroenterology')
+  assert.equal(resolveFromLibrary([{ id: 'x', kind: 'condition', condition_id: 'c1', is_active: true }], [{ id: 'c1', slug: 's', name: 'N', specialtyName: null }], [])[0].conditions.specialties, null)
+})
