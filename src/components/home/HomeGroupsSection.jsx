@@ -17,12 +17,14 @@
  * Props: onOpenGroup(group), onSeeAll()
  */
 
-import { memo, useState } from 'react'
+import { memo, useEffect, useState } from 'react'
 import { Folder } from 'lucide-react'
 import { shimmer } from '../drugs/home/shimmer'
 import GroupStateMessage from '../drugs/groups/GroupStateMessage'
 import GroupEditorSheet from '../drugs/groups/GroupEditorSheet'
 import FailedChangesSheet from '../drugs/groups/FailedChangesSheet'
+import Snackbar from '../ui/Snackbar'
+import { takePendingUndo } from '../drugs/groups/pendingUndo'
 import { HomeGroupCard, HomeNewGroupCard } from './HomeGroupCard'
 import { CARD_W, CARD_H } from './HomeRoshettaCard'
 import { useFavouritesContext } from '../../context/FavouritesContext'
@@ -118,7 +120,7 @@ function GuestRow({ onSignIn }) {
 function HomeGroupsSection({ onOpenGroup, onSeeAll }) {
   const {
     groups = [], groupsStatus = 'loading', groupsLoadError = false, isReadOnly = false, canCreateGroup = true,
-    reloadGroups, promptSignIn, showGroupLimit, showGroupReadOnly, waitingGroupIds = [],
+    reloadGroups, restoreGroup, promptSignIn, showGroupLimit, showGroupReadOnly, waitingGroupIds = [],
     waitingCount = 0, failedCount = 0, syncState = 'idle',
   } = useFavouritesContext()
   const { groupsSortMode } = useDrugContext()
@@ -127,6 +129,27 @@ function HomeGroupsSection({ onOpenGroup, onSeeAll }) {
   const { isOnline } = useOnlineStatus()
   const [editorOpen, setEditorOpen] = useState(false)
   const [seeOpen, setSeeOpen] = useState(false)
+
+  // Undo for Delete group (moved here from the Drugs screen in step 9.7): a group deleted from its
+  // page hands itself over through pendingUndo.js, and the message shows for 5 seconds.
+  const [undo, setUndo] = useState(() => {
+    const g = takePendingUndo()
+    return { group: g, visible: !!g }
+  })
+  useEffect(() => {
+    if (!undo.visible) return undefined
+    const t = setTimeout(() => setUndo(u => ({ ...u, visible: false })), 5000)
+    return () => clearTimeout(t)
+  }, [undo.visible, undo.group])
+
+  async function handleUndo() {
+    const restored = undo.group
+    setUndo(u => ({ ...u, visible: false }))
+    const res = await restoreGroup?.(restored)
+    if (res?.ok) return
+    if (res?.reason === 'limit') showGroupLimit?.('groups')
+    else if (res?.reason === 'read_only') showGroupReadOnly?.()
+  }
 
   const count = groups.length
   const state = sectionState({ authLoading, isGuest: !user, status: groupsStatus, count })
@@ -226,6 +249,7 @@ function HomeGroupsSection({ onOpenGroup, onSeeAll }) {
       {content}
       <GroupEditorSheet isOpen={editorOpen} onClose={() => setEditorOpen(false)} group={null} />
       <FailedChangesSheet isOpen={seeOpen} onClose={() => setSeeOpen(false)} />
+      <Snackbar visible={undo.visible} message="Group deleted" actionLabel="Undo" onAction={handleUndo} />
     </section>
   )
 }

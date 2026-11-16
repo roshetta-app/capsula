@@ -61,7 +61,7 @@
  * question can say the link stops working too.
  *
  * Deleting (from the editor, or the button on a read-only group) takes the
- * person back to the Drugs home, which offers Undo for 5 seconds
+ * person back to Home, which offers Undo for 5 seconds
  * (pendingUndo.js). While the editor or delete question is open the page
  * keeps showing the last copy of the group, so a delete in progress never
  * flashes "not found".
@@ -119,7 +119,7 @@ export default function DrugGroupScreen() {
   const { groupId } = useParams()
   // Back goes to the real previous screen; opened straight from a link, the
   // Drugs home is put behind it first.
-  useDeepLinkParent(ROUTES.DRUGS)
+  useDeepLinkParent(ROUTES.HOME)
 
   const { drugs, loading: drugsLoading } = useDrugContext()
   const {
@@ -187,11 +187,11 @@ export default function DrugGroupScreen() {
   }, [byId, ids])
 
   function goHome() {
-    navigate(ROUTES.DRUGS, { replace: true })
+    navigate(ROUTES.HOME, { replace: true })
   }
 
-  // Delete finished (from the editor or the read-only button): back to the
-  // Drugs home, which offers Undo.
+  // Delete finished (from the editor or the read-only button): back to Home
+  // (My drug groups lives there since step 9.7), which offers Undo.
   function handleDeleted(deleted) {
     setPendingUndo(deleted ?? group)
     goHome()
@@ -312,7 +312,7 @@ export default function DrugGroupScreen() {
       <GroupStateMessage
         title="This group isn't available"
         body="It may have been deleted on another device."
-        actionLabel="Back to Drugs"
+        actionLabel="Back to Home"
         onAction={goHome}
       />
     )

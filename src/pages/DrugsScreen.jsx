@@ -310,8 +310,6 @@ import RecentlyViewedSheet from '../components/drugs/RecentlyViewedSheet'
 import DrugsSearchSection, { MODE_OPTIONS } from '../components/drugs/home/DrugsSearchSection'
 import ModeButton from '../components/drugs/home/ModeButton'
 import DrugsBrowseSection from '../components/drugs/home/DrugsBrowseSection'
-import GroupsSection from '../components/drugs/groups/GroupsSection'
-import { isDrugGroupsOn } from '../constants/features'
 import {
   FadeIn, SearchSwitchingState, TooShortState, RecentEmptyState, SearchAllButton, WidenSearchState,
   EmptyState, ClassHintStrip, ModeSwitchState, FilterMaskedState, DidYouMeanState,
@@ -1049,17 +1047,9 @@ export default function DrugsScreen() {
     // ── Home view: the Browse area ────────────────────────────────────────
     // 2026-10-18 (Drugs groups plan, step 1.5): Browse is two buttons that
     // open the Category and Class pages; it needs no data from this screen.
-    // 2026-10-18 (Drug groups plan, step 3.6): under Browse sits the My drug
-    // groups area, drawn only when the groups switch (or the test preview on
-    // this phone) is on.
-    // 2026-10-22 (UI refresh plan, step 8.2a): My drug groups moved above Browse, right
-    // under Recently viewed.
-    body = (
-      <>
-        {isDrugGroupsOn() && <GroupsSection />}
-        <DrugsBrowseSection />
-      </>
-    )
+    // 2026-11-16 (Roshetta plan, step 9.7): My drug groups moved to the Home screen, so this
+    // view is Browse only (Recently viewed sits above it, drawn elsewhere on this screen).
+    body = <DrugsBrowseSection />
   }
 
   // Phase 5 (§4.3, step 5c) — wires the filter-masked usageEvent (added in

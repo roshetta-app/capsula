@@ -22,9 +22,9 @@ export default function DrugGroupsScreen() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const { groups, groupsStatus } = useFavouritesContext()
-  useDeepLinkParent(ROUTES.DRUGS)
+  useDeepLinkParent(ROUTES.HOME)
 
-  if (!isDrugGroupsOn()) return <Navigate to={ROUTES.DRUGS} replace />
+  if (!isDrugGroupsOn()) return <Navigate to={ROUTES.HOME} replace />
 
   const n = groups?.length ?? 0
   const subtitle = user && groupsStatus === 'ready' && n > 0 ? `${n} ${n === 1 ? 'group' : 'groups'}` : null
@@ -32,7 +32,7 @@ export default function DrugGroupsScreen() {
   // Side gap and max width come from Layout; this page adds bottom space only.
   return (
     <div style={{ padding: '0 0 var(--space-4)' }}>
-      <GroupsSection all headerProps={{ backLabel: 'Drugs', onBack: () => navigate(-1), title: 'My drug groups', subtitle }} />
+      <GroupsSection all headerProps={{ backLabel: 'Home', onBack: () => navigate(-1), title: 'My drug groups', subtitle }} />
     </div>
   )
 }

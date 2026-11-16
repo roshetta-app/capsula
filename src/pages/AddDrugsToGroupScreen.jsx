@@ -283,8 +283,8 @@ export default function AddDrugsToGroupScreen() {
       <GroupStateMessage
         title="This group isn't available"
         body="It may have been deleted on another device."
-        actionLabel="Back to Drugs"
-        onAction={() => navigate(ROUTES.DRUGS, { replace: true })}
+        actionLabel="Back to Home"
+        onAction={() => navigate(ROUTES.HOME, { replace: true })}
       />
     )
   } else if (isReadOnly) {
