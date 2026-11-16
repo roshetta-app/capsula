@@ -14,6 +14,10 @@ import { cardLabel } from '../../utils/homeRoshettas'
 export const CARD_W = 148
 export const NEW_W = 112
 export const CARD_H = 132
+// Large text: the card width follows the text size (9.25em is 148px at the normal size) and the
+// height is a minimum, so names and dates are never cut off (step 9.8).
+export const CARD_W_CSS = `max(${CARD_W}px, 9.25em)`
+export const NEW_W_CSS = `max(${NEW_W}px, 7em)`
 
 const font = 'var(--font-body)'
 const oneLine = { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
@@ -41,7 +45,7 @@ export function HomeRoshettaCard({ roshetta, waiting = false, now, onOpen }) {
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen?.() } }}
       {...pressProps(setPressed)}
       style={{
-        flex: `0 0 ${CARD_W}px`, width: CARD_W, height: CARD_H, boxSizing: 'border-box', scrollSnapAlign: 'start',
+        fontSize: 16, flex: `0 0 ${CARD_W_CSS}`, width: CARD_W_CSS, minHeight: CARD_H, boxSizing: 'border-box', scrollSnapAlign: 'start',
         display: 'flex', flexDirection: 'column', padding: 12,
         backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 16,
         cursor: 'pointer', outline: 'none', WebkitTapHighlightColor: 'transparent',
@@ -91,7 +95,7 @@ export function HomeNewCard({ onTap, showPro = false }) {
       aria-label="New roshetta"
       {...pressProps(setPressed)}
       style={{
-        flex: `0 0 ${NEW_W}px`, width: NEW_W, height: CARD_H, boxSizing: 'border-box', scrollSnapAlign: 'start',
+        fontSize: 16, flex: `0 0 ${NEW_W_CSS}`, width: NEW_W_CSS, minHeight: CARD_H, boxSizing: 'border-box', scrollSnapAlign: 'start',
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 12,
         backgroundColor: 'transparent', border: '1.5px dashed var(--color-chip-line)', borderRadius: 16,
         cursor: 'pointer', outline: 'none', WebkitTapHighlightColor: 'transparent',

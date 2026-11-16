@@ -11,7 +11,7 @@ import { ProPill } from '../drugs/groups/GroupTile'
 import { resolveToken } from '../../utils/specialtyTokens'
 import { useIsDark } from '../../utils/specialtyIcon'
 import { groupCardLabel, groupCountText } from '../../utils/homeGroups'
-import { CARD_W, NEW_W, CARD_H } from './HomeRoshettaCard'
+import { CARD_W_CSS, NEW_W_CSS, CARD_H } from './HomeRoshettaCard'
 
 const font = 'var(--font-body)'
 const GREY = 'color-mix(in srgb, var(--color-text-primary) 5%, var(--color-bg))'
@@ -40,7 +40,7 @@ export function HomeGroupCard({ group, waiting = false, onOpen }) {
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen?.() } }}
       {...pressProps(setPressed)}
       style={{
-        flex: `0 0 ${CARD_W}px`, width: CARD_W, height: CARD_H, boxSizing: 'border-box', scrollSnapAlign: 'start',
+        fontSize: 16, flex: `0 0 ${CARD_W_CSS}`, width: CARD_W_CSS, minHeight: CARD_H, boxSizing: 'border-box', scrollSnapAlign: 'start',
         display: 'flex', flexDirection: 'column', padding: 12,
         backgroundColor: colors.bg, borderRadius: 16, border: 'none',
         cursor: 'pointer', outline: 'none', WebkitTapHighlightColor: 'transparent',
@@ -95,7 +95,7 @@ export function HomeNewGroupCard({ onTap, showPro = false }) {
       aria-label="New group"
       {...pressProps(setPressed)}
       style={{
-        flex: `0 0 ${NEW_W}px`, width: NEW_W, height: CARD_H, boxSizing: 'border-box', scrollSnapAlign: 'start',
+        fontSize: 16, flex: `0 0 ${NEW_W_CSS}`, width: NEW_W_CSS, minHeight: CARD_H, boxSizing: 'border-box', scrollSnapAlign: 'start',
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 12,
         backgroundColor: GREY, border: '1.5px dashed var(--color-chip-line)', borderRadius: 16,
         cursor: 'pointer', outline: 'none', WebkitTapHighlightColor: 'transparent',
