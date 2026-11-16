@@ -31,6 +31,12 @@
  * The bar then says "Saved 10 of 14 drugs. Upgrade to Pro to keep all of them." (a Pro account
  * is not told to upgrade). The drug limit sheet is no longer opened for this case.
  *
+ * 2026-11-16 (Phase I step 10.8): the name and description sit in the same letterhead as the
+ * owner's roshetta page (RoshettaPageHeader), with the specialty the author chose (its name,
+ * icon and colour come with the shared data, so the page needs nothing else loaded); no specialty
+ * shows "Roshetta" in the app's blue. Save a copy gives the copy the same specialty. The
+ * specialty is a public library item; the owner is still never shown.
+ *
  * 2026-11-14 (step 6.3): two analytics events, never a code, name or text: 'shared_roshetta_open'
  * once per link when the roshetta really shows (Try again or coming back online does not count
  * it twice) and 'shared_roshetta_save' when a copy is saved (the new roshetta's id).
@@ -40,6 +46,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { FileX, WifiOff, CircleAlert, Check } from 'lucide-react'
 import RoshettaDisclaimer from '../components/roshettas/RoshettaDisclaimer'
+import RoshettaPageHeader from '../components/roshettas/RoshettaPageHeader'
 import PrescriptionSheetBlock from '../components/conditions/PrescriptionSheetBlock'
 import GroupStateMessage from '../components/drugs/groups/GroupStateMessage'
 import { shimmer } from '../components/drugs/home/shimmer'
@@ -296,32 +303,10 @@ function SharedRoshettaBody({ code }) {
     )
   } else {
     const { roshetta } = result
-    const description = (roshetta.description || '').trim()
     const font = 'var(--font-body)'
     content = (
       <>
-        <h1
-          dir="auto"
-          style={{
-            margin: 0, textAlign: 'start', overflowWrap: 'anywhere',
-            fontSize: 22, fontWeight: 700, lineHeight: 1.25,
-            color: 'var(--color-text-primary)', fontFamily: font,
-          }}
-        >
-          {roshetta.name}
-        </h1>
-        {description ? (
-          <p
-            dir="auto"
-            style={{
-              margin: '6px 0 0', textAlign: 'start', whiteSpace: 'pre-line', overflowWrap: 'anywhere',
-              fontSize: 14, lineHeight: 1.5,
-              color: 'var(--color-text-secondary)', fontFamily: font,
-            }}
-          >
-            {description}
-          </p>
-        ) : null}
+        <RoshettaPageHeader name={roshetta.name} description={roshetta.description} specialty={roshetta.specialty} />
 
         <RoshettaDisclaimer marginTop={14} />
 

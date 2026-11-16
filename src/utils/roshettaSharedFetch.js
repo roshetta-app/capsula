@@ -5,11 +5,11 @@
  * database. sharedRoshetta.js binds the real database to loadSharedRoshetta.
  *
  * Reads only through the database function get_shared_roshetta(p_code), which anyone
- * (signed in or not) may call and which returns { name, description, rows } and never
- * an owner or a user id. The tables themselves are closed to the public.
+ * (signed in or not) may call and which returns { name, description, rows, specialty } and
+ * never an owner or a user id. The tables themselves are closed to the public.
  *
  * loadSharedRoshetta(code, deps) answers one of:
- *   { status: 'ok', roshetta: { name, description, rows } }
+ *   { status: 'ok', roshetta: { name, description, rows, specialtyId, specialty } }
  *   { status: 'unavailable' }  wrong, short, stopped or deleted-roshetta link
  *                              (all the same answer, so nothing is revealed)
  *   { status: 'offline' }      the phone has no connection (or the database stayed silent)
@@ -22,18 +22,25 @@
 
 import { ROSHETTA_ROW_TYPES } from './roshettaRows.js'
 import { withTimeLimit } from './roshettaLoad.js'
+import { specialtyFromShared } from './roshettaSpecialty.js'
 
 // The database refuses codes shorter than this; no need to ask it.
 export const MIN_CODE_LENGTH = 32
 
 const KEPT_TYPES = new Set([ROSHETTA_ROW_TYPES.DRUG, ROSHETTA_ROW_TYPES.PLAIN_TEXT])
 
-// Name, description and rows only; nothing else the database might ever add is passed on.
+// Name, description, rows and the specialty only; nothing else the database might ever add is
+// passed on. 2026-11-16 (Phase I step 10.8): specialtyId is the specialty's own (public library)
+// id, kept so Save a copy can give the copy the same specialty (null when none); specialty is the
+// same thing in the picker's shape, for the header (null when none or not a proper specialty,
+// so the default blue is shown).
 export function mapSharedRoshetta(data) {
   const rows = Array.isArray(data.rows)
     ? data.rows.filter(r => r && typeof r === 'object' && KEPT_TYPES.has(r.row_type))
     : []
-  return { name: data.name, description: data.description ?? '', rows }
+  const sp = data.specialty
+  const specialtyId = sp && typeof sp === 'object' && !Array.isArray(sp) && typeof sp.id === 'string' && sp.id ? sp.id : null
+  return { name: data.name, description: data.description ?? '', rows, specialtyId, specialty: specialtyFromShared(sp) }
 }
 
 // deps: { rpc: (fn, args) => Promise<{ data, error }>, isOnline: () => boolean, timeLimitMs? }

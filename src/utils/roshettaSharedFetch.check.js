@@ -2,6 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { MIN_CODE_LENGTH, mapSharedRoshetta, loadSharedRoshetta } from './roshettaSharedFetch.js';
+import { copyFields } from './roshettaSaveCopy.js';
 
 const CODE = 'k'.repeat(64);
 const drug = { row_type: 'drug', id: 'd1', drug_name: 'Panadol', dose: '500 mg' };
@@ -20,7 +21,7 @@ async function run(code, { reply = { data: { name: 'Chest pain', description: 'd
 
 test('a good code: name, description and rows come back, asked through get_shared_roshetta with the code as given', async () => {
   const { result, asked } = await run(CODE);
-  assert.deepEqual(result, { status: 'ok', roshetta: { name: 'Chest pain', description: 'd', rows: [drug, text] } });
+  assert.deepEqual(result, { status: 'ok', roshetta: { name: 'Chest pain', description: 'd', rows: [drug, text], specialtyId: null, specialty: null } });
   assert.deepEqual(asked, [['get_shared_roshetta', { p_code: CODE }]]);
 });
 
@@ -65,5 +66,40 @@ test('only drug and text rows are kept; anything else (a free_text row would be 
 });
 
 test('rows that are not a list become an empty list; only name, description and rows are passed on', () => {
-  assert.deepEqual(mapSharedRoshetta({ name: 'N', description: 'd', rows: 'x', owner: 'u1', user_id: 'u1' }), { name: 'N', description: 'd', rows: [] });
+  assert.deepEqual(mapSharedRoshetta({ name: 'N', description: 'd', rows: 'x', owner: 'u1', user_id: 'u1' }), { name: 'N', description: 'd', rows: [], specialtyId: null, specialty: null });
+});
+
+// Phase I step 10.8: the specialty comes through for the header, and its id for Save a copy.
+const CARDIO = { id: 's1', name_en: 'Cardiology', name_ar: 'x', icon_type: 'lucide', icon_value: 'HeartPulse', color_token: 'rose' };
+
+test('a shared roshetta with a specialty: the id and the picker-shaped specialty come through, nothing else', () => {
+  const m = mapSharedRoshetta({ name: 'N', description: '', rows: [], specialty: CARDIO });
+  assert.equal(m.specialtyId, 's1');
+  assert.deepEqual(m.specialty, { id: 's1', name: 'Cardiology', iconType: 'lucide', iconValue: 'HeartPulse', colorToken: 'rose' });
+  assert.deepEqual(Object.keys(m).sort(), ['description', 'name', 'rows', 'specialty', 'specialtyId']);
+});
+
+test('no specialty, or anything that is not a proper one, gives none (the default blue) and no id to copy', () => {
+  for (const sp of [undefined, null, [], 'x', 5, {}, { name_en: 'A' }, { id: '' }]) {
+    const m = mapSharedRoshetta({ name: 'N', rows: [], specialty: sp });
+    assert.equal(m.specialtyId, null, JSON.stringify(sp));
+    assert.equal(m.specialty, null, JSON.stringify(sp));
+  }
+});
+
+test('a specialty with an id but no usable name: the copy still keeps it, the header shows the default', () => {
+  const m = mapSharedRoshetta({ name: 'N', rows: [], specialty: { id: 's9', name_en: '  ' } });
+  assert.equal(m.specialtyId, 's9');
+  assert.equal(m.specialty, null);
+});
+
+test('loadSharedRoshetta passes the specialty on, and Save a copy takes it from there', async () => {
+  const { result } = await run(CODE, { reply: { data: { name: 'N', description: '', rows: [drug], specialty: CARDIO }, error: null } });
+  assert.equal(result.roshetta.specialtyId, 's1');
+  assert.equal(result.roshetta.specialty.name, 'Cardiology');
+});
+
+test('Save a copy from a shared roshetta keeps the specialty; without one the copy has none', () => {
+  assert.equal(copyFields(mapSharedRoshetta({ name: 'N', rows: [], specialty: CARDIO })).specialtyId, 's1');
+  assert.equal('specialtyId' in copyFields(mapSharedRoshetta({ name: 'N', rows: [], specialty: null })), false);
 });
