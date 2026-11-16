@@ -2,8 +2,8 @@
  * src/pages/HomeScreen.jsx
  * Phase H, step 9.3 — Home, the app's first screen (address "/").
  *
- * Top bar (wordmark, bell, dark mode), the welcome heading, the featured card and, from step 9.4,
- * the My roshettas row. My drug groups joins in step 9.5. The roshettas shelf stays on Topics and
+ * Top bar (wordmark, bell, dark mode), the welcome heading, the featured card, then the My roshettas
+ * row (step 9.4) and the My drug groups row (step 9.5). The roshettas shelf stays on Topics and
  * My drug groups on Drugs until steps 9.6 and 9.7 take them off.
  * No search on Home (assumption W). The card opens its topic or drug; it is not drawn at all when there
  * is nothing to show.
@@ -12,6 +12,7 @@ import { useNavigate } from 'react-router-dom'
 import HomeTopBar from '../components/home/HomeTopBar'
 import FeaturedCardView from '../components/home/FeaturedCardView'
 import HomeRoshettasSection from '../components/home/HomeRoshettasSection'
+import HomeGroupsSection from '../components/home/HomeGroupsSection'
 import { useAuth } from '../hooks/useAuth'
 import { useConditionContext } from '../context/ConditionContext'
 import { useDrugContext } from '../context/DrugContext'
@@ -52,6 +53,11 @@ export default function HomeScreen() {
       <HomeRoshettasSection
         onOpenRoshetta={r => navigate(ROUTES.ROSHETTA(r.id))}
         onSeeAll={() => navigate(ROUTES.ROSHETTAS)}
+      />
+
+      <HomeGroupsSection
+        onOpenGroup={g => navigate(ROUTES.DRUGS_GROUP(g.id))}
+        onSeeAll={() => navigate(ROUTES.DRUGS_GROUPS)}
       />
     </div>
   )
