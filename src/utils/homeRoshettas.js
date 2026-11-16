@@ -1,0 +1,46 @@
+/**
+ * src/utils/homeRoshettas.js
+ * Phase H, step 9.4 (2026-11-16): the small decisions of the My roshettas row on Home, in a plain
+ * file so they are checked without a screen (homeRoshettas.check.js). The state of the row
+ * (loading / guest / error / empty / list) and what a tap on New does are the same as on the Topics
+ * shelf (roshettaSectionState.js); this file only adds what is new on Home.
+ *
+ *   HOME_ROW_MAX                 how many roshetta cards the row holds before "See all" (10)
+ *   homeRowCards(list)           the first HOME_ROW_MAX roshettas, as given (already newest first)
+ *   showNewCard({ state, isReadOnly })   the dashed New card starts the row of a list, unless read only
+ *   limitLine({ isPro, count, cap, proCap })
+ *                                \"3 of 3 on the free plan. Upgrade to Pro for 100.\" when a free
+ *                                account is full, otherwise ''
+ *   homeNotice({ online, failedCount, waitingCount, syncState })
+ *                                the slim notice above the row (the existing sync wording), only
+ *                                while changes are waiting or were refused; otherwise null
+ *   cardLabel(roshetta, waiting, summary)  what a screen reader says for one card
+ */
+
+import { syncStatusLine } from './groupSyncStatus.js';
+
+export const HOME_ROW_MAX = 10;
+
+export function homeRowCards(list) {
+  const all = Array.isArray(list) ? list : [];
+  return all.slice(0, HOME_ROW_MAX);
+}
+
+export function showNewCard({ state = 'list', isReadOnly = false } = {}) {
+  return state === 'list' && !isReadOnly;
+}
+
+export function limitLine({ isPro = false, count = 0, cap = 3, proCap = 100 } = {}) {
+  if (isPro || count < cap) return '';
+  return `${cap} of ${cap} on the free plan. Upgrade to Pro for ${proCap}.`;
+}
+
+export function homeNotice({ online = true, failedCount = 0, waitingCount = 0, syncState = 'idle' } = {}) {
+  if (failedCount < 1 && waitingCount < 1) return null;
+  return syncStatusLine({ online, failedCount, waitingCount, syncState });
+}
+
+export function cardLabel(roshetta, waiting = false, summary = '') {
+  const name = roshetta?.name ?? '';
+  return `${name}${summary ? `, ${summary}` : ''}${waiting ? ', waiting to save' : ''}`;
+}
