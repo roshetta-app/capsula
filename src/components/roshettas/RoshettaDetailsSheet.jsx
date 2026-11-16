@@ -15,6 +15,13 @@
  *                          roshetta is passed in, so the screen can open it.
  *
  * Rules:
+ *  - Specialty (2026-11-16, Roshetta plan 10.5): an optional row under the description. It
+ *    shows the chosen specialty (icon, name) or 'None', opens the same specialty picker
+ *    the Topics screen uses (with a 'No specialty' row on top), and has a small X to clear
+ *    it. Its colour tints the row's icon only; the card colours come in step 10.6. A
+ *    specialty changed here counts as a change (the discard question and the unchanged-close
+ *    rule see it). A specialty left alone is never sent, so a rename cannot touch it.
+ *    The list comes from the Topics data already on the phone, so the row works offline.
  *  - Name is required, 40 characters; description is optional, 200 characters.
  *    Both show a counter ("12/40"). Typing stops at the limit, counted as people
  *    count (an emoji is one). Names need not be unique (decision D), so there is
@@ -37,14 +44,18 @@
  */
 
 import { useRef, useState } from 'react'
-import { X } from 'lucide-react'
+import { ChevronDown, X } from 'lucide-react'
 import SheetShell from '../ui/SheetShell'
 import ConfirmSheet from '../ui/ConfirmSheet'
+import SpecialtiesBottomSheet from '../conditions/SpecialtiesBottomSheet'
+import { SpecialtyIcon, useIsDark } from '../../utils/specialtyIcon'
+import { useConditionContext } from '../../context/ConditionContext'
 import { useFavouritesContext } from '../../context/FavouritesContext'
 import { useIsPro } from '../../hooks/useIsPro'
 import { useDirtyState } from '../../hooks/useDirtyState'
 import { ROSHETTA_NAME_MAX, ROSHETTA_DESCRIPTION_MAX } from '../../utils/roshettaRows'
-import { countText, limitText, nameProblem, saveFailureMessage } from '../../utils/roshettaDetailsText'
+import { countText, limitText, nameProblem, saveFailureMessage, specialtyRowText, detailsFields } from '../../utils/roshettaDetailsText'
+import { findSpecialty, specialtyColors } from '../../utils/roshettaSpecialty'
 
 const LABEL_STYLE = {
   display: 'block', marginBottom: 6,
@@ -70,12 +81,16 @@ export default function RoshettaDetailsSheet({ isOpen, onClose, roshetta = null,
   const { roshettasApi } = useFavouritesContext()
   const { createRoshetta, saveRoshetta } = roshettasApi
   const isPro = useIsPro()
+  const { specialties } = useConditionContext()
+  const isDark = useIsDark()
   const isEdit = !!roshetta
 
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
+  const [specialtyId, setSpecialtyId] = useState(null)
+  const [pickerOpen, setPickerOpen] = useState(false)
   // What the sheet started with this time it opened (to know whether anything changed).
-  const [start, setStart] = useState({ name: '', description: '' })
+  const [start, setStart] = useState({ name: '', description: '', specialtyId: null })
   const [nameError, setNameError] = useState(false)
   const [saveError, setSaveError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -87,10 +102,16 @@ export default function RoshettaDetailsSheet({ isOpen, onClose, roshetta = null,
   if (isOpen !== wasOpen) {
     setWasOpen(isOpen)
     if (isOpen) {
-      const first = { name: roshetta?.name ?? '', description: roshetta?.description ?? '' }
+      const first = {
+        name: roshetta?.name ?? '',
+        description: roshetta?.description ?? '',
+        specialtyId: roshetta?.specialtyId ?? null,
+      }
       setName(first.name)
       setDescription(first.description)
+      setSpecialtyId(first.specialtyId)
       setStart(first)
+      setPickerOpen(false)
       setNameError(false)
       setSaveError('')
       setSaving(false)
@@ -98,7 +119,11 @@ export default function RoshettaDetailsSheet({ isOpen, onClose, roshetta = null,
     }
   }
 
-  const isDirty = useDirtyState(start, { name, description })
+  const isDirty = useDirtyState(start, { name, description, specialtyId })
+
+  // The chosen specialty from the list on the phone (null: none, or no longer in the list).
+  const specialty = findSpecialty(specialtyId, specialties)
+  const specialtyLook = specialtyColors(specialty, isDark)
 
   // Every way of closing comes through here.
   function requestClose() {
@@ -117,7 +142,7 @@ export default function RoshettaDetailsSheet({ isOpen, onClose, roshetta = null,
     if (isEdit && !isDirty) { onClose(); return }
     setSaving(true)
     setSaveError('')
-    const fields = { name: name.trim(), description: description.trim() }
+    const fields = detailsFields({ name, description, specialtyId, start })
     let res
     try {
       res = isEdit ? await saveRoshetta(roshetta.id, fields) : await createRoshetta(fields)
@@ -214,6 +239,59 @@ export default function RoshettaDetailsSheet({ isOpen, onClose, roshetta = null,
             />
             <div style={COUNTER_STYLE}>{countText(description)}/{ROSHETTA_DESCRIPTION_MAX}</div>
           </div>
+
+          <div>
+            <div id="roshetta-specialty-label" style={LABEL_STYLE}>Specialty (optional)</div>
+            <div style={{
+              ...FIELD_STYLE, padding: 0,
+              display: 'flex', alignItems: 'center',
+            }}>
+              <button
+                type="button"
+                onClick={() => { document.activeElement?.blur?.(); setPickerOpen(true) }}
+                aria-labelledby="roshetta-specialty-label roshetta-specialty-value"
+                aria-haspopup="dialog"
+                style={{
+                  flex: 1, minWidth: 0, minHeight: 48,
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '12px 14px', border: 'none', background: 'none',
+                  textAlign: 'start', cursor: 'pointer', outline: 'none',
+                  fontSize: 15, lineHeight: 1.4, fontFamily: 'var(--font-body)',
+                  color: specialty ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
+                  WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                {specialty && (
+                  <SpecialtyIcon
+                    iconType={specialty.iconType ?? 'lucide'}
+                    iconValue={specialty.iconValue ?? 'Stethoscope'}
+                    size={18}
+                    color={specialtyLook.fg}
+                  />
+                )}
+                <span id="roshetta-specialty-value" dir="auto" style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>
+                  {specialtyRowText(specialty)}
+                </span>
+                {!specialty && (
+                  <ChevronDown size={18} color="var(--color-text-tertiary)" aria-hidden="true" />
+                )}
+              </button>
+              {specialty && (
+                <button
+                  type="button"
+                  onClick={() => setSpecialtyId(null)}
+                  aria-label="Clear specialty"
+                  style={{
+                    width: 44, height: 44, flexShrink: 0, border: 'none', background: 'none',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    cursor: 'pointer', outline: 'none', WebkitTapHighlightColor: 'transparent',
+                  }}
+                >
+                  <X size={18} color="var(--color-text-secondary)" aria-hidden="true" />
+                </button>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Save */}
@@ -240,6 +318,17 @@ export default function RoshettaDetailsSheet({ isOpen, onClose, roshetta = null,
           </button>
         </div>
       </SheetShell>
+
+      <SpecialtiesBottomSheet
+        isOpen={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        specialties={specialties}
+        activeSpecialty={specialty?.id ?? null}
+        onSelect={id => setSpecialtyId(id ?? null)}
+        allowAll={false}
+        noneLabel="No specialty"
+        zIndex={300}
+      />
 
       <ConfirmSheet
         isOpen={confirmOpen}

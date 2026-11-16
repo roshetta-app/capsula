@@ -59,12 +59,16 @@
  *                    row (the condition editor picks one specialty, never 'all').
  *   onAdd            () => void (optional) — when given, a 'New specialty' row is shown
  *                    and tapping it closes the sheet and calls onAdd. Not used by the app.
+ *   noneLabel        string (optional) — when given, a first row with this text (for example
+ *                    'No specialty') is shown; tapping it calls onSelect(null). It looks
+ *                    selected when activeSpecialty is empty. Used by the roshetta details
+ *                    sheet (2026-11-16, Roshetta plan 10.5); left out everywhere else.
  *   zIndex           number  (optional) — layer the sheet sits on. Left out in the app
  *                    (sheet default); the CMS passes a higher one so the sheet shows
  *                    above its top bars.
  */
 
-import { LayoutGrid, Plus }             from 'lucide-react'
+import { Ban, LayoutGrid, Plus }       from 'lucide-react'
 import { SpecialtyIcon, useIsDark }     from '../../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN } from '../../utils/specialtyTokens'
 import SheetShell                       from '../ui/SheetShell'
@@ -78,6 +82,7 @@ export default function SpecialtiesBottomSheet({
   isOpen,
   zIndex,
   allowAll = true,
+  noneLabel,
   onAdd,
 }) {
   const isDark = useIsDark()
@@ -156,6 +161,34 @@ export default function SpecialtiesBottomSheet({
           />
           All topics
         </button>
+        )}
+
+        {noneLabel && (
+          <button
+            onClick={() => handleSelect(null)}
+            style={{
+              width:                   '100%',
+              display:                 'flex',
+              alignItems:              'center',
+              gap:                     'var(--space-3)',
+              textAlign:               'left',
+              padding:                 '12px 14px',
+              marginBottom:            'var(--space-2)',
+              borderRadius:            'var(--radius-md)',
+              background:              !activeSpecialty ? resolveToken(FALLBACK_TOKEN, isDark).bg : 'none',
+              border:                  'none',
+              fontSize:                16,
+              fontFamily:              'var(--font-body)',
+              fontWeight:              600,
+              color:                   !activeSpecialty ? resolveToken(FALLBACK_TOKEN, isDark).fg : 'var(--color-text-primary)',
+              cursor:                  'pointer',
+              WebkitTapHighlightColor: 'transparent',
+              outline:                 'none',
+            }}
+          >
+            <Ban size={18} color={resolveToken(FALLBACK_TOKEN, isDark).fg} />
+            {noneLabel}
+          </button>
         )}
 
         {onAdd && (
