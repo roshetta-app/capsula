@@ -5,6 +5,9 @@
  * ("Doses written by the author. Not checked by Capsula."), then the sheet drawn by the
  * same viewer the topic pages use, with line breaks kept in doses.
  *
+ * 2026-11-16 (step 10.7): the name and description sit in the letterhead (RoshettaPageHeader): a
+ * header band with the roshetta's specialty (or "Roshetta" in the app's blue when there is none).
+ *
  * 2026-11-14 (step 4.2b): a "more" button at the top right opens a small menu with
  * "Delete roshetta" (asks first, then goes back to Home); the one status line of the
  * groups wording sits under the Back row (saving, waiting, offline, changes that could not
@@ -33,10 +36,12 @@ import { useNavigate, useParams } from 'react-router-dom'
 import ConfirmSheet from '../components/ui/ConfirmSheet'
 import Icon from '../components/ui/Icon'
 import GroupStateMessage from '../components/drugs/groups/GroupStateMessage'
+import RoshettaPageHeader from '../components/roshettas/RoshettaPageHeader'
 import RoshettaDisclaimer from '../components/roshettas/RoshettaDisclaimer'
 import ShareRoshettaSheet from '../components/roshettas/ShareRoshettaSheet'
 import PrescriptionSheetBlock from '../components/conditions/PrescriptionSheetBlock'
 import { shimmer } from '../components/drugs/home/shimmer'
+import { useConditionContext } from '../context/ConditionContext'
 import { useFavouritesContext } from '../context/FavouritesContext'
 import { useAuth } from '../hooks/useAuth'
 import { useBackLabel } from '../hooks/useBackLabel'
@@ -44,6 +49,7 @@ import { useDeepLinkParent } from '../hooks/useDeepLinkParent'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
 import { syncStatusLine } from '../utils/groupSyncStatus'
 import { sheetRowsForDisplay } from '../utils/roshettaDrugLines'
+import { findSpecialty } from '../utils/roshettaSpecialty'
 import { pageRoshetta, pageState, pageControls, deleteOutcome, shownRoshetta } from '../utils/roshettaPageState'
 import { ROUTES } from '../router'
 
@@ -70,6 +76,7 @@ export default function RoshettaScreen() {
   const backLabel = useBackLabel() || 'Home'
 
   const { roshettasApi } = useFavouritesContext()
+  const { specialties } = useConditionContext()
   const {
     roshettas = [], roshettasStatus = 'loading', isGuest = false, reloadRoshettas,
     waitingCount = 0, failedCount = 0, syncState = 'idle', retryFailedChanges, deleteRoshetta,
@@ -301,28 +308,7 @@ export default function RoshettaScreen() {
             />
           </div>
         )}
-        <h1
-          dir="auto"
-          style={{
-            margin: 0, textAlign: 'start', overflowWrap: 'anywhere',
-            fontSize: 22, fontWeight: 700, lineHeight: 1.25,
-            color: 'var(--color-text-primary)', fontFamily: font,
-          }}
-        >
-          {roshetta.name}
-        </h1>
-        {description ? (
-          <p
-            dir="auto"
-            style={{
-              margin: '6px 0 0', textAlign: 'start', whiteSpace: 'pre-line', overflowWrap: 'anywhere',
-              fontSize: 14, lineHeight: 1.5,
-              color: 'var(--color-text-secondary)', fontFamily: font,
-            }}
-          >
-            {description}
-          </p>
-        ) : null}
+        <RoshettaPageHeader name={roshetta.name} description={description} specialty={findSpecialty(roshetta.specialtyId, specialties)} />
 
         <RoshettaDisclaimer marginTop={14} />
 

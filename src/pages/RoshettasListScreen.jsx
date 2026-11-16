@@ -10,6 +10,7 @@ import RoshettaRow from '../components/roshettas/RoshettaRow'
 import RoshettaStateCard from '../components/roshettas/RoshettaStateCard'
 import RoshettaDetailsSheet from '../components/roshettas/RoshettaDetailsSheet'
 import { shimmer } from '../components/drugs/home/shimmer'
+import { useConditionContext } from '../context/ConditionContext'
 import { useFavouritesContext } from '../context/FavouritesContext'
 import { useAuth } from '../hooks/useAuth'
 import { useBackLabel } from '../hooks/useBackLabel'
@@ -17,6 +18,7 @@ import { useDeepLinkParent } from '../hooks/useDeepLinkParent'
 import { useIsPro } from '../hooks/useIsPro'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
 import { syncStatusLine } from '../utils/groupSyncStatus'
+import { findSpecialty } from '../utils/roshettaSpecialty'
 import { sectionState, newTapAnswer } from '../utils/roshettaSectionState'
 import { filterRoshettas, groupRoshettas, listMeta } from '../utils/roshettaShelfText'
 import { ROUTES } from '../router'
@@ -34,6 +36,7 @@ export default function RoshettasListScreen() {
   useDeepLinkParent(ROUTES.HOME)
   const backLabel = useBackLabel() || 'Home'
   const { roshettasApi } = useFavouritesContext()
+  const { specialties } = useConditionContext()
   const {
     roshettas = [], roshettasStatus = 'loading', roshettasLoadError = false, isGuest = false,
     reloadRoshettas, waitingRoshettaIds = [], waitingCount = 0, failedCount = 0, syncState = 'idle',
@@ -233,6 +236,7 @@ export default function RoshettasListScreen() {
                   <RoshettaRow
                     key={r.id}
                     roshetta={r}
+                    specialty={findSpecialty(r.specialtyId, specialties)}
                     waiting={waitingRoshettaIds.includes(r.id)}
                     showDivider={i < g.items.length - 1}
                     onOpen={() => navigate(ROUTES.ROSHETTA(r.id))}

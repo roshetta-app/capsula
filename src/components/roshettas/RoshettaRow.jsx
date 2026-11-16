@@ -1,15 +1,22 @@
 // One roshetta in a list (the shelf on Topics and the See all screen). Phase G step 8.1.
 // Same anatomy as a topic row: icon tile, name, small line, date and chevron on the right.
 // The small line is a preview of the drug names; "Waiting" shows when changes are not saved yet.
+// 2026-11-16 (step 10.7): the tile takes the roshetta's specialty (icon and colours), or the app's
+// blue prescription tile when there is none (prop specialty: the picker shape, or null).
 
 import { useState } from 'react'
 import { FileText } from 'lucide-react'
+import { SpecialtyIcon, useIsDark } from '../../utils/specialtyIcon'
+import { specialtyColors, specialtyHeaderText } from '../../utils/roshettaSpecialty'
 import { WaitingMark } from '../drugs/groups/GroupTile'
 import { rowSummary } from '../../utils/roshettaRowText'
 import { drugPreviewText, shortDateText } from '../../utils/roshettaShelfText'
 
-export default function RoshettaRow({ roshetta, waiting = false, showDivider = false, now, onOpen }) {
+export default function RoshettaRow({ roshetta, specialty = null, waiting = false, showDivider = false, now, onOpen }) {
   const [pressed, setPressed] = useState(false)
+  const isDark = useIsDark()
+  const look = specialtyColors(specialty, isDark)
+  const specName = specialtyHeaderText(specialty)
   const name = roshetta?.name ?? ''
   const preview = drugPreviewText(roshetta?.rows)
   const date = shortDateText(roshetta?.updatedAt, now)
@@ -19,7 +26,7 @@ export default function RoshettaRow({ roshetta, waiting = false, showDivider = f
       onClick={onOpen}
       role="button"
       tabIndex={0}
-      aria-label={`${name}, ${rowSummary(roshetta, now)}${waiting ? ', waiting to save' : ''}`}
+      aria-label={`${name}${specName ? `, ${specName}` : ''}, ${rowSummary(roshetta, now)}${waiting ? ', waiting to save' : ''}`}
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen?.() } }}
       onPointerDown={() => setPressed(true)}
       onPointerUp={() => setPressed(false)}
@@ -39,11 +46,13 @@ export default function RoshettaRow({ roshetta, waiting = false, showDivider = f
         aria-hidden="true"
         style={{
           width: 32, height: 32, flexShrink: 0, borderRadius: 10,
-          backgroundColor: 'var(--color-accent-light)', color: 'var(--color-accent)',
+          backgroundColor: look.bg, color: look.fg,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}
       >
-        <FileText size={16} strokeWidth={2} />
+        {specialty
+          ? <SpecialtyIcon iconType={specialty.iconType ?? 'lucide'} iconValue={specialty.iconValue ?? 'Stethoscope'} size={16} color={look.fg} />
+          : <FileText size={16} strokeWidth={2} />}
       </div>
 
       <div style={{ flex: 1, minWidth: 0 }}>
