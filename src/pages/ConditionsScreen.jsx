@@ -151,9 +151,6 @@
  *     scrolls out of view, slides back out when it re-enters view.
  *
  * List rendering modes:
- *   My roshettas (2026-11-14, roshetta plan step 4.1e): the RoshettasSection sits just above
- *   the list header; it is hidden while isSearching or while a specialty is picked.
- *   Step 4.2a: a tap on a roshetta row (or a roshetta just made) opens its page (/roshetta/:id).
  *   isSearching (query >= 1)  → flat list with highlight, no dividers
  *   sortMode === 'recent'     → flat list in recency order, no dividers
  *   sortMode === 'az'         → grouped by letter with AlphabetSectionDividers
@@ -168,8 +165,6 @@ import SearchBar               from '../components/ui/SearchBar'
 import ConditionCard           from '../components/ConditionCard'
 import RecentlyViewedChips     from '../components/conditions/RecentlyViewedChips'
 import ConditionListHeader     from '../components/conditions/ConditionListHeader'
-import RoshettasSection        from '../components/roshettas/RoshettasSection'
-import { showArea as showRoshettaArea } from '../utils/roshettaSectionState'
 import AlphabetSectionDivider  from '../components/conditions/AlphabetSectionDivider'
 import ConditionsEmptyState    from '../components/conditions/ConditionsEmptyState'
 import SpecialtiesBottomSheet  from '../components/conditions/SpecialtiesBottomSheet'
@@ -851,9 +846,7 @@ export default function ConditionsScreen() {
 
   function handleClearFilter() {
     setActiveSpecialty('all')
-    // Delayed like handleSelectSpecialty: clearing the filter brings the My roshettas area
-    // back above the list header, so the snap has to measure after it is drawn.
-    if (isStickyShown()) setTimeout(snapToListHeader, 50)
+    if (isStickyShown()) snapToListHeader()
   }
 
   // When a specialty is chosen via the sticky header (user is scrolled down),
@@ -1041,21 +1034,6 @@ export default function ConditionsScreen() {
 
       {/* The list: flat on the page colour, under the header block. */}
       <div style={{ paddingTop: 'var(--space-4)', ...entranceStyle(2) }}>
-
-        {/* My roshettas (roshetta plan, step 4.1e): above the list header; hidden while
-            searching or while a specialty is picked. */}
-        {showRoshettaArea({ isSearching, activeSpecialty }) && (
-          <>
-            <RoshettasSection
-              onOpenRoshetta={r => navigate(ROUTES.ROSHETTA(r.id))}
-              onSeeAll={() => navigate(ROUTES.ROSHETTAS)}
-            />
-            {/* The topic list gets its own label, so the letter and the sort link below belong to it. */}
-            <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-text-primary)', fontFamily: 'var(--font-body)', minHeight: 44, display: 'flex', alignItems: 'center' }}>
-              Topics
-            </div>
-          </>
-        )}
 
         {/* 5. Count + sort row — in A-Z mode, the first letter is shown inline on the left */}
         <div ref={listHeaderRef}>
