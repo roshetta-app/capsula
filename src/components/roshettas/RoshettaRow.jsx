@@ -3,6 +3,8 @@
 // The small line is a preview of the drug names; "Waiting" shows when changes are not saved yet.
 // 2026-11-16 (step 10.7): the tile takes the roshetta's specialty (icon and colours), or the app's
 // blue prescription tile when there is none (prop specialty: the picker shape, or null).
+// 2026-11-16 (step 10.9): the name may take two lines (it was one line cut with '...'), so a short
+// name is never cut at the biggest phone font; a very long one still ends with '...'.
 
 import { useState } from 'react'
 import { FileText } from 'lucide-react'
@@ -61,7 +63,8 @@ export default function RoshettaRow({ roshetta, specialty = null, waiting = fals
           style={{
             textAlign: 'start', fontSize: 16, fontWeight: 600, lineHeight: 1.3,
             color: 'var(--color-text-primary)', fontFamily: 'var(--font-body)',
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: 2,
+            overflow: 'hidden', overflowWrap: 'anywhere',
           }}
         >
           {name}
