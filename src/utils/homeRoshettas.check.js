@@ -44,3 +44,11 @@ test('cardLabel: name, summary and waiting, in that order', () => {
   assert.equal(cardLabel({ name: 'X' }), 'X');
   assert.equal(cardLabel(null), '');
 });
+
+test('cardLabel: the specialty comes after the name, and is left out when there is none', () => {
+  assert.equal(cardLabel({ name: 'Chest pain' }, false, '3 drugs', 'Cardiology'), 'Chest pain, Cardiology, 3 drugs');
+  assert.equal(cardLabel({ name: 'Chest pain' }, true, '3 drugs', 'Cardiology'), 'Chest pain, Cardiology, 3 drugs, waiting to save');
+  assert.equal(cardLabel({ name: 'Chest pain' }, false, '3 drugs', ''), 'Chest pain, 3 drugs');
+  assert.equal(cardLabel({ name: 'Chest pain' }, false, '3 drugs', undefined), 'Chest pain, 3 drugs');
+  assert.equal(cardLabel({ name: 'Chest pain' }, false, '', '   '), 'Chest pain');
+});

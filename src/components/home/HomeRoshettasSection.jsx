@@ -20,6 +20,8 @@ import { shimmer } from '../drugs/home/shimmer'
 import GroupStateMessage from '../drugs/groups/GroupStateMessage'
 import RoshettaStateCard from '../roshettas/RoshettaStateCard'
 import RoshettaDetailsSheet from '../roshettas/RoshettaDetailsSheet'
+import { useConditionContext } from '../../context/ConditionContext'
+import { findSpecialty } from '../../utils/roshettaSpecialty'
 import { HomeRoshettaCard, HomeNewCard, CARD_W, CARD_H } from './HomeRoshettaCard'
 import { useFavouritesContext } from '../../context/FavouritesContext'
 import { useAuth } from '../../hooks/useAuth'
@@ -56,6 +58,7 @@ function SkeletonRow() {
 
 function HomeRoshettasSection({ onOpenRoshetta, onSeeAll }) {
   const { roshettasApi } = useFavouritesContext()
+  const { specialties } = useConditionContext()
   const {
     roshettas = [], roshettasStatus = 'loading', roshettasLoadError = false, isGuest = false,
     reloadRoshettas, waitingRoshettaIds = [], waitingCount = 0, failedCount = 0, syncState = 'idle',
@@ -135,6 +138,7 @@ function HomeRoshettasSection({ onOpenRoshetta, onSeeAll }) {
             <HomeRoshettaCard
               key={r.id}
               roshetta={r}
+              specialty={findSpecialty(r.specialtyId, specialties)}
               waiting={waitingRoshettaIds.includes(r.id)}
               onOpen={() => onOpenRoshetta?.(r)}
             />

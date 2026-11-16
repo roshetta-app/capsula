@@ -14,7 +14,9 @@
  *   homeNotice({ online, failedCount, waitingCount, syncState })
  *                                the slim notice above the row (the existing sync wording), only
  *                                while changes are waiting or were refused; otherwise null
- *   cardLabel(roshetta, waiting, summary)  what a screen reader says for one card
+ *   cardLabel(roshetta, waiting, summary, specialtyName)
+ *                                what a screen reader says for one card: name, specialty (when
+ *                                there is one), summary, waiting
  */
 
 import { syncStatusLine } from './groupSyncStatus.js';
@@ -40,7 +42,8 @@ export function homeNotice({ online = true, failedCount = 0, waitingCount = 0, s
   return syncStatusLine({ online, failedCount, waitingCount, syncState });
 }
 
-export function cardLabel(roshetta, waiting = false, summary = '') {
+export function cardLabel(roshetta, waiting = false, summary = '', specialtyName = '') {
   const name = roshetta?.name ?? '';
-  return `${name}${summary ? `, ${summary}` : ''}${waiting ? ', waiting to save' : ''}`;
+  const spec = typeof specialtyName === 'string' && specialtyName.trim() ? `, ${specialtyName.trim()}` : '';
+  return `${name}${name ? spec : spec.slice(2)}${summary ? `, ${summary}` : ''}${waiting ? ', waiting to save' : ''}`;
 }

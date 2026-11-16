@@ -1,14 +1,22 @@
-// One card in the My roshettas row on Home (Phase H step 9.4). White "paper" card, 148 x 132,
-// radius 16, thin border: the blue Rx tile and the date on top, the name (one line), the drug
-// preview (one line), and "Waiting" in the warning colour at the bottom while changes are not
-// saved. The name is the person's own text and is drawn as plain text (dir="auto" for Arabic).
+// One card in the My roshettas row on Home. Phase H step 9.4; redrawn as the "letterhead" in Phase I
+// step 10.6 (2026-11-16): white paper with a thin border in the specialty's colour, a coloured
+// header band with the specialty icon and name ("Roshetta" with a prescription icon when there is
+// none, in the app's blue), a blue-style italic Rx mark and the short date, the name (up to two
+// lines), and the drug count at the foot with "Waiting" while changes are not saved. No drug names
+// and no ruled lines. Width and minimum height as before (148 x 132, growing with large text).
+// The name is the person's own text and is drawn as plain text (dir="auto" for Arabic).
 // Also exports the dashed New card that starts the row.
+//
+// Props: roshetta, specialty (the picker shape from the specialty list, or null), waiting, now, onOpen.
 
 import { useState } from 'react'
 import { CloudUpload, FileText, Plus } from 'lucide-react'
 import { ProPill } from '../drugs/groups/GroupTile'
-import { rowSummary } from '../../utils/roshettaRowText'
-import { drugPreviewText, shortDateText } from '../../utils/roshettaShelfText'
+import { SpecialtyIcon, useIsDark } from '../../utils/specialtyIcon'
+import { rowSummary, drugCountText } from '../../utils/roshettaRowText'
+import { countDrugs } from '../../utils/roshettaRows'
+import { specialtyColors, specialtyHeaderText } from '../../utils/roshettaSpecialty'
+import { shortDateText } from '../../utils/roshettaShelfText'
 import { cardLabel } from '../../utils/homeRoshettas'
 
 export const CARD_W = 148
@@ -31,8 +39,11 @@ function pressProps(setPressed) {
   }
 }
 
-export function HomeRoshettaCard({ roshetta, waiting = false, now, onOpen }) {
+export function HomeRoshettaCard({ roshetta, specialty = null, waiting = false, now, onOpen }) {
   const [pressed, setPressed] = useState(false)
+  const isDark = useIsDark()
+  const look = specialtyColors(specialty, isDark)
+  const header = specialtyHeaderText(specialty, 'Roshetta')
   const name = roshetta?.name ?? ''
   const date = shortDateText(roshetta?.updatedAt, now)
 
@@ -41,47 +52,54 @@ export function HomeRoshettaCard({ roshetta, waiting = false, now, onOpen }) {
       role="button"
       tabIndex={0}
       onClick={onOpen}
-      aria-label={cardLabel(roshetta, waiting, rowSummary(roshetta, now))}
+      aria-label={cardLabel(roshetta, waiting, rowSummary(roshetta, now), specialtyHeaderText(specialty))}
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen?.() } }}
       {...pressProps(setPressed)}
       style={{
         fontSize: 16, flex: `0 0 ${CARD_W_CSS}`, width: CARD_W_CSS, minHeight: CARD_H, boxSizing: 'border-box', scrollSnapAlign: 'start',
-        display: 'flex', flexDirection: 'column', padding: 12,
-        backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 16,
+        display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden',
+        backgroundColor: 'var(--color-surface)', border: `1px solid ${look.pill}`, borderRadius: 16,
         cursor: 'pointer', outline: 'none', WebkitTapHighlightColor: 'transparent',
         opacity: pressed ? 0.8 : 1, transform: pressed ? 'scale(0.985)' : 'scale(1)',
         transition: 'opacity var(--motion-fast) var(--ease-settle), transform var(--motion-fast) var(--ease-settle)',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+      <div
+        aria-hidden="true"
+        style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', backgroundColor: look.bg, color: look.fg }}
+      >
+        {specialty
+          ? <SpecialtyIcon iconType={specialty.iconType ?? 'lucide'} iconValue={specialty.iconValue ?? 'Stethoscope'} size={14} color={look.fg} />
+          : <FileText size={14} strokeWidth={2} style={{ flexShrink: 0 }} />}
+        <span dir="auto" style={{ fontSize: 12, fontWeight: 600, lineHeight: 1.4, fontFamily: font, minWidth: 0, ...oneLine }}>{header}</span>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, padding: '8px 12px 10px' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
+          <span aria-hidden="true" style={{ fontSize: 17, fontWeight: 700, fontStyle: 'italic', lineHeight: 1.2, fontFamily: 'Georgia, \'Times New Roman\', serif', color: look.fg }}>Rx</span>
+          {date && <span dir="auto" style={{ fontSize: 12, lineHeight: 1.4, color: 'var(--color-text-tertiary)', fontFamily: font, ...oneLine }}>{date}</span>}
+        </div>
         <div
-          aria-hidden="true"
+          dir="auto"
           style={{
-            width: 32, height: 32, flexShrink: 0, borderRadius: 10,
-            backgroundColor: 'var(--color-accent-light)', color: 'var(--color-accent)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            marginTop: 4, fontSize: 15, fontWeight: 500, lineHeight: 1.3, textAlign: 'start', color: 'var(--color-text-primary)', fontFamily: font,
+            display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', overflowWrap: 'anywhere',
           }}
         >
-          <FileText size={16} strokeWidth={2} />
+          {name}
         </div>
-        {date && <span style={{ fontSize: 12, lineHeight: 1.4, color: 'var(--color-text-tertiary)', fontFamily: font, ...oneLine }}>{date}</span>}
-      </div>
-      <div
-        dir="auto"
-        style={{ marginTop: 10, fontSize: 15, fontWeight: 500, lineHeight: 1.3, textAlign: 'start', color: 'var(--color-text-primary)', fontFamily: font, ...oneLine }}
-      >
-        {name}
-      </div>
-      <div style={{ marginTop: 2, fontSize: 12, lineHeight: 1.4, color: 'var(--color-text-secondary)', fontFamily: font, ...oneLine }}>
-        {drugPreviewText(roshetta?.rows)}
-      </div>
-      <div style={{ flex: 1 }} />
-      {waiting && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 500, color: 'var(--color-warning)', fontFamily: font }}>
-          <CloudUpload size={14} aria-hidden="true" />
-          Waiting
+        <div style={{ flex: 1 }} />
+        <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '2px 8px' }}>
+          <span dir="auto" style={{ fontSize: 12, lineHeight: 1.4, color: 'var(--color-text-secondary)', fontFamily: font }}>
+            {drugCountText(countDrugs(roshetta?.rows))}
+          </span>
+          {waiting && (
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 500, color: 'var(--color-warning)', fontFamily: font }}>
+              <CloudUpload size={14} aria-hidden="true" />
+              Waiting
+            </span>
+          )}
         </div>
-      )}
+      </div>
     </div>
   )
 }
