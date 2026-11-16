@@ -4,7 +4,7 @@ import { LogOut, Menu } from 'lucide-react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
   faHouse, faCapsules, faNotesMedical, faStethoscope, faTags,
-  faChartBar, faBug, faBell, faClipboardList, faUsers, faRocket, faBullhorn,
+  faChartBar, faBug, faBell, faClipboardList, faUsers, faRocket, faBullhorn, faRectangleList,
   faMagnifyingGlass,
 } from '@fortawesome/free-solid-svg-icons'
 import { useAuth } from '../../hooks/useAuth'
@@ -74,6 +74,7 @@ const NAV_GROUPS = [
     items: [
       { path: '/admin/releases', label: 'Releases', faIcon: faRocket },
       { path: '/admin/messages', label: 'Messages',  faIcon: faBullhorn },
+      { path: '/admin/home-card', label: 'Home card', faIcon: faRectangleList },
     ],
   },
   {

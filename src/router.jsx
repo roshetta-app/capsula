@@ -99,6 +99,7 @@ import AuditLog              from './pages/admin/AuditLog'
 import UsersManager         from './pages/admin/UsersManager'
 import ReleasesManager      from './pages/admin/ReleasesManager'
 import GatesManager         from './pages/admin/GatesManager'
+import HomeCardManager      from './pages/admin/HomeCardManager'
 
 // ─── Route path constants ─────────────────────────────────────────────────────
 
@@ -158,6 +159,7 @@ export const ROUTES = {
   ADMIN_USERS:            '/admin/users',
   ADMIN_RELEASES:         '/admin/releases',
   ADMIN_MESSAGES:         '/admin/messages',
+  ADMIN_HOME_CARD:        '/admin/home-card',
 }
 
 // ─── PublicRoutes — rendered inside the public provider branch in App.jsx ────
@@ -278,6 +280,9 @@ export function AdminRoutes() {
         />
         <Route path="/admin/messages"
           element={<GatesManager />}
+        />
+        <Route path="/admin/home-card"
+          element={<HomeCardManager />}
         />
       </Route>
 

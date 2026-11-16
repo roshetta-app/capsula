@@ -2022,3 +2022,114 @@ export async function setR2Pictures(on) {
   const { data, error } = await supabase.rpc('admin_set_r2_pictures', { p_on: on })
   return { data: data ?? null, error }
 }
+
+// ─── Home card featured list (Phase H, step 9.2) ─────────────────────────────
+// Table home_featured: one row per topic or drug. Ids only; titles come from the joined library rows.
+// `conditions` links to specialties twice, so the specialty is read with the explicit link name.
+
+const HOME_FEATURED_SELECT = `
+  id, kind, condition_id, brand_id, tagline, is_active, created_at,
+  conditions (
+    id, name, slug, is_published,
+    specialties!conditions_specialty_id_fkey ( name_en )
+  ),
+  brands (
+    id, tradename_clean, slug, is_published,
+    formulations ( is_published, generics ( class, is_published ) )
+  )
+`
+
+/** All featured items, oldest first (the admin sees the switched-off ones too). */
+export async function listHomeFeatured() {
+  const { data, error } = await supabase
+    .from('home_featured')
+    .select(HOME_FEATURED_SELECT)
+    .order('created_at', { ascending: true })
+  return { data: data ?? [], error }
+}
+
+/**
+ * Add one topic or one drug to the list. Created switched on.
+ * @param {{ kind: 'condition'|'brand', targetId: string, tagline?: string|null, title?: string }} input
+ */
+export async function addHomeFeatured({ kind, targetId, tagline = null, title = null }) {
+  const row = {
+    kind,
+    condition_id: kind === 'condition' ? targetId : null,
+    brand_id:     kind === 'brand'     ? targetId : null,
+    tagline:      tagline || null,
+    is_active:    true,
+  }
+  const { data, error } = await supabase
+    .from('home_featured')
+    .insert(row)
+    .select('id')
+    .single()
+  if (!error && data) {
+    await logAudit('create', 'home_featured', data.id, title, row)
+  }
+  return { data, error }
+}
+
+/** Change the short line (null clears it). */
+export async function updateHomeFeaturedTagline(id, tagline, title = null) {
+  const { error } = await supabase
+    .from('home_featured')
+    .update({ tagline: tagline || null })
+    .eq('id', id)
+  if (!error) await logAudit('update', 'home_featured', id, title, { tagline })
+  return { error }
+}
+
+/** The on/off switch. */
+export async function setHomeFeaturedActive(id, isActive, title = null) {
+  const { error } = await supabase
+    .from('home_featured')
+    .update({ is_active: isActive })
+    .eq('id', id)
+  if (!error) await logAudit(isActive ? 'publish' : 'unpublish', 'home_featured', id, title)
+  return { error }
+}
+
+/** Remove one item from the list. The topic or drug itself is never touched. */
+export async function removeHomeFeatured(id, title = null) {
+  const { error } = await supabase
+    .from('home_featured')
+    .delete()
+    .eq('id', id)
+  if (!error) await logAudit('delete', 'home_featured', id, title)
+  return { error }
+}
+
+/** Live search of published topics by name, for the Home card add sheet. */
+export async function searchTopicsForHomeCard(query, { limit = 20 } = {}) {
+  const term = query.trim()
+  let q = supabase
+    .from('conditions')
+    .select('id, name, slug, is_published, specialties!conditions_specialty_id_fkey ( name_en )')
+    .eq('is_published', true)
+    .order('name', { ascending: true })
+    .limit(limit)
+  if (term) q = q.ilike('name', `%${term}%`)
+  const { data, error } = await q
+  return { data: data ?? [], error }
+}
+
+/** Live search of published drugs (brands) by name, for the Home card add sheet. */
+export async function searchBrandsForHomeCard(query, { limit = 20 } = {}) {
+  const term = query.trim()
+  if (!term) return { data: [], error: null }
+  const { data, error } = await supabase
+    .from('brands')
+    .select('id, slug, tradename_clean, is_published, formulations ( is_published, generics ( class, is_published ) )')
+    .eq('is_published', true)
+    .ilike('tradename_clean', `%${term}%`)
+    .order('tradename_clean', { ascending: true })
+    .limit(limit)
+  const rows = (data ?? []).filter(b => {
+    const f = Array.isArray(b.formulations) ? b.formulations[0] : b.formulations
+    const g = Array.isArray(f?.generics) ? f.generics[0] : f?.generics
+    return f?.is_published === true && g?.is_published === true
+  })
+  return { data: rows, error }
+}
