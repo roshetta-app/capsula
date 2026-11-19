@@ -51,6 +51,7 @@
 
 import { Routes, Route, Outlet } from 'react-router-dom'
 import Layout from './components/layout'
+import PageEntrance from './components/ui/PageEntrance'
 import { BackLabelTracker } from './hooks/useBackLabel'
 import useCmsSurface from './hooks/useCmsSurface'
 
@@ -200,13 +201,18 @@ export function PublicRoutes() {
           outside the shared Layout entirely — unchanged from before.
           /account/edit and /account/faq follow the same pattern (own
           back-arrow header, no BottomNav) — see file header note above. */}
-      <Route path="/conditions/:slug"    element={<ConditionDetailScreen />} />
-      <Route path="/drugs/:slug"                   element={<DrugDetailScreen />} />
-      <Route path="/drugs/generic/:slug"           element={<GenericDetailScreen />} />
-      <Route path="/g/:code"                       element={<SharedGroupScreen />} />
-      <Route path="/r/:code"                       element={<SharedRoshettaScreen />} />
-      <Route path="/account/edit"        element={<AccountEditScreen />} />
-      <Route path="/account/faq"         element={<AccountFaqScreen />} />
+      {/* Step 11.20: these screens sit outside Layout, so the entrance rules (utils/pageEntrance.js)
+          never reached them and they snapped open. This route has no look of its own; it only
+          carries the same PageEntrance that Layout uses. */}
+      <Route element={<PageEntrance><Outlet /></PageEntrance>}>
+        <Route path="/conditions/:slug"    element={<ConditionDetailScreen />} />
+        <Route path="/drugs/:slug"                   element={<DrugDetailScreen />} />
+        <Route path="/drugs/generic/:slug"           element={<GenericDetailScreen />} />
+        <Route path="/g/:code"                       element={<SharedGroupScreen />} />
+        <Route path="/r/:code"                       element={<SharedRoshettaScreen />} />
+        <Route path="/account/edit"        element={<AccountEditScreen />} />
+        <Route path="/account/faq"         element={<AccountFaqScreen />} />
+      </Route>
 
     </Routes>
     </>
