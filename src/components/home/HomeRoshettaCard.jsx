@@ -1,7 +1,7 @@
 // One card in the My roshettas row on Home. Phase H step 9.4; "letterhead" in Phase I step 10.6;
 // redrawn as the quiet "pad" in Phase J step 11.3 (2026-11-19): a plain sheet with a small
-// uppercase specialty label (icon and name; "Roshetta" with a prescription icon when there is
-// none, in the app's blue) over a hairline, like the top of a prescription pad; a faint italic Rx
+// specialty label in normal letters, light grey (icon and name; "Roshetta" with a prescription icon when there is
+// none) over a hairline, like the top of a prescription pad; a faint italic Rx
 // watermark in the bottom corner (in dark mode a neutral, barely-there grey, not the specialty tint); the name (up to two lines); and at the foot the day on the start
 // side and "Waiting" on the end side while changes are not saved. No drug count on the card (the
 // spoken label still says it). Width and minimum height as before (148 x 132, growing with large
@@ -11,7 +11,7 @@
 // Props: roshetta, specialty (the picker shape from the specialty list, or null), waiting, now, onOpen.
 
 import { useState } from 'react'
-import { CloudUpload, FileText, Plus } from 'lucide-react'
+import { Clock, CloudUpload, FileText, Plus } from 'lucide-react'
 import { ProPill } from '../drugs/groups/GroupTile'
 import { SpecialtyIcon, useIsDark } from '../../utils/specialtyIcon'
 import { rowSummary } from '../../utils/roshettaRowText'
@@ -39,9 +39,6 @@ function pressProps(setPressed) {
   }
 }
 
-// Arabic and other joined scripts must not be letter-spaced (it breaks the joins).
-const JOINED_SCRIPT = /[\u0590-\u08FF]/
-
 export function HomeRoshettaCard({ roshetta, specialty = null, waiting = false, now, onOpen }) {
   const [pressed, setPressed] = useState(false)
   const isDark = useIsDark()
@@ -49,7 +46,6 @@ export function HomeRoshettaCard({ roshetta, specialty = null, waiting = false, 
   const header = specialtyHeaderText(specialty, 'Roshetta')
   const name = roshetta?.name ?? ''
   const date = shortDateText(roshetta?.updatedAt, now)
-  const labelSpacing = JOINED_SCRIPT.test(header) ? 0 : '0.06em'
 
   return (
     <div
@@ -73,7 +69,7 @@ export function HomeRoshettaCard({ roshetta, specialty = null, waiting = false, 
         style={{
           position: 'absolute', insetInlineEnd: -6, bottom: -14, pointerEvents: 'none', userSelect: 'none',
           fontSize: 78, fontWeight: 700, fontStyle: 'italic', lineHeight: 1,
-          color: isDark ? 'var(--color-text-primary)' : look.bg, opacity: isDark ? 0.05 : 1,
+          color: isDark ? 'var(--color-text-primary)' : look.bg, opacity: isDark ? 0.035 : 0.7,
           fontFamily: 'Georgia, \'Times New Roman\', serif',
         }}
       >
@@ -81,14 +77,14 @@ export function HomeRoshettaCard({ roshetta, specialty = null, waiting = false, 
       </span>
       <div
         aria-hidden="true"
-        style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 5, paddingBottom: 7, borderBottom: `1px solid ${isDark ? 'var(--color-border)' : look.bg}`, color: look.fg }}
+        style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 6, paddingBottom: 7, borderBottom: `1px solid ${isDark ? 'var(--color-border)' : look.bg}`, color: look.fg }}
       >
         {specialty
-          ? <SpecialtyIcon iconType={specialty.iconType ?? 'lucide'} iconValue={specialty.iconValue ?? 'Stethoscope'} size={11} color={look.fg} />
-          : <FileText size={11} strokeWidth={2} style={{ flexShrink: 0 }} />}
+          ? <SpecialtyIcon iconType={specialty.iconType ?? 'lucide'} iconValue={specialty.iconValue ?? 'Stethoscope'} size={12} color={look.fg} />
+          : <FileText size={12} strokeWidth={2} style={{ flexShrink: 0 }} />}
         <span
           dir="auto"
-          style={{ fontSize: 10, fontWeight: 600, lineHeight: 1.4, letterSpacing: labelSpacing, textTransform: 'uppercase', color: 'var(--color-text-tertiary)', fontFamily: font, minWidth: 0, ...oneLine }}
+          style={{ fontSize: 11, fontWeight: 400, lineHeight: 1.4, color: 'var(--color-text-tertiary)', fontFamily: font, minWidth: 0, ...oneLine }}
         >
           {header}
         </span>
@@ -106,8 +102,9 @@ export function HomeRoshettaCard({ roshetta, specialty = null, waiting = false, 
       <div style={{ flex: 1 }} />
       <div style={{ position: 'relative', marginTop: 6, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '2px 8px' }}>
         {date && (
-          <span dir="auto" style={{ fontSize: 12, lineHeight: 1.4, color: 'var(--color-text-secondary)', fontFamily: font }}>
-            {date}
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: 'var(--color-text-secondary)' }}>
+            <Clock size={12} strokeWidth={2} aria-hidden="true" style={{ flexShrink: 0 }} />
+            <span dir="auto" style={{ fontSize: 12, lineHeight: 1.4, fontFamily: font }}>{date}</span>
           </span>
         )}
         {waiting && (

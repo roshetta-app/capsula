@@ -14,6 +14,9 @@
  *   homeNotice({ online, failedCount, waitingCount, syncState })
  *                                the slim notice above the row (the existing sync wording), only
  *                                while changes are waiting or were refused; otherwise null
+ *   noticeKind({ online, failedCount, waitingCount, syncState })
+ *                                which small icon the status line under the row uses:
+ *                                'failed' | 'offline' | 'syncing' | 'waiting' (or '' when no notice)
  *   cardLabel(roshetta, waiting, summary, specialtyName)
  *                                what a screen reader says for one card: name, specialty (when
  *                                there is one), summary, waiting
@@ -40,6 +43,14 @@ export function limitLine({ isPro = false, count = 0, cap = 3, proCap = 100 } = 
 export function homeNotice({ online = true, failedCount = 0, waitingCount = 0, syncState = 'idle' } = {}) {
   if (failedCount < 1 && waitingCount < 1) return null;
   return syncStatusLine({ online, failedCount, waitingCount, syncState });
+}
+
+export function noticeKind({ online = true, failedCount = 0, waitingCount = 0, syncState = 'idle' } = {}) {
+  if (failedCount < 1 && waitingCount < 1) return ''
+  if (failedCount > 0) return 'failed'
+  if (!online) return 'offline'
+  if (syncState === 'syncing') return 'syncing'
+  return 'waiting'
 }
 
 export function cardLabel(roshetta, waiting = false, summary = '', specialtyName = '') {

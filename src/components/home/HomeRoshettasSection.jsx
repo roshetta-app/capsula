@@ -6,7 +6,7 @@
  *
  * States: loading (grey cards, the last one cut off), guest (the sign-in card), could not load
  * (Try again), signed in with none (the full-width "Write your first roshetta" card), the list,
- * a refresh that failed while a saved copy is shown, read only (banner, no New card), a full free
+ * read only (banner, no New card), a full free
  * list (New carries the Pro mark and opens the limit sheet; the line "3 of 3 on the free plan.
  * Upgrade to Pro for 100." sits under the row), and the slim notice while changes wait or were
  * refused. The decisions are shared with the Topics shelf (roshettaSectionState.js) and the new
@@ -21,6 +21,7 @@ import { shimmer } from '../drugs/home/shimmer'
 import GroupStateMessage from '../drugs/groups/GroupStateMessage'
 import RoshettaStateCard from '../roshettas/RoshettaStateCard'
 import RoshettaDetailsSheet from '../roshettas/RoshettaDetailsSheet'
+import HomeSyncLine from './HomeSyncLine'
 import { useConditionContext } from '../../context/ConditionContext'
 import { findSpecialty } from '../../utils/roshettaSpecialty'
 import { HomeRoshettaCard, HomeNewCard, CARD_W, CARD_H } from './HomeRoshettaCard'
@@ -29,7 +30,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { useIsPro } from '../../hooks/useIsPro'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
 import { sectionState, newTapAnswer } from '../../utils/roshettaSectionState'
-import { homeNotice, homeRowCards, limitLine, showNewCard } from '../../utils/homeRoshettas'
+import { homeNotice, noticeKind, homeRowCards, limitLine, showNewCard } from '../../utils/homeRoshettas'
 import { ROSHETTAS_CAP_PRO } from '../../constants/features'
 
 const font = 'var(--font-body)'
@@ -83,7 +84,16 @@ function HomeRoshettasSection({ onOpenRoshetta, onSeeAll }) {
   }
 
   const atFreeCap = !isPro && count >= roshettaCap
-  const notice = state === 'list' ? homeNotice({ online: isOnline, failedCount, waitingCount, syncState }) : null
+  const syncArgs = { online: isOnline, failedCount, waitingCount, syncState }
+  const refreshFailed = state === 'list' && roshettasLoadError && isOnline
+  let notice = state === 'list' ? homeNotice(syncArgs) : null
+  let kind = notice ? noticeKind(syncArgs) : ''
+  let onNoticeAction = failedCount > 0 ? retryFailedChanges : undefined
+  if (!notice && refreshFailed) {
+    notice = { tone: 'warning', title: "Couldn't refresh your roshettas" }
+    kind = 'failed'
+    onNoticeAction = reloadRoshettas
+  }
 
   let content
   if (state === 'loading') {
@@ -121,18 +131,6 @@ function HomeRoshettasSection({ onOpenRoshetta, onSeeAll }) {
     content = (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
         {isReadOnly && <GroupStateMessage variant="banner" tone="warning" title={READ_ONLY_MESSAGE} />}
-        {notice && (
-          <GroupStateMessage
-            variant="banner"
-            tone={notice.tone}
-            title={notice.title}
-            actionLabel={failedCount > 0 ? 'Try again' : undefined}
-            onAction={failedCount > 0 ? retryFailedChanges : undefined}
-          />
-        )}
-        {roshettasLoadError && isOnline && (
-          <GroupStateMessage variant="banner" title="Couldn't refresh your roshettas" actionLabel="Try again" onAction={reloadRoshettas} />
-        )}
         <div className="home-roshettas-row" style={ROW_STYLE}>
           {showNewCard({ state, isReadOnly }) && <HomeNewCard onTap={handleNew} showPro={atFreeCap} />}
           {homeRowCards(roshettas).map(r => (
@@ -145,6 +143,7 @@ function HomeRoshettasSection({ onOpenRoshetta, onSeeAll }) {
             />
           ))}
         </div>
+        <HomeSyncLine notice={notice} kind={kind} actionLabel="Try again" onAction={onNoticeAction} />
         {line && <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', fontFamily: font }}>{line}</div>}
       </div>
     )

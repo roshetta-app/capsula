@@ -1,7 +1,7 @@
 // Checks for homeRoshettas.js (step 9.4). Run with: node --test src/utils/homeRoshettas.check.js
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { HOME_ROW_MAX, homeRowCards, showNewCard, limitLine, homeNotice, cardLabel } from './homeRoshettas.js';
+import { HOME_ROW_MAX, homeRowCards, showNewCard, limitLine, homeNotice, noticeKind, cardLabel } from './homeRoshettas.js';
 
 test('homeRowCards: the first ten, in the given order, never changes the list', () => {
   const list = Array.from({ length: 14 }, (_, i) => ({ id: 'r' + i }));
@@ -51,4 +51,13 @@ test('cardLabel: the specialty comes after the name, and is left out when there 
   assert.equal(cardLabel({ name: 'Chest pain' }, false, '3 drugs', ''), 'Chest pain, 3 drugs');
   assert.equal(cardLabel({ name: 'Chest pain' }, false, '3 drugs', undefined), 'Chest pain, 3 drugs');
   assert.equal(cardLabel({ name: 'Chest pain' }, false, '', '   '), 'Chest pain');
+});
+
+test('noticeKind: the icon follows the same order as the wording', () => {
+  assert.equal(noticeKind({ online: true }), '');
+  assert.equal(noticeKind({ online: false, failedCount: 0, waitingCount: 0 }), '');
+  assert.equal(noticeKind({ online: false, failedCount: 1, waitingCount: 2 }), 'failed');
+  assert.equal(noticeKind({ online: false, waitingCount: 1 }), 'offline');
+  assert.equal(noticeKind({ online: true, waitingCount: 1, syncState: 'syncing' }), 'syncing');
+  assert.equal(noticeKind({ online: true, waitingCount: 1 }), 'waiting');
 });
