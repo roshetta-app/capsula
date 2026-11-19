@@ -30,7 +30,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { useIsPro } from '../../hooks/useIsPro'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
 import { sectionState, newTapAnswer } from '../../utils/roshettaSectionState'
-import { homeNotice, noticeKind, homeRowCards, limitLine, showNewCard } from '../../utils/homeRoshettas'
+import { noticeKind, statusText, homeRowCards, limitLine, showNewCard } from '../../utils/homeRoshettas'
 import { ROSHETTAS_CAP_PRO } from '../../constants/features'
 
 const font = 'var(--font-body)'
@@ -86,12 +86,12 @@ function HomeRoshettasSection({ onOpenRoshetta, onSeeAll }) {
   const atFreeCap = !isPro && count >= roshettaCap
   const syncArgs = { online: isOnline, failedCount, waitingCount, syncState }
   const refreshFailed = state === 'list' && roshettasLoadError && isOnline
-  let notice = state === 'list' ? homeNotice(syncArgs) : null
-  let kind = notice ? noticeKind(syncArgs) : ''
+  let kind = state === 'list' ? noticeKind(syncArgs) : ''
+  let text = statusText(kind, failedCount)
   let onNoticeAction = failedCount > 0 ? retryFailedChanges : undefined
-  if (!notice && refreshFailed) {
-    notice = { tone: 'warning', title: "Couldn't refresh your roshettas" }
-    kind = 'failed'
+  if (!kind && refreshFailed) {
+    kind = 'refresh'
+    text = statusText('refresh')
     onNoticeAction = reloadRoshettas
   }
 
@@ -143,7 +143,7 @@ function HomeRoshettasSection({ onOpenRoshetta, onSeeAll }) {
             />
           ))}
         </div>
-        <HomeSyncLine notice={notice} kind={kind} actionLabel="Try again" onAction={onNoticeAction} />
+        <HomeSyncLine kind={kind} text={text} actionLabel="Try again" onAction={onNoticeAction} />
         {line && <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', fontFamily: font }}>{line}</div>}
       </div>
     )

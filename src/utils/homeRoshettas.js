@@ -17,6 +17,10 @@
  *   noticeKind({ online, failedCount, waitingCount, syncState })
  *                                which small icon the status line under the row uses:
  *                                'failed' | 'offline' | 'syncing' | 'waiting' (or '' when no notice)
+ *   statusText(kind, failedCount)
+ *                                the short words on the status line: "Offline · saved on this phone",
+ *                                "Saving…", "Waiting to save", "2 changes not saved", "Couldn't refresh",
+ *                                "All saved"
  *   cardLabel(roshetta, waiting, summary, specialtyName)
  *                                what a screen reader says for one card: name, specialty (when
  *                                there is one), summary, waiting
@@ -51,6 +55,18 @@ export function noticeKind({ online = true, failedCount = 0, waitingCount = 0, s
   if (!online) return 'offline'
   if (syncState === 'syncing') return 'syncing'
   return 'waiting'
+}
+
+export function statusText(kind, failedCount = 0) {
+  switch (kind) {
+    case 'failed': return failedCount === 1 ? '1 change not saved' : `${failedCount} changes not saved`
+    case 'offline': return 'Offline \u00b7 saved on this phone'
+    case 'syncing': return 'Saving\u2026'
+    case 'waiting': return 'Waiting to save'
+    case 'refresh': return "Couldn't refresh"
+    case 'saved': return 'All saved'
+    default: return ''
+  }
 }
 
 export function cardLabel(roshetta, waiting = false, summary = '', specialtyName = '') {

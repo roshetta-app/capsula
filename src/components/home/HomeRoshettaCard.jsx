@@ -3,7 +3,7 @@
 // specialty label in normal letters, light grey (icon and name; "Roshetta" with a prescription icon when there is
 // none) over a hairline, like the top of a prescription pad; a faint italic Rx
 // watermark in the bottom corner (in dark mode a neutral, barely-there grey, not the specialty tint); the name (up to two lines); and at the foot the day on the start
-// side and "Waiting" on the end side while changes are not saved. No drug count on the card (the
+// side and a small cloud icon on the end side while changes are not saved (no word; the spoken label says "waiting to save"). No drug count on the card (the
 // spoken label still says it). Width and minimum height as before (148 x 132, growing with large
 // text). The name is the person's own text and is drawn as plain text (dir="auto" for Arabic).
 // Also exports the dashed New card that starts the row.
@@ -108,9 +108,8 @@ export function HomeRoshettaCard({ roshetta, specialty = null, waiting = false, 
           </span>
         )}
         {waiting && (
-          <span style={{ marginInlineStart: 'auto', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 500, color: 'var(--color-warning)', fontFamily: font }}>
-            <CloudUpload size={14} aria-hidden="true" />
-            Waiting
+          <span aria-hidden="true" style={{ marginInlineStart: 'auto', display: 'flex', alignItems: 'center', color: 'var(--color-warning)' }}>
+            <CloudUpload size={15} strokeWidth={2} />
           </span>
         )}
       </div>

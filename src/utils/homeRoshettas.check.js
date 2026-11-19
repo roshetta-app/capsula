@@ -1,7 +1,7 @@
 // Checks for homeRoshettas.js (step 9.4). Run with: node --test src/utils/homeRoshettas.check.js
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { HOME_ROW_MAX, homeRowCards, showNewCard, limitLine, homeNotice, noticeKind, cardLabel } from './homeRoshettas.js';
+import { HOME_ROW_MAX, homeRowCards, showNewCard, limitLine, homeNotice, noticeKind, statusText, cardLabel } from './homeRoshettas.js';
 
 test('homeRowCards: the first ten, in the given order, never changes the list', () => {
   const list = Array.from({ length: 14 }, (_, i) => ({ id: 'r' + i }));
@@ -60,4 +60,15 @@ test('noticeKind: the icon follows the same order as the wording', () => {
   assert.equal(noticeKind({ online: false, waitingCount: 1 }), 'offline');
   assert.equal(noticeKind({ online: true, waitingCount: 1, syncState: 'syncing' }), 'syncing');
   assert.equal(noticeKind({ online: true, waitingCount: 1 }), 'waiting');
+});
+
+test('statusText: short plain words for every kind', () => {
+  assert.equal(statusText('failed', 1), '1 change not saved');
+  assert.equal(statusText('failed', 3), '3 changes not saved');
+  assert.equal(statusText('offline'), 'Offline \u00b7 saved on this phone');
+  assert.equal(statusText('syncing'), 'Saving\u2026');
+  assert.equal(statusText('waiting'), 'Waiting to save');
+  assert.equal(statusText('refresh'), "Couldn't refresh");
+  assert.equal(statusText('saved'), 'All saved');
+  assert.equal(statusText(''), '');
 });

@@ -34,7 +34,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { useIsPro } from '../../hooks/useIsPro'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
 import { sectionState, newTapAnswer } from '../../utils/roshettaSectionState'
-import { homeNotice, noticeKind, showNewCard } from '../../utils/homeRoshettas'
+import { noticeKind, statusText, showNewCard } from '../../utils/homeRoshettas'
 import { homeGroupCards, groupLimitLine } from '../../utils/homeGroups'
 import { DRUG_GROUPS_CAP_FREE } from '../../constants/features'
 
@@ -166,12 +166,12 @@ function HomeGroupsSection({ onOpenGroup, onSeeAll }) {
   const atFreeCap = !isPro && count >= DRUG_GROUPS_CAP_FREE
   const syncArgs = { online: isOnline, failedCount, waitingCount, syncState }
   const refreshFailed = state === 'list' && groupsLoadError && isOnline
-  let notice = state === 'list' ? homeNotice(syncArgs) : null
-  let kind = notice ? noticeKind(syncArgs) : ''
+  let kind = state === 'list' ? noticeKind(syncArgs) : ''
+  let text = statusText(kind, failedCount)
   let noticeAction = failedCount > 0 ? { label: 'See', run: () => setSeeOpen(true) } : null
-  if (!notice && refreshFailed) {
-    notice = { tone: 'warning', title: "Couldn't refresh your groups" }
-    kind = 'failed'
+  if (!kind && refreshFailed) {
+    kind = 'refresh'
+    text = statusText('refresh')
     noticeAction = { label: 'Try again', run: reloadGroups }
   }
 
@@ -208,7 +208,7 @@ function HomeGroupsSection({ onOpenGroup, onSeeAll }) {
             />
           ))}
         </div>
-        <HomeSyncLine notice={notice} kind={kind} actionLabel={noticeAction?.label} onAction={noticeAction?.run} />
+        <HomeSyncLine kind={kind} text={text} actionLabel={noticeAction?.label} onAction={noticeAction?.run} />
         {line && <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', fontFamily: font }}>{line}</div>}
       </div>
     )
