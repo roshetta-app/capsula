@@ -21,7 +21,7 @@ import { statusText } from '../../utils/homeRoshettas'
 import { CheckCircle2, CloudOff, CloudUpload, RefreshCw, TriangleAlert } from 'lucide-react'
 
 const font = 'var(--font-body)'
-export const LINE_H = 18
+export const LINE_H = 16
 const SAVED = { kind: 'saved', text: statusText('saved') }
 const SAVED_SHOWN_MS = 2500
 
@@ -71,7 +71,7 @@ export default function HomeSyncLine({ kind = '', text = '', actionLabel, onActi
     <div
       role="status"
       aria-live="polite"
-      style={{ position: 'absolute', insetInline: 0, top: '100%', marginTop: 1, height: LINE_H, display: 'flex', alignItems: 'center', pointerEvents: 'none' }}
+      style={{ position: 'absolute', insetInline: 0, top: '100%', marginTop: 4, height: LINE_H, display: 'flex', alignItems: 'center', pointerEvents: 'none' }}
     >
       <style>{CSS}</style>
       {shown && (

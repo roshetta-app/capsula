@@ -37,6 +37,9 @@
  *   - display time follows the text length, and errors stay a little longer;
  *   - tap, or swipe it away sideways or down, to dismiss;
  *   - motion follows the phone's reduce-motion setting.
+ *
+ * 2026-11-20: a tap on a toast only dismisses it. The toast stays hit-testable while it leaves and
+ * swallows the click that follows the tap, so the click no longer lands on whatever is under it.
  */
 
 import { createContext, useCallback, useContext, useRef, useState } from 'react'
@@ -203,7 +206,10 @@ function ToastItem({ toast, onDismiss }) {
       data-cap-toast
       style={{
         width: '100%',
-        pointerEvents: toast.leaving ? 'none' : 'auto',
+        // Stays hit-testable while it leaves (240 ms): on a phone the tap's click is sent a moment
+        // after the finger lifts, and by then the toast is already leaving. If it let the touch
+        // through, the click would land on whatever is under it. The click is swallowed below.
+        pointerEvents: 'auto',
         touchAction: 'none',
         transform: `translate(${drag.x}px, ${drag.y}px)`,
         opacity: dragOpacity,
@@ -214,6 +220,7 @@ function ToastItem({ toast, onDismiss }) {
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
+      onClick={e => { e.preventDefault(); e.stopPropagation() }}
     >
       <div
         key={toast.pulse}
