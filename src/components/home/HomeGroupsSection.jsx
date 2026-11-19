@@ -7,7 +7,7 @@
  *
  * States: loading (three white folders, the last one cut off), guest (a white folder with
  * "Sign in"), could not load (Try again), signed in with none ("Start your first group"; these
- * four are drawn in HomeStateCards.jsx, text left and button right), the list,
+ * four are drawn in HomeStateCards.jsx, title, line and button), the list,
  * a refresh that failed while a saved copy is shown, read only (banner, no New card), a full free list (New
  * carries the Pro mark; the line "3 of 3 groups · Full" sits under the row) and the slim notice
  * while changes wait or were refused. The groups data, the sign-in prompt, the limit and read only
@@ -122,7 +122,7 @@ function HomeGroupsSection({ onOpenGroup, onSeeAll }) {
     content = (
       <HomeGroupStateCard
         title="Sign in to keep drug groups"
-        body="Your groups save to your account and work offline."
+        body="Groups are saved to your account and available offline."
         actionLabel="Sign in"
         onAction={handleNew}
       />
@@ -141,8 +141,9 @@ function HomeGroupsSection({ onOpenGroup, onSeeAll }) {
     content = (
       <HomeGroupStateCard
         title="Start your first group"
-        body="Keep the drugs you use most in one list, then share them as a link."
+        body="Keep the drugs you use most in a single list."
         actionLabel="Create group"
+        withIcon
         onAction={handleNew}
       />
     )

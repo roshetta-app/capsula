@@ -65,19 +65,29 @@ export function HomeGroupCard({ group, waiting = false, onOpen }) {
         style={{
           flex: '1 1 auto', minWidth: 0, minHeight: CARD_H - FOLDER_TAB_HEIGHT, boxSizing: 'border-box',
           display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 10,
+          position: 'relative', overflow: 'hidden',
           backgroundColor: wash, borderRadius: FOLDER_BODY_RADIUS, padding: 14,
         }}
       >
+        <span
+          aria-hidden="true"
+          style={{
+            position: 'absolute', insetInlineEnd: 4, bottom: -12, pointerEvents: 'none', display: 'flex',
+            transform: 'rotate(-28deg)', color: countColor, opacity: 0.1,
+          }}
+        >
+          <Pill size={72} strokeWidth={1.6} />
+        </span>
         <div
           dir="ltr"
           style={{
-            textAlign: 'left', fontSize: 16, fontWeight: 700, lineHeight: 1.25, color: 'var(--color-text-primary)', fontFamily: font,
+            position: 'relative', textAlign: 'left', fontSize: 16, fontWeight: 700, lineHeight: 1.25, color: 'var(--color-text-primary)', fontFamily: font,
             display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: 2, overflow: 'hidden', overflowWrap: 'anywhere',
           }}
         >
           {group?.name ?? ''}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, minWidth: 0 }}>
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, minWidth: 0 }}>
           <span style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0, color: countColor }}>
             <Pill size={14} strokeWidth={2.2} aria-hidden="true" style={{ flexShrink: 0 }} />
             <span style={{ fontSize: 12, fontWeight: 600, lineHeight: 1.2, fontFamily: font, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>

@@ -102,7 +102,7 @@ function HomeRoshettasSection({ onOpenRoshetta, onSeeAll }) {
     content = (
       <HomeRoshettaStateCard
         title="Sign in to write roshettas"
-        body="Your roshettas save to your account and work offline."
+        body="Roshettas are saved to your account and available offline."
         actionLabel="Sign in"
         onAction={handleNew}
       />
@@ -121,8 +121,9 @@ function HomeRoshettasSection({ onOpenRoshetta, onSeeAll }) {
     content = (
       <HomeRoshettaStateCard
         title="Write your first roshetta"
-        body="Build a prescription from library drugs, then share it as a link."
+        body="Build a prescription from library drugs."
         actionLabel="Create roshetta"
+        withIcon
         onAction={handleNew}
       />
     )
