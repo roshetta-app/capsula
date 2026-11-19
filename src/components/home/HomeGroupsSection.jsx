@@ -3,11 +3,12 @@
  * Phase H, step 9.5: My drug groups on Home. The same layout as My roshettas (a header with the
  * name and "See all" with an arrow, then one sideways swipe row with the grey dashed New card
  * first, the next card peeking in from the edge) with its own personality from step 9.0: cards
- * tinted in each group's own colour, a soft grey empty card, and a slim grey row for a guest.
+ * tinted in each group's own colour, and grey folders for every other state.
  *
- * States: loading (grey cards, the last one cut off), guest (the slim sign-in row), could not load
- * (Try again), signed in with none (the grey "Start your first group" card), the list, a refresh
- * that failed while a saved copy is shown, read only (banner, no New card), a full free list (New
+ * States: loading (three grey folders, the last one cut off), guest (the grey folder with
+ * "Sign in"), could not load (Try again, grey folder), signed in with none (the grey folder
+ * "Start your first group"; those three are the Drugs screen's own grey folder card), the list,
+ * a refresh that failed while a saved copy is shown, read only (banner, no New card), a full free list (New
  * carries the Pro mark; the line "3 of 3 groups · Full" sits under the row) and the slim notice
  * while changes wait or were refused. The groups data, the sign-in prompt, the limit and read only
  * messages and the editor sheet are the ones the Drugs screen uses today; nothing about groups
@@ -18,8 +19,7 @@
  */
 
 import { memo, useEffect, useState } from 'react'
-import { ArrowRight, Folder } from 'lucide-react'
-import { shimmer } from '../drugs/home/shimmer'
+import { ArrowRight } from 'lucide-react'
 import GroupStateMessage from '../drugs/groups/GroupStateMessage'
 import GroupEditorSheet from '../drugs/groups/GroupEditorSheet'
 import FailedChangesSheet from '../drugs/groups/FailedChangesSheet'
@@ -27,7 +27,7 @@ import Snackbar from '../ui/Snackbar'
 import { takePendingUndo } from '../drugs/groups/pendingUndo'
 import { HomeGroupCard, HomeNewGroupCard } from './HomeGroupCard'
 import HomeSyncLine from './HomeSyncLine'
-import { CARD_W, CARD_H } from './HomeRoshettaCard'
+import { HomeGroupSkeletonCards } from './HomeStateCards'
 import { useFavouritesContext } from '../../context/FavouritesContext'
 import { useDrugContext } from '../../context/DrugContext'
 import { useAuth } from '../../hooks/useAuth'
@@ -39,7 +39,6 @@ import { homeGroupCards, groupLimitLine } from '../../utils/homeGroups'
 import { DRUG_GROUPS_CAP_FREE } from '../../constants/features'
 
 const font = 'var(--font-body)'
-const GREY = 'color-mix(in srgb, var(--color-text-primary) 5%, var(--color-bg))'
 const READ_ONLY_MESSAGE = 'Your groups are read only. Delete a group or upgrade to edit.'
 const HIDE_BAR_CSS = '.home-groups-row::-webkit-scrollbar { display: none; }'
 
@@ -54,66 +53,7 @@ const ROW_STYLE = {
 function SkeletonRow() {
   return (
     <div aria-hidden="true" style={{ ...ROW_STYLE, overflowX: 'hidden' }}>
-      {[0, 1, 2].map(i => (
-        <div key={i} style={shimmer({ flex: `0 0 ${CARD_W}px`, width: CARD_W, height: CARD_H, borderRadius: 16 })} />
-      ))}
-    </div>
-  )
-}
-
-// The signed-in person's empty row: one full-width soft grey card, a round white icon chip, one
-// white outlined button.
-function EmptyCard({ onAction }) {
-  return (
-    <div style={{ backgroundColor: GREY, borderRadius: 16, padding: '24px 16px', textAlign: 'center', fontFamily: font }}>
-      <div
-        aria-hidden="true"
-        style={{
-          width: 40, height: 40, borderRadius: 9999, margin: '0 auto 12px',
-          backgroundColor: 'var(--color-surface)', color: 'var(--color-text-secondary)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}
-      >
-        <Folder size={22} strokeWidth={2} />
-      </div>
-      <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 4 }}>Start your first group</div>
-      <div style={{ fontSize: 14, lineHeight: 1.5, color: 'var(--color-text-secondary)', marginBottom: 16 }}>
-        Keep the drugs you use most in one list.
-      </div>
-      <button
-        type="button"
-        onClick={onAction}
-        style={{
-          minHeight: 44, padding: '0 24px', borderRadius: 9999, cursor: 'pointer',
-          backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-accent-text)',
-          fontFamily: font, fontSize: 14, fontWeight: 600, outline: 'none', WebkitTapHighlightColor: 'transparent',
-        }}
-      >
-        Create group
-      </button>
-    </div>
-  )
-}
-
-// A guest sees only a slim grey row, so the screen does not repeat two big cards.
-function GuestRow({ onSignIn }) {
-  return (
-    <div style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)',
-      backgroundColor: GREY, borderRadius: 14, padding: '0 var(--space-3)', minHeight: 48, fontFamily: font,
-    }}>
-      <span style={{ fontSize: 14, color: 'var(--color-text-secondary)', minWidth: 0 }}>Sign in to keep drug groups</span>
-      <button
-        type="button"
-        onClick={onSignIn}
-        style={{
-          minHeight: 44, padding: '0 0 0 12px', background: 'none', border: 'none', cursor: 'pointer', outline: 'none',
-          color: 'var(--color-accent-text)', fontFamily: font, fontSize: 14, fontWeight: 600, flexShrink: 0,
-          WebkitTapHighlightColor: 'transparent',
-        }}
-      >
-        Sign in
-      </button>
+      <HomeGroupSkeletonCards />
     </div>
   )
 }
@@ -179,19 +119,31 @@ function HomeGroupsSection({ onOpenGroup, onSeeAll }) {
   if (state === 'loading') {
     content = <SkeletonRow />
   } else if (state === 'guest') {
-    content = <GuestRow onSignIn={handleNew} />
+    content = (
+      <GroupStateMessage flat secondary title="Sign in to keep drug groups" actionLabel="Sign in" onAction={handleNew} />
+    )
   } else if (state === 'error') {
     content = (
       <GroupStateMessage
+        flat
+        secondary
         title="Couldn't load your groups"
         body={isOnline ? undefined : "You're offline. Check your connection and try again."}
         actionLabel="Try again"
         onAction={reloadGroups}
-        secondary
       />
     )
   } else if (state === 'empty') {
-    content = <EmptyCard onAction={handleNew} />
+    content = (
+      <GroupStateMessage
+        flat
+        secondary
+        title="Start your first group"
+        body="Keep the drugs you use most in one list."
+        actionLabel="Create group"
+        onAction={handleNew}
+      />
+    )
   } else {
     const line = groupLimitLine({ isPro, count, cap: DRUG_GROUPS_CAP_FREE })
     content = (

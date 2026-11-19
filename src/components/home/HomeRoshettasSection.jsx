@@ -4,8 +4,9 @@
  * a header (name, "See all" with an arrow on the right), then the dashed New card (112 wide) followed
  * by the roshetta cards (148 wide) with the next card peeking in from the edge.
  *
- * States: loading (grey cards, the last one cut off), guest (the sign-in card), could not load
- * (Try again), signed in with none (the full-width "Write your first roshetta" card), the list,
+ * States: loading (three grey pads, the last one cut off), guest (the sign-in pad), could not load
+ * (Try again, on the same pad), signed in with none (the full-width "Write your first roshetta"
+ * pad; all four drawn in HomeStateCards.jsx in the look of the real card), the list,
  * read only (banner, no New card), a full free
  * list (New carries the Pro mark and opens the limit sheet; the line "3 of 3 on the free plan.
  * Upgrade to Pro for 100." sits under the row), and the slim notice while changes wait or were
@@ -17,15 +18,14 @@
 
 import { memo, useState } from 'react'
 import { ArrowRight } from 'lucide-react'
-import { shimmer } from '../drugs/home/shimmer'
 import GroupStateMessage from '../drugs/groups/GroupStateMessage'
-import RoshettaStateCard from '../roshettas/RoshettaStateCard'
+import { HomeRoshettaStateCard, HomeRoshettaSkeletonCards } from './HomeStateCards'
 import RoshettaDetailsSheet from '../roshettas/RoshettaDetailsSheet'
 import HomeSyncLine from './HomeSyncLine'
 import RoshettaFailedChangesSheet from '../roshettas/RoshettaFailedChangesSheet'
 import { useConditionContext } from '../../context/ConditionContext'
 import { findSpecialty } from '../../utils/roshettaSpecialty'
-import { HomeRoshettaCard, HomeNewCard, CARD_W, CARD_H } from './HomeRoshettaCard'
+import { HomeRoshettaCard, HomeNewCard } from './HomeRoshettaCard'
 import { useFavouritesContext } from '../../context/FavouritesContext'
 import { useAuth } from '../../hooks/useAuth'
 import { useIsPro } from '../../hooks/useIsPro'
@@ -52,9 +52,7 @@ function SkeletonRow() {
       aria-hidden="true"
       style={{ ...ROW_STYLE, overflowX: 'hidden' }}
     >
-      {[0, 1, 2].map(i => (
-        <div key={i} style={shimmer({ flex: `0 0 ${CARD_W}px`, width: CARD_W, height: CARD_H, borderRadius: 16 })} />
-      ))}
+      <HomeRoshettaSkeletonCards />
     </div>
   )
 }
@@ -102,7 +100,7 @@ function HomeRoshettasSection({ onOpenRoshetta, onSeeAll }) {
     content = <SkeletonRow />
   } else if (state === 'guest') {
     content = (
-      <RoshettaStateCard
+      <HomeRoshettaStateCard
         title="Sign in to write roshettas"
         body="Your roshettas save to your account and work offline."
         actionLabel="Sign in"
@@ -111,17 +109,17 @@ function HomeRoshettasSection({ onOpenRoshetta, onSeeAll }) {
     )
   } else if (state === 'error') {
     content = (
-      <GroupStateMessage
+      <HomeRoshettaStateCard
+        tone="error"
         title="Couldn't load your roshettas"
         body={isOnline ? undefined : "You're offline. Check your connection and try again."}
         actionLabel="Try again"
         onAction={reloadRoshettas}
-        secondary
       />
     )
   } else if (state === 'empty') {
     content = (
-      <RoshettaStateCard
+      <HomeRoshettaStateCard
         title="Write your first roshetta"
         body="Build a prescription from library drugs, then share it as a link."
         actionLabel="Create roshetta"
