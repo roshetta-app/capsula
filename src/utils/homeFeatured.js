@@ -5,8 +5,43 @@
 
 export const TAGLINE_MAX = 80
 
-const TOPIC_DEFAULT_LINE = 'Overview and key points'
-const DRUG_DEFAULT_LINE  = 'Brands, strengths and doses'
+// 2026-11-16 (Phase J step 11.2): one default line for both kinds; the small label above already says
+// whether the card opens a drug or a topic.
+const DEFAULT_LINE = 'Overview and key points'
+
+// Short joining words stay in lower case in a name (except as its first word).
+const SMALL_WORDS = new Set(['and', 'or', 'of', 'in', 'on', 'at', 'to', 'for', 'with', 'by', 'the', 'a', 'an', 'per', 'vs'])
+
+// Proper capitalization for a name shown on the card (the library row itself is never changed): a word
+// written entirely in lower case gets a capital first letter; a word that already has any capital
+// (DKA, COPD, ACE) is left exactly as written; short joining words stay lower case unless first; a word
+// that starts with a digit, and Arabic, are untouched. Brackets and hyphens are handled ((forte) ->
+// (Forte), beta-lactamase -> Beta-lactamase).
+export function properName(text) {
+  if (typeof text !== 'string') return ''
+  return text.split(/(\s+)/).map((part, i, all) => {
+    if (!part || /^\s+$/.test(part)) return part
+    if (part !== part.toLowerCase()) return part
+    const isFirst = all.slice(0, i).every(x => !x || /^\s+$/.test(x))
+    if (!isFirst && SMALL_WORDS.has(part)) return part
+    const m = part.match(/^([^\p{L}\p{N}]*)(\p{L})(.*)$/u)
+    return m ? m[1] + m[2].toUpperCase() + m[3] : part
+  }).join('')
+}
+
+// The name's size on the card: 30, 26 or 22 by its length, then lower again when one word is long, so a
+// long word (Gastroenteritis) is not broken inside the card: over 12 letters 22, over 15 letters 20,
+// over 18 letters 18.
+export function cardTitleSize(title) {
+  const text = typeof title === 'string' ? title : ''
+  const n = Array.from(text).length
+  let size = n <= 12 ? 30 : n <= 24 ? 26 : 22
+  const longest = Math.max(0, ...text.split(/\s+/).map(w => Array.from(w).length))
+  if (longest > 18) size = Math.min(size, 18)
+  else if (longest > 15) size = Math.min(size, 20)
+  else if (longest > 12) size = Math.min(size, 22)
+  return size
+}
 
 // The joined library row of an item (a topic or a drug), or null when it is gone.
 function target(item) {
@@ -23,7 +58,7 @@ export function cardTitle(item) {
   const t = target(item)
   if (!t) return ''
   const raw = item.kind === 'brand' ? t.tradename_clean : t.name
-  return typeof raw === 'string' ? raw.trim() : ''
+  return typeof raw === 'string' ? properName(raw.trim()) : ''
 }
 
 // "Topic · Gastroenterology" or "Drug · Antibiotic". Just "Topic" / "Drug" when there is no more to say.
@@ -34,7 +69,7 @@ export function cardLabel(item) {
   const extra = item.kind === 'brand'
     ? (one(one(t.formulations)?.generics)?.class ?? '')
     : (one(t.specialties)?.name_en ?? '')
-  const text = typeof extra === 'string' ? extra.trim() : ''
+  const text = typeof extra === 'string' ? properName(extra.trim()) : ''
   return text ? `${word} \u00b7 ${text}` : word
 }
 
@@ -42,7 +77,7 @@ export function cardLabel(item) {
 export function cardLine(item) {
   const own = typeof item?.tagline === 'string' ? item.tagline.trim() : ''
   if (own) return own
-  return item?.kind === 'brand' ? DRUG_DEFAULT_LINE : TOPIC_DEFAULT_LINE
+  return DEFAULT_LINE
 }
 
 export function cardButton(item) {

@@ -2,7 +2,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  cardTitle, cardLabel, cardLine, cardButton, cardPath, blockedReason, canShow,
+  properName, cardTitleSize, cardTitle, cardLabel, cardLine, cardButton, cardPath, blockedReason, canShow,
   countSummary, summaryText, pickFeatured, cleanTagline, TAGLINE_MAX,
 } from './homeFeatured.js'
 
@@ -39,7 +39,7 @@ test('label falls back to the plain word; Arabic titles pass through untouched',
 test('the line: own line wins, blank falls back to the default for the kind', () => {
   assert.equal(cardLine(topic({ tagline: 'Know the signs' })), 'Know the signs')
   assert.equal(cardLine(topic({ tagline: '   ' })), 'Overview and key points')
-  assert.equal(cardLine(drug()), 'Brands, strengths and doses')
+  assert.equal(cardLine(drug()), 'Overview and key points')
 })
 
 test('can it show: on and published only, with the reason when not', () => {
@@ -105,4 +105,45 @@ test('Home: rows are matched to the saved library; a missing item gets no joined
   assert.deepEqual(resolveFromLibrary(undefined, undefined, undefined), [])
   assert.equal(resolveFromLibrary([{ id: 'x', kind: 'condition', condition_id: 'c1', is_active: true }], conditions, [])[0].conditions.specialties.name_en, 'Gastroenterology')
   assert.equal(resolveFromLibrary([{ id: 'x', kind: 'condition', condition_id: 'c1', is_active: true }], [{ id: 'c1', slug: 's', name: 'N', specialtyName: null }], [])[0].conditions.specialties, null)
+})
+
+// Phase J step 11.2: proper capitalization, one default line, the name size.
+test('proper capitalization: lower-case words get a capital, existing capitals are kept', () => {
+  assert.equal(properName('omepak'), 'Omepak')
+  assert.equal(properName('acute gastroenteritis'), 'Acute Gastroenteritis')
+  assert.equal(properName('DKA management'), 'DKA Management')
+  assert.equal(properName('ACE inhibitors'), 'ACE Inhibitors')
+  assert.equal(properName('augmentin XR'), 'Augmentin XR')
+  assert.equal(properName('MacConkey agar'), 'MacConkey Agar')
+})
+
+test('proper capitalization: joining words stay lower case unless first; brackets, hyphens, digits, Arabic', () => {
+  assert.equal(properName('management of diabetes in children'), 'Management of Diabetes in Children')
+  assert.equal(properName('the common cold'), 'The Common Cold')
+  assert.equal(properName('penicillins with beta-lactamase inhibitors'), 'Penicillins with Beta-lactamase Inhibitors')
+  assert.equal(properName('augmentin (forte) 1g'), 'Augmentin (Forte) 1g')
+  assert.equal(properName('  omepak   40 '), '  Omepak   40 ')
+  assert.equal(properName('\u0627\u0644\u062a\u0647\u0627\u0628 \u0627\u0644\u062d\u0644\u0642'), '\u0627\u0644\u062a\u0647\u0627\u0628 \u0627\u0644\u062d\u0644\u0642')
+  assert.equal(properName(null), '')
+  assert.equal(properName(5), '')
+})
+
+test('the card shows proper names for the title and the label, the library row is not touched', () => {
+  const t = topic({}, { name: 'acute cholecystitis', specialties: { name_en: 'general surgery' } })
+  assert.equal(cardTitle(t), 'Acute Cholecystitis')
+  assert.equal(cardLabel(t), 'Topic \u00b7 General Surgery')
+  assert.equal(t.conditions.name, 'acute cholecystitis')
+  assert.equal(cardTitle(drug({}, { tradename_clean: 'omepak' })), 'Omepak')
+})
+
+test('the name size steps down with the length (30, 26, 22) and again for a long single word', () => {
+  assert.equal(cardTitleSize('Omepak'), 30)
+  assert.equal(cardTitleSize('123456789012'), 30)
+  assert.equal(cardTitleSize('Acute Pancreatitis'), 26)
+  assert.equal(cardTitleSize('Augmentin Extended Release Suspension Forte'), 22)
+  assert.equal(cardTitleSize('Acute Gastroenteritis'), 22)
+  assert.equal(cardTitleSize('Hypercholesterolemia'), 18)
+  assert.equal(cardTitleSize('Pneumonia Atypical Mycoplasma'), 22)
+  assert.equal(cardTitleSize(''), 30)
+  assert.equal(cardTitleSize(null), 30)
 })
