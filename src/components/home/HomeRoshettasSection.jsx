@@ -22,6 +22,7 @@ import GroupStateMessage from '../drugs/groups/GroupStateMessage'
 import RoshettaStateCard from '../roshettas/RoshettaStateCard'
 import RoshettaDetailsSheet from '../roshettas/RoshettaDetailsSheet'
 import HomeSyncLine from './HomeSyncLine'
+import RoshettaFailedChangesSheet from '../roshettas/RoshettaFailedChangesSheet'
 import { useConditionContext } from '../../context/ConditionContext'
 import { findSpecialty } from '../../utils/roshettaSpecialty'
 import { HomeRoshettaCard, HomeNewCard, CARD_W, CARD_H } from './HomeRoshettaCard'
@@ -64,13 +65,14 @@ function HomeRoshettasSection({ onOpenRoshetta, onSeeAll }) {
   const {
     roshettas = [], roshettasStatus = 'loading', roshettasLoadError = false, isGuest = false,
     reloadRoshettas, waitingRoshettaIds = [], waitingCount = 0, failedCount = 0, syncState = 'idle',
-    retryFailedChanges, isReadOnly = false, canCreateRoshetta = true, roshettaCap = 3,
+    isReadOnly = false, canCreateRoshetta = true, roshettaCap = 3,
     showRoshettaLimit, showRoshettaReadOnly,
   } = roshettasApi ?? {}
   const { loading: authLoading, signInWithGoogle } = useAuth()
   const isPro = useIsPro()
   const { isOnline } = useOnlineStatus()
   const [sheetOpen, setSheetOpen] = useState(false)
+  const [seeOpen, setSeeOpen] = useState(false)
 
   const count = roshettas.length
   const state = sectionState({ authLoading, isGuest, status: roshettasStatus, count })
@@ -88,11 +90,11 @@ function HomeRoshettasSection({ onOpenRoshetta, onSeeAll }) {
   const refreshFailed = state === 'list' && roshettasLoadError && isOnline
   let kind = state === 'list' ? noticeKind(syncArgs) : ''
   let text = statusText(kind, failedCount)
-  let onNoticeAction = failedCount > 0 ? retryFailedChanges : undefined
+  let noticeAction = failedCount > 0 ? { label: 'See', run: () => setSeeOpen(true) } : null
   if (!kind && refreshFailed) {
     kind = 'refresh'
     text = statusText('refresh')
-    onNoticeAction = reloadRoshettas
+    noticeAction = { label: 'Try again', run: reloadRoshettas }
   }
 
   let content
@@ -144,7 +146,7 @@ function HomeRoshettasSection({ onOpenRoshetta, onSeeAll }) {
           ))}
         </div>
         {line && <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', fontFamily: font }}>{line}</div>}
-        <HomeSyncLine kind={kind} text={text} actionLabel="Try again" onAction={onNoticeAction} />
+        <HomeSyncLine kind={kind} text={text} actionLabel={noticeAction?.label} onAction={noticeAction?.run} />
       </div>
     )
   }
@@ -174,6 +176,7 @@ function HomeRoshettasSection({ onOpenRoshetta, onSeeAll }) {
         )}
       </div>
       {content}
+      <RoshettaFailedChangesSheet isOpen={seeOpen} onClose={() => setSeeOpen(false)} />
       <RoshettaDetailsSheet
         isOpen={sheetOpen}
         onClose={() => setSheetOpen(false)}
