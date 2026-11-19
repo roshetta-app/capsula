@@ -3,7 +3,7 @@
  * Phase J, step 11.4: the one quiet status line under a Home row (My roshettas, My drug groups).
  * It replaces the grey banners that used to sit above the cards and pushed them down.
  *
- * The slot under the row keeps its height at all times, so the cards never move when a message
+ * The slot under the row keeps its height at all times (28 px; its bottom 12 px sits in the gap before the next section, so an idle row has no big empty space), so the cards never move when a message
  * comes or goes; only the line inside it fades in and out. Kinds: failed and refresh (amber,
  * with an action), offline, syncing (turning arrows), waiting, and a short green "All changes
  * saved" that shows for a moment after a message clears, then fades away.
@@ -17,7 +17,7 @@ import { statusText } from '../../utils/homeRoshettas'
 import { CheckCircle2, CloudOff, CloudUpload, RefreshCw, TriangleAlert } from 'lucide-react'
 
 const font = 'var(--font-body)'
-export const SLOT_H = 36
+export const SLOT_H = 28
 const SAVED = { kind: 'saved', text: statusText('saved') }
 const SAVED_SHOWN_MS = 2500
 
@@ -65,20 +65,20 @@ export default function HomeSyncLine({ kind = '', text = '', actionLabel, onActi
   const hasAction = visible && (shown?.kind === 'failed' || shown?.kind === 'refresh') && actionLabel && onAction
 
   return (
-    <div role="status" aria-live="polite" style={{ minHeight: SLOT_H, display: 'flex', alignItems: 'center' }}>
+    <div role="status" aria-live="polite" style={{ minHeight: SLOT_H, display: 'flex', alignItems: 'center', marginTop: -2, marginBottom: -12 }}>
       <style>{CSS}</style>
       {shown && (
         <div
           style={{
             display: 'flex', alignItems: 'center', gap: 8, width: '100%', boxSizing: 'border-box',
-            minHeight: 36, padding: hasAction ? '0 4px 0 12px' : '0 12px', borderRadius: 12,
-            backgroundColor: look.bg, color: look.text, fontFamily: font, fontSize: 13, fontWeight: 500, lineHeight: 1.3,
+            minHeight: SLOT_H, padding: hasAction ? '0 2px 0 10px' : '0 10px', borderRadius: 10,
+            backgroundColor: look.bg, color: look.text, fontFamily: font, fontSize: 12, fontWeight: 500, lineHeight: 1.3,
             opacity: visible ? 1 : 0, visibility: visible ? 'visible' : 'hidden',
             transform: visible ? 'translateY(0)' : 'translateY(-3px)',
             transition: 'opacity var(--motion-base) var(--ease-reveal), transform var(--motion-base) var(--ease-settle), visibility var(--motion-base)',
           }}
         >
-          <Icon size={15} strokeWidth={2.2} aria-hidden="true" className={look.spin ? 'home-sync-spin' : undefined} style={{ flexShrink: 0, color: look.icon }} />
+          <Icon size={14} strokeWidth={2.2} aria-hidden="true" className={look.spin ? 'home-sync-spin' : undefined} style={{ flexShrink: 0, color: look.icon }} />
           <span style={{ flex: 1, minWidth: 0 }}>{shown.text}</span>
           {hasAction && (
             <button
@@ -86,8 +86,8 @@ export default function HomeSyncLine({ kind = '', text = '', actionLabel, onActi
               onClick={onAction}
               style={{
                 background: 'none', border: 'none', cursor: 'pointer', outline: 'none', fontFamily: font, flexShrink: 0,
-                fontSize: 13, fontWeight: 700, color: 'var(--color-accent-text)',
-                padding: '0 12px', minHeight: 44, margin: '-4px 0', WebkitTapHighlightColor: 'transparent',
+                fontSize: 12, fontWeight: 700, color: 'var(--color-accent-text)',
+                padding: '0 10px', minHeight: 44, margin: '-8px 0', WebkitTapHighlightColor: 'transparent',
               }}
             >
               {actionLabel}

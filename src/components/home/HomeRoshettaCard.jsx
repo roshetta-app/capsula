@@ -58,7 +58,7 @@ export function HomeRoshettaCard({ roshetta, specialty = null, waiting = false, 
       style={{
         fontSize: 16, flex: `0 0 ${CARD_W_CSS}`, width: CARD_W_CSS, minHeight: CARD_H, boxSizing: 'border-box', scrollSnapAlign: 'start',
         position: 'relative', display: 'flex', flexDirection: 'column', padding: '12px 14px', overflow: 'hidden',
-        backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 16,
+        backgroundColor: 'var(--color-surface)', border: 'none', borderRadius: 16,
         cursor: 'pointer', outline: 'none', WebkitTapHighlightColor: 'transparent',
         opacity: pressed ? 0.8 : 1, transform: pressed ? 'scale(0.985)' : 'scale(1)',
         transition: 'opacity var(--motion-fast) var(--ease-settle), transform var(--motion-fast) var(--ease-settle)',

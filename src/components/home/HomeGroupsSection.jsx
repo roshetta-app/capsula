@@ -208,8 +208,8 @@ function HomeGroupsSection({ onOpenGroup, onSeeAll }) {
             />
           ))}
         </div>
-        <HomeSyncLine kind={kind} text={text} actionLabel={noticeAction?.label} onAction={noticeAction?.run} />
         {line && <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', fontFamily: font }}>{line}</div>}
+        <HomeSyncLine kind={kind} text={text} actionLabel={noticeAction?.label} onAction={noticeAction?.run} />
       </div>
     )
   }

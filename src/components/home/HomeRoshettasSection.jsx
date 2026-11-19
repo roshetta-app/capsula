@@ -143,8 +143,8 @@ function HomeRoshettasSection({ onOpenRoshetta, onSeeAll }) {
             />
           ))}
         </div>
-        <HomeSyncLine kind={kind} text={text} actionLabel="Try again" onAction={onNoticeAction} />
         {line && <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', fontFamily: font }}>{line}</div>}
+        <HomeSyncLine kind={kind} text={text} actionLabel="Try again" onAction={onNoticeAction} />
       </div>
     )
   }
