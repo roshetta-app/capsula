@@ -1,15 +1,19 @@
 /**
  * src/components/home/HomeSyncLine.jsx
- * Phase J, step 11.4: the one quiet status line under a Home row (My roshettas, My drug groups).
- * It replaces the grey banners that used to sit above the cards and pushed them down.
+ * Phase J, step 11.4 (redrawn in 11.9): the one quiet status line under a Home row (My roshettas,
+ * My drug groups). Plain small text with a tiny icon, no box, no bold: it should be read only
+ * when someone looks for it.
  *
- * The slot under the row keeps its height at all times (28 px; its bottom 12 px sits in the gap before the next section, so an idle row has no big empty space), so the cards never move when a message
- * comes or goes; only the line inside it fades in and out. Kinds: failed and refresh (amber,
- * with an action), offline, syncing (turning arrows), waiting, and a short green "All changes
- * saved" that shows for a moment after a message clears, then fades away.
+ * It sits in the empty gap between this section and the next (absolutely placed just under the
+ * row), so it takes NO height of its own: the cards and the next heading never move, and an idle
+ * row has no extra empty space. It is left aligned; the action ("See", "Try again") is a text
+ * link right after the words. Kinds: failed and refresh (amber icon, with an action), offline,
+ * syncing (turning arrows), waiting, and a green "All saved" that shows for a moment after a
+ * message clears, then fades away.
  *
- * The line is full width. Props: kind (from noticeKind, 'refresh' or '' for none), text (from
- *        statusText), actionLabel, onAction (the amber lines only)
+ * Must be placed inside a parent that is position: relative and ends at the row (the section's
+ * content column does). Props: kind (from noticeKind, 'refresh' or '' for none), text (from
+ * statusText), actionLabel, onAction (the amber lines only)
  */
 
 import { useEffect, useState } from 'react'
@@ -17,7 +21,7 @@ import { statusText } from '../../utils/homeRoshettas'
 import { CheckCircle2, CloudOff, CloudUpload, RefreshCw, TriangleAlert } from 'lucide-react'
 
 const font = 'var(--font-body)'
-export const SLOT_H = 28
+export const LINE_H = 18
 const SAVED = { kind: 'saved', text: statusText('saved') }
 const SAVED_SHOWN_MS = 2500
 
@@ -27,16 +31,14 @@ const CSS = `
 @media (prefers-reduced-motion: reduce) { .home-sync-spin { animation: none; } }
 `
 
-const FAILED_LOOK = {
-  Icon: TriangleAlert, icon: 'var(--color-warning)', bg: 'color-mix(in srgb, var(--color-warning) 14%, transparent)', text: 'var(--color-text-primary)',
-}
+const FAILED_LOOK = { Icon: TriangleAlert, icon: 'var(--color-warning)' }
 const LOOK = {
   failed: FAILED_LOOK,
   refresh: FAILED_LOOK,
-  offline: { Icon: CloudOff, icon: 'var(--color-text-tertiary)', bg: 'color-mix(in srgb, var(--color-text-primary) 6%, transparent)', text: 'var(--color-text-secondary)' },
-  syncing: { Icon: RefreshCw, icon: 'var(--color-accent-text)', bg: 'color-mix(in srgb, var(--color-text-primary) 6%, transparent)', text: 'var(--color-text-secondary)', spin: true },
-  waiting: { Icon: CloudUpload, icon: 'var(--color-text-tertiary)', bg: 'color-mix(in srgb, var(--color-text-primary) 6%, transparent)', text: 'var(--color-text-secondary)' },
-  saved: { Icon: CheckCircle2, icon: 'var(--color-success)', bg: 'color-mix(in srgb, var(--color-success) 13%, transparent)', text: 'var(--color-text-secondary)' },
+  offline: { Icon: CloudOff, icon: 'var(--color-text-tertiary)' },
+  syncing: { Icon: RefreshCw, icon: 'var(--color-text-tertiary)', spin: true },
+  waiting: { Icon: CloudUpload, icon: 'var(--color-text-tertiary)' },
+  saved: { Icon: CheckCircle2, icon: 'var(--color-success)' },
 }
 
 export default function HomeSyncLine({ kind = '', text = '', actionLabel, onAction }) {
@@ -45,7 +47,7 @@ export default function HomeSyncLine({ kind = '', text = '', actionLabel, onActi
   const [prevKey, setPrevKey] = useState('')
 
   // Adjusted while drawing (not in an effect): a new message shows; a message that just cleared
-  // turns into the short "All changes saved"; otherwise the line stays hidden.
+  // turns into the short "All saved"; otherwise the line stays hidden.
   const key = kind ? `${kind}|${text}` : ''
   if (key !== prevKey) {
     setPrevKey(key)
@@ -62,32 +64,36 @@ export default function HomeSyncLine({ kind = '', text = '', actionLabel, onActi
 
   const look = LOOK[shown?.kind] ?? LOOK.waiting
   const Icon = look.Icon
-  const hasAction = visible && (shown?.kind === 'failed' || shown?.kind === 'refresh') && actionLabel && onAction
+  const warn = shown?.kind === 'failed' || shown?.kind === 'refresh'
+  const hasAction = visible && warn && actionLabel && onAction
 
   return (
-    <div role="status" aria-live="polite" style={{ minHeight: SLOT_H, display: 'flex', alignItems: 'center', marginTop: -2, marginBottom: -12 }}>
+    <div
+      role="status"
+      aria-live="polite"
+      style={{ position: 'absolute', insetInline: 0, top: '100%', marginTop: 1, height: LINE_H, display: 'flex', alignItems: 'center', pointerEvents: 'none' }}
+    >
       <style>{CSS}</style>
       {shown && (
         <div
           style={{
-            display: 'flex', alignItems: 'center', gap: 8, width: '100%', boxSizing: 'border-box',
-            minHeight: SLOT_H, padding: hasAction ? '0 2px 0 10px' : '0 10px', borderRadius: 10,
-            backgroundColor: look.bg, color: look.text, fontFamily: font, fontSize: 12, fontWeight: 500, lineHeight: 1.3,
+            display: 'inline-flex', alignItems: 'center', gap: 5, maxWidth: '100%', minWidth: 0,
+            fontFamily: font, fontSize: 12, fontWeight: 400, lineHeight: 1.3,
+            color: warn ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
             opacity: visible ? 1 : 0, visibility: visible ? 'visible' : 'hidden',
-            transform: visible ? 'translateY(0)' : 'translateY(-3px)',
-            transition: 'opacity var(--motion-base) var(--ease-reveal), transform var(--motion-base) var(--ease-settle), visibility var(--motion-base)',
+            transition: 'opacity var(--motion-base) var(--ease-reveal), visibility var(--motion-base)',
           }}
         >
-          <Icon size={14} strokeWidth={2.2} aria-hidden="true" className={look.spin ? 'home-sync-spin' : undefined} style={{ flexShrink: 0, color: look.icon }} />
-          <span style={{ flex: 1, minWidth: 0 }}>{shown.text}</span>
+          <Icon size={12} strokeWidth={2.2} aria-hidden="true" className={look.spin ? 'home-sync-spin' : undefined} style={{ flexShrink: 0, color: look.icon }} />
+          <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{shown.text}</span>
           {hasAction && (
             <button
               type="button"
               onClick={onAction}
               style={{
-                background: 'none', border: 'none', cursor: 'pointer', outline: 'none', fontFamily: font, flexShrink: 0,
-                fontSize: 12, fontWeight: 700, color: 'var(--color-accent-text)',
-                padding: '0 10px', minHeight: 44, margin: '-8px 0', WebkitTapHighlightColor: 'transparent',
+                pointerEvents: 'auto', background: 'none', border: 'none', cursor: 'pointer', outline: 'none', fontFamily: font, flexShrink: 0,
+                fontSize: 12, fontWeight: 600, color: 'var(--color-accent-text)',
+                padding: '6px 8px', margin: '-6px -2px -6px 0', WebkitTapHighlightColor: 'transparent',
               }}
             >
               {actionLabel}

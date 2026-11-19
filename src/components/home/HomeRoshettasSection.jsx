@@ -131,7 +131,7 @@ function HomeRoshettasSection({ onOpenRoshetta, onSeeAll }) {
   } else {
     const line = limitLine({ isPro, count, cap: roshettaCap, proCap: ROSHETTAS_CAP_PRO })
     content = (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+      <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
         {isReadOnly && <GroupStateMessage variant="banner" tone="warning" title={READ_ONLY_MESSAGE} />}
         <div className="home-roshettas-row" style={ROW_STYLE}>
           {showNewCard({ state, isReadOnly }) && <HomeNewCard onTap={handleNew} showPro={atFreeCap} />}

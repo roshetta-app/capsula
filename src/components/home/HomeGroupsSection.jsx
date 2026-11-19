@@ -195,7 +195,7 @@ function HomeGroupsSection({ onOpenGroup, onSeeAll }) {
   } else {
     const line = groupLimitLine({ isPro, count, cap: DRUG_GROUPS_CAP_FREE })
     content = (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+      <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
         {isReadOnly && <GroupStateMessage variant="banner" tone="warning" title={READ_ONLY_MESSAGE} />}
         <div className="home-groups-row" style={ROW_STYLE}>
           {showNewCard({ state, isReadOnly }) && <HomeNewGroupCard onTap={handleNew} showPro={atFreeCap} />}
