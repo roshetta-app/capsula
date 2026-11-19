@@ -49,7 +49,7 @@ export function HomeRoshettaCard({ roshetta, specialty = null, waiting = false, 
   const header = specialtyHeaderText(specialty, 'Roshetta')
   const name = roshetta?.name ?? ''
   const date = shortDateText(roshetta?.updatedAt, now)
-  const labelSpacing = JOINED_SCRIPT.test(header) ? 0 : '0.07em'
+  const labelSpacing = JOINED_SCRIPT.test(header) ? 0 : '0.06em'
 
   return (
     <div
@@ -83,11 +83,11 @@ export function HomeRoshettaCard({ roshetta, specialty = null, waiting = false, 
         style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 5, paddingBottom: 7, borderBottom: `1px solid ${isDark ? 'var(--color-border)' : look.bg}`, color: look.fg }}
       >
         {specialty
-          ? <SpecialtyIcon iconType={specialty.iconType ?? 'lucide'} iconValue={specialty.iconValue ?? 'Stethoscope'} size={12} color={look.fg} />
-          : <FileText size={12} strokeWidth={2} style={{ flexShrink: 0 }} />}
+          ? <SpecialtyIcon iconType={specialty.iconType ?? 'lucide'} iconValue={specialty.iconValue ?? 'Stethoscope'} size={11} color={look.fg} />
+          : <FileText size={11} strokeWidth={2} style={{ flexShrink: 0 }} />}
         <span
           dir="auto"
-          style={{ fontSize: 10.5, fontWeight: 700, lineHeight: 1.4, letterSpacing: labelSpacing, textTransform: 'uppercase', fontFamily: font, minWidth: 0, ...oneLine }}
+          style={{ fontSize: 10, fontWeight: 600, lineHeight: 1.4, letterSpacing: labelSpacing, textTransform: 'uppercase', color: 'var(--color-text-tertiary)', fontFamily: font, minWidth: 0, ...oneLine }}
         >
           {header}
         </span>

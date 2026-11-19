@@ -154,13 +154,9 @@ function HomeRoshettasSection({ onOpenRoshetta, onSeeAll }) {
       <style>{HIDE_BAR_CSS}</style>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', minHeight: 44, marginBottom: 'var(--space-1)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-          <span style={{ fontSize: 16, fontWeight: 500, color: 'var(--color-text-primary)', fontFamily: font }}>My roshettas</span>
+          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, lineHeight: 1.2, letterSpacing: '-0.01em', color: 'var(--color-text-primary)', fontFamily: font }}>My roshettas</h2>
           {state === 'list' && (
-            <span style={{
-              fontSize: 12, fontWeight: 500, color: 'var(--color-text-secondary)', fontFamily: font,
-              backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)',
-              borderRadius: 9999, padding: '1px 8px',
-            }}>
+            <span aria-hidden="true" style={{ fontSize: 14, fontWeight: 500, lineHeight: 1, color: 'var(--color-text-tertiary)', fontFamily: font, fontVariantNumeric: 'tabular-nums' }}>
               {count}
             </span>
           )}

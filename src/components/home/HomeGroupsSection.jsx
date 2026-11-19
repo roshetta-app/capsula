@@ -1,7 +1,7 @@
 /**
  * src/components/home/HomeGroupsSection.jsx
  * Phase H, step 9.5: My drug groups on Home. The same layout as My roshettas (a header with the
- * name, a count pill and "See all", then one sideways swipe row with the grey dashed New card
+ * name, a quiet count and "See all", then one sideways swipe row with the grey dashed New card
  * first, the next card peeking in from the edge) with its own personality from step 9.0: cards
  * tinted in each group's own colour, a soft grey empty card, and a slim grey row for a guest.
  *
@@ -220,13 +220,9 @@ function HomeGroupsSection({ onOpenGroup, onSeeAll }) {
       <style>{HIDE_BAR_CSS}</style>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', minHeight: 44, marginBottom: 'var(--space-1)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-          <span style={{ fontSize: 16, fontWeight: 500, color: 'var(--color-text-primary)', fontFamily: font }}>My drug groups</span>
+          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, lineHeight: 1.2, letterSpacing: '-0.01em', color: 'var(--color-text-primary)', fontFamily: font }}>My drug groups</h2>
           {state === 'list' && (
-            <span style={{
-              fontSize: 12, fontWeight: 500, color: 'var(--color-text-secondary)', fontFamily: font,
-              backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)',
-              borderRadius: 9999, padding: '1px 8px',
-            }}>
+            <span aria-hidden="true" style={{ fontSize: 14, fontWeight: 500, lineHeight: 1, color: 'var(--color-text-tertiary)', fontFamily: font, fontVariantNumeric: 'tabular-nums' }}>
               {count}
             </span>
           )}

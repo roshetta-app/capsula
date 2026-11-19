@@ -9,7 +9,7 @@
  * header band with the roshetta's specialty (or "Roshetta" in the app's blue when there is none).
  *
  * 2026-11-14 (step 4.2b): a "more" button at the top right opens a small menu with
- * "Delete roshetta" (asks first, then goes back to Home); the one status line of the
+ * "Edit details" (name, description, specialty) and "Delete roshetta" (asks first, then goes back to Home); the one status line of the
  * groups wording sits under the Back row (saving, waiting, offline, changes that could not
  * be saved, with Try again); and a fixed Edit and Share bar sits just above the bottom tab
  * bar. 2026-11-14 (step 6.1b): Share opens the share sheet, and the delete question adds
@@ -39,6 +39,7 @@ import GroupStateMessage from '../components/drugs/groups/GroupStateMessage'
 import RoshettaPageHeader from '../components/roshettas/RoshettaPageHeader'
 import RoshettaDisclaimer from '../components/roshettas/RoshettaDisclaimer'
 import ShareRoshettaSheet from '../components/roshettas/ShareRoshettaSheet'
+import RoshettaDetailsSheet from '../components/roshettas/RoshettaDetailsSheet'
 import PrescriptionSheetBlock from '../components/conditions/PrescriptionSheetBlock'
 import { shimmer } from '../components/drugs/home/shimmer'
 import { useConditionContext } from '../context/ConditionContext'
@@ -88,6 +89,7 @@ export default function RoshettaScreen() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
+  const [detailsOpen, setDetailsOpen] = useState(false)
   // The live share code (null = not shared or not known), so the delete question can say the link stops working.
   const [shareCode, setShareCode] = useState(null)
   // The roshetta as it was when Delete was confirmed: kept on screen while the delete runs.
@@ -202,6 +204,21 @@ export default function RoshettaScreen() {
             padding: 4,
           }}
         >
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => { setMenuOpen(false); setDetailsOpen(true) }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8, width: '100%', minHeight: 44,
+              padding: '8px 10px', fontSize: 14, fontFamily: font,
+              color: 'var(--color-text-primary)', background: 'none', border: 'none',
+              borderRadius: 'var(--radius-sm)', textAlign: 'start', cursor: 'pointer',
+              WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            <Icon name="Pencil" size={16} color="var(--color-text-secondary)" />
+            Edit details
+          </button>
           <button
             type="button"
             role="menuitem"
@@ -350,6 +367,12 @@ export default function RoshettaScreen() {
         roshetta={roshetta}
         waiting={waitingRoshettaIds.includes(id)}
         onShareChange={setShareCode}
+      />
+      <RoshettaDetailsSheet
+        isOpen={detailsOpen}
+        onClose={() => setDetailsOpen(false)}
+        roshetta={roshetta}
+        onSaved={() => {}}
       />
       <ConfirmSheet
         isOpen={deleteOpen}
