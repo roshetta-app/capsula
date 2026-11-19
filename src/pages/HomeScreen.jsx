@@ -5,12 +5,14 @@
  * Top bar (wordmark, bell, dark mode), the welcome heading, the featured card, then the My roshettas
  * row (step 9.4) and the My drug groups row (step 9.5). The roshettas shelf stays on Topics and
  * My drug groups on Drugs until steps 9.6 and 9.7 take them off.
- * No search on Home (assumption W). The card opens its topic or drug; it is not drawn at all when there
+ * No search on Home (assumption W). 2026-11-16 (Phase J 11.1): a rotating line sits under the welcome
+ * heading (HomeTagline). The card opens its topic or drug; it is not drawn at all when there
  * is nothing to show.
  */
 import { useNavigate } from 'react-router-dom'
 import HomeTopBar from '../components/home/HomeTopBar'
-import FeaturedCardView from '../components/home/FeaturedCardView'
+import FeaturedCardView, { FEATURED_MIN_H } from '../components/home/FeaturedCardView'
+import HomeTagline from '../components/home/HomeTagline'
 import HomeRoshettasSection from '../components/home/HomeRoshettasSection'
 import HomeGroupsSection from '../components/home/HomeGroupsSection'
 import { useAuth } from '../hooks/useAuth'
@@ -35,18 +37,21 @@ export default function HomeScreen() {
     <div style={{ paddingTop: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
       <HomeTopBar />
 
-      <h1 dir="auto" style={{
-        margin: 0, fontSize: 28, fontWeight: 600, lineHeight: 1.2, overflowWrap: 'anywhere',
-        color: 'var(--color-text-primary)', fontFamily: 'var(--font-body)',
-      }}>
-        {heading}
-      </h1>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <h1 dir="auto" style={{
+          margin: 0, fontSize: 28, fontWeight: 600, lineHeight: 1.2, overflowWrap: 'anywhere',
+          color: 'var(--color-text-primary)', fontFamily: 'var(--font-body)',
+        }}>
+          {heading}
+        </h1>
+        <HomeTagline />
+      </div>
 
       {item && path ? (
         <FeaturedCardView item={item} onOpen={() => navigate(path)} />
       ) : loadingFirst ? (
         <div aria-hidden="true" style={{
-          minHeight: 150, borderRadius: 16, backgroundColor: 'var(--color-surface-muted, var(--color-border))', opacity: 0.6,
+          minHeight: FEATURED_MIN_H, borderRadius: 24, backgroundColor: 'var(--color-surface-muted, var(--color-border))', opacity: 0.6,
         }} />
       ) : null}
 
