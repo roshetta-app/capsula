@@ -67,15 +67,6 @@ export function HomeGroupCard({ group, waiting = false, onOpen }) {
           backgroundColor: wash, borderRadius: FOLDER_BODY_RADIUS, padding: 14,
         }}
       >
-        <span
-          aria-hidden="true"
-          style={{
-            position: 'absolute', insetInlineEnd: 4, bottom: -12, pointerEvents: 'none', display: 'flex',
-            transform: 'rotate(-28deg)', color: countColor, opacity: 0.1,
-          }}
-        >
-          <Pill size={72} strokeWidth={1.6} />
-        </span>
         <div
           dir="ltr"
           style={{
