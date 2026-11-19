@@ -18,25 +18,23 @@
 
 import { memo, useState } from 'react'
 import { ArrowRight } from 'lucide-react'
-import GroupStateMessage from '../drugs/groups/GroupStateMessage'
 import { HomeRoshettaStateCard, HomeRoshettaSkeletonCards } from './HomeStateCards'
 import RoshettaDetailsSheet from '../roshettas/RoshettaDetailsSheet'
 import HomeSyncLine from './HomeSyncLine'
 import RoshettaFailedChangesSheet from '../roshettas/RoshettaFailedChangesSheet'
 import { useConditionContext } from '../../context/ConditionContext'
 import { findSpecialty } from '../../utils/roshettaSpecialty'
-import { HomeRoshettaCard, HomeNewCard } from './HomeRoshettaCard'
+import { HomeRoshettaCard } from './HomeRoshettaCard'
+import HomeNewCard from './HomeNewCard'
 import { useFavouritesContext } from '../../context/FavouritesContext'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../context/ToastContext'
 import { useIsPro } from '../../hooks/useIsPro'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
 import { sectionState, newTapAnswer } from '../../utils/roshettaSectionState'
-import { noticeKind, statusText, homeRowCards, limitLine, showNewCard } from '../../utils/homeRoshettas'
-import { ROSHETTAS_CAP_PRO } from '../../constants/features'
+import { noticeKind, statusText, homeRowCards, showNewCard, newCardMode } from '../../utils/homeRoshettas'
 
 const font = 'var(--font-body)'
-const READ_ONLY_MESSAGE = 'Your roshettas are read only. Delete a roshetta or upgrade to edit.'
 const HIDE_BAR_CSS = '.home-roshettas-row::-webkit-scrollbar { display: none; }'
 
 // The row reaches both screen edges (the page keeps a 16 px gutter) so the next card can peek in.
@@ -136,12 +134,10 @@ function HomeRoshettasSection({ onOpenRoshetta, onSeeAll }) {
       />
     )
   } else {
-    const line = limitLine({ isPro, count, cap: roshettaCap, proCap: ROSHETTAS_CAP_PRO })
     content = (
       <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-        {isReadOnly && <GroupStateMessage variant="banner" tone="warning" title={READ_ONLY_MESSAGE} />}
         <div className="home-roshettas-row" style={ROW_STYLE}>
-          {showNewCard({ state, isReadOnly }) && <HomeNewCard onTap={handleNew} showPro={atFreeCap} />}
+          {showNewCard({ state }) && <HomeNewCard kind="roshetta" mode={newCardMode({ isReadOnly, atFreeCap })} onTap={handleNew} />}
           {homeRowCards(roshettas).map(r => (
             <HomeRoshettaCard
               key={r.id}
@@ -152,7 +148,6 @@ function HomeRoshettasSection({ onOpenRoshetta, onSeeAll }) {
             />
           ))}
         </div>
-        {line && <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', fontFamily: font }}>{line}</div>}
         <HomeSyncLine kind={kind} text={text} actionLabel={noticeAction?.label} onAction={noticeAction?.run} />
       </div>
     )

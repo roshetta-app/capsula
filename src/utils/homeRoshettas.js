@@ -7,7 +7,8 @@
  *
  *   HOME_ROW_MAX                 how many roshetta cards the row holds before "See all" (10)
  *   homeRowCards(list)           the first HOME_ROW_MAX roshettas, as given (already newest first)
- *   showNewCard({ state, isReadOnly })   the dashed New card starts the row of a list, unless read only
+ *   showNewCard({ state })               the dashed New card starts the row of a list (also when read only: it is dimmed)
+ *   newCardMode({ isReadOnly, atFreeCap })  'readonly' | 'locked' | 'new'
  *   limitLine({ isPro, count, cap, proCap })
  *                                \"3 of 3 on the free plan. Upgrade to Pro for 100.\" when a free
  *                                account is full, otherwise ''
@@ -35,8 +36,16 @@ export function homeRowCards(list) {
   return all.slice(0, HOME_ROW_MAX);
 }
 
-export function showNewCard({ state = 'list', isReadOnly = false } = {}) {
-  return state === 'list' && !isReadOnly;
+export function showNewCard({ state = 'list' } = {}) {
+  return state === 'list';
+}
+
+// Which New card to draw: a lapsed account sees it dimmed ("Read only"), a free account at its limit
+// sees the locked "Upgrade to Pro" card, everyone else the plain "New" card.
+export function newCardMode({ isReadOnly = false, atFreeCap = false } = {}) {
+  if (isReadOnly) return 'readonly';
+  if (atFreeCap) return 'locked';
+  return 'new';
 }
 
 export function limitLine({ isPro = false, count = 0, cap = 3, proCap = 100 } = {}) {

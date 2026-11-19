@@ -20,12 +20,12 @@
 
 import { memo, useEffect, useState } from 'react'
 import { ArrowRight } from 'lucide-react'
-import GroupStateMessage from '../drugs/groups/GroupStateMessage'
 import GroupEditorSheet from '../drugs/groups/GroupEditorSheet'
 import FailedChangesSheet from '../drugs/groups/FailedChangesSheet'
 import Snackbar from '../ui/Snackbar'
 import { takePendingUndo } from '../drugs/groups/pendingUndo'
-import { HomeGroupCard, HomeNewGroupCard } from './HomeGroupCard'
+import { HomeGroupCard } from './HomeGroupCard'
+import HomeNewCard from './HomeNewCard'
 import HomeSyncLine from './HomeSyncLine'
 import { HomeGroupSkeletonCards, HomeGroupStateCard } from './HomeStateCards'
 import { useFavouritesContext } from '../../context/FavouritesContext'
@@ -35,12 +35,11 @@ import { useToast } from '../../context/ToastContext'
 import { useIsPro } from '../../hooks/useIsPro'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
 import { sectionState, newTapAnswer } from '../../utils/roshettaSectionState'
-import { noticeKind, statusText, showNewCard } from '../../utils/homeRoshettas'
-import { homeGroupCards, groupLimitLine } from '../../utils/homeGroups'
+import { noticeKind, statusText, showNewCard, newCardMode } from '../../utils/homeRoshettas'
+import { homeGroupCards } from '../../utils/homeGroups'
 import { DRUG_GROUPS_CAP_FREE } from '../../constants/features'
 
 const font = 'var(--font-body)'
-const READ_ONLY_MESSAGE = 'Your groups are read only. Delete a group or upgrade to edit.'
 const HIDE_BAR_CSS = '.home-groups-row::-webkit-scrollbar { display: none; }'
 
 // The row reaches both screen edges (the page keeps a 16 px gutter) so the next card can peek in.
@@ -156,12 +155,10 @@ function HomeGroupsSection({ onOpenGroup, onSeeAll }) {
       />
     )
   } else {
-    const line = groupLimitLine({ isPro, count, cap: DRUG_GROUPS_CAP_FREE })
     content = (
       <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-        {isReadOnly && <GroupStateMessage variant="banner" tone="warning" title={READ_ONLY_MESSAGE} />}
         <div className="home-groups-row" style={ROW_STYLE}>
-          {showNewCard({ state, isReadOnly }) && <HomeNewGroupCard onTap={handleNew} showPro={atFreeCap} />}
+          {showNewCard({ state }) && <HomeNewCard kind="group" mode={newCardMode({ isReadOnly, atFreeCap })} onTap={handleNew} />}
           {homeGroupCards(groups, groupsSortMode).map(g => (
             <HomeGroupCard
               key={`${g.id}:${g.name}`}
@@ -171,7 +168,6 @@ function HomeGroupsSection({ onOpenGroup, onSeeAll }) {
             />
           ))}
         </div>
-        {line && <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', fontFamily: font }}>{line}</div>}
         <HomeSyncLine kind={kind} text={text} actionLabel={noticeAction?.label} onAction={noticeAction?.run} />
       </div>
     )

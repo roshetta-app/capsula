@@ -11,8 +11,7 @@
 // Props: roshetta, specialty (the picker shape from the specialty list, or null), waiting, now, onOpen.
 
 import { useState } from 'react'
-import { Clock, CloudUpload, FileText, Plus } from 'lucide-react'
-import { ProPill } from '../drugs/groups/GroupTile'
+import { Clock, CloudUpload, FileText } from 'lucide-react'
 import { SpecialtyIcon, useIsDark } from '../../utils/specialtyIcon'
 import { rowSummary } from '../../utils/roshettaRowText'
 import { specialtyColors, specialtyHeaderText } from '../../utils/roshettaSpecialty'
@@ -114,36 +113,5 @@ export function HomeRoshettaCard({ roshetta, specialty = null, waiting = false, 
         )}
       </div>
     </div>
-  )
-}
-
-export function HomeNewCard({ onTap, showPro = false }) {
-  const [pressed, setPressed] = useState(false)
-  return (
-    <button
-      type="button"
-      onClick={onTap}
-      aria-label="New roshetta"
-      {...pressProps(setPressed)}
-      style={{
-        fontSize: 16, flex: `0 0 ${NEW_W_CSS}`, width: NEW_W_CSS, minHeight: CARD_H, boxSizing: 'border-box', scrollSnapAlign: 'start',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 12,
-        backgroundColor: 'transparent', border: '1.5px dashed var(--color-chip-line)', borderRadius: 16,
-        cursor: 'pointer', outline: 'none', WebkitTapHighlightColor: 'transparent',
-        color: 'var(--color-accent-text)', fontFamily: font,
-        opacity: pressed ? 0.7 : 1,
-      }}
-    >
-      <span
-        aria-hidden="true"
-        style={{ width: 32, height: 32, borderRadius: 9999, backgroundColor: 'var(--color-accent-light)', color: 'var(--color-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-      >
-        <Plus size={18} strokeWidth={2.4} />
-      </span>
-      <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, fontWeight: 600 }}>
-        New
-        {showPro ? <ProPill /> : null}
-      </span>
-    </button>
   )
 }

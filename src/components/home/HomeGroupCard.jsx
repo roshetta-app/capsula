@@ -8,16 +8,14 @@
 // cuts the name (step 9.8).
 
 import { useState } from 'react'
-import { CloudUpload, Pill, Plus } from 'lucide-react'
-import { ProPill } from '../drugs/groups/GroupTile'
-import { FOLDER_TAB_WIDTH, FOLDER_TAB_HEIGHT, FOLDER_BODY_RADIUS, FOLDER_GREY_WASH, folderWash, folderCountColor } from '../drugs/groups/folderStyles'
+import { CloudUpload, Pill } from 'lucide-react'
+import { FOLDER_TAB_WIDTH, FOLDER_TAB_HEIGHT, FOLDER_BODY_RADIUS, folderWash, folderCountColor } from '../drugs/groups/folderStyles'
 import { resolveToken } from '../../utils/specialtyTokens'
 import { useIsDark } from '../../utils/specialtyIcon'
 import { groupCardLabel, groupCountText } from '../../utils/homeGroups'
-import { CARD_W_CSS, NEW_W_CSS, CARD_H } from './HomeRoshettaCard'
+import { CARD_W_CSS, CARD_H } from './HomeRoshettaCard'
 
 const font = 'var(--font-body)'
-const GREY = FOLDER_GREY_WASH
 
 function pressProps(setPressed) {
   return {
@@ -102,36 +100,5 @@ export function HomeGroupCard({ group, waiting = false, onOpen }) {
         </div>
       </div>
     </div>
-  )
-}
-
-export function HomeNewGroupCard({ onTap, showPro = false }) {
-  const [pressed, setPressed] = useState(false)
-  return (
-    <button
-      type="button"
-      onClick={onTap}
-      aria-label="New group"
-      {...pressProps(setPressed)}
-      style={{
-        fontSize: 16, flex: `0 0 ${NEW_W_CSS}`, width: NEW_W_CSS, minHeight: CARD_H, boxSizing: 'border-box', scrollSnapAlign: 'start',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 12,
-        backgroundColor: GREY, border: '1.5px dashed var(--color-chip-line)', borderRadius: 16,
-        cursor: 'pointer', outline: 'none', WebkitTapHighlightColor: 'transparent',
-        color: 'var(--color-text-secondary)', fontFamily: font,
-        opacity: pressed ? 0.7 : 1,
-      }}
-    >
-      <span
-        aria-hidden="true"
-        style={{ width: 32, height: 32, borderRadius: 9999, backgroundColor: 'var(--color-surface)', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-      >
-        <Plus size={18} strokeWidth={2.4} />
-      </span>
-      <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)' }}>
-        New
-        {showPro ? <ProPill /> : null}
-      </span>
-    </button>
   )
 }

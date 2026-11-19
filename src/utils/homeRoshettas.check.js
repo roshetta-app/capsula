@@ -1,7 +1,7 @@
 // Checks for homeRoshettas.js (step 9.4). Run with: node --test src/utils/homeRoshettas.check.js
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { HOME_ROW_MAX, homeRowCards, showNewCard, limitLine, homeNotice, noticeKind, statusText, cardLabel } from './homeRoshettas.js';
+import { HOME_ROW_MAX, homeRowCards, showNewCard, newCardMode, limitLine, homeNotice, noticeKind, statusText, cardLabel } from './homeRoshettas.js';
 
 test('homeRowCards: the first ten, in the given order, never changes the list', () => {
   const list = Array.from({ length: 14 }, (_, i) => ({ id: 'r' + i }));
@@ -15,9 +15,9 @@ test('homeRowCards: the first ten, in the given order, never changes the list', 
   assert.equal(homeRowCards([{ id: 'a' }]).length, 1);
 });
 
-test('showNewCard: only a list that can be changed gets the dashed New card', () => {
+test('showNewCard: only a list gets the dashed New card (dimmed when read only)', () => {
   assert.equal(showNewCard({ state: 'list', isReadOnly: false }), true);
-  assert.equal(showNewCard({ state: 'list', isReadOnly: true }), false);
+  assert.equal(showNewCard({ state: 'list', isReadOnly: true }), true);
   for (const s of ['loading', 'guest', 'error', 'empty']) assert.equal(showNewCard({ state: s }), false);
   assert.equal(showNewCard(), true);
 });
@@ -71,4 +71,12 @@ test('statusText: short plain words for every kind', () => {
   assert.equal(statusText('refresh'), "Couldn't refresh");
   assert.equal(statusText('saved'), 'All saved');
   assert.equal(statusText(''), '');
+});
+
+test('newCardMode: read only first, then the free limit, otherwise plain New', () => {
+  assert.equal(newCardMode({ isReadOnly: true, atFreeCap: true }), 'readonly');
+  assert.equal(newCardMode({ isReadOnly: true }), 'readonly');
+  assert.equal(newCardMode({ atFreeCap: true }), 'locked');
+  assert.equal(newCardMode({}), 'new');
+  assert.equal(newCardMode(), 'new');
 });

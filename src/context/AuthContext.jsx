@@ -121,6 +121,7 @@ import { Capacitor } from '@capacitor/core'
 import { Browser } from '@capacitor/browser'
 import { App } from '@capacitor/app'
 import { supabase } from '../lib/supabase'
+import { isStandalonePwa } from '../utils/standalonePwa'
 import { useToast } from './ToastContext'
 import { writeCachedAuthSnapshot, clearCachedAuthSnapshot, getCachedAuthSnapshot } from '../utils/authSnapshot'
 import { setCurrentUserId } from '../analytics/deviceSession'
@@ -728,6 +729,20 @@ export function AuthProvider({ children }) {
       })
       if (error) return { error }
       await Browser.open({ url: data.url })
+      return { error: null }
+    }
+
+    // Installed app (PWA), 2026-11-20: no popup. A popup from an installed app opens as a browser tab
+    // with its own address bar and that bar stayed on screen after sign-in. Here the app itself goes
+    // to Google and comes back to the same page. location.replace keeps the app's own page out of
+    // the history behind Google's, so Back after signing in does not step into Google.
+    if (isStandalonePwa()) {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: window.location.href, skipBrowserRedirect: true },
+      })
+      if (error) return { error }
+      window.location.replace(data.url)
       return { error: null }
     }
 
