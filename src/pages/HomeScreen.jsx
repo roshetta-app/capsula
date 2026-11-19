@@ -11,7 +11,8 @@
  */
 import { useNavigate } from 'react-router-dom'
 import HomeTopBar from '../components/home/HomeTopBar'
-import FeaturedCardView, { FEATURED_H } from '../components/home/FeaturedCardView'
+import FeaturedCardView from '../components/home/FeaturedCardView'
+import { FeaturedCardSkeleton } from '../components/home/HomeStateCards'
 import HomeTagline from '../components/home/HomeTagline'
 import HomeRoshettasSection from '../components/home/HomeRoshettasSection'
 import HomeGroupsSection from '../components/home/HomeGroupsSection'
@@ -57,9 +58,7 @@ export default function HomeScreen() {
       {item && path ? (
         <FeaturedCardView item={item} onOpen={() => navigate(path)} />
       ) : loadingFirst ? (
-        <div aria-hidden="true" style={{
-          height: FEATURED_H, borderRadius: 24, backgroundColor: 'var(--color-surface-muted, var(--color-border))', opacity: 0.6,
-        }} />
+        <FeaturedCardSkeleton />
       ) : null}
 
       <HomeRoshettasSection

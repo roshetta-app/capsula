@@ -112,7 +112,7 @@ function HomeRoshettasSection({ onOpenRoshetta, onSeeAll }) {
       <HomeRoshettaStateCard
         tone="error"
         title="Couldn't load your roshettas"
-        body={isOnline ? undefined : "You're offline. Check your connection and try again."}
+        body={isOnline ? 'Something went wrong. Please try again.' : "You're offline. Check your connection and try again."}
         actionLabel="Try again"
         onAction={reloadRoshettas}
       />

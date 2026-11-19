@@ -3,11 +3,11 @@
  * Phase H, step 9.5: My drug groups on Home. The same layout as My roshettas (a header with the
  * name and "See all" with an arrow, then one sideways swipe row with the grey dashed New card
  * first, the next card peeking in from the edge) with its own personality from step 9.0: cards
- * tinted in each group's own colour, and grey folders for every other state.
+ * tinted in each group's own colour, and white folders for every other state.
  *
- * States: loading (three grey folders, the last one cut off), guest (the grey folder with
- * "Sign in"), could not load (Try again, grey folder), signed in with none (the grey folder
- * "Start your first group"; those three are the Drugs screen's own grey folder card), the list,
+ * States: loading (three white folders, the last one cut off), guest (a white folder with
+ * "Sign in"), could not load (Try again), signed in with none ("Start your first group"; these
+ * four are drawn in HomeStateCards.jsx, text left and button right), the list,
  * a refresh that failed while a saved copy is shown, read only (banner, no New card), a full free list (New
  * carries the Pro mark; the line "3 of 3 groups · Full" sits under the row) and the slim notice
  * while changes wait or were refused. The groups data, the sign-in prompt, the limit and read only
@@ -27,7 +27,7 @@ import Snackbar from '../ui/Snackbar'
 import { takePendingUndo } from '../drugs/groups/pendingUndo'
 import { HomeGroupCard, HomeNewGroupCard } from './HomeGroupCard'
 import HomeSyncLine from './HomeSyncLine'
-import { HomeGroupSkeletonCards } from './HomeStateCards'
+import { HomeGroupSkeletonCards, HomeGroupStateCard } from './HomeStateCards'
 import { useFavouritesContext } from '../../context/FavouritesContext'
 import { useDrugContext } from '../../context/DrugContext'
 import { useAuth } from '../../hooks/useAuth'
@@ -120,26 +120,28 @@ function HomeGroupsSection({ onOpenGroup, onSeeAll }) {
     content = <SkeletonRow />
   } else if (state === 'guest') {
     content = (
-      <GroupStateMessage flat secondary title="Sign in to keep drug groups" actionLabel="Sign in" onAction={handleNew} />
+      <HomeGroupStateCard
+        title="Sign in to keep drug groups"
+        body="Your groups save to your account and work offline."
+        actionLabel="Sign in"
+        onAction={handleNew}
+      />
     )
   } else if (state === 'error') {
     content = (
-      <GroupStateMessage
-        flat
-        secondary
+      <HomeGroupStateCard
+        tone="error"
         title="Couldn't load your groups"
-        body={isOnline ? undefined : "You're offline. Check your connection and try again."}
+        body={isOnline ? 'Something went wrong. Please try again.' : "You're offline. Check your connection and try again."}
         actionLabel="Try again"
         onAction={reloadGroups}
       />
     )
   } else if (state === 'empty') {
     content = (
-      <GroupStateMessage
-        flat
-        secondary
+      <HomeGroupStateCard
         title="Start your first group"
-        body="Keep the drugs you use most in one list."
+        body="Keep the drugs you use most in one list, then share them as a link."
         actionLabel="Create group"
         onAction={handleNew}
       />
