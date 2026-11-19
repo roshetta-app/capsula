@@ -33,6 +33,7 @@ import { useDrugContext } from '../../context/DrugContext'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../context/ToastContext'
 import { useIsPro } from '../../hooks/useIsPro'
+import { useSoftSwap } from '../../hooks/useSoftSwap'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
 import { sectionState, newTapAnswer } from '../../utils/roshettaSectionState'
 import { noticeKind, statusText, showNewCard, newCardMode } from '../../utils/homeRoshettas'
@@ -122,6 +123,8 @@ function HomeGroupsSection({ onOpenGroup, onSeeAll }) {
     noticeAction = { label: 'Try again', run: reloadGroups }
   }
 
+  const swapClass = useSoftSwap(state === 'loading')
+
   let content
   if (state === 'loading') {
     content = <SkeletonRow />
@@ -197,7 +200,7 @@ function HomeGroupsSection({ onOpenGroup, onSeeAll }) {
           </button>
         )}
       </div>
-      {content}
+      <div className={swapClass || undefined}>{content}</div>
       <GroupEditorSheet isOpen={editorOpen} onClose={() => setEditorOpen(false)} group={null} />
       <FailedChangesSheet isOpen={seeOpen} onClose={() => setSeeOpen(false)} />
       <Snackbar visible={undo.visible} message="Group deleted" actionLabel="Undo" onAction={handleUndo} />

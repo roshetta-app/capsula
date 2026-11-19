@@ -2,6 +2,7 @@ import { useLocation } from 'react-router-dom'
 import BottomNav from './BottomNav'
 import OfflineStatusToast from './ui/OfflineStatusToast'
 import NotificationsBanner from './ui/NotificationsBanner'
+import PageEntrance from './ui/PageEntrance'
 
 /**
  * Routes that render their own top section and suppress the shared header.
@@ -125,7 +126,7 @@ export default function Layout({ children }) {
           ? '0 var(--page-gutter) 0'
           : '0 var(--page-gutter) calc(var(--space-12) + 60px)',
       }}>
-        {children}
+        <PageEntrance>{children}</PageEntrance>
       </main>
 
       <BottomNav />

@@ -30,6 +30,7 @@ import { useFavouritesContext } from '../../context/FavouritesContext'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../context/ToastContext'
 import { useIsPro } from '../../hooks/useIsPro'
+import { useSoftSwap } from '../../hooks/useSoftSwap'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
 import { sectionState, newTapAnswer } from '../../utils/roshettaSectionState'
 import { noticeKind, statusText, homeRowCards, showNewCard, newCardMode } from '../../utils/homeRoshettas'
@@ -100,6 +101,8 @@ function HomeRoshettasSection({ onOpenRoshetta, onSeeAll }) {
     text = statusText('refresh')
     noticeAction = { label: 'Try again', run: reloadRoshettas }
   }
+
+  const swapClass = useSoftSwap(state === 'loading')
 
   let content
   if (state === 'loading') {
@@ -177,7 +180,7 @@ function HomeRoshettasSection({ onOpenRoshetta, onSeeAll }) {
           </button>
         )}
       </div>
-      {content}
+      <div className={swapClass || undefined}>{content}</div>
       <RoshettaFailedChangesSheet isOpen={seeOpen} onClose={() => setSeeOpen(false)} />
       <RoshettaDetailsSheet
         isOpen={sheetOpen}

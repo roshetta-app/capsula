@@ -21,6 +21,7 @@ import { useConditionContext } from '../context/ConditionContext'
 import { useDrugContext } from '../context/DrugContext'
 import { useHomeFeatured } from '../hooks/useHomeFeatured'
 import { useHomeEntrance } from '../hooks/useHomeEntrance'
+import { useSoftSwap } from '../hooks/useSoftSwap'
 import { cardPath } from '../utils/homeFeatured'
 import { welcomeParts } from '../utils/homeHeading'
 import { ROUTES } from '../router'
@@ -33,6 +34,7 @@ export default function HomeScreen() {
   const { item, loadingFirst } = useHomeFeatured(conditions, drugs, !conditionsLoading && !drugsLoading)
 
   const entrance = useHomeEntrance()
+  const featuredSwap = useSoftSwap(loadingFirst && !item)
   const welcome = welcomeParts(!!user, profile?.fullName)
   const path = item ? cardPath(item) : null
 
@@ -58,7 +60,7 @@ export default function HomeScreen() {
       </div>
 
       {item && path ? (
-        <div style={entrance(1)}><FeaturedCardView item={item} onOpen={() => navigate(path)} /></div>
+        <div className={featuredSwap || undefined} style={entrance(1)}><FeaturedCardView item={item} onOpen={() => navigate(path)} /></div>
       ) : loadingFirst ? (
         <div style={entrance(1)}><FeaturedCardSkeleton /></div>
       ) : null}

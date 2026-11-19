@@ -1333,3 +1333,8 @@ body {
 
 @keyframes contents-sheet-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
 @keyframes contents-fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+/* ─── Soft swap: placeholders turn into the real content (2026-11-20) ────────── */
+/* Opacity only, one short fade; the duration collapses with "reduce motion" through --motion-base. */
+@keyframes capSoftIn { from { opacity: 0; } to { opacity: 1; } }
+.cap-soft-in { animation: capSoftIn var(--motion-base) var(--ease-reveal) both; }
