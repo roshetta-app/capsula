@@ -2,7 +2,7 @@
 // redrawn as the quiet "pad" in Phase J step 11.3 (2026-11-19): a plain sheet with a small
 // uppercase specialty label (icon and name; "Roshetta" with a prescription icon when there is
 // none, in the app's blue) over a hairline, like the top of a prescription pad; a faint italic Rx
-// watermark in the bottom corner; the name (up to two lines); and at the foot the day on the start
+// watermark in the bottom corner (in dark mode a neutral, barely-there grey, not the specialty tint); the name (up to two lines); and at the foot the day on the start
 // side and "Waiting" on the end side while changes are not saved. No drug count on the card (the
 // spoken label still says it). Width and minimum height as before (148 x 132, growing with large
 // text). The name is the person's own text and is drawn as plain text (dir="auto" for Arabic).
@@ -72,7 +72,8 @@ export function HomeRoshettaCard({ roshetta, specialty = null, waiting = false, 
         aria-hidden="true"
         style={{
           position: 'absolute', insetInlineEnd: -6, bottom: -14, pointerEvents: 'none', userSelect: 'none',
-          fontSize: 78, fontWeight: 700, fontStyle: 'italic', lineHeight: 1, color: look.bg, opacity: isDark ? 0.3 : 1,
+          fontSize: 78, fontWeight: 700, fontStyle: 'italic', lineHeight: 1,
+          color: isDark ? 'var(--color-text-primary)' : look.bg, opacity: isDark ? 0.05 : 1,
           fontFamily: 'Georgia, \'Times New Roman\', serif',
         }}
       >

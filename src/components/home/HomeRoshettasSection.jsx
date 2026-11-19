@@ -1,7 +1,7 @@
 /**
  * src/components/home/HomeRoshettasSection.jsx
  * Phase H, step 9.4: My roshettas on Home. One sideways swipe row (the look decided in step 9.0):
- * a header (name, count pill, "See all" on the right), then the dashed New card (112 wide) followed
+ * a header (name, "See all" with an arrow on the right), then the dashed New card (112 wide) followed
  * by the roshetta cards (148 wide) with the next card peeking in from the edge.
  *
  * States: loading (grey cards, the last one cut off), guest (the sign-in card), could not load
@@ -16,6 +16,7 @@
  */
 
 import { memo, useState } from 'react'
+import { ArrowRight } from 'lucide-react'
 import { shimmer } from '../drugs/home/shimmer'
 import GroupStateMessage from '../drugs/groups/GroupStateMessage'
 import RoshettaStateCard from '../roshettas/RoshettaStateCard'
@@ -155,11 +156,6 @@ function HomeRoshettasSection({ onOpenRoshetta, onSeeAll }) {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', minHeight: 44, marginBottom: 'var(--space-1)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
           <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, lineHeight: 1.2, letterSpacing: '-0.01em', color: 'var(--color-text-primary)', fontFamily: font }}>My roshettas</h2>
-          {state === 'list' && (
-            <span aria-hidden="true" style={{ fontSize: 14, fontWeight: 500, lineHeight: 1, color: 'var(--color-text-tertiary)', fontFamily: font, fontVariantNumeric: 'tabular-nums' }}>
-              {count}
-            </span>
-          )}
         </div>
         {state === 'list' && (
           <button
@@ -168,11 +164,13 @@ function HomeRoshettasSection({ onOpenRoshetta, onSeeAll }) {
             aria-label={`See all ${count} roshettas`}
             style={{
               minHeight: 44, padding: '0 0 0 12px', background: 'none', border: 'none', cursor: 'pointer', outline: 'none',
+              display: 'inline-flex', alignItems: 'center', gap: 4,
               color: 'var(--color-accent-text)', fontFamily: font, fontSize: 14, fontWeight: 600,
               WebkitTapHighlightColor: 'transparent',
             }}
           >
             See all
+            <ArrowRight size={16} strokeWidth={2.2} aria-hidden="true" />
           </button>
         )}
       </div>

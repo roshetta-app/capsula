@@ -1,7 +1,7 @@
 /**
  * src/components/home/HomeGroupsSection.jsx
  * Phase H, step 9.5: My drug groups on Home. The same layout as My roshettas (a header with the
- * name, a quiet count and "See all", then one sideways swipe row with the grey dashed New card
+ * name and "See all" with an arrow, then one sideways swipe row with the grey dashed New card
  * first, the next card peeking in from the edge) with its own personality from step 9.0: cards
  * tinted in each group's own colour, a soft grey empty card, and a slim grey row for a guest.
  *
@@ -18,7 +18,7 @@
  */
 
 import { memo, useEffect, useState } from 'react'
-import { Folder } from 'lucide-react'
+import { ArrowRight, Folder } from 'lucide-react'
 import { shimmer } from '../drugs/home/shimmer'
 import GroupStateMessage from '../drugs/groups/GroupStateMessage'
 import GroupEditorSheet from '../drugs/groups/GroupEditorSheet'
@@ -221,11 +221,6 @@ function HomeGroupsSection({ onOpenGroup, onSeeAll }) {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', minHeight: 44, marginBottom: 'var(--space-1)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
           <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, lineHeight: 1.2, letterSpacing: '-0.01em', color: 'var(--color-text-primary)', fontFamily: font }}>My drug groups</h2>
-          {state === 'list' && (
-            <span aria-hidden="true" style={{ fontSize: 14, fontWeight: 500, lineHeight: 1, color: 'var(--color-text-tertiary)', fontFamily: font, fontVariantNumeric: 'tabular-nums' }}>
-              {count}
-            </span>
-          )}
         </div>
         {state === 'list' && (
           <button
@@ -234,11 +229,13 @@ function HomeGroupsSection({ onOpenGroup, onSeeAll }) {
             aria-label={`See all ${count} drug groups`}
             style={{
               minHeight: 44, padding: '0 0 0 12px', background: 'none', border: 'none', cursor: 'pointer', outline: 'none',
+              display: 'inline-flex', alignItems: 'center', gap: 4,
               color: 'var(--color-accent-text)', fontFamily: font, fontSize: 14, fontWeight: 600,
               WebkitTapHighlightColor: 'transparent',
             }}
           >
             See all
+            <ArrowRight size={16} strokeWidth={2.2} aria-hidden="true" />
           </button>
         )}
       </div>
