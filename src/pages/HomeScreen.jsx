@@ -20,6 +20,7 @@ import { useAuth } from '../hooks/useAuth'
 import { useConditionContext } from '../context/ConditionContext'
 import { useDrugContext } from '../context/DrugContext'
 import { useHomeFeatured } from '../hooks/useHomeFeatured'
+import { useHomeEntrance } from '../hooks/useHomeEntrance'
 import { cardPath } from '../utils/homeFeatured'
 import { welcomeParts } from '../utils/homeHeading'
 import { ROUTES } from '../router'
@@ -31,6 +32,7 @@ export default function HomeScreen() {
   const { drugs, loading: drugsLoading } = useDrugContext()
   const { item, loadingFirst } = useHomeFeatured(conditions, drugs, !conditionsLoading && !drugsLoading)
 
+  const entrance = useHomeEntrance()
   const welcome = welcomeParts(!!user, profile?.fullName)
   const path = item ? cardPath(item) : null
 
@@ -38,7 +40,7 @@ export default function HomeScreen() {
     <div style={{ paddingTop: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
       <HomeTopBar />
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, ...entrance(0) }}>
         <h1 style={{
           margin: 0, display: 'flex', flexDirection: 'column', gap: 2, overflowWrap: 'anywhere',
           color: 'var(--color-text-primary)', fontFamily: 'var(--font-body)',
@@ -56,20 +58,24 @@ export default function HomeScreen() {
       </div>
 
       {item && path ? (
-        <FeaturedCardView item={item} onOpen={() => navigate(path)} />
+        <div style={entrance(1)}><FeaturedCardView item={item} onOpen={() => navigate(path)} /></div>
       ) : loadingFirst ? (
-        <FeaturedCardSkeleton />
+        <div style={entrance(1)}><FeaturedCardSkeleton /></div>
       ) : null}
 
-      <HomeRoshettasSection
-        onOpenRoshetta={r => navigate(ROUTES.ROSHETTA(r.id))}
-        onSeeAll={() => navigate(ROUTES.ROSHETTAS)}
-      />
+      <div style={entrance(2)}>
+        <HomeRoshettasSection
+          onOpenRoshetta={r => navigate(ROUTES.ROSHETTA(r.id))}
+          onSeeAll={() => navigate(ROUTES.ROSHETTAS)}
+        />
+      </div>
 
-      <HomeGroupsSection
-        onOpenGroup={g => navigate(ROUTES.DRUGS_GROUP(g.id))}
-        onSeeAll={() => navigate(ROUTES.DRUGS_GROUPS)}
-      />
+      <div style={entrance(3)}>
+        <HomeGroupsSection
+          onOpenGroup={g => navigate(ROUTES.DRUGS_GROUP(g.id))}
+          onSeeAll={() => navigate(ROUTES.DRUGS_GROUPS)}
+        />
+      </div>
     </div>
   )
 }
