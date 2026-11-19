@@ -1,10 +1,11 @@
-// One card in the My roshettas row on Home. Phase H step 9.4; redrawn as the "letterhead" in Phase I
-// step 10.6 (2026-11-16): white paper with a thin border in the specialty's colour, a coloured
-// header band with the specialty icon and name ("Roshetta" with a prescription icon when there is
-// none, in the app's blue), a blue-style italic Rx mark and the short date, the name (up to two
-// lines), and the drug count at the foot with "Waiting" while changes are not saved. No drug names
-// and no ruled lines. Width and minimum height as before (148 x 132, growing with large text).
-// The name is the person's own text and is drawn as plain text (dir="auto" for Arabic).
+// One card in the My roshettas row on Home. Phase H step 9.4; "letterhead" in Phase I step 10.6;
+// redrawn as the quiet "pad" in Phase J step 11.3 (2026-11-19): a plain sheet with a small
+// uppercase specialty label (icon and name; "Roshetta" with a prescription icon when there is
+// none, in the app's blue) over a hairline, like the top of a prescription pad; a faint italic Rx
+// watermark in the bottom corner; the name (up to two lines); and at the foot the day on the start
+// side and "Waiting" on the end side while changes are not saved. No drug count on the card (the
+// spoken label still says it). Width and minimum height as before (148 x 132, growing with large
+// text). The name is the person's own text and is drawn as plain text (dir="auto" for Arabic).
 // Also exports the dashed New card that starts the row.
 //
 // Props: roshetta, specialty (the picker shape from the specialty list, or null), waiting, now, onOpen.
@@ -13,8 +14,7 @@ import { useState } from 'react'
 import { CloudUpload, FileText, Plus } from 'lucide-react'
 import { ProPill } from '../drugs/groups/GroupTile'
 import { SpecialtyIcon, useIsDark } from '../../utils/specialtyIcon'
-import { rowSummary, drugCountText } from '../../utils/roshettaRowText'
-import { countDrugs } from '../../utils/roshettaRows'
+import { rowSummary } from '../../utils/roshettaRowText'
 import { specialtyColors, specialtyHeaderText } from '../../utils/roshettaSpecialty'
 import { shortDateText } from '../../utils/roshettaShelfText'
 import { cardLabel } from '../../utils/homeRoshettas'
@@ -39,6 +39,9 @@ function pressProps(setPressed) {
   }
 }
 
+// Arabic and other joined scripts must not be letter-spaced (it breaks the joins).
+const JOINED_SCRIPT = /[\u0590-\u08FF]/
+
 export function HomeRoshettaCard({ roshetta, specialty = null, waiting = false, now, onOpen }) {
   const [pressed, setPressed] = useState(false)
   const isDark = useIsDark()
@@ -46,6 +49,7 @@ export function HomeRoshettaCard({ roshetta, specialty = null, waiting = false, 
   const header = specialtyHeaderText(specialty, 'Roshetta')
   const name = roshetta?.name ?? ''
   const date = shortDateText(roshetta?.updatedAt, now)
+  const labelSpacing = JOINED_SCRIPT.test(header) ? 0 : '0.07em'
 
   return (
     <div
@@ -57,48 +61,60 @@ export function HomeRoshettaCard({ roshetta, specialty = null, waiting = false, 
       {...pressProps(setPressed)}
       style={{
         fontSize: 16, flex: `0 0 ${CARD_W_CSS}`, width: CARD_W_CSS, minHeight: CARD_H, boxSizing: 'border-box', scrollSnapAlign: 'start',
-        display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden',
-        backgroundColor: 'var(--color-surface)', border: `1px solid ${look.pill}`, borderRadius: 16,
+        position: 'relative', display: 'flex', flexDirection: 'column', padding: '12px 14px', overflow: 'hidden',
+        backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 16,
         cursor: 'pointer', outline: 'none', WebkitTapHighlightColor: 'transparent',
         opacity: pressed ? 0.8 : 1, transform: pressed ? 'scale(0.985)' : 'scale(1)',
         transition: 'opacity var(--motion-fast) var(--ease-settle), transform var(--motion-fast) var(--ease-settle)',
       }}
     >
+      <span
+        aria-hidden="true"
+        style={{
+          position: 'absolute', insetInlineEnd: -6, bottom: -14, pointerEvents: 'none', userSelect: 'none',
+          fontSize: 78, fontWeight: 700, fontStyle: 'italic', lineHeight: 1, color: look.bg, opacity: isDark ? 0.3 : 1,
+          fontFamily: 'Georgia, \'Times New Roman\', serif',
+        }}
+      >
+        Rx
+      </span>
       <div
         aria-hidden="true"
-        style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', backgroundColor: look.bg, color: look.fg }}
+        style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 5, paddingBottom: 7, borderBottom: `1px solid ${isDark ? 'var(--color-border)' : look.bg}`, color: look.fg }}
       >
         {specialty
-          ? <SpecialtyIcon iconType={specialty.iconType ?? 'lucide'} iconValue={specialty.iconValue ?? 'Stethoscope'} size={14} color={look.fg} />
-          : <FileText size={14} strokeWidth={2} style={{ flexShrink: 0 }} />}
-        <span dir="auto" style={{ fontSize: 12, fontWeight: 600, lineHeight: 1.4, fontFamily: font, minWidth: 0, ...oneLine }}>{header}</span>
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, padding: '8px 12px 10px' }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
-          <span aria-hidden="true" style={{ fontSize: 17, fontWeight: 700, fontStyle: 'italic', lineHeight: 1.2, fontFamily: 'Georgia, \'Times New Roman\', serif', color: look.fg }}>Rx</span>
-          {date && <span dir="auto" style={{ fontSize: 12, lineHeight: 1.4, color: 'var(--color-text-tertiary)', fontFamily: font, ...oneLine }}>{date}</span>}
-        </div>
-        <div
+          ? <SpecialtyIcon iconType={specialty.iconType ?? 'lucide'} iconValue={specialty.iconValue ?? 'Stethoscope'} size={12} color={look.fg} />
+          : <FileText size={12} strokeWidth={2} style={{ flexShrink: 0 }} />}
+        <span
           dir="auto"
-          style={{
-            marginTop: 4, fontSize: 15, fontWeight: 500, lineHeight: 1.3, textAlign: 'start', color: 'var(--color-text-primary)', fontFamily: font,
-            display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', overflowWrap: 'anywhere',
-          }}
+          style={{ fontSize: 10.5, fontWeight: 700, lineHeight: 1.4, letterSpacing: labelSpacing, textTransform: 'uppercase', fontFamily: font, minWidth: 0, ...oneLine }}
         >
-          {name}
-        </div>
-        <div style={{ flex: 1 }} />
-        <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '2px 8px' }}>
+          {header}
+        </span>
+      </div>
+      <div
+        dir="auto"
+        style={{
+          position: 'relative', marginTop: 9, fontSize: 15, fontWeight: 700, lineHeight: 1.3, letterSpacing: '-0.01em', textAlign: 'start',
+          color: 'var(--color-text-primary)', fontFamily: font,
+          display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', overflowWrap: 'anywhere',
+        }}
+      >
+        {name}
+      </div>
+      <div style={{ flex: 1 }} />
+      <div style={{ position: 'relative', marginTop: 6, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '2px 8px' }}>
+        {date && (
           <span dir="auto" style={{ fontSize: 12, lineHeight: 1.4, color: 'var(--color-text-secondary)', fontFamily: font }}>
-            {drugCountText(countDrugs(roshetta?.rows))}
+            {date}
           </span>
-          {waiting && (
-            <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 500, color: 'var(--color-warning)', fontFamily: font }}>
-              <CloudUpload size={14} aria-hidden="true" />
-              Waiting
-            </span>
-          )}
-        </div>
+        )}
+        {waiting && (
+          <span style={{ marginInlineStart: 'auto', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 500, color: 'var(--color-warning)', fontFamily: font }}>
+            <CloudUpload size={14} aria-hidden="true" />
+            Waiting
+          </span>
+        )}
       </div>
     </div>
   )
