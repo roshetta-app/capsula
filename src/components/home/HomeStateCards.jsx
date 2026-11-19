@@ -5,7 +5,7 @@
 //  - My roshettas keeps the quiet "pad" with the faint Rx in the corner.
 //  - My drug groups keeps the folder shape (tab and body), in white, with a faint pill in the corner
 //    the way the pad has its Rx.
-// The guest, empty and could-not-load cards stack title, one line and a pill button. The create
+// The guest, empty and could-not-load cards stack title (with the roshetta or folder icon), one line and a pill button. The create
 // buttons carry the icon of what they make (roshetta, folder). Loading is three pads or three
 // folders made of grey bars, and the featured card has its own skeleton.
 //
@@ -32,10 +32,13 @@ const FOLDER_OUTLINE = 'drop-shadow(0 0 0.6px color-mix(in srgb, var(--color-tex
 
 // Stacked: title, one line, one pill button (with an icon when the button makes something).
 // `soft` is the light blue button used for "Try again"; the calm cases keep the solid blue one.
-function StateStack({ title, body, actionLabel, onAction, ActionIcon = null, soft = false }) {
+function StateStack({ title, body, actionLabel, onAction, ActionIcon = null, TitleIcon = null, soft = false }) {
   return (
     <div style={{ position: 'relative', fontFamily: font, textAlign: 'start' }}>
-      <div style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.3, letterSpacing: '-0.01em', color: 'var(--color-text-primary)' }}>{title}</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 16, fontWeight: 700, lineHeight: 1.3, letterSpacing: '-0.01em', color: 'var(--color-text-primary)' }}>
+        {TitleIcon && <TitleIcon size={18} strokeWidth={2.2} aria-hidden="true" style={{ flexShrink: 0, color: DEFAULT_LOOK.fg }} />}
+        <span style={{ minWidth: 0 }}>{title}</span>
+      </div>
       {body && (
         <div style={{ marginTop: 3, fontSize: 13, lineHeight: 1.4, color: 'var(--color-text-secondary)' }}>{body}</div>
       )}
@@ -83,7 +86,7 @@ export function HomeRoshettaStateCard({ tone = 'neutral', title, body, actionLab
       >
         Rx
       </span>
-      <StateStack title={title} body={body} actionLabel={actionLabel} onAction={onAction} ActionIcon={withIcon ? FileText : null} soft={isError} />
+      <StateStack title={title} body={body} actionLabel={actionLabel} onAction={onAction} ActionIcon={withIcon ? FileText : null} TitleIcon={FileText} soft={isError} />
     </div>
   )
 }
@@ -119,7 +122,7 @@ export function HomeGroupStateCard({ tone = 'neutral', title, body, actionLabel,
         >
           <Pill size={96} strokeWidth={1.6} />
         </span>
-        <StateStack title={title} body={body} actionLabel={actionLabel} onAction={onAction} ActionIcon={withIcon ? Folder : null} soft={isError} />
+        <StateStack title={title} body={body} actionLabel={actionLabel} onAction={onAction} ActionIcon={withIcon ? Folder : null} TitleIcon={Folder} soft={isError} />
       </div>
     </div>
   )

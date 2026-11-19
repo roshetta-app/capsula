@@ -28,6 +28,7 @@ import { findSpecialty } from '../../utils/roshettaSpecialty'
 import { HomeRoshettaCard, HomeNewCard } from './HomeRoshettaCard'
 import { useFavouritesContext } from '../../context/FavouritesContext'
 import { useAuth } from '../../hooks/useAuth'
+import { useToast } from '../../context/ToastContext'
 import { useIsPro } from '../../hooks/useIsPro'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
 import { sectionState, newTapAnswer } from '../../utils/roshettaSectionState'
@@ -69,15 +70,22 @@ function HomeRoshettasSection({ onOpenRoshetta, onSeeAll }) {
   const { loading: authLoading, signInWithGoogle } = useAuth()
   const isPro = useIsPro()
   const { isOnline } = useOnlineStatus()
+  const { toast } = useToast()
   const [sheetOpen, setSheetOpen] = useState(false)
   const [seeOpen, setSeeOpen] = useState(false)
 
   const count = roshettas.length
   const state = sectionState({ authLoading, isGuest, status: roshettasStatus, count })
 
+  // The guest button goes straight to Google sign-in (no sheet in between).
+  async function handleSignIn() {
+    const res = await signInWithGoogle?.()
+    if (res?.error) toast.error(res.error.message ?? 'Sign-in failed. Please try again.')
+  }
+
   function handleNew() {
     const answer = newTapAnswer({ isGuest, isReadOnly, canCreate: canCreateRoshetta })
-    if (answer === 'signin') { signInWithGoogle?.(); return }
+    if (answer === 'signin') { handleSignIn(); return }
     if (answer === 'readonly') { showRoshettaReadOnly?.(); return }
     if (answer === 'limit') { showRoshettaLimit?.('roshettas'); return }
     setSheetOpen(true)
@@ -101,10 +109,10 @@ function HomeRoshettasSection({ onOpenRoshetta, onSeeAll }) {
   } else if (state === 'guest') {
     content = (
       <HomeRoshettaStateCard
-        title="Sign in to write roshettas"
-        body="Roshettas are saved to your account and available offline."
+        title="Create your own roshettas"
+        body="Sign in to save your prescriptions and open them anywhere."
         actionLabel="Sign in"
-        onAction={handleNew}
+        onAction={handleSignIn}
       />
     )
   } else if (state === 'error') {
@@ -121,7 +129,7 @@ function HomeRoshettasSection({ onOpenRoshetta, onSeeAll }) {
     content = (
       <HomeRoshettaStateCard
         title="Write your first roshetta"
-        body="Build a prescription from library drugs."
+        body="Prepare a prescription with doses and keep it ready to use again."
         actionLabel="Create roshetta"
         withIcon
         onAction={handleNew}

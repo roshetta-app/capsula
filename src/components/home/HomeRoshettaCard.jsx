@@ -92,7 +92,7 @@ export function HomeRoshettaCard({ roshetta, specialty = null, waiting = false, 
       <div
         dir="auto"
         style={{
-          position: 'relative', marginTop: 9, fontSize: 15, fontWeight: 700, lineHeight: 1.3, letterSpacing: '-0.01em', textAlign: 'start',
+          position: 'relative', marginTop: 9, fontSize: 16, fontWeight: 700, lineHeight: 1.3, letterSpacing: '-0.01em', textAlign: 'start',
           color: 'var(--color-text-primary)', fontFamily: font,
           display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', overflowWrap: 'anywhere',
         }}
@@ -104,7 +104,7 @@ export function HomeRoshettaCard({ roshetta, specialty = null, waiting = false, 
         {date && (
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: 'var(--color-text-secondary)' }}>
             <Clock size={12} strokeWidth={2} aria-hidden="true" style={{ flexShrink: 0 }} />
-            <span dir="auto" style={{ fontSize: 12, lineHeight: 1.4, fontFamily: font }}>{date}</span>
+            <span dir="auto" style={{ fontSize: 12, fontWeight: 600, lineHeight: 1.4, fontFamily: font }}>{date}</span>
           </span>
         )}
         {waiting && (

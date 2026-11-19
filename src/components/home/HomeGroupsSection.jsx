@@ -31,6 +31,7 @@ import { HomeGroupSkeletonCards, HomeGroupStateCard } from './HomeStateCards'
 import { useFavouritesContext } from '../../context/FavouritesContext'
 import { useDrugContext } from '../../context/DrugContext'
 import { useAuth } from '../../hooks/useAuth'
+import { useToast } from '../../context/ToastContext'
 import { useIsPro } from '../../hooks/useIsPro'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
 import { sectionState, newTapAnswer } from '../../utils/roshettaSectionState'
@@ -61,13 +62,14 @@ function SkeletonRow() {
 function HomeGroupsSection({ onOpenGroup, onSeeAll }) {
   const {
     groups = [], groupsStatus = 'loading', groupsLoadError = false, isReadOnly = false, canCreateGroup = true,
-    reloadGroups, restoreGroup, promptSignIn, showGroupLimit, showGroupReadOnly, waitingGroupIds = [],
+    reloadGroups, restoreGroup, showGroupLimit, showGroupReadOnly, waitingGroupIds = [],
     waitingCount = 0, failedCount = 0, syncState = 'idle',
   } = useFavouritesContext()
   const { groupsSortMode } = useDrugContext()
-  const { user, loading: authLoading } = useAuth()
+  const { user, loading: authLoading, signInWithGoogle } = useAuth()
   const isPro = useIsPro()
   const { isOnline } = useOnlineStatus()
+  const { toast } = useToast()
   const [editorOpen, setEditorOpen] = useState(false)
   const [seeOpen, setSeeOpen] = useState(false)
 
@@ -95,9 +97,15 @@ function HomeGroupsSection({ onOpenGroup, onSeeAll }) {
   const count = groups.length
   const state = sectionState({ authLoading, isGuest: !user, status: groupsStatus, count })
 
+  // The guest button goes straight to Google sign-in (no sheet in between).
+  async function handleSignIn() {
+    const res = await signInWithGoogle?.()
+    if (res?.error) toast.error(res.error.message ?? 'Sign-in failed. Please try again.')
+  }
+
   function handleNew() {
     const answer = newTapAnswer({ isGuest: !user, isReadOnly, canCreate: canCreateGroup })
-    if (answer === 'signin') { promptSignIn?.('groups', 'new'); return }
+    if (answer === 'signin') { handleSignIn(); return }
     if (answer === 'readonly') { showGroupReadOnly?.(); return }
     if (answer === 'limit') { showGroupLimit?.('groups'); return }
     setEditorOpen(true)
@@ -121,10 +129,10 @@ function HomeGroupsSection({ onOpenGroup, onSeeAll }) {
   } else if (state === 'guest') {
     content = (
       <HomeGroupStateCard
-        title="Sign in to keep drug groups"
-        body="Groups are saved to your account and available offline."
+        title="Organize drugs in groups"
+        body="Sign in to save your groups and open them anywhere."
         actionLabel="Sign in"
-        onAction={handleNew}
+        onAction={handleSignIn}
       />
     )
   } else if (state === 'error') {

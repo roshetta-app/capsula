@@ -81,7 +81,7 @@ export function HomeGroupCard({ group, waiting = false, onOpen }) {
         <div
           dir="ltr"
           style={{
-            position: 'relative', textAlign: 'left', fontSize: 16, fontWeight: 700, lineHeight: 1.25, color: 'var(--color-text-primary)', fontFamily: font,
+            position: 'relative', textAlign: 'left', fontSize: 16, fontWeight: 700, lineHeight: 1.3, letterSpacing: '-0.01em', color: 'var(--color-text-primary)', fontFamily: font,
             display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: 2, overflow: 'hidden', overflowWrap: 'anywhere',
           }}
         >
