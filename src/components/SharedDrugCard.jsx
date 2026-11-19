@@ -177,7 +177,6 @@ import { toTitleCase, getDrugTitleSuffix, TITLE_HIDDEN_MODIFIER_TAGS } from '../
 import { hasArabicLetters } from '../utils/searchUtils'
 import { formatArabicFullName } from '../utils/arabicName'
 import { highlightArabic } from '../utils/arabicHighlight'
-import { useRowEntrance } from '../hooks/useRowEntrance'
 
 const ROW_HEIGHT = 64 // tentative — revisit once 1d.2-1d.4 content is in place
 
@@ -197,7 +196,6 @@ export default function SharedDrugCard({
 }) {
   const [pressed, setPressed] = useState(false)
   const [searchPressed, setSearchPressed] = useState(false)
-  const rowIn = useRowEntrance()   // step 11.19: the first cards of a screen fade in one after another
 
   function handleTap() {
     if (disableTap) return
@@ -273,7 +271,6 @@ export default function SharedDrugCard({
       onClick={disableTap ? undefined : handleTap}
       role={disableTap ? undefined : 'button'}
       tabIndex={disableTap ? undefined : 0}
-      className={rowIn.className}
       onKeyDown={disableTap ? undefined : (e => e.key === 'Enter' && handleTap())}
       onPointerDown={disableTap ? undefined : e => {
         // A press on the search strip is not a press on the row.
@@ -283,7 +280,6 @@ export default function SharedDrugCard({
       onPointerLeave={disableTap ? undefined : () => setPressed(false)}
       onPointerCancel={disableTap ? undefined : () => setPressed(false)}
       style={{
-        ...rowIn.style,
         display:                 'flex',
         // With an Arabic line the row grows (taller, with a little more room above and
         // below) and its icon, text and trailing icons line up with the two English

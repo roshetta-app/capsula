@@ -47,7 +47,6 @@ import { useState }       from 'react'
 import { useNavigate }    from 'react-router-dom'
 import { Info }           from 'lucide-react'
 import { highlightMatch } from '../utils/highlightMatch'
-import { useRowEntrance } from '../hooks/useRowEntrance'
 import { SpecialtyIcon, useIsDark }  from '../utils/specialtyIcon'
 import { resolveToken, tintedBg, FALLBACK_TOKEN } from '../utils/specialtyTokens'
 
@@ -64,7 +63,6 @@ export default function ConditionCard({
 }) {
   const navigate = useNavigate()
   const isDark = useIsDark()
-  const rowIn = useRowEntrance()   // step 11.19: the first cards of a screen fade in one after another
 
   // Press feedback — conditions-screen-polish-master-plan Phase 3. Same
   // pointer-event pattern as Phase 5's sticky header search icon; pointer
@@ -103,14 +101,12 @@ export default function ConditionCard({
       onClick={handleTap}
       role="button"
       tabIndex={0}
-      className={rowIn.className}
       onKeyDown={e => e.key === 'Enter' && handleTap()}
       onPointerDown={() => setPressed(true)}
       onPointerUp={() => setPressed(false)}
       onPointerLeave={() => setPressed(false)}
       onPointerCancel={() => setPressed(false)}
       style={{
-        ...rowIn.style,
         display:                 'flex',
         alignItems:              isMultiLine ? 'flex-start' : 'center',
         gap:                     'var(--space-3)',

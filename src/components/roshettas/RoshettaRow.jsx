@@ -13,11 +13,9 @@ import { specialtyColors, specialtyHeaderText } from '../../utils/roshettaSpecia
 import { WaitingMark } from '../drugs/groups/GroupTile'
 import { rowSummary } from '../../utils/roshettaRowText'
 import { drugPreviewText, shortDateText } from '../../utils/roshettaShelfText'
-import { useRowEntrance } from '../../hooks/useRowEntrance'
 
 export default function RoshettaRow({ roshetta, specialty = null, waiting = false, showDivider = false, now, onOpen }) {
   const [pressed, setPressed] = useState(false)
-  const rowIn = useRowEntrance()   // step 11.19: the first cards of a screen fade in one after another
   const isDark = useIsDark()
   const look = specialtyColors(specialty, isDark)
   const specName = specialtyHeaderText(specialty)
@@ -30,7 +28,6 @@ export default function RoshettaRow({ roshetta, specialty = null, waiting = fals
       onClick={onOpen}
       role="button"
       tabIndex={0}
-      className={rowIn.className}
       aria-label={`${name}${specName ? `, ${specName}` : ''}, ${rowSummary(roshetta, now)}${waiting ? ', waiting to save' : ''}`}
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen?.() } }}
       onPointerDown={() => setPressed(true)}
@@ -38,7 +35,6 @@ export default function RoshettaRow({ roshetta, specialty = null, waiting = fals
       onPointerLeave={() => setPressed(false)}
       onPointerCancel={() => setPressed(false)}
       style={{
-        ...rowIn.style,
         display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
         padding: '12px 16px', minHeight: 56, boxSizing: 'border-box',
         borderBottom: showDivider ? '1px solid var(--color-border-subtle)' : 'none',

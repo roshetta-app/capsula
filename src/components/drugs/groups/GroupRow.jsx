@@ -30,11 +30,9 @@ import { resolveToken } from '../../../utils/specialtyTokens'
 import { useIsDark } from '../../../utils/specialtyIcon'
 import { drugCountLabel, ProPill, WaitingMark } from './GroupTile'
 import { FOLDER_GREY_WASH, folderWash, folderCountColor } from './folderStyles'
-import { useRowEntrance } from '../../../hooks/useRowEntrance'
 
 export default function GroupRow({ group, drugNames = [], isNew = false, showProBadge = false, waiting = false, animate = false, onOpen }) {
   const [pressed, setPressed] = useState(false)
-  const rowIn = useRowEntrance()   // step 11.19: the first cards of a screen fade in one after another
   const isDark = useIsDark()
   const colors = resolveToken(isNew ? 'slate' : group?.color, isDark)
   const name = isNew ? 'New group' : (group?.name ?? '')
@@ -50,7 +48,7 @@ export default function GroupRow({ group, drugNames = [], isNew = false, showPro
       onClick={onOpen}
       role="button"
       tabIndex={0}
-      className={[animate ? 'group-soft-in' : '', rowIn.className ?? ''].filter(Boolean).join(' ') || undefined}
+      className={animate ? 'group-soft-in' : undefined}
       aria-label={isNew ? 'New group' : `${name}, ${drugCountLabel(count)}`}
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen?.() } }}
       onPointerDown={() => setPressed(true)}
@@ -58,7 +56,6 @@ export default function GroupRow({ group, drugNames = [], isNew = false, showPro
       onPointerLeave={() => setPressed(false)}
       onPointerCancel={() => setPressed(false)}
       style={{
-        ...rowIn.style,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
         padding: '12px 14px', minHeight: 64, borderRadius: 16,
         backgroundColor: isNew ? FOLDER_GREY_WASH : folderWash(colors.fg),

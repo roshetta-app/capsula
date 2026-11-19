@@ -5,8 +5,6 @@
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigationType } from 'react-router-dom'
 import { pageEntranceKind, pageFadeStyle, PAGE_FADE_MS, TAB_ROOTS } from '../../utils/pageEntrance'
-import { newRowGate } from '../../utils/rowEntrance'
-import { RowEntranceContext } from './rowEntranceContext'
 
 const SEEN_PREFIX = 'capsula_page_entrance_'
 
@@ -20,21 +18,17 @@ function decide(pathname, navType) {
     }
     reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
   } catch { /* storage or matchMedia unavailable: play nothing special */ }
-  const play = pageEntranceKind({ pathname, navType, seenTab, reduceMotion }) === 'fade'
-  // The same decision also opens the gate for the first cards of the screen (utils/rowEntrance.js).
-  return { phase: play ? 'hidden' : 'off', gate: play ? newRowGate() : null }
+  return pageEntranceKind({ pathname, navType, seenTab, reduceMotion }) === 'fade' ? 'hidden' : 'off'
 }
 
 export default function PageEntrance({ children }) {
   const { pathname } = useLocation()
   const navType = useNavigationType()
-  const [state, setState] = useState(() => ({ path: pathname, ...decide(pathname, navType) }))
-  let { phase, gate } = state
+  const [state, setState] = useState(() => ({ path: pathname, phase: decide(pathname, navType) }))
+  let { phase } = state
   if (state.path !== pathname) {
-    const next = decide(pathname, navType)
-    phase = next.phase
-    gate = next.gate
-    setState({ path: pathname, ...next })
+    phase = decide(pathname, navType)
+    setState({ path: pathname, phase })
   }
 
   useEffect(() => {
@@ -49,9 +43,5 @@ export default function PageEntrance({ children }) {
     return undefined
   }, [phase, pathname])
 
-  return (
-    <RowEntranceContext.Provider value={gate}>
-      <div style={pageFadeStyle(phase)}>{children}</div>
-    </RowEntranceContext.Provider>
-  )
+  return <div style={pageFadeStyle(phase)}>{children}</div>
 }

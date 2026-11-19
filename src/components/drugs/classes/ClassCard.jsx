@@ -37,7 +37,6 @@ import { ChevronRight } from 'lucide-react'
 import CountTag from '../../ui/CountTag.jsx'
 import { MoleculeIcon } from './ClassIcons.jsx'
 import { highlightMatch } from '../../../utils/highlightMatch'
-import { useRowEntrance } from '../../../hooks/useRowEntrance'
 
 // Size of the icon tile.
 const ICON_TILE = 34
@@ -81,7 +80,6 @@ export default function ClassCard({
   variant = 'list',
 }) {
   const [pressed, setPressed] = useState(false)
-  const rowIn = useRowEntrance()   // step 11.19: the first cards of a screen fade in one after another
   const isSearch = variant === 'search'
   const isSaved  = variant === 'saved'
   const wrap     = isSearch ? { overflowWrap: 'anywhere' } : null
@@ -231,9 +229,7 @@ export default function ClassCard({
   return (
     <button
       {...pressHandlers}
-      className={rowIn.className}
       style={{
-        ...rowIn.style,
         display:         'flex',
         alignItems:      'center',
         gap:             10,
