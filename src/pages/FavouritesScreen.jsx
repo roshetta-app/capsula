@@ -540,6 +540,7 @@ import { useFavouritesContext } from '../context/FavouritesContext'
 import { useConditionSearch } from '../hooks/useConditionSearch'
 import { useCategories } from '../hooks/useCategories'
 import { useSortToggle } from '../hooks/useSortToggle'
+import { useSoftSwap } from '../hooks/useSoftSwap'
 import { useBackToTop } from '../hooks/useBackToTop'
 import { useBackClose } from '../hooks/useBackClose'
 import { useAuth } from '../hooks/useAuth'
@@ -807,6 +808,10 @@ export default function FavouritesScreen() {
   useEffect(() => {
     if (!drugsLoading) setDrugsEverLoaded(true)
   }, [drugsLoading])
+
+  // Step 11.19: the saved rows fade in when the placeholder rows go (once per tab).
+  const conditionsSwapClass = useSoftSwap(!conditionsEverLoaded)
+  const drugsSwapClass = useSoftSwap(!drugsEverLoaded)
 
   // Look up full objects from context. Memoized — without this, a new array
   // reference was created every render, which re-triggered
@@ -1408,6 +1413,7 @@ export default function FavouritesScreen() {
                     onClear={() => setActiveSpecialty('all')}
                   />
                 )}
+                <div className={conditionsSwapClass || undefined}>
                 {!conditionsEverLoaded ? (
                   Array.from({ length: SKELETON_ROW_COUNT }, (_, i) => <SkeletonRow key={i} />)
                 ) : savedConditions.length === 0
@@ -1493,6 +1499,7 @@ export default function FavouritesScreen() {
                           </div>
                         )
                       })}
+                </div>
               </>
             )}
 
@@ -1518,6 +1525,7 @@ export default function FavouritesScreen() {
                     onClick={() => setShowClassesSheet(true)}
                   />
                 )}
+                <div className={drugsSwapClass || undefined}>
                 {!drugsEverLoaded ? (
                   Array.from({ length: SKELETON_ROW_COUNT }, (_, i) => <SkeletonRow key={i} />)
                 ) : savedDrugs.length === 0
@@ -1592,6 +1600,7 @@ export default function FavouritesScreen() {
                         </div>
                       )
                     })}
+                </div>
               </>
             )}
           </div>

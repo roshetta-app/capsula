@@ -17,6 +17,7 @@ import { useNavigate } from 'react-router-dom'
 import CategoryRow from '../components/drugs/home/CategoryRow'
 import BrowseHeader from '../components/drugs/home/BrowseHeader'
 import { DrugsSkeleton, LibraryErrorState } from '../components/drugs/home/BrowseStates'
+import { useSoftSwap } from '../hooks/useSoftSwap'
 import { useDrugContext } from '../context/DrugContext'
 import { useCategories } from '../hooks/useCategories'
 import { useIsDark } from '../utils/specialtyIcon'
@@ -51,6 +52,8 @@ export default function DrugCategoriesScreen() {
     prepareCategoryOpen(slug)
     navigate(ROUTES.DRUGS_CATEGORY(slug), { state: { from: 'categories' } })
   }
+
+  const swapClass = useSoftSwap(loading && !hasDrugs)   // step 11.19: the tiles fade in when the placeholders go
 
   let body = null
   if (loading && !hasDrugs) {
@@ -94,7 +97,7 @@ export default function DrugCategoriesScreen() {
   return (
     <div style={{ padding: '0 0 var(--space-4)' }}>
       <BrowseHeader backLabel="Drugs" onBack={() => navigate(-1)} title="Categories" />
-      {body}
+      <div className={swapClass || undefined}>{body}</div>
     </div>
   )
 }

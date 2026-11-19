@@ -50,6 +50,7 @@ import { useIsDark } from '../../../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN } from '../../../utils/specialtyTokens'
 import { useDrugContext } from '../../../context/DrugContext'
 import { useCategories } from '../../../hooks/useCategories'
+import { useSoftSwap } from '../../../hooks/useSoftSwap'
 import { ROUTES } from '../../../router'
 import { prepareCategoryOpen } from '../../../pages/DrugsScreen'
 
@@ -129,6 +130,7 @@ export default function DrugsBrowseSection() {
   const hasDrugs = drugs.length > 0
   const showSkeleton = (drugsLoading && !hasDrugs) || (catsLoading && categories.length === 0)
   const failed = !showSkeleton && !hasDrugs && !!drugsError
+  const swapClass = useSoftSwap(showSkeleton)   // step 11.19: the tiles fade in when the placeholders go
 
   const title = <span style={SECTION_TITLE_STYLE}>Categories</span>
   const viewAll = (
@@ -195,7 +197,7 @@ export default function DrugsBrowseSection() {
   return (
     <>
       <DrugsSectionCard label="Browse" flat title={title} trailing={viewAll}>
-        {strip}
+        <div className={swapClass || undefined}>{strip}</div>
       </DrugsSectionCard>
       <section
         aria-label="Browse by class"

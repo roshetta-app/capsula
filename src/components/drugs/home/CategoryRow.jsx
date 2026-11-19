@@ -6,6 +6,7 @@
 
 import { useState } from 'react'
 import { SpecialtyIcon } from '../../../utils/specialtyIcon'
+import { useRowEntrance } from '../../../hooks/useRowEntrance'
 
 // 2026-07-18 (drug_library_ui_ux, plan §7 step 1c.3, decision 4.21): softened —
 // "N drugs" count removed (and the now-unused `count` prop dropped from both
@@ -32,18 +33,21 @@ import { SpecialtyIcon } from '../../../utils/specialtyIcon'
 export default function CategoryRow({ label, iconType, iconValue, textColor, onTap }) {
   const ink = textColor || 'var(--color-accent)'
   const [pressed, setPressed] = useState(false)
+  const rowIn = useRowEntrance()   // step 11.19: the first cards of a screen fade in one after another
 
   return (
     <div
       onClick={onTap}
       role="button"
       tabIndex={0}
+      className={rowIn.className}
       onKeyDown={e => e.key === 'Enter' && onTap()}
       onPointerDown={() => setPressed(true)}
       onPointerUp={() => setPressed(false)}
       onPointerLeave={() => setPressed(false)}
       onPointerCancel={() => setPressed(false)}
       style={{
+        ...rowIn.style,
         display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 10,
         minHeight: 92, boxSizing: 'border-box',
         // 2026-10-23: a quiet white tile with a thin border, icon square at the top and the name under it (the name always fits). Only the

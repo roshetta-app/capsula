@@ -34,6 +34,7 @@ import ClassSearchResults from '../components/drugs/classes/ClassSearchResults'
 import ClassSheet from '../components/drugs/classes/ClassSheet'
 import { ALL_KEY as ALL_CLASS_DRUGS_KEY } from '../components/drugs/classes/classKeys'
 import { DrugsSkeleton, LibraryErrorState } from '../components/drugs/home/BrowseStates'
+import { useSoftSwap } from '../hooks/useSoftSwap'
 import { SearchSwitchingState, TooShortState, EmptyState, DidYouMeanState } from '../components/drugs/search/SearchStates'
 import { useDrugSearch } from '../hooks/useDrugSearch'
 import { useDrugContext } from '../context/DrugContext'
@@ -134,6 +135,7 @@ export default function DrugClassesScreen() {
   }
 
   const hasDrugs = drugs.length > 0
+  const swapClass = useSoftSwap(loading && !hasDrugs)   // step 11.19: the cards fade in when the placeholders go
   let body = null
   if (loading && !hasDrugs) {
     body = <DrugsSkeleton />
@@ -198,7 +200,7 @@ export default function DrugClassesScreen() {
           />
         )}
       </BrowseHeader>
-      {body}
+      <div className={swapClass || undefined}>{body}</div>
 
       <ClassSheet
         key={classSheetKey}
