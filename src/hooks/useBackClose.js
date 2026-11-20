@@ -122,6 +122,15 @@ let openBackCloseCount = 0
 // than a real user back-press.
 const RESUME_GUARD_MS = 500
 
+// How many hidden steps open sheets have put on top of the real page right now (website and installed
+// app only). Sign-in uses it so that coming back from Google lands on the real page (step 12.15e).
+export function openSheetStepCount() {
+  if (typeof window === 'undefined') return 0
+  const state = window.history.state
+  if (!state || !state.capsulaBackClose) return 0
+  return Math.max(1, openBackCloseCount)
+}
+
 export function isAnyBackCloseOpen() {
   return openBackCloseCount > 0
 }

@@ -37,11 +37,15 @@ function isCount(n) {
 // forwardSteps is how many steps sit AHEAD of the current page (there are some when the person went
 // Back earlier). The browser's count includes them, but leaving for Google throws them away, so they
 // must not be counted: the note keeps the number of steps up to and including the current page.
-export function makeMarker({ historyLength, forwardSteps = 0, pathname, now }) {
+export function makeMarker({ historyLength, forwardSteps = 0, sheetSteps = 0, pathname, now }) {
   if (!isCount(historyLength)) return null
   if (typeof forwardSteps !== 'number' || !Number.isInteger(forwardSteps)) return null
   if (forwardSteps < 0 || forwardSteps >= historyLength) return null
-  const len = historyLength - forwardSteps
+  // sheetSteps: hidden steps an open sheet added on top of the real page (see useBackClose). The
+  // jump should land on the real page, not on a hidden step that would cost the person one more Back.
+  if (typeof sheetSteps !== 'number' || !Number.isInteger(sheetSteps) || sheetSteps < 0) return null
+  const len = historyLength - forwardSteps - sheetSteps
+  if (len < 1) return null
   if (typeof pathname !== 'string' || pathname === '') return null
   if (typeof now !== 'number' || !Number.isFinite(now)) return null
   // Room must be left for Google's pages and the returned page without the list filling up.

@@ -130,6 +130,7 @@ import { useToast } from './ToastContext'
 import { writeCachedAuthSnapshot, clearCachedAuthSnapshot, getCachedAuthSnapshot } from '../utils/authSnapshot'
 import { setCurrentUserId } from '../analytics/deviceSession'
 import { prefetchAllNotes, useNotesPrefetchResume } from '../hooks/useNotesPrefetch'
+import { openSheetStepCount } from '../hooks/useBackClose'
 
 // Sign-in return (step 12.15, 2026-11-20) — web only. When the app leaves its own window for Google
 // (the installed app, or a browser that blocked the sign-in popup), Google's pages pile up in the
@@ -181,6 +182,7 @@ function rememberSignInDeparture() {
   const marker = makeMarker({
     historyLength: window.history.length,
     forwardSteps: stepsAheadOfThisPage(),
+    sheetSteps: openSheetStepCount(),
     pathname: window.location.pathname,
     now: Date.now(),
   })

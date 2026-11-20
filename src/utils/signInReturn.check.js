@@ -148,3 +148,20 @@ test('the Home trip: left from /capsula, back on /capsula/, still jumps back', (
   const marker = makeMarker({ historyLength: 4, pathname: '/capsula', now: NOW })
   assert.deepEqual(planRewind({ marker, now: NOW + 4000, historyLength: 8, pathname: '/capsula/' }), { steps: 4, reason: 'ok' })
 })
+
+test('makeMarker: hidden steps from an open sheet are not counted (the jump lands on the real page)', () => {
+  assert.deepEqual(makeMarker({ historyLength: 6, sheetSteps: 1, pathname: '/a', now: NOW }), { v: 1, at: NOW, len: 5, path: '/a' })
+  assert.deepEqual(makeMarker({ historyLength: 6, forwardSteps: 1, sheetSteps: 2, pathname: '/a', now: NOW }), { v: 1, at: NOW, len: 3, path: '/a' })
+  assert.equal(makeMarker({ historyLength: 2, sheetSteps: 2, pathname: '/a', now: NOW }), null)
+  assert.equal(makeMarker({ historyLength: 4, sheetSteps: -1, pathname: '/a', now: NOW }), null)
+  assert.equal(makeMarker({ historyLength: 4, sheetSteps: 0.5, pathname: '/a', now: NOW }), null)
+})
+
+test('the sheet trip: the jump lands on the real page, so one Back goes to the screen before it', () => {
+  // list: s0, page, [sheet step]; the person is on the sheet step (index 2) and leaves for Google
+  const marker = makeMarker({ historyLength: 3, sheetSteps: 1, pathname: '/page', now: NOW })
+  // Google adds 2, the return adds 1: 6 steps now, current index 5
+  const plan = planRewind({ marker, now: NOW + 4000, historyLength: 6, pathname: '/page' })
+  assert.deepEqual(plan, { steps: 4, reason: 'ok' })
+  assert.equal(5 - plan.steps, 1) // index 1 = the real page, not the hidden step at index 2
+})
