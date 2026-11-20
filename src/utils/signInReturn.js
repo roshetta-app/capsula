@@ -33,13 +33,20 @@ function isCount(n) {
 
 // What to remember when leaving. Returns the note to store, or null when a rewind could not be done
 // safely later (so nothing is stored and the person simply stays on the page they return to).
-export function makeMarker({ historyLength, pathname, now }) {
+//
+// forwardSteps is how many steps sit AHEAD of the current page (there are some when the person went
+// Back earlier). The browser's count includes them, but leaving for Google throws them away, so they
+// must not be counted: the note keeps the number of steps up to and including the current page.
+export function makeMarker({ historyLength, forwardSteps = 0, pathname, now }) {
   if (!isCount(historyLength)) return null
+  if (typeof forwardSteps !== 'number' || !Number.isInteger(forwardSteps)) return null
+  if (forwardSteps < 0 || forwardSteps >= historyLength) return null
+  const len = historyLength - forwardSteps
   if (typeof pathname !== 'string' || pathname === '') return null
   if (typeof now !== 'number' || !Number.isFinite(now)) return null
   // Room must be left for Google's pages and the returned page without the list filling up.
   if (historyLength > HISTORY_CAP - MAX_STEPS - 1) return null
-  return { v: 1, at: now, len: historyLength, path: pathname }
+  return { v: 1, at: now, len, path: pathname }
 }
 
 // Reads a stored note back. Anything that is not exactly the shape written above is "no note".

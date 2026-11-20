@@ -115,3 +115,23 @@ test('shouldReloadOnRestore: only a restored page right after a jump reloads', (
   assert.equal(shouldReloadOnRestore({ persisted: true, rewoundAt: NOW + 10, now: NOW }), false)
   assert.equal(shouldReloadOnRestore({ persisted: undefined, rewoundAt: NOW, now: NOW }), false)
 })
+
+test('makeMarker: steps ahead of the current page (after an earlier Back) are not counted', () => {
+  // 4 steps in the list, the person is on step 3 of 4: leaving for Google drops the last one
+  assert.deepEqual(makeMarker({ historyLength: 4, forwardSteps: 1, pathname: '/a', now: NOW }), { v: 1, at: NOW, len: 3, path: '/a' })
+  assert.equal(makeMarker({ historyLength: 4, forwardSteps: -1, pathname: '/a', now: NOW }), null)
+  assert.equal(makeMarker({ historyLength: 4, forwardSteps: 4, pathname: '/a', now: NOW }), null)
+  assert.equal(makeMarker({ historyLength: 4, forwardSteps: 1.5, pathname: '/a', now: NOW }), null)
+  assert.equal(makeMarker({ historyLength: 4, forwardSteps: '1', pathname: '/a', now: NOW }), null)
+})
+
+test('the whole trip after an earlier Back lands on the page the person started from', () => {
+  // list: p0, p1, p2; the person pressed Back, so they are on p1 and p2 is still ahead
+  const length = 3
+  const marker = makeMarker({ historyLength: length, forwardSteps: 1, pathname: '/p1', now: NOW })
+  // leaving drops p2, then: p0, p1, chooser, consent, back on p1 = 5 steps
+  const plan = planRewind({ marker, now: NOW + 5000, historyLength: 5, pathname: '/p1' })
+  assert.deepEqual(plan, { steps: 3, reason: 'ok' })
+  // current index 4, minus 3 = index 1 = p1 (the page they started from)
+  assert.equal(4 - plan.steps, 1)
+})

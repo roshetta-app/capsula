@@ -162,12 +162,25 @@ function removeNote(key) {
   try { window.localStorage.removeItem(key) } catch { /* storage blocked: do nothing */ }
 }
 
+// How many history steps sit ahead of the current page (there are some after the person pressed
+// Back earlier). Leaving for Google throws them away, so they must not be counted (step 12.15c).
+// Browsers without the newer history interface report 0, which is the old behaviour.
+function stepsAheadOfThisPage() {
+  try {
+    const nav = window.navigation
+    if (!nav || !nav.currentEntry) return 0
+    const ahead = nav.entries().length - 1 - nav.currentEntry.index
+    return Number.isInteger(ahead) && ahead > 0 ? ahead : 0
+  } catch { return 0 }
+}
+
 // Called right before the page leaves for Google. Always clears an older note first, so a note
 // from an earlier trip can never be used for this one.
 function rememberSignInDeparture() {
   removeNote(MARKER_KEY)
   const marker = makeMarker({
     historyLength: window.history.length,
+    forwardSteps: stepsAheadOfThisPage(),
     pathname: window.location.pathname,
     now: Date.now(),
   })
