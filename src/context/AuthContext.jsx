@@ -123,7 +123,7 @@ import { App } from '@capacitor/app'
 import { supabase } from '../lib/supabase'
 import { isStandalonePwa } from '../utils/standalonePwa'
 import {
-  MARKER_KEY, REWOUND_KEY, WAIT_FOR_SIGN_IN_MS,
+  MARKER_KEY, REWOUND_KEY, WAIT_FOR_SIGN_IN_MS, MAX_AGE_MS,
   makeMarker, parseMarker, loadedAsSignInReturn, planRewind, shouldReloadOnRestore,
 } from '../utils/signInReturn'
 import { useToast } from './ToastContext'
@@ -172,6 +172,26 @@ function rememberSignInDeparture() {
     now: Date.now(),
   })
   if (marker) writeNote(MARKER_KEY, JSON.stringify(marker))
+  // TEMPORARY phone-check message (step 12.15b): what was written down, shown after the return.
+  writeNote(TRACE_KEY, JSON.stringify({ at: Date.now(), len: window.history.length, saved: !!marker }))
+}
+
+// TEMPORARY phone-check message (step 12.15b) — remove once the sign-in return is confirmed on a
+// phone. The return page cannot always show a message itself (it may jump away a moment later), so
+// the text is stored and shown by whichever page is on screen next.
+const TRACE_KEY = 'capsula.signin.trace'
+const SAY_KEY = 'capsula.signin.say'
+function saySignInCheck(text) {
+  writeNote(SAY_KEY, JSON.stringify({ at: Date.now(), text }))
+}
+function takeSignInCheckText() {
+  const raw = readNote(SAY_KEY)
+  removeNote(SAY_KEY)
+  try {
+    const m = JSON.parse(raw)
+    if (m && typeof m.text === 'string' && Date.now() - m.at < 60 * 1000) return m.text
+  } catch { /* nothing stored */ }
+  return null
 }
 
 // Stage 3 (F6) — the custom scheme/host the native app registers in
@@ -701,28 +721,46 @@ export function AuthProvider({ children }) {
   //     (it can after the jump), load it again so it shows the signed-in screen.
   // Any doubt (no note, old note, moved to another page, odd step count) leaves the person on the
   // page they returned to, which is how the app behaved before this step.
+  const toastRef = useRef(toast)
+  useEffect(() => { toastRef.current = toast }, [toast])
   useEffect(() => {
     if (Capacitor.isNativePlatform()) return
     if (window.opener && window.opener !== window) return
 
+    function showCheckText() {
+      const text = takeSignInCheckText()
+      if (text) toastRef.current.info(`Sign-in check: ${text}`, 15000)
+    }
     function onPageShow(event) {
       const raw = readNote(REWOUND_KEY)
       removeNote(REWOUND_KEY)
       const rewoundAt = raw === null ? null : Number(raw)
       if (shouldReloadOnRestore({ persisted: event.persisted, rewoundAt, now: Date.now() })) {
         window.location.reload()
+        return
       }
+      if (event.persisted) showCheckText()
     }
     window.addEventListener('pageshow', onPageShow)
+
+    // TEMPORARY phone-check message (step 12.15b): what was written down when leaving.
+    let trace = null
+    try { trace = JSON.parse(readNote(TRACE_KEY)) } catch { /* nothing stored */ }
+    removeNote(TRACE_KEY)
+    if (!trace || typeof trace.at !== 'number' || Date.now() - trace.at > MAX_AGE_MS) trace = null
+    const left = trace ? `left with ${trace.len} steps, note ${trace.saved ? 'saved' : 'NOT saved'}` : 'no leaving record'
+    showCheckText()
 
     let stopWaiting = () => {}
     if (!LOADED_AS_SIGN_IN_RETURN) {
       // A normal load: any note left over from an earlier trip is finished with.
       removeNote(MARKER_KEY)
+      if (trace) { saySignInCheck(`back without a sign-in code (${left})`); showCheckText() }
     } else {
       const marker = parseMarker(readNote(MARKER_KEY))
       if (!marker) {
         removeNote(MARKER_KEY)
+        if (trace) { saySignInCheck(`no note found on return (${left})`); showCheckText() }
       } else {
         let finished = false
         let giveUpTimer = null
@@ -744,7 +782,9 @@ export function AuthProvider({ children }) {
               pathname: window.location.pathname,
             })
             removeNote(MARKER_KEY)
-            if (plan.steps < 1) return
+            const detail = `${plan.reason}, left with ${marker.len}, now ${window.history.length}, going back ${plan.steps}`
+            saySignInCheck(detail)
+            if (plan.steps < 1) { showCheckText(); return }
             writeNote(REWOUND_KEY, String(Date.now()))
             window.history.go(-plan.steps)
           }, 500)
@@ -754,6 +794,8 @@ export function AuthProvider({ children }) {
           finished = true
           subscription.unsubscribe()
           removeNote(MARKER_KEY)
+          saySignInCheck(`sign-in did not finish in time (${left})`)
+          showCheckText()
         }, WAIT_FOR_SIGN_IN_MS)
         stopWaiting = () => {
           subscription.unsubscribe()
