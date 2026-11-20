@@ -14,9 +14,9 @@
 //   kind        'main' (the five top screens), 'page' (a page opened from somewhere),
 //               'edit' (a screen where you change or add something)
 //   parent      the pattern of the screen that belongs behind it, or null for Home only
-//   label       the short name the Back arrow of the NEXT screen shows for this one. null means
-//               "no name yet" (the arrow just says Back). These match today's behaviour exactly;
-//               step 12.8 decides the names for the ones that are null now.
+//   label       the short name the Back arrow of the NEXT screen shows for this one, and the
+//               screen's name in the page title (step 12.11). Step 12.8 named the five screens
+//               that had none (roshetta page, its Add and Edit screens, Account edit and FAQ).
 //   signIn      true when the screen is for signed-in people only (a guest sees a sign-in card)
 //   laysBehind  true when a page opened from outside (link, notification, refresh) gets its
 //               parent placed behind it. Shared pages stand alone: they have their own
@@ -56,9 +56,9 @@ export const SCREENS = [
 
   // ── My roshettas (they live on Home too)
   { pattern: '/roshettas',                 kind: 'page', parent: '/',                        label: 'My roshettas', signIn: true,  laysBehind: true },
-  { pattern: '/roshetta/:id',              kind: 'page', parent: '/',                        label: null,           signIn: true,  laysBehind: true },
-  { pattern: '/roshetta/:id/add',          kind: 'edit', parent: '/roshetta/:id',            label: null,           signIn: true,  laysBehind: true },
-  { pattern: '/roshetta/:id/edit',         kind: 'edit', parent: '/roshetta/:id',            label: null,           signIn: true,  laysBehind: true },
+  { pattern: '/roshetta/:id',              kind: 'page', parent: '/',                        label: 'Roshetta',           signIn: true,  laysBehind: true },
+  { pattern: '/roshetta/:id/add',          kind: 'edit', parent: '/roshetta/:id',            label: 'Add drugs',           signIn: true,  laysBehind: true },
+  { pattern: '/roshetta/:id/edit',         kind: 'edit', parent: '/roshetta/:id',            label: 'Editor',           signIn: true,  laysBehind: true },
 
   // ── Shared pages: public, stand alone (no screen is placed behind them)
   { pattern: '/g/:code',                   kind: 'page', parent: '/',                        label: 'Group',        signIn: false, laysBehind: false },
@@ -66,8 +66,8 @@ export const SCREENS = [
 
   // ── Account pages. Today no screen places Account behind them on a link arrival; the rule
   // says it should (plan rule 3), and step 12.3 is where that gets built.
-  { pattern: '/account/edit',              kind: 'edit', parent: '/account',                 label: null,           signIn: true,  laysBehind: true },
-  { pattern: '/account/faq',               kind: 'page', parent: '/account',                 label: null,           signIn: false, laysBehind: true },
+  { pattern: '/account/edit',              kind: 'edit', parent: '/account',                 label: 'Edit profile',           signIn: true,  laysBehind: true },
+  { pattern: '/account/faq',               kind: 'page', parent: '/account',                 label: 'FAQ',           signIn: false, laysBehind: true },
 ]
 
 // ─── Matching an address to its rule ──────────────────────────────────────────

@@ -122,6 +122,12 @@ function legacyLabel(path) {
   if (path.startsWith('/conditions/')) return 'Topic'
   if (path === '/favourites') return 'Favourites'
   if (path === '/account') return 'Account'
+  // Step 12.8 named the five screens that had no name before.
+  if (/^\/roshetta\/[^/]+$/.test(path)) return 'Roshetta'
+  if (/^\/roshetta\/[^/]+\/add$/.test(path)) return 'Add drugs'
+  if (/^\/roshetta\/[^/]+\/edit$/.test(path)) return 'Editor'
+  if (path === '/account/edit') return 'Edit profile'
+  if (path === '/account/faq') return 'FAQ'
   return null
 }
 

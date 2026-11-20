@@ -124,6 +124,7 @@ import { useDrugContext }                from '../context/DrugContext'
 import { useFavouritesContext }          from '../context/FavouritesContext'
 import { useCategories }                 from '../hooks/useCategories'
 import { useDeepLinkParent }             from '../hooks/useDeepLinkParent'
+import { useScreenTitle }                  from '../hooks/useScreenTitle'
 import { useIsDark }                     from '../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN }  from '../utils/specialtyTokens'
 import { logUsageEvent }                 from '../analytics/usageEvents'
@@ -248,6 +249,7 @@ export default function DrugDetailScreen() {
 
   // Match by formulation slug first, fall back to id
   const drug = drugs.find(d => d.slug === slug || d.id === slug)
+  useScreenTitle(drug?.tradenameClean)
 
   // Add to group (step 5.2): opened by the header icon, or by itself after a
   // signed-out tap once the account is signed in and its groups are loaded.

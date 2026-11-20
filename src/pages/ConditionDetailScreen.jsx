@@ -18,6 +18,7 @@ import { logUsageEvent } from '../analytics/usageEvents'
 import { SpecialtyIcon, useIsDark } from '../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN } from '../utils/specialtyTokens'
 import NotAvailableScreen from './NotAvailableScreen'
+import { useScreenTitle } from '../hooks/useScreenTitle'
 
 // ─── Tab icon SVGs ────────────────────────────────────────────────────────────
 
@@ -250,6 +251,7 @@ export default function ConditionDetailScreen() {
   }
 
   const condition = conditions.find(c => c.slug === slug)
+  useScreenTitle(condition?.name)
 
   const isFav = condition ? isConditionFavourited(condition.id) : false
 

@@ -27,6 +27,7 @@ import { useNavigate } from 'react-router-dom'
 import { FileX, ChevronLeft } from 'lucide-react'
 import BottomNav from '../components/BottomNav'
 import { useBackLabel } from '../hooks/useBackLabel'
+import { useScreenTitle } from '../hooks/useScreenTitle'
 import { hasStepBehind } from '../utils/arrivalRecord'
 import { HOME_PATH } from '../utils/navRules'
 
@@ -52,6 +53,7 @@ export default function NotAvailableScreen({
 }) {
   const navigate = useNavigate()
   const backLabel = useBackLabel()
+  useScreenTitle('Not available')
   // Read once when the screen opens: whether a screen sits behind this one.
   const [canGoBack] = useState(() => hasStepBehind(window.history.state))
 

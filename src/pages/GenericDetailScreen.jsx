@@ -45,6 +45,7 @@ import { useIsDark } from '../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN } from '../utils/specialtyTokens'
 import { logUsageEvent } from '../analytics/usageEvents'
 import { ROUTES } from '../router'
+import { useScreenTitle } from '../hooks/useScreenTitle'
 import NotAvailableScreen from './NotAvailableScreen'
 
 // Same two lists the brand page builds for its sheets (DrugDetailScreen: findAlternatives and
@@ -92,6 +93,7 @@ export default function GenericDetailScreen() {
 
   // One brand of this generic carries the generic's data into the sections. It is never shown.
   const drug = useMemo(() => drugs.find(d => d.genericSlug === slug), [drugs, slug])
+  useScreenTitle(drug?.genericName)
 
   // The brands of this generic (all of them: the carrier brand is never singled out), the brands of
   // the other generics in the same family, and everything in the same class. Same rules as the brand page.
