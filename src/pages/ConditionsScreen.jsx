@@ -157,7 +157,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useOpenTopic } from '../hooks/useOpenTopic'
 import { Search, ListFilter, Heart, Bell, WifiOff } from 'lucide-react'
 import BackToTopButton         from '../components/ui/BackToTopButton'
 import ScrollRevealHeader      from '../components/ui/ScrollRevealHeader'
@@ -178,7 +178,6 @@ import { useBackClose }        from '../hooks/useBackClose'
 import { alphabetGroup }                           from '../utils/alphabetGroup'
 import { SpecialtyIcon, useIsDark }                from '../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN, tintedBg }  from '../utils/specialtyTokens'
-import { ROUTES }                                  from '../router'
 
 // ─── Entrance stagger (session-scoped) ────────────────────────────────────────
 // conditions-screen-polish-master-plan Phase 11. Plays once per browser
@@ -655,7 +654,7 @@ function StickyLogoHeader({
 // ─── ConditionsScreen ─────────────────────────────────────────────────────────
 
 export default function ConditionsScreen() {
-  const navigate = useNavigate()
+  const openTopic = useOpenTopic()
   const {
     conditions, specialties, loading, error, refresh,
     recentlyViewed, recentOrder,
@@ -813,7 +812,7 @@ export default function ConditionsScreen() {
   // ── Handlers ────────────────────────────────────────────────────────────────
 
   function handleCardTap(condition) {
-    navigate(ROUTES.CONDITION_DETAIL(condition.slug))
+    openTopic(condition)
   }
 
   function handleClearSearch() {

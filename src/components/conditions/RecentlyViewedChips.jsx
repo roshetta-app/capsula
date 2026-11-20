@@ -11,11 +11,10 @@
  *   hidden          boolean  — renders null when true (search active)
  */
 import { Clock } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
-import { ROUTES } from '../../router'
+import { useOpenTopic } from '../../hooks/useOpenTopic'
 
 export default function RecentlyViewedChips({ recentlyViewed, hidden }) {
-  const navigate = useNavigate()
+  const openTopic = useOpenTopic()
 
   if (hidden || !recentlyViewed || recentlyViewed.length === 0) return null
 
@@ -73,7 +72,7 @@ export default function RecentlyViewedChips({ recentlyViewed, hidden }) {
               }}>·</span>
             )}
             <button
-              onClick={() => navigate(ROUTES.CONDITION_DETAIL(condition.slug))}
+              onClick={() => openTopic(condition)}
               style={{
                 background:              'none',
                 border:                  'none',

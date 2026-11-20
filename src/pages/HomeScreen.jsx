@@ -10,6 +10,7 @@
  * is nothing to show.
  */
 import { useNavigate } from 'react-router-dom'
+import { useTapGuard } from '../hooks/useTapGuard'
 import HomeTopBar from '../components/home/HomeTopBar'
 import FeaturedCardView from '../components/home/FeaturedCardView'
 import { FeaturedCardSkeleton } from '../components/home/HomeStateCards'
@@ -28,6 +29,7 @@ import { ROUTES } from '../router'
 
 export default function HomeScreen() {
   const navigate = useNavigate()
+  const { openPage } = useTapGuard()
   const { user, profile } = useAuth()
   const { conditions, loading: conditionsLoading } = useConditionContext()
   const { drugs, loading: drugsLoading } = useDrugContext()
@@ -60,7 +62,7 @@ export default function HomeScreen() {
       </div>
 
       {item && path ? (
-        <div className={featuredSwap || undefined} style={entrance(1)}><FeaturedCardView item={item} onOpen={() => navigate(path)} /></div>
+        <div className={featuredSwap || undefined} style={entrance(1)}><FeaturedCardView item={item} onOpen={() => openPage(path)} /></div>
       ) : loadingFirst ? (
         <div style={entrance(1)}><FeaturedCardSkeleton /></div>
       ) : null}

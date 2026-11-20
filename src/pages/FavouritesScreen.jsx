@@ -517,7 +517,8 @@
  */
 
 import { useState, useRef, useEffect, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useOpenTopic } from '../hooks/useOpenTopic'
+import { useOpenDrug } from '../hooks/useOpenDrug'
 import { Circle, CheckCircle2 } from 'lucide-react'
 import BackToTopButton from '../components/ui/BackToTopButton'
 import ConditionCard from '../components/ConditionCard'
@@ -676,7 +677,8 @@ function saveTab(key) {
 // ─── FavouritesScreen ─────────────────────────────────────────────────────────
 
 export default function FavouritesScreen() {
-  const navigate = useNavigate()
+  const openTopic = useOpenTopic()
+  const openDrug = useOpenDrug()
   const [activeTab, setActiveTab] = useState(readSavedTab)
   const isDark = useIsDark()
   const { categories } = useCategories()
@@ -1432,7 +1434,7 @@ export default function FavouritesScreen() {
                             onTap={
                               isManaging
                                 ? () => toggleSelectId(condition.id)
-                                : () => navigate(`/conditions/${condition.slug}`)
+                                : () => openTopic(condition)
                             }
                             trailing={
                               isManaging
@@ -1543,7 +1545,7 @@ export default function FavouritesScreen() {
                           onTap={
                             isManaging
                               ? () => toggleSelectId(drug.id)
-                              : () => navigate(`/drugs/${drug.slug || drug.id}`)
+                              : () => openDrug(drug)
                           }
                           trailing={
                             isManaging
@@ -1654,7 +1656,7 @@ export default function FavouritesScreen() {
         classLabel={titleCaseWords(classTarget?.className ?? '')}
         classDrugs={classSheetDrugs}
         currentDrug={null}
-        onSelectBrand={d => navigate(`/drugs/${d.slug || d.id}`)}
+        onSelectBrand={d => openDrug(d)}
         directSubclass={classTarget?.direct ?? null}
       />
 
