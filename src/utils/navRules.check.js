@@ -19,7 +19,12 @@ function publicRoutes() {
   const src = read('../router.jsx')
   const body = src.slice(src.indexOf('export function PublicRoutes'), src.indexOf('export function AdminRoutes'))
   const imports = Object.fromEntries([...src.matchAll(/import (\w+)\s+from '\.\/pages\/(\w+)'/g)].map((m) => [m[1], m[2]]))
-  return [...body.matchAll(/path="([^"]+)"\s+element=\{<(\w+)/g)].map((m) => ({ path: m[1], file: imports[m[2]] }))
+  // Step 12.5: the catch-all and the four reserved words go to UnknownAddressScreen. They are not
+  // screens with a place in the rulebook (they send the person elsewhere or say "not available"),
+  // so they are left out here; addressFixes.check.js checks that each one has its route.
+  return [...body.matchAll(/path="([^"]+)"\s+element=\{<(\w+)/g)]
+    .map((m) => ({ path: m[1], file: imports[m[2]] }))
+    .filter((r) => r.file !== 'UnknownAddressScreen')
 }
 
 test('every public route in router.jsx has a rule, and every rule has a route', () => {

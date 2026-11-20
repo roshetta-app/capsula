@@ -77,6 +77,7 @@ import FavouritesScreen      from './pages/FavouritesScreen'
 import AccountScreen         from './pages/AccountScreen'
 import AccountEditScreen     from './pages/AccountEditScreen'
 import AccountFaqScreen      from './pages/AccountFaqScreen'
+import UnknownAddressScreen  from './pages/UnknownAddressScreen'
 
 // ─── Admin screens ────────────────────────────────────────────────────────────
 
@@ -212,6 +213,17 @@ export function PublicRoutes() {
         <Route path="/r/:code"                       element={<SharedRoshettaScreen />} />
         <Route path="/account/edit"        element={<AccountEditScreen />} />
         <Route path="/account/faq"         element={<AccountFaqScreen />} />
+
+        {/* Step 12.5: no dead ends. The four words below would otherwise be read as a drug with that
+            name (/drugs/:slug), so they get their own routes: each is sent to the right list. Every
+            other address that matches nothing lands on the catch-all, which shows the shared "not
+            available" screen with Home (and Back when a screen is behind). A known typo such as
+            /favorites is sent to the real screen (utils/addressFixes.js). */}
+        <Route path="/drugs/browse"        element={<UnknownAddressScreen />} />
+        <Route path="/drugs/group"         element={<UnknownAddressScreen />} />
+        <Route path="/drugs/category"      element={<UnknownAddressScreen />} />
+        <Route path="/drugs/generic"       element={<UnknownAddressScreen />} />
+        <Route path="*"                    element={<UnknownAddressScreen />} />
       </Route>
 
     </Routes>

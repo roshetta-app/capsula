@@ -17,6 +17,7 @@ import BottomNav from '../components/BottomNav'
 import { logUsageEvent } from '../analytics/usageEvents'
 import { SpecialtyIcon, useIsDark } from '../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN } from '../utils/specialtyTokens'
+import NotAvailableScreen from './NotAvailableScreen'
 
 // ─── Tab icon SVGs ────────────────────────────────────────────────────────────
 
@@ -360,15 +361,12 @@ export default function ConditionDetailScreen() {
   // (!loading && !error && !condition), so a failed fetch can no longer
   // fall through and be misreported as a bad slug.
   if (!condition) {
+    // Step 12.5: the one shared screen (Home, and Back when something is behind).
     return (
-      <div style={simplePageStyle}>
-        <DetailHeader onBack={handleBack} condition={null} activeTab={activeTab} setActiveTab={switchTab} />
-        <div style={{ maxWidth: 680, margin: '0 auto', padding: 'var(--space-8) var(--space-6)', textAlign: 'center' }}>
-          <div style={{ fontSize: 15, color: 'var(--color-text-secondary)', marginBottom: 'var(--space-2)' }}>Topic not found</div>
-          <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)' }}>"{slug}" does not match any topic in the database.</div>
-        </div>
-        <BottomNav />
-      </div>
+      <NotAvailableScreen
+        title="This topic isn't available"
+        body="It may have been removed, or the link may be incomplete."
+      />
     )
   }
 

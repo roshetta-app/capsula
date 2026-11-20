@@ -128,6 +128,7 @@ import { useIsDark }                     from '../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN }  from '../utils/specialtyTokens'
 import { logUsageEvent }                 from '../analytics/usageEvents'
 import { ROUTES }                        from '../router'
+import NotAvailableScreen                from './NotAvailableScreen'
 
 // ─── Loading skeleton ───────────────────────────────────────────────────────
 // Same shimmer() convention ConditionsScreen.jsx / ConditionDetailScreen.jsx
@@ -435,45 +436,13 @@ export default function DrugDetailScreen() {
     )
   }
 
-  // ── Not found ──────────────────────────────────────────────────────────────
+  // ── Not found ── step 12.5: the one shared screen (Home, and Back when something is behind).
   if (!drug) {
     return (
-      <div style={{
-        display:        'flex',
-        flexDirection:  'column',
-        alignItems:     'center',
-        justifyContent: 'center',
-        minHeight:      '60dvh',
-        gap:            'var(--space-3)',
-        color:          'var(--color-text-tertiary)',
-        padding:        'var(--space-6)',
-        textAlign:      'center',
-      }}>
-        <div style={{ fontSize: 32, opacity: 0.3 }}>💊</div>
-        <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-text-secondary)' }}>
-          Drug not found
-        </div>
-        <div style={{ fontSize: 13 }}>
-          This drug may have been removed or the link is incorrect.
-        </div>
-        <button
-          onClick={() => navigate('/drugs')}
-          style={{
-            marginTop:    'var(--space-2)',
-            padding:      '8px 20px',
-            borderRadius: 'var(--radius-sm)',
-            border:       '1px solid var(--color-border)',
-            background:   'none',
-            fontSize:     13,
-            fontWeight:   500,
-            color:        'var(--color-text-secondary)',
-            cursor:       'pointer',
-            fontFamily:   'var(--font-body)',
-          }}
-        >
-          ← Back to Drugs
-        </button>
-      </div>
+      <NotAvailableScreen
+        title="This drug isn't available"
+        body="It may have been removed, or the link may be incomplete."
+      />
     )
   }
 

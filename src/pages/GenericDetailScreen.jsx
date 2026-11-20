@@ -45,6 +45,7 @@ import { useIsDark } from '../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN } from '../utils/specialtyTokens'
 import { logUsageEvent } from '../analytics/usageEvents'
 import { ROUTES } from '../router'
+import NotAvailableScreen from './NotAvailableScreen'
 
 // Same two lists the brand page builds for its sheets (DrugDetailScreen: findAlternatives and
 // findClassDrugs): the brands of the other generics in this class AND family, and every brand in
@@ -174,11 +175,11 @@ export default function GenericDetailScreen() {
     )
   }
   if (!drug) {
+    // Step 12.5: the one shared screen (Home, and Back when something is behind).
     return (
-      <Message
-        icon={<div style={{ fontSize: 32, opacity: 0.3 }}>💊</div>}
-        title="Generic not found" text="This page may have been removed or the link is incorrect."
-        actionLabel="← Back to Drugs" onAction={() => navigate('/drugs')}
+      <NotAvailableScreen
+        title="This drug isn't available"
+        body="It may have been removed, or the link may be incomplete."
       />
     )
   }
