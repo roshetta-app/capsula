@@ -24,17 +24,17 @@ import { useIsDark } from '../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN } from '../utils/specialtyTokens'
 import { ROUTES } from '../router'
 import { useDeepLinkParent } from '../hooks/useDeepLinkParent'
-import useScrollToTopOnOpen from '../hooks/useScrollToTopOnOpen'
+import useListScrollMemory from '../hooks/useListScrollMemory'
 import { prepareCategoryOpen } from './DrugsScreen'
 
 export default function DrugCategoriesScreen() {
-  useScrollToTopOnOpen()
   const navigate = useNavigate()
   // Back (arrow and phone button) goes to the real previous screen; if this page
   // is opened straight from a link, the Drugs home is put behind it first.
   useDeepLinkParent(ROUTES.DRUGS)
   const isDark = useIsDark()
   const { drugs, loading, error, retry } = useDrugContext()
+  useListScrollMemory('list:categories', !loading || drugs.length > 0)
   const { categories } = useCategories()
 
   // Only categories that have drugs, same rule as the Drugs home.

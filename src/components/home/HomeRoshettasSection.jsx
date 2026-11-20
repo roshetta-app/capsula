@@ -32,6 +32,7 @@ import { useToast } from '../../context/ToastContext'
 import { useIsPro } from '../../hooks/useIsPro'
 import { useSoftSwap } from '../../hooks/useSoftSwap'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
+import useRowScrollMemory from '../../hooks/useRowScrollMemory'
 import { sectionState, newTapAnswer } from '../../utils/roshettaSectionState'
 import { noticeKind, statusText, homeRowCards, showNewCard, newCardMode } from '../../utils/homeRoshettas'
 
@@ -70,6 +71,7 @@ function HomeRoshettasSection({ onOpenRoshetta, onSeeAll }) {
   const isPro = useIsPro()
   const { isOnline } = useOnlineStatus()
   const { toast } = useToast()
+  const rowRef = useRowScrollMemory('row:home-roshettas')
   const [sheetOpen, setSheetOpen] = useState(false)
   const [seeOpen, setSeeOpen] = useState(false)
 
@@ -139,7 +141,7 @@ function HomeRoshettasSection({ onOpenRoshetta, onSeeAll }) {
   } else {
     content = (
       <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-        <div className="home-roshettas-row" style={ROW_STYLE}>
+        <div ref={rowRef} className="home-roshettas-row" style={ROW_STYLE}>
           {showNewCard({ state }) && <HomeNewCard kind="roshetta" mode={newCardMode({ isReadOnly, atFreeCap })} onTap={handleNew} />}
           {homeRowCards(roshettas).map(r => (
             <HomeRoshettaCard

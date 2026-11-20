@@ -93,6 +93,7 @@ import { useAuth } from '../hooks/useAuth'
 import { useIsPro } from '../hooks/useIsPro'
 import { useCategories } from '../hooks/useCategories'
 import { useDeepLinkParent } from '../hooks/useDeepLinkParent'
+import useScrollToTopOnOpen from '../hooks/useScrollToTopOnOpen'
 import { useIsDark } from '../utils/specialtyIcon'
 import { resolveToken } from '../utils/specialtyTokens'
 import { DRUG_GROUP_DRUGS_CAP_FREE, DRUG_GROUP_DRUGS_CAP_PRO } from '../constants/features'
@@ -115,6 +116,7 @@ function SkeletonCard() {
 }
 
 export default function DrugGroupScreen() {
+  useScrollToTopOnOpen()
   const navigate = useNavigate()
   const { groupId } = useParams()
   // Back goes to the real previous screen; opened straight from a link, the

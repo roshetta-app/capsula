@@ -35,6 +35,7 @@ import { useToast } from '../../context/ToastContext'
 import { useIsPro } from '../../hooks/useIsPro'
 import { useSoftSwap } from '../../hooks/useSoftSwap'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
+import useRowScrollMemory from '../../hooks/useRowScrollMemory'
 import { sectionState, newTapAnswer } from '../../utils/roshettaSectionState'
 import { noticeKind, statusText, showNewCard, newCardMode } from '../../utils/homeRoshettas'
 import { homeGroupCards } from '../../utils/homeGroups'
@@ -70,6 +71,7 @@ function HomeGroupsSection({ onOpenGroup, onSeeAll }) {
   const isPro = useIsPro()
   const { isOnline } = useOnlineStatus()
   const { toast } = useToast()
+  const rowRef = useRowScrollMemory('row:home-groups')
   const [editorOpen, setEditorOpen] = useState(false)
   const [seeOpen, setSeeOpen] = useState(false)
 
@@ -160,7 +162,7 @@ function HomeGroupsSection({ onOpenGroup, onSeeAll }) {
   } else {
     content = (
       <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-        <div className="home-groups-row" style={ROW_STYLE}>
+        <div ref={rowRef} className="home-groups-row" style={ROW_STYLE}>
           {showNewCard({ state }) && <HomeNewCard kind="group" mode={newCardMode({ isReadOnly, atFreeCap })} onTap={handleNew} />}
           {homeGroupCards(groups, groupsSortMode).map(g => (
             <HomeGroupCard

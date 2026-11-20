@@ -56,6 +56,7 @@ import { useFavouritesContext } from '../../../context/FavouritesContext'
 import { useAuth } from '../../../hooks/useAuth'
 import { useIsPro } from '../../../hooks/useIsPro'
 import { useOnlineStatus } from '../../../hooks/useOnlineStatus'
+import useRowScrollMemory from '../../../hooks/useRowScrollMemory'
 import GroupSyncStatus from './GroupSyncStatus'
 import { toTitleCase } from '../../../utils/drugTitleFormat'
 import { DRUG_GROUPS_CAP_FREE } from '../../../constants/features'
@@ -105,6 +106,7 @@ function GroupsSection({ all = false, headerProps = null }) {
   const [editor, setEditor] = useState({ open: false, group: null })
 
   const navigate = useNavigate()
+  const rowRef = useRowScrollMemory('row:drugs-groups')
 
   // Undo for Delete group (step 4.4): a message with Undo for 5 seconds. Starts
   // already showing when the group was just deleted from its page (6.2).
@@ -296,7 +298,7 @@ function GroupsSection({ all = false, headerProps = null }) {
             {showNew && <GroupRow isNew showProBadge={showPro} onOpen={handleNewGroup} />}
           </div>
         ) : (
-          <div className={all ? undefined : 'groups-row'} style={all ? GRID_STYLE : ROW_STYLE}>
+          <div ref={all ? undefined : rowRef} className={all ? undefined : 'groups-row'} style={all ? GRID_STYLE : ROW_STYLE}>
             {sorted.map(g => (
               <GroupTile
                 fill={all}

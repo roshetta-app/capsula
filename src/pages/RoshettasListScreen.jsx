@@ -16,6 +16,7 @@ import { useAuth } from '../hooks/useAuth'
 import { useBackLabel } from '../hooks/useBackLabel'
 import { useDeepLinkParent } from '../hooks/useDeepLinkParent'
 import { useIsPro } from '../hooks/useIsPro'
+import useListScrollMemory from '../hooks/useListScrollMemory'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
 import { syncStatusLine } from '../utils/groupSyncStatus'
 import { findSpecialty } from '../utils/roshettaSpecialty'
@@ -43,6 +44,7 @@ export default function RoshettasListScreen() {
     retryFailedChanges, isReadOnly = false, canCreateRoshetta = true, roshettaCap = 3,
     showRoshettaLimit, showRoshettaReadOnly,
   } = roshettasApi ?? {}
+  useListScrollMemory('list:roshettas', roshettasStatus !== 'loading')
   const { loading: authLoading, signInWithGoogle } = useAuth()
   const isPro = useIsPro()
   const { isOnline } = useOnlineStatus()

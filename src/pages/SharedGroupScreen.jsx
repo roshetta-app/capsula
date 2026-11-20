@@ -79,6 +79,7 @@ import { shimmer } from '../components/drugs/home/shimmer'
 import { useCategories } from '../hooks/useCategories'
 import { markScreenMounted } from '../hooks/useDeepLinkParent'
 import { useAuth } from '../hooks/useAuth'
+import useScrollToTopOnOpen from '../hooks/useScrollToTopOnOpen'
 import { useFavouritesContext } from '../context/FavouritesContext'
 import { isDrugGroupsOn } from '../constants/features'
 import { SAVE_OFFLINE_MESSAGE, SAVE_READ_ONLY_MESSAGE, SAVE_ERROR_MESSAGE, savedGroupMessage } from '../components/drugs/groups/groupMessages'
@@ -142,6 +143,7 @@ function LinkProblem({ Icon, title, body, actionLabel, onAction }) {
 }
 
 export default function SharedGroupScreen() {
+  useScrollToTopOnOpen()
   const { code } = useParams()
   // Keyed by the code, so opening a different link starts from loading.
   return <SharedGroupBody key={code} code={code} />

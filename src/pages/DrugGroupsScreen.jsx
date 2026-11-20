@@ -13,15 +13,15 @@ import GroupsSection from '../components/drugs/groups/GroupsSection'
 import { useFavouritesContext } from '../context/FavouritesContext'
 import { useAuth } from '../hooks/useAuth'
 import { useDeepLinkParent } from '../hooks/useDeepLinkParent'
-import useScrollToTopOnOpen from '../hooks/useScrollToTopOnOpen'
+import useListScrollMemory from '../hooks/useListScrollMemory'
 import { isDrugGroupsOn } from '../constants/features'
 import { ROUTES } from '../router'
 
 export default function DrugGroupsScreen() {
-  useScrollToTopOnOpen()
   const navigate = useNavigate()
   const { user } = useAuth()
   const { groups, groupsStatus } = useFavouritesContext()
+  useListScrollMemory('list:groups', groupsStatus !== 'loading')
   useDeepLinkParent(ROUTES.HOME)
 
   if (!isDrugGroupsOn()) return <Navigate to={ROUTES.HOME} replace />

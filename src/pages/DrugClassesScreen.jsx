@@ -27,7 +27,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowUpDown } from 'lucide-react'
-import useScrollToTopOnOpen from '../hooks/useScrollToTopOnOpen'
+import useListScrollMemory from '../hooks/useListScrollMemory'
 import SearchBar from '../components/drugs/DrugSearchBar'
 import BrowseHeader from '../components/drugs/home/BrowseHeader'
 import ClassSearchResults from '../components/drugs/classes/ClassSearchResults'
@@ -68,12 +68,12 @@ function ClassSortButton({ sortMode, onToggle }) {
 }
 
 export default function DrugClassesScreen() {
-  useScrollToTopOnOpen()
   const navigate = useNavigate()
   // Back (arrow and phone button) goes to the real previous screen; if this page
   // is opened straight from a link, the Drugs home is put behind it first.
   useDeepLinkParent(ROUTES.DRUGS)
   const { drugs, loading, error, retry, classSortMode, setClassSortMode, classKeywords } = useDrugContext()
+  useListScrollMemory('list:classes', !loading || drugs.length > 0)
   const { addRecentlyViewed: addRecentDrug } = useRecentlyViewed('drug')
 
   // The class sheet: 'classTarget' stays after the sheet closes so it can

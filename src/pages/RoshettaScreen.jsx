@@ -48,6 +48,7 @@ import { useAuth } from '../hooks/useAuth'
 import { useBackLabel } from '../hooks/useBackLabel'
 import { useDeepLinkParent } from '../hooks/useDeepLinkParent'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
+import useScrollToTopOnOpen from '../hooks/useScrollToTopOnOpen'
 import { syncStatusLine } from '../utils/groupSyncStatus'
 import { sheetRowsForDisplay } from '../utils/roshettaDrugLines'
 import { findSpecialty } from '../utils/roshettaSpecialty'
@@ -70,6 +71,7 @@ function PageSkeleton() {
 }
 
 export default function RoshettaScreen() {
+  useScrollToTopOnOpen()
   const navigate = useNavigate()
   const { id } = useParams()
   // Back goes to the real previous screen; opened straight from a link, the Home screen is put behind it first.

@@ -54,6 +54,7 @@ import { useAuth } from '../hooks/useAuth'
 import { useIsPro } from '../hooks/useIsPro'
 import { useFavouritesContext } from '../context/FavouritesContext'
 import { markScreenMounted } from '../hooks/useDeepLinkParent'
+import useScrollToTopOnOpen from '../hooks/useScrollToTopOnOpen'
 import { fetchSharedRoshetta } from '../utils/sharedRoshetta'
 import { sheetRowsForDisplay } from '../utils/roshettaDrugLines'
 import { sharedPageState, sharedProblemText } from '../utils/roshettaSharedPageState'
@@ -114,6 +115,7 @@ function Placeholder() {
 }
 
 export default function SharedRoshettaScreen() {
+  useScrollToTopOnOpen()
   const { code } = useParams()
   // Keyed by the code, so opening a different link starts from loading.
   return <SharedRoshettaBody key={code} code={code} />
