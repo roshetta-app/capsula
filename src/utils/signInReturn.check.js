@@ -4,7 +4,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  makeMarker, parseMarker, loadedAsSignInReturn, planRewind, shouldReloadOnRestore,
+  makeMarker, parseMarker, loadedAsSignInReturn, planRewind, shouldReloadOnRestore, samePage,
   HISTORY_CAP, MAX_STEPS, MAX_AGE_MS, REWOUND_MAX_AGE_MS,
 } from './signInReturn.js'
 
@@ -134,4 +134,17 @@ test('the whole trip after an earlier Back lands on the page the person started 
   assert.deepEqual(plan, { steps: 3, reason: 'ok' })
   // current index 4, minus 3 = index 1 = p1 (the page they started from)
   assert.equal(4 - plan.steps, 1)
+})
+
+test('samePage: a closing slash does not make it another page', () => {
+  assert.equal(samePage('/capsula', '/capsula/'), true)
+  assert.equal(samePage('/capsula/drugs/5/', '/capsula/drugs/5'), true)
+  assert.equal(samePage('/', '/'), true)
+  assert.equal(samePage('/capsula/drugs', '/capsula/topics'), false)
+  assert.equal(samePage(undefined, '/'), false)
+})
+
+test('the Home trip: left from /capsula, back on /capsula/, still jumps back', () => {
+  const marker = makeMarker({ historyLength: 4, pathname: '/capsula', now: NOW })
+  assert.deepEqual(planRewind({ marker, now: NOW + 4000, historyLength: 8, pathname: '/capsula/' }), { steps: 4, reason: 'ok' })
 })

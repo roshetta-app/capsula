@@ -73,6 +73,14 @@ export function loadedAsSignInReturn(search) {
   } catch { return false }
 }
 
+// The same page can be written with or without a closing slash (the Home tab is '/capsula', and the
+// site's host sends the person back to '/capsula/'). They are the same page, so compare them without it.
+export function samePage(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false
+  const clean = (p) => (p.length > 1 ? p.replace(/\/+$/, '') : p) || '/'
+  return clean(a) === clean(b)
+}
+
 // Decide whether to jump back and by how many steps. Called when the real sign-in has finished.
 // Returns { steps, reason }: steps is a positive number to jump back by, or 0 to do nothing.
 export function planRewind({ marker, now, historyLength, pathname }) {
@@ -82,7 +90,7 @@ export function planRewind({ marker, now, historyLength, pathname }) {
   if (age < 0 || age > MAX_AGE_MS) return { steps: 0, reason: 'stale' }
   if (!isCount(historyLength)) return { steps: 0, reason: 'bad-length' }
   // The person moved on to another page while sign-in was finishing: leave them where they are.
-  if (pathname !== marker.path) return { steps: 0, reason: 'moved-on' }
+  if (!samePage(pathname, marker.path)) return { steps: 0, reason: 'moved-on' }
   // A full list stops counting, so the number of added steps cannot be known.
   if (historyLength >= HISTORY_CAP) return { steps: 0, reason: 'list-full' }
   const steps = historyLength - marker.len
