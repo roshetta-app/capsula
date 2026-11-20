@@ -297,6 +297,7 @@
 import { Search, Target, ArrowDown01, ArrowUpDown, ChevronDown } from 'lucide-react'
 import { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import { useOpenDrug } from '../hooks/useOpenDrug'
 import { useWindowVirtualizer, observeWindowOffset } from '@tanstack/react-virtual'
 import SharedDrugCard from '../components/SharedDrugCard'
 import RowStarButton from '../components/ui/RowStarButton'
@@ -524,10 +525,9 @@ export default function DrugsScreen() {
     .map(d => drugs.find(x => x.id === d.id))
     .filter(Boolean)
 
-  function handleDrugTap(drug) {
-    addRecentDrug({ id: drug.id, name: drug.genericName, slug: drug.slug || drug.id })
-    navigate(ROUTES.DRUG_DETAIL(drug.slug || drug.id))
-  }
+  // Step 12.7a: one door for every drug open on this screen (search results, category lists, the
+  // class sheet, the recent sheet): one new step, a double tap opens once, recent list written once.
+  const handleDrugTap = useOpenDrug(addRecentDrug)
 
   function handleApplyFilters(filters) {
     // Check if anything is actually active

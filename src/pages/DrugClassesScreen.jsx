@@ -39,8 +39,8 @@ import { SearchSwitchingState, TooShortState, EmptyState, DidYouMeanState } from
 import { useDrugSearch } from '../hooks/useDrugSearch'
 import { useDrugContext } from '../context/DrugContext'
 import { useRecentlyViewed } from '../hooks/useRecentlyViewed'
+import { useOpenDrug } from '../hooks/useOpenDrug'
 import { titleCaseWords, buildClassIndex } from '../utils/classSearch'
-import { ROUTES } from '../router'
 import { useDeepLinkParent } from '../hooks/useDeepLinkParent'
 
 const CLASS_SORT_LABELS = { relevance: 'Relevance', az: 'A \u2013 Z' }
@@ -129,10 +129,8 @@ export default function DrugClassesScreen() {
     openClassSheet(className, subclassName)
   }
 
-  function handleDrugTap(drug) {
-    addRecentDrug({ id: drug.id, name: drug.genericName, slug: drug.slug || drug.id })
-    navigate(ROUTES.DRUG_DETAIL(drug.slug || drug.id))
-  }
+  // Step 12.7a: the same one door as the Drugs screen.
+  const handleDrugTap = useOpenDrug(addRecentDrug)
 
   const hasDrugs = drugs.length > 0
   const swapClass = useSoftSwap(loading && !hasDrugs)   // step 11.19: the cards fade in when the placeholders go
