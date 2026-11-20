@@ -74,7 +74,7 @@ function SkeletonCards() {
 export default function RoshettaEditorScreen() {
   const navigate = useNavigate()
   const { id } = useParams()
-  useDeepLinkParent(ROUTES.ROSHETTA(id))
+  useDeepLinkParent()
 
   const { drugs, loading: drugsLoading } = useDrugContext()
   const { roshettasApi } = useFavouritesContext()

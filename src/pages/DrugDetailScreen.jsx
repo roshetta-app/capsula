@@ -228,7 +228,7 @@ export default function DrugDetailScreen() {
   // link or notification tap landing directly here had nothing real
   // behind it in history, so back exited instead of going to the Drugs
   // list. No effect on a normal in-app visit.
-  useDeepLinkParent('/drugs')
+  useDeepLinkParent()
 
   const { drugs, loading, error, retry } = useDrugContext()
   const { isDrugFavourited, toggleDrug, pendingFavourite, promptSignIn, groupsStatus } = useFavouritesContext()

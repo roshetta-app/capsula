@@ -81,7 +81,7 @@ export default function RoshettaAddDrugScreen() {
   const navigate = useNavigate()
   const { id } = useParams()
   const { search } = useLocation()
-  useDeepLinkParent(ROUTES.ROSHETTA(id))
+  useDeepLinkParent()
 
   const { drugs, loading: drugsLoading } = useDrugContext()
   const { roshettasApi } = useFavouritesContext()

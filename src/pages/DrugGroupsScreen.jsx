@@ -22,7 +22,7 @@ export default function DrugGroupsScreen() {
   const { user } = useAuth()
   const { groups, groupsStatus } = useFavouritesContext()
   useListScrollMemory('list:groups', groupsStatus !== 'loading')
-  useDeepLinkParent(ROUTES.HOME)
+  useDeepLinkParent()
 
   if (!isDrugGroupsOn()) return <Navigate to={ROUTES.HOME} replace />
 

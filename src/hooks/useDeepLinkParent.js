@@ -1,46 +1,30 @@
 /**
- * useDeepLinkParent — "fake parent screen" helper for detail screens
- * reached via a notification tap or an external/shared link.
+ * useDeepLinkParent — puts the screens behind a page that was opened from outside
+ * (a link, a notification on the website, a reopened installed app, a refresh).
  *
- * Confirmed baseline this fixes: a shared link or notification tap can
- * land someone directly on a detail screen with no real screen behind it
- * in history — a plain navigate, no synthetic parent pushed first — so
- * back exits immediately instead of going somewhere sensible.
+ * Step 12.3 (Roshetta plan, Phase K): it takes no argument any more. The screens that belong
+ * behind a page (Home, then its parent) come from the navigation rulebook (utils/navRules.js),
+ * and when to add them comes from the arrival record (utils/arrivalRecord.js): only when this page
+ * is the place the app started on, nothing has been navigated since, and the history has no earlier
+ * step. A page opened from inside the app never gets anything added, so there is no second copy
+ * of its parent behind it.
  *
- * Usage — call once, near the top of a detail screen component, with the
- * path its list should return to on back:
+ * Usage — call once, near the top of a page that has a parent:
  *
- *   useDeepLinkParent('/conditions')
+ *   useDeepLinkParent()
  *
- * How it decides whether to act: a module-level flag tracks whether any
- * screen has already rendered in this app session. If this detail screen
- * is the very first thing to mount — exactly what happens when a shared
- * link is opened directly, or a notification tap lands here with nothing
- * else visited first — this pushes a synthetic history entry for
- * `parentPath`, then restores the current detail URL on top of it, so
- * back always has somewhere real to land. If some other screen already
- * rendered first this session (a normal in-app visit — e.g. tapping into
- * this item from its list), this does nothing at all: back already has
- * the right thing behind it.
- *
- * The replace-then-push happens inside one effect tick, so React batches
- * both location updates into a single render — the list screen this
- * briefly "visits" in history never actually paints.
+ * The replace and the pushes happen inside one effect tick, so React batches them into a single
+ * render — the screens laid behind the page never paint.
  */
 
 import { useEffect, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { createArrivalRecord, planArrival } from '../utils/arrivalRecord'
 
-let hasMountedAnyScreen = false
+// One record for the whole app session. useBackLabel's tracker feeds it every location.
+export const arrivalRecord = createArrivalRecord()
 
-// 2026-10-19 (Drug groups plan, step 8.2): the public shared-group page does not
-// want the Drugs home put behind it, but it still counts as a screen that was
-// shown first, so a drug opened from it keeps the group behind it for Back.
-export function markScreenMounted() {
-  hasMountedAnyScreen = true
-}
-
-export function useDeepLinkParent(parentPath) {
+export function useDeepLinkParent() {
   const navigate = useNavigate()
   const location = useLocation()
   const handledRef = useRef(false)
@@ -49,13 +33,17 @@ export function useDeepLinkParent(parentPath) {
     if (handledRef.current) return
     handledRef.current = true
 
-    if (!hasMountedAnyScreen) {
-      const detailPath = location.pathname + location.search
-      navigate(parentPath, { replace: true })
-      navigate(detailPath, { replace: false })
+    const steps = planArrival({
+      isArrival: arrivalRecord.isArrival(location.key),
+      historyState: window.history.state,
+      pathname: location.pathname,
+      search: location.search,
+      hash: location.hash,
+    })
+    for (const step of steps) {
+      if (step.replace !== undefined) navigate(step.replace, { replace: true })
+      else navigate(step.push, { state: location.state })
     }
-
-    hasMountedAnyScreen = true
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 }

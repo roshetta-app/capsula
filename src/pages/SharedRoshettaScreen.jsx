@@ -53,7 +53,6 @@ import { shimmer } from '../components/drugs/home/shimmer'
 import { useAuth } from '../hooks/useAuth'
 import { useIsPro } from '../hooks/useIsPro'
 import { useFavouritesContext } from '../context/FavouritesContext'
-import { markScreenMounted } from '../hooks/useDeepLinkParent'
 import useScrollToTopOnOpen from '../hooks/useScrollToTopOnOpen'
 import { fetchSharedRoshetta } from '../utils/sharedRoshetta'
 import { sheetRowsForDisplay } from '../utils/roshettaDrugLines'
@@ -123,9 +122,9 @@ export default function SharedRoshettaScreen() {
 
 function SharedRoshettaBody({ code }) {
   const navigate = useNavigate()
-  // A person opening a link just wants the roshetta, so no Topics screen is put behind it,
-  // but it counts as a screen that was shown first (a drug opened from here keeps it for Back).
-  useEffect(() => { markScreenMounted() }, [])
+  // A person opening a link just wants this page, so no screen is put behind it (navRules.js:
+  // laysBehind false). A drug opened from here keeps this page behind it, because the page is
+  // no longer the arrival once the person moves on.
 
   const location = useLocation()
   // The first screen of the session has nothing behind it, so no Back button.

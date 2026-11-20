@@ -71,7 +71,7 @@ export default function DrugClassesScreen() {
   const navigate = useNavigate()
   // Back (arrow and phone button) goes to the real previous screen; if this page
   // is opened straight from a link, the Drugs home is put behind it first.
-  useDeepLinkParent(ROUTES.DRUGS)
+  useDeepLinkParent()
   const { drugs, loading, error, retry, classSortMode, setClassSortMode, classKeywords } = useDrugContext()
   useListScrollMemory('list:classes', !loading || drugs.length > 0)
   const { addRecentlyViewed: addRecentDrug } = useRecentlyViewed('drug')

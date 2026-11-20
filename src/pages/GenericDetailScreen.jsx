@@ -85,7 +85,7 @@ export default function GenericDetailScreen() {
   const { slug } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
-  useDeepLinkParent('/drugs')
+  useDeepLinkParent()
 
   const { drugs, loading, error, retry } = useDrugContext()
 

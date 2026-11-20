@@ -65,7 +65,7 @@ export default function ConditionDetailScreen() {
   // used to exit the app immediately instead of going to the Conditions
   // list. Does nothing on a normal in-app visit (tapping in from the
   // list) — only acts the first time anything renders this session.
-  useDeepLinkParent('/conditions')
+  useDeepLinkParent()
   const navigationType = useNavigationType() // 'POP' | 'PUSH' | 'REPLACE'
   const { conditions, loading, error, refresh, addRecentlyViewed } = useConditionContext()
   const { isConditionFavourited, toggleCondition } = useFavouritesContext()

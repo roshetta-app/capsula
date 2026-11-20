@@ -9,6 +9,7 @@
 import { useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 import { labelForPath } from '../utils/homePaths'
+import { arrivalRecord } from './useDeepLinkParent'
 
 const pathsByStep = new Map()
 
@@ -23,6 +24,9 @@ export function BackLabelTracker() {
   const location = useLocation()
   useEffect(() => {
     pathsByStep.set(currentStep(), location.pathname)
+    // Step 12.3: the arrival record learns every place the router shows. This sits above the
+    // routes, so its effect runs before any screen's own effect.
+    arrivalRecord.note(location.key)
   }, [location])
   return null
 }

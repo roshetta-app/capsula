@@ -79,27 +79,20 @@ test('stacks of the screens that matter', () => {
   assert.equal(parentPath('/nowhere'), null)
 })
 
-// The 12 screens that guess their own parent today (useDeepLinkParent). The rulebook must give the
-// same parent for each. Step 12.3 removes those 12 calls, and this check goes with them.
-test('parents equal what the 12 screens guess today', () => {
-  const known = {
-    'ROUTES.HOME': '/',
-    'ROUTES.DRUGS': '/drugs',
-    "'/drugs'": '/drugs',
-    "'/conditions'": '/conditions',
-    'ROUTES.ROSHETTA(id)': '/roshetta/:id',
-    'ROUTES.DRUGS_GROUP(groupId)': '/drugs/group/:groupId',
-  }
+// Step 12.3: the 12 screens that used to name their own parent (useDeepLinkParent) now call it
+// with nothing, and the parent comes from the table. Each of them must be a rule that lays
+// screens behind it, and nothing may use the old "first screen" flag any more.
+test('the 12 screens ask the rulebook for their parent, with no argument', () => {
   let found = 0
   for (const { path, file } of publicRoutes()) {
     if (!file) continue
-    const line = read(`../pages/${file}.jsx`).match(/^\s*useDeepLinkParent\((.+)\)\s*$/m)
-    if (!line) continue
+    const src = read(`../pages/${file}.jsx`)
+    assert.ok(!/markScreenMounted/.test(src), `${file}: old flag still used`)
+    const call = src.match(/^\s*useDeepLinkParent\((.*)\)\s*$/m)
+    if (!call) continue
     found++
-    const expr = line[1].trim()
-    assert.ok(expr in known, `${file}: unknown parent expression ${expr}`)
-    const rule = SCREENS.find((s) => s.pattern === path)
-    assert.equal(rule.parent, known[expr], `${path} (${file})`)
+    assert.equal(call[1].trim(), '', `${file}: still names its own parent`)
+    assert.equal(SCREENS.find((s) => s.pattern === path).laysBehind, true, path)
   }
   assert.equal(found, 12)
 })

@@ -77,7 +77,6 @@ import { folderWash } from '../components/drugs/groups/folderStyles'
 import { sortDrugsByTitle } from '../components/drugs/groups/groupDrugText'
 import { shimmer } from '../components/drugs/home/shimmer'
 import { useCategories } from '../hooks/useCategories'
-import { markScreenMounted } from '../hooks/useDeepLinkParent'
 import { useAuth } from '../hooks/useAuth'
 import useScrollToTopOnOpen from '../hooks/useScrollToTopOnOpen'
 import { useFavouritesContext } from '../context/FavouritesContext'
@@ -151,10 +150,9 @@ export default function SharedGroupScreen() {
 
 function SharedGroupBody({ code }) {
   const navigate = useNavigate()
-  // This page does not put the Drugs home behind itself (a person opening a
-  // link just wants the group), but it counts as a screen that was shown first,
-  // so a drug opened from here keeps this page behind it for Back.
-  useEffect(() => { markScreenMounted() }, [])
+  // A person opening a link just wants this page, so no screen is put behind it (navRules.js:
+  // laysBehind false). A drug opened from here keeps this page behind it, because the page is
+  // no longer the arrival once the person moves on.
 
   const location = useLocation()
   // The first screen of the session has nothing behind it, so no Back button.

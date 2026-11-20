@@ -121,7 +121,7 @@ export default function DrugGroupScreen() {
   const { groupId } = useParams()
   // Back goes to the real previous screen; opened straight from a link, the
   // Drugs home is put behind it first.
-  useDeepLinkParent(ROUTES.HOME)
+  useDeepLinkParent()
 
   const { drugs, loading: drugsLoading } = useDrugContext()
   const {

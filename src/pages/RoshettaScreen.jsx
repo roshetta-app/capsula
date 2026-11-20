@@ -75,7 +75,7 @@ export default function RoshettaScreen() {
   const navigate = useNavigate()
   const { id } = useParams()
   // Back goes to the real previous screen; opened straight from a link, the Home screen is put behind it first.
-  useDeepLinkParent(ROUTES.HOME)
+  useDeepLinkParent()
   const backLabel = useBackLabel() || 'Home'
 
   const { roshettasApi } = useFavouritesContext()

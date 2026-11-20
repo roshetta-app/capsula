@@ -31,7 +31,7 @@ export default function DrugCategoriesScreen() {
   const navigate = useNavigate()
   // Back (arrow and phone button) goes to the real previous screen; if this page
   // is opened straight from a link, the Drugs home is put behind it first.
-  useDeepLinkParent(ROUTES.DRUGS)
+  useDeepLinkParent()
   const isDark = useIsDark()
   const { drugs, loading, error, retry } = useDrugContext()
   useListScrollMemory('list:categories', !loading || drugs.length > 0)

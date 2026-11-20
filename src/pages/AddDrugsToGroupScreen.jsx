@@ -95,7 +95,7 @@ function SkeletonRows() {
 export default function AddDrugsToGroupScreen() {
   const navigate = useNavigate()
   const { groupId } = useParams()
-  useDeepLinkParent(ROUTES.DRUGS_GROUP(groupId))
+  useDeepLinkParent()
 
   const { drugs, loading: drugsLoading } = useDrugContext()
   const {
