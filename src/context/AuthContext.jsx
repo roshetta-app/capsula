@@ -122,10 +122,57 @@ import { Browser } from '@capacitor/browser'
 import { App } from '@capacitor/app'
 import { supabase } from '../lib/supabase'
 import { isStandalonePwa } from '../utils/standalonePwa'
+import {
+  MARKER_KEY, REWOUND_KEY, WAIT_FOR_SIGN_IN_MS,
+  makeMarker, parseMarker, loadedAsSignInReturn, planRewind, shouldReloadOnRestore,
+} from '../utils/signInReturn'
 import { useToast } from './ToastContext'
 import { writeCachedAuthSnapshot, clearCachedAuthSnapshot, getCachedAuthSnapshot } from '../utils/authSnapshot'
 import { setCurrentUserId } from '../analytics/deviceSession'
 import { prefetchAllNotes, useNotesPrefetchResume } from '../hooks/useNotesPrefetch'
+
+// Sign-in return (step 12.15, 2026-11-20) — web only. When the app leaves its own window for Google
+// (the installed app, or a browser that blocked the sign-in popup), Google's pages pile up in the
+// history between the page the person started on and the page Google sends them back to, so one
+// Back after signing in showed Google again. Just before leaving, the app writes down how many
+// history steps there are and which page it is on; when the person is back and the sign-in has
+// really finished, it jumps back over exactly the steps added since. The rules live in
+// signInReturn.js; this is only the browser glue. Every piece is wrapped so a blocked or full
+// storage means "do nothing" (the old behaviour), never an error.
+// Read once, now, before the sign-in library cleans the one-time code out of the address.
+const LOADED_AS_SIGN_IN_RETURN =
+  typeof window !== 'undefined' && loadedAsSignInReturn(window.location.search)
+
+// The note is kept in both the tab's own storage and the shared site storage: some browsers start a
+// fresh tab storage when a page comes back from Google (Google's pages ask for that separation), so
+// the shared copy is the backup. The step count and page check below keep a stray copy harmless.
+function readNote(key) {
+  try {
+    const v = window.sessionStorage.getItem(key)
+    if (v !== null) return v
+  } catch { /* storage blocked: try the other one */ }
+  try { return window.localStorage.getItem(key) } catch { return null }
+}
+function writeNote(key, value) {
+  try { window.sessionStorage.setItem(key, value) } catch { /* storage blocked: do nothing */ }
+  try { window.localStorage.setItem(key, value) } catch { /* storage blocked: do nothing */ }
+}
+function removeNote(key) {
+  try { window.sessionStorage.removeItem(key) } catch { /* storage blocked: do nothing */ }
+  try { window.localStorage.removeItem(key) } catch { /* storage blocked: do nothing */ }
+}
+
+// Called right before the page leaves for Google. Always clears an older note first, so a note
+// from an earlier trip can never be used for this one.
+function rememberSignInDeparture() {
+  removeNote(MARKER_KEY)
+  const marker = makeMarker({
+    historyLength: window.history.length,
+    pathname: window.location.pathname,
+    now: Date.now(),
+  })
+  if (marker) writeNote(MARKER_KEY, JSON.stringify(marker))
+}
 
 // Stage 3 (F6) — the custom scheme/host the native app registers in
 // AndroidManifest.xml to catch Google's redirect back from the system
@@ -645,6 +692,83 @@ export function AuthProvider({ children }) {
     })
   }, [toast])
 
+  // Sign-in return (step 12.15) — web only, main window only. Two small jobs, both doing nothing
+  // unless the trip was noted down by rememberSignInDeparture() above:
+  //  1. This page just loaded as the place Google sent the person back to (the address carried a
+  //     code at load). Wait for the sign-in to really finish, then jump back over Google's pages
+  //     to the page they started from. The note is cleared first, so it can never loop.
+  //  2. If the browser later restores the start page from its memory instead of loading it again
+  //     (it can after the jump), load it again so it shows the signed-in screen.
+  // Any doubt (no note, old note, moved to another page, odd step count) leaves the person on the
+  // page they returned to, which is how the app behaved before this step.
+  useEffect(() => {
+    if (Capacitor.isNativePlatform()) return
+    if (window.opener && window.opener !== window) return
+
+    function onPageShow(event) {
+      const raw = readNote(REWOUND_KEY)
+      removeNote(REWOUND_KEY)
+      const rewoundAt = raw === null ? null : Number(raw)
+      if (shouldReloadOnRestore({ persisted: event.persisted, rewoundAt, now: Date.now() })) {
+        window.location.reload()
+      }
+    }
+    window.addEventListener('pageshow', onPageShow)
+
+    let stopWaiting = () => {}
+    if (!LOADED_AS_SIGN_IN_RETURN) {
+      // A normal load: any note left over from an earlier trip is finished with.
+      removeNote(MARKER_KEY)
+    } else {
+      const marker = parseMarker(readNote(MARKER_KEY))
+      if (!marker) {
+        removeNote(MARKER_KEY)
+      } else {
+        let finished = false
+        let giveUpTimer = null
+        let settleTimer = null
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+          // INITIAL_SESSION covers a sign-in that finished before this effect subscribed.
+          if (finished || !session?.user) return
+          if (event !== 'SIGNED_IN' && event !== 'INITIAL_SESSION') return
+          finished = true
+          subscription.unsubscribe()
+          clearTimeout(giveUpTimer)
+          // A short pause lets the app finish laying out its own screens on arrival; the step
+          // count is read after it, so those steps are included.
+          settleTimer = setTimeout(() => {
+            const plan = planRewind({
+              marker,
+              now: Date.now(),
+              historyLength: window.history.length,
+              pathname: window.location.pathname,
+            })
+            removeNote(MARKER_KEY)
+            if (plan.steps < 1) return
+            writeNote(REWOUND_KEY, String(Date.now()))
+            window.history.go(-plan.steps)
+          }, 500)
+        })
+        giveUpTimer = setTimeout(() => {
+          if (finished) return
+          finished = true
+          subscription.unsubscribe()
+          removeNote(MARKER_KEY)
+        }, WAIT_FOR_SIGN_IN_MS)
+        stopWaiting = () => {
+          subscription.unsubscribe()
+          clearTimeout(giveUpTimer)
+          clearTimeout(settleTimer)
+        }
+      }
+    }
+
+    return () => {
+      window.removeEventListener('pageshow', onPageShow)
+      stopWaiting()
+    }
+  }, [])
+
   // signin-back-gesture fix (2026-09-06) — web only. This is the other
   // half of the popup approach used by signInWithGoogle() below. Google
   // sign-in on the web now opens in a small popup running this exact same
@@ -734,18 +858,26 @@ export function AuthProvider({ children }) {
 
     // Installed app (PWA), 2026-11-20: no popup. A popup from an installed app opens as a browser tab
     // with its own address bar and that bar stayed on screen after sign-in. Here the app itself goes
-    // to Google and comes back to the same page. location.replace keeps the app's own page out of
-    // the history behind Google's, so Back after signing in does not step into Google.
+    // to Google and comes back to the same page.
+    // Step 12.15 (2026-11-20): this used location.replace, which only removes the app's own page, so
+    // Google's pages stayed in the history and one Back after signing in showed Google again. It now
+    // keeps the app's page in the history (location.assign) and writes down the step count first;
+    // the sign-in return effect above jumps back to that page once sign-in has finished. If that
+    // jump is not possible, the person simply stays on the page they returned to.
     if (isStandalonePwa()) {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: { redirectTo: window.location.href, skipBrowserRedirect: true },
       })
       if (error) return { error }
-      window.location.replace(data.url)
+      rememberSignInDeparture()
+      window.location.assign(data.url)
       return { error: null }
     }
 
+    // The popup route never leaves this page, so there is nothing to jump back over: make sure no
+    // note from an earlier trip (step 12.15) is left behind for it.
+    removeNote(MARKER_KEY)
     const popup = window.open('', 'capsula-google-signin', 'width=480,height=640')
 
     const { data, error } = await supabase.auth.signInWithOAuth({
@@ -764,8 +896,9 @@ export function AuthProvider({ children }) {
     if (!popup || popup.closed) {
       // Popup blocked or already dismissed — fall back to the old
       // full-page redirect so sign-in still works rather than silently
-      // failing. The back-gesture improvement just doesn't apply on
-      // whichever browser blocked it.
+      // failing. Step 12.15: the step count is written down first so the
+      // sign-in return effect can jump back over Google's pages afterwards.
+      rememberSignInDeparture()
       window.location.href = data.url
       return { error: null }
     }
