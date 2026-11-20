@@ -64,6 +64,10 @@
  *     the same place focus() lands anyway), but it would have silently
  *     broken every real deep link the moment the app was already open in a
  *     tab. Now calls client.navigate(target) first, then focuses.
+ *   - Step 12.4 (2026-11-20): that navigate() reloaded the window and lost
+ *     unsaved work, so the open app is now sent an OPEN_URL message and opens
+ *     the page itself; navigate() stays only as the fallback when the app
+ *     does not answer in time. See the note at the notificationclick handler.
  *
  * Fix (offline-app-shell, 2026-09-01):
  *   - Previously index.html was never cached at all (URLS_TO_PRECACHE was
@@ -270,11 +274,36 @@ self.addEventListener('notificationclick', event => {
   // existing window to `target` first, then focuses it. New-window opens
   // (self.clients.openWindow) already always went to the right target, so
   // that branch is unchanged.
+  //
+  // Step 12.4 (Roshetta plan, Phase K): client.navigate() reloads the whole window, which threw
+  // away unsaved work, closed no sheet and asked no question. Now the open app is sent an OPEN_URL
+  // message and opens the page itself (src/hooks/useOpenFromOutside.js): it closes any open sheet,
+  // asks Leave or Stay about unsaved work and opens the page on top of the current screen. The app
+  // answers the message at once; if no answer comes within OPEN_URL_ANSWER_MS (an older copy of the
+  // app that does not know the message, or a window that is frozen), the old reload is used so the
+  // tap is never lost. A closed app still gets a new window on the target, as before.
+  const OPEN_URL_ANSWER_MS = 1500
   const focusOrOpen = self.clients.matchAll({ type: 'window', includeUncontrolled: true })
     .then(clients => {
       const existing = clients.find(c => c.url.includes('/capsula/'))
-      if (existing) return existing.navigate(target).then(client => client.focus())
-      return self.clients.openWindow(target)
+      if (!existing) return self.clients.openWindow(target)
+      return new Promise(resolve => {
+        const timer = setTimeout(() => resolve(false), OPEN_URL_ANSWER_MS)
+        try {
+          const channel = new MessageChannel()
+          channel.port1.onmessage = () => {
+            clearTimeout(timer)
+            resolve(true)
+          }
+          existing.postMessage({ type: 'OPEN_URL', url: rawTarget }, [channel.port2])
+        } catch {
+          clearTimeout(timer)
+          resolve(false)
+        }
+      }).then(appTookIt => {
+        if (appTookIt) return existing.focus()
+        return existing.navigate(target).then(client => client.focus())
+      })
     })
 
   event.waitUntil(Promise.all([reportClick, focusOrOpen]))

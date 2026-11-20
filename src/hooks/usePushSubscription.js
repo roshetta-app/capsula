@@ -239,13 +239,13 @@
  * chance to fire.
  */
 
-import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect, useRef } from 'react'
 import { initializeApp, getApps } from 'firebase/app'
 import { Capacitor } from '@capacitor/core'
 import { FirebaseMessaging } from '@capacitor-firebase/messaging'
 import { supabase } from '../lib/supabase'
 import { useOnlineStatus } from './useOnlineStatus'
+import { useOpenFromOutside } from './useOpenFromOutside'
 import { usePushBanner } from '../context/PushBannerContext'
 import { getDeviceId } from '../analytics/deviceSession'
 
@@ -300,7 +300,13 @@ function withTimeout(promise, ms, label) {
 }
 
 export function usePushSubscription() {
-  const navigate = useNavigate()
+  // 2026-11-20 (step 12.4): every notification tap goes through one function that closes open
+  // sheets, asks about unsaved work and opens the page on top of the current screen (or lays the
+  // full stack when the app has only just started). It replaces the plain navigate() that used to
+  // sit here. The same hook also takes the website tap from the service worker.
+  const openFromOutside = useOpenFromOutside()
+  const openFromOutsideRef = useRef(openFromOutside)
+  useEffect(() => { openFromOutsideRef.current = openFromOutside }, [openFromOutside])
   // Bug fix, 2026-09-01 (alarms-redirect-fix) — this hook is only ever
   // mounted via PushSubscriptionProvider, which App.jsx now renders inside
   // <PushBannerProvider>, so usePushBanner() is always safe to call here.
@@ -459,7 +465,7 @@ export function usePushSubscription() {
     // doesn't exist here.
     function navigateToDeepLink(url) {
       if (!url) return
-      navigate(url === '/capsula/' ? '/' : url)
+      openFromOutsideRef.current(url)
     }
 
     const handles = []

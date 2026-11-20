@@ -1,6 +1,12 @@
 /**
  * useBackClose — shared popup/sheet back-close mechanism.
  *
+ * 2026-11-20 (step 12.4, notifications and links while the app is open): closeOpenSheets() is new.
+ * A tapped notification closes every open sheet before the page behind it changes. On the website
+ * and the installed app it presses Back once per open layer or sheet, so each one closes through
+ * its own Back handling and leaves no extra history step; on the phone app it runs each sheet's
+ * own close. Nothing else in this file changes.
+ *
  * 2026-10-15 (Drugs search coming back from an opened drug): when the screen is drawn again
  * standing on the placeholder step it added earlier, and nothing else is open, the hook reuses
  * that step instead of pushing a second one (see the note in the website effect below). Every
@@ -120,6 +126,52 @@ export function isAnyBackCloseOpen() {
   return openBackCloseCount > 0
 }
 
+// --- Closing every open sheet from outside (step 12.4) ------------------------
+// A notification tap (or any link handed to the app while it runs) must close an open sheet before
+// the page behind it changes, the same way a real Back press would. Every open sheet is listed
+// here with its close function.
+const openSheetCloses = new Set()
+
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+const CLOSE_ALL_MAX_BACKS = 5   // sheets plus layers inside them; a safety stop, never expected to be reached
+const BACK_ANSWER_MS = 400      // how long to wait for the browser to report a Back step
+const UNMOUNT_SETTLE_MS = 100   // lets the closed sheet leave the screen before the next look
+
+// Resolves true when the browser reported one Back step, false after BACK_ANSWER_MS.
+function backOnce() {
+  return new Promise((resolve) => {
+    let done = false
+    function finish(result) {
+      if (done) return
+      done = true
+      window.removeEventListener('popstate', onPop)
+      resolve(result)
+    }
+    function onPop() { finish(true) }
+    window.addEventListener('popstate', onPop)
+    window.history.back()
+    setTimeout(() => finish(false), BACK_ANSWER_MS)
+  })
+}
+
+// Closes every open sheet and resolves when they are gone. With nothing open it returns at once.
+// Phone app: each sheet's own close runs. Website and installed app: it presses Back once for
+// each layer or sheet, so each one closes through its own Back handling and no extra history step
+// is left behind (calling the close function alone would leave the sheet's placeholder step in
+// the history, and Back would then land twice on the same screen).
+export async function closeOpenSheets() {
+  if (openBackCloseCount === 0) return
+  if (Capacitor.isNativePlatform()) {
+    for (const entry of [...openSheetCloses]) entry.onCloseRef.current()
+    await wait(UNMOUNT_SETTLE_MS)
+    return
+  }
+  for (let i = 0; i < CLOSE_ALL_MAX_BACKS && openBackCloseCount > 0; i++) {
+    await backOnce()
+    await wait(UNMOUNT_SETTLE_MS)
+  }
+}
+
 // --- Back layers (see 2026-10-03 note above) --------------------------------
 const backLayers = []          // open layers, newest last
 let layerPressHandled = false  // one Back press is handled by one layer only
@@ -211,9 +263,12 @@ export function useBackClose(isOpen, onClose) {
       onCloseRef.current()
     })
     openBackCloseCount++
+    const sheetEntry = { onCloseRef }
+    openSheetCloses.add(sheetEntry)
 
     return () => {
       openBackCloseCount--
+      openSheetCloses.delete(sheetEntry)
       stateListenerPromise.then((handle) => handle.remove())
       backListenerPromise.then((handle) => handle.remove())
     }
@@ -235,6 +290,8 @@ export function useBackClose(isOpen, onClose) {
       window.history.pushState({ ...(window.history.state || {}), capsulaBackClose: true }, '')
     }
     openBackCloseCount++
+    const sheetEntry = { onCloseRef }
+    openSheetCloses.add(sheetEntry)
 
     function handlePopState(event) {
       // The landing back on the placeholder after a layer took a Back press
@@ -273,6 +330,7 @@ export function useBackClose(isOpen, onClose) {
     return () => {
       window.removeEventListener('popstate', handlePopState)
       openBackCloseCount--
+      openSheetCloses.delete(sheetEntry)
       if (!poppedViaBrowserBackRef.current) {
         // Bug fix (2026-09-06, revised): closing via anything other than
         // a real back press (backdrop tap, X button, confirming an
