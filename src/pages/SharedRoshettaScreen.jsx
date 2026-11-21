@@ -328,7 +328,7 @@ function SharedRoshettaBody({ code }) {
             border: '1px solid var(--color-border)',
             borderRadius: 'var(--radius-lg)',
           }}>
-            <PrescriptionSheetBlock sheet={{ rows: sheetRowsForDisplay(roshetta.rows) }} hasContentAfter={false} keepDoseLineBreaks />
+            <PrescriptionSheetBlock sheet={{ rows: sheetRowsForDisplay(roshetta.rows) }} hasContentAfter={false} keepDoseLineBreaks separateDrugCards />
           </div>
         )}
       </>

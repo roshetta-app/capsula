@@ -388,7 +388,7 @@ export default function RoshettaScreen() {
               onAction={isReadOnly ? undefined : () => openPage(ROUTES.ROSHETTA_EDIT(id))}
             />
           ) : (
-            <PrescriptionSheetBlock sheet={{ rows: sheetRowsForDisplay(rows) }} hasContentAfter={false} keepDoseLineBreaks />
+            <PrescriptionSheetBlock sheet={{ rows: sheetRowsForDisplay(rows) }} hasContentAfter={false} keepDoseLineBreaks separateDrugCards />
           )}
 
         </div>

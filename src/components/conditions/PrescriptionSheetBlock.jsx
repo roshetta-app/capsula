@@ -124,8 +124,12 @@ const NAME_LINE_HEIGHT = 1.3
  *                     is a text box). Defaults to false, so condition pages
  *                     (where a single line break has always run together)
  *                     look exactly as before.
+ *   separateDrugCards   boolean — 2026-11-21 (Roshetta page). When true, every loose
+ *                     drug row sits in its own box with a gap between boxes, instead of
+ *                     one shared card with lines between rows. Defaults to false, so
+ *                     condition pages look exactly as before.
  */
-export default function PrescriptionSheetBlock({ sheet, hasContentAfter = true, keepDoseLineBreaks = false }) {
+export default function PrescriptionSheetBlock({ sheet, hasContentAfter = true, keepDoseLineBreaks = false, separateDrugCards = false }) {
   const { openPage: guardedOpen } = useTapGuard()
   // In the CMS phone preview, tapping a drug must not leave the editor.
   const inPreview = useContext(PreviewModeContext)
@@ -339,11 +343,21 @@ export default function PrescriptionSheetBlock({ sheet, hasContentAfter = true, 
             group.push(items[i])
             i += 1
           }
-          const nodes = group.map((row, gi) => renderRowItem(row, start + gi, group[gi + 1]))
-          entries.push({
-            kind: 'drugcard',
-            node: <DrugCard key={`drugcard-${segIdx}-${start}`}>{nodes}</DrugCard>,
-          })
+          if (separateDrugCards) {
+            // One box per drug row; no line below the row (the boxes are the separation).
+            group.forEach((row, gi) => {
+              entries.push({
+                kind: 'drugcard',
+                node: <DrugCard key={`drugcard-${segIdx}-${start + gi}`}>{renderRowItem(row, start + gi, undefined)}</DrugCard>,
+              })
+            })
+          } else {
+            const nodes = group.map((row, gi) => renderRowItem(row, start + gi, group[gi + 1]))
+            entries.push({
+              kind: 'drugcard',
+              node: <DrugCard key={`drugcard-${segIdx}-${start}`}>{nodes}</DrugCard>,
+            })
+          }
         } else {
           const node = renderRowItem(items[i], i, items[i + 1])
           if (node) entries.push({ kind: ROW_KIND[items[i].row_type] ?? 'other', node })
