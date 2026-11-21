@@ -7,7 +7,7 @@
 //   - the specialty, small, in the header content (a tiny tinted tile with its icon and the name
 //     in its colour; "Roshetta" in the app's blue when there is none). The wash fades to white towards the bottom;
 //   - the name, 22, the full width, as many lines as it needs;
-//   - the description, as an indented note with a thin line at its start (no fill, so the Rx behind it stays visible) (added and edited HERE, in
+//   - the description, as plain text with no box or line (added and edited HERE, in
 //     place, never in a sheet): a dashed "Add description" box when there is none; the text, two
 //     lines then "more", with a pencil at its end when there is one (tapping the text only opens
 //     or closes it; only the pencil edits); while editing a box that grows as you type, a clear
@@ -140,7 +140,7 @@ export default function RoshettaPadHeader({
   const dateText = (Icon, title, value) => (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
       <Icon size={12} strokeWidth={2} aria-hidden="true" style={{ flexShrink: 0 }} />
-      <span>{title}{' '}<span style={{ fontWeight: 500, color: 'var(--color-text-secondary)' }}>{value}</span></span>
+      <span>{title}{' '}<span style={{ fontWeight: 400, color: 'var(--color-text-secondary)' }}>{value}</span></span>
     </span>
   )
 
@@ -148,8 +148,9 @@ export default function RoshettaPadHeader({
     <div
       style={{
         position: 'relative',
-        // One flat, light tint of the specialty colour. No gradient and no edge line: the soft rounded bottom is the only shape.
-        backgroundColor: `color-mix(in srgb, ${look.bg} ${isDark ? 45 : 55}%, var(--color-surface))`,
+        // Calm on purpose: a plain white surface with a rounded bottom. Colour lives only in the
+        // specialty label and the faint Rx.
+        backgroundColor: 'var(--color-surface)',
         borderRadius: '0 0 22px 22px',
         margin: '0 calc(-1 * var(--page-gutter, 16px))',
         padding: '4px calc(var(--page-gutter, 16px) + 2px) 12px',
@@ -158,9 +159,9 @@ export default function RoshettaPadHeader({
       <div aria-hidden="true" style={{ position: 'absolute', inset: 0, overflow: 'hidden', borderRadius: 'inherit', pointerEvents: 'none' }}>
         <span
           style={{
-            position: 'absolute', insetInlineEnd: -6, bottom: -14, userSelect: 'none',
-            fontSize: 76, fontWeight: 700, fontStyle: 'italic', lineHeight: 1,
-            color: isDark ? 'var(--color-text-primary)' : look.fg, opacity: isDark ? 0.045 : 0.12,
+            position: 'absolute', insetInlineEnd: 18, bottom: 34, userSelect: 'none',
+            fontSize: 60, fontWeight: 700, fontStyle: 'italic', lineHeight: 1,
+            color: isDark ? 'var(--color-text-primary)' : look.fg, opacity: isDark ? 0.05 : 0.08,
             fontFamily: 'Georgia, \'Times New Roman\', serif',
           }}
         >
@@ -177,16 +178,16 @@ export default function RoshettaPadHeader({
         <div
           aria-hidden="true"
           style={{
-            width: 18, height: 18, borderRadius: 5, flexShrink: 0,
-            backgroundColor: look.bg, color: look.fg,
+            width: 14, height: 14, flexShrink: 0,
+            color: look.fg,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}
         >
           {specialty
-            ? <SpecialtyIcon iconType={specialty.iconType ?? 'lucide'} iconValue={specialty.iconValue ?? 'Stethoscope'} size={11} color={look.fg} />
-            : <FileText size={11} strokeWidth={2} />}
+            ? <SpecialtyIcon iconType={specialty.iconType ?? 'lucide'} iconValue={specialty.iconValue ?? 'Stethoscope'} size={14} color={look.fg} />
+            : <FileText size={14} strokeWidth={2} />}
         </div>
-        <span dir="auto" style={{ minWidth: 0, fontSize: 12, fontWeight: 500, lineHeight: 1.3, color: look.fg, fontFamily: font, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <span dir="auto" style={{ minWidth: 0, fontSize: 12, fontWeight: 600, lineHeight: 1.3, color: look.fg, fontFamily: font, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {label}
         </span>
       </div>
@@ -287,7 +288,7 @@ export default function RoshettaPadHeader({
           </div>
         </div>
       ) : text ? (
-        <div style={{ position: 'relative', marginTop: 8, display: 'flex', alignItems: 'flex-start', gap: 4, borderInlineStart: '3px solid var(--color-border)', borderRadius: 2, padding: '2px 4px 2px 12px' }}>
+        <div style={{ position: 'relative', marginTop: 8, display: 'flex', alignItems: 'flex-start', gap: 4, padding: 0 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <p
               ref={textRef}
