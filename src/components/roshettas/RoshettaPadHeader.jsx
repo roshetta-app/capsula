@@ -13,10 +13,11 @@
 //     button, and one slim row with the count, Cancel and Save (Save is grey until the text
 //     changes; a refusal shows in words and the text stays; Back closes the editing first and,
 //     if the text changed, asks before discarding);
-//   - one foot line: "Created 12 Nov" and, when it is a different day, "Edited Today" on the
-//     start side; on the end side the one status line the Home roshetta section uses (Waiting to
-//     save, Saving, Offline, changes not saved with See, All saved). The line is always one line
-//     high, so nothing moves when a message appears.
+//   - the dates: "Created 12 Nov" and, when it is a different day, "Edited Today", each with a small
+//     icon, on one line;
+//   - under them, on its own row, the one status line the Home roshetta section uses (Waiting to
+//     save, Saving, Offline, changes not saved with See, All saved). The row is always one line
+//     high, so nothing moves when a message appears and the message is never cut by the dates.
 //
 // Props:
 //   name, description, specialty (the picker shape, or null), createdAt, updatedAt (ISO text)
@@ -342,16 +343,15 @@ export default function RoshettaPadHeader({
         </button>
       ) : null}
 
-      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 12, marginTop: 10, minHeight: LINE_H }}>
-        {(created || showEdited) && (
-          <div style={{ display: 'flex', flexShrink: 0, gap: 12, fontSize: 12, lineHeight: 1.3, color: 'var(--color-text-tertiary)', fontFamily: font }}>
-            {created && dateText(CalendarDays, 'Created', created)}
-            {showEdited && dateText(Clock, 'Edited', edited)}
-          </div>
-        )}
-        <div style={{ position: 'relative', flex: 1, minWidth: 0, height: LINE_H }}>
-          <HomeSyncLine inside end kind={syncKind} text={syncText} actionLabel={syncActionLabel} onAction={onSyncAction} />
+      {(created || showEdited) && (
+        <div style={{ position: 'relative', display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: 12, rowGap: 2, marginTop: 10, fontSize: 12, lineHeight: 1.3, color: 'var(--color-text-tertiary)', fontFamily: font }}>
+          {created && dateText(CalendarDays, 'Created', created)}
+          {showEdited && dateText(Clock, 'Edited', edited)}
         </div>
+      )}
+      {/* The status line has its own row, always one line high, so it is never cut and nothing moves when it appears. */}
+      <div style={{ position: 'relative', height: LINE_H, marginTop: 4 }}>
+        <HomeSyncLine inside kind={syncKind} text={syncText} actionLabel={syncActionLabel} onAction={onSyncAction} />
       </div>
       <ConfirmSheet
         isOpen={discardOpen}
