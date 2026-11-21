@@ -5,6 +5,14 @@
  * ("Doses written by the author. Not checked by Capsula."), then the sheet drawn by the
  * same viewer the topic pages use, with line breaks kept in doses.
  *
+ * 2026-11-21 (step 8.3b, your overhaul): the page is built like a topic sheet. A white header with
+ * a rounded bottom (Back and the specialty, Share and the options menu), a hairline in the specialty
+ * colour, a faint Rx, the name, the description (added and edited in place there, never in a
+ * sheet) and the day; the content below has no card, with the topic sheet's margins; the safety
+ * label is a quiet footnote at the end of the sheet; one round "Edit roshetta" bar at the bottom;
+ * an empty roshetta shows "Start your roshetta" and "Add drugs". The letterhead below is the
+ * earlier look (still used by the shared page until step 8.5).
+ *
  * 2026-11-16 (step 10.7): the name and description sit in the letterhead (RoshettaPageHeader): a
  * header band with the roshetta's specialty (or "Roshetta" in the app's blue when there is none).
  *
@@ -36,7 +44,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import ConfirmSheet from '../components/ui/ConfirmSheet'
 import Icon from '../components/ui/Icon'
 import GroupStateMessage from '../components/drugs/groups/GroupStateMessage'
-import RoshettaPageHeader from '../components/roshettas/RoshettaPageHeader'
+import RoshettaPadHeader from '../components/roshettas/RoshettaPadHeader'
 import RoshettaDisclaimer from '../components/roshettas/RoshettaDisclaimer'
 import ShareRoshettaSheet from '../components/roshettas/ShareRoshettaSheet'
 import RoshettaDetailsSheet from '../components/roshettas/RoshettaDetailsSheet'
@@ -45,6 +53,7 @@ import { shimmer } from '../components/drugs/home/shimmer'
 import { useConditionContext } from '../context/ConditionContext'
 import { useFavouritesContext } from '../context/FavouritesContext'
 import { useAuth } from '../hooks/useAuth'
+import { useIsPro } from '../hooks/useIsPro'
 import { useTapGuard } from '../hooks/useTapGuard'
 import { useBackLabel } from '../hooks/useBackLabel'
 import { useDeepLinkParent } from '../hooks/useDeepLinkParent'
@@ -85,8 +94,9 @@ export default function RoshettaScreen() {
   const {
     roshettas = [], roshettasStatus = 'loading', isGuest = false, reloadRoshettas,
     waitingCount = 0, failedCount = 0, syncState = 'idle', retryFailedChanges, deleteRoshetta,
-    waitingRoshettaIds = [], getRoshettaShareCode,
+    waitingRoshettaIds = [], getRoshettaShareCode, saveRoshetta, isReadOnly = false,
   } = roshettasApi ?? {}
+  const isPro = useIsPro()
   const { loading: authLoading, signInWithGoogle } = useAuth()
   const { isOnline } = useOnlineStatus()
 
@@ -94,6 +104,8 @@ export default function RoshettaScreen() {
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(false)
+  // True while the description is being typed in the header: the bottom bar steps aside.
+  const [editingDescription, setEditingDescription] = useState(false)
   // The live share code (null = not shared or not known), so the delete question can say the link stops working.
   const [shareCode, setShareCode] = useState(null)
   // The roshetta as it was when Delete was confirmed: kept on screen while the delete runs.
@@ -243,6 +255,22 @@ export default function RoshettaScreen() {
     </div>
   ) : null
 
+  const shareButton = controls.menu ? (
+    <button
+      type="button"
+      onClick={() => setShareOpen(true)}
+      aria-label="Share roshetta"
+      style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        width: 44, height: 44, margin: '-8px 0', background: 'none', border: 'none', padding: 0,
+        cursor: 'pointer', color: 'var(--color-text-secondary)',
+        WebkitTapHighlightColor: 'transparent',
+      }}
+    >
+      <Icon name="Share2" size={20} />
+    </button>
+  ) : null
+
   const topRow = (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-3)' }}>
       {backButton}
@@ -257,9 +285,10 @@ export default function RoshettaScreen() {
     WebkitTapHighlightColor: 'transparent',
   }
 
-  // Edit opens the editor; Share opens the share sheet.
-  // Fixed just above the bottom tab bar (60 px plus the phone's bottom safe area).
-  const actionBar = controls.bar ? (
+  // Edit opens the editor (Share moved up into the header, 2026-11-21).
+  // Fixed just above the bottom tab bar (60 px plus the phone's bottom safe area); it steps aside
+  // while the description is being typed.
+  const actionBar = controls.bar && !editingDescription ? (
     <div
       style={{
         position: 'fixed', left: 0, right: 0, zIndex: 90,
@@ -268,22 +297,14 @@ export default function RoshettaScreen() {
         borderTop: '1px solid var(--color-border)',
       }}
     >
-      <div style={{ maxWidth: 680, margin: '0 auto', padding: '10px var(--page-gutter)', display: 'flex', gap: 10, boxSizing: 'border-box' }}>
+      <div style={{ maxWidth: 680, margin: '0 auto', padding: '10px var(--page-gutter)', boxSizing: 'border-box' }}>
         <button
           type="button"
           onClick={() => openPage(ROUTES.ROSHETTA_EDIT(id))}
-          style={{ ...barButton, backgroundColor: 'var(--color-accent-solid)', color: '#fff', border: 'none' }}
+          style={{ ...barButton, width: '100%', backgroundColor: 'var(--color-accent-solid)', color: '#fff', border: 'none' }}
         >
           <Icon name="Pencil" size={16} />
-          Edit
-        </button>
-        <button
-          type="button"
-          onClick={() => setShareOpen(true)}
-          style={{ ...barButton, backgroundColor: 'var(--color-surface)', color: 'var(--color-accent-text)', border: '1px solid var(--color-border)' }}
-        >
-          <Icon name="Share2" size={16} />
-          Share
+          Edit roshetta
         </button>
       </div>
     </div>
@@ -315,54 +336,68 @@ export default function RoshettaScreen() {
       />
     )
   } else {
-    const description = (roshetta.description ?? '').trim()
     content = (
       <>
-        {line && (
-          <div style={{ marginBottom: 'var(--space-3)' }}>
-            <GroupStateMessage
-              variant="banner"
-              tone={line.tone}
-              title={line.title}
-              actionLabel={failedCount > 0 ? 'Try again' : undefined}
-              onAction={failedCount > 0 ? retryFailedChanges : undefined}
-            />
-          </div>
-        )}
-        <RoshettaPageHeader name={roshetta.name} description={description} specialty={findSpecialty(roshetta.specialtyId, specialties)} />
+        <RoshettaPadHeader
+          name={roshetta.name}
+          description={roshetta.description ?? ''}
+          specialty={findSpecialty(roshetta.specialtyId, specialties)}
+          updatedAt={roshetta.updatedAt}
+          waiting={waitingRoshettaIds.includes(id)}
+          topLeft={backButton}
+          topRight={<>{shareButton}{moreMenu}</>}
+          editable={!isReadOnly && !!saveRoshetta}
+          onSaveDescription={text => saveRoshetta(roshetta.id, { description: text })}
+          onEditingChange={setEditingDescription}
+          isPro={isPro}
+        />
 
-        <RoshettaDisclaimer marginTop={14} />
+        {/* The sheet itself: no card, the topic sheet's side margins and spacing. */}
+        <div style={{ padding: 'var(--space-5) calc(var(--space-6) - var(--page-gutter, 16px)) 0' }}>
+          {line && (
+            <div style={{ marginBottom: 'var(--space-4)' }}>
+              <GroupStateMessage
+                variant="banner"
+                tone={line.tone}
+                title={line.title}
+                actionLabel={failedCount > 0 ? 'Try again' : undefined}
+                onAction={failedCount > 0 ? retryFailedChanges : undefined}
+              />
+            </div>
+          )}
 
-        {state === 'empty' ? (
-          <p
-            style={{
-              margin: '24px 0 0', textAlign: 'center', fontSize: 14, lineHeight: 1.5,
-              color: 'var(--color-text-secondary)', fontFamily: font,
-            }}
-          >
-            Nothing in this roshetta yet.
-          </p>
-        ) : (
-          <div
-            style={{
-              marginTop: 'var(--space-4)',
-              padding: 'var(--space-3) var(--space-4)',
-              backgroundColor: 'var(--color-surface)',
-              border: '1px solid var(--color-border)',
-              borderRadius: 'var(--radius-lg)',
-            }}
-          >
+          {state === 'empty' ? (
+            <div style={{ textAlign: 'center', padding: 'var(--space-8, 32px) 0 var(--space-4)' }}>
+              <Icon name="FileText" size={26} color="var(--color-accent-text)" />
+              <p style={{ margin: '8px 0 14px', fontSize: 16, fontWeight: 600, color: 'var(--color-text-primary)', fontFamily: font }}>
+                Start your roshetta
+              </p>
+              <button
+                type="button"
+                onClick={() => openPage(ROUTES.ROSHETTA_EDIT(id))}
+                style={{
+                  minHeight: 44, padding: '0 22px', borderRadius: 999, border: 'none', cursor: 'pointer',
+                  backgroundColor: 'var(--color-accent-solid)', color: '#fff',
+                  fontSize: 14, fontWeight: 600, fontFamily: font, WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                Add drugs
+              </button>
+            </div>
+          ) : (
             <PrescriptionSheetBlock sheet={{ rows: sheetRowsForDisplay(rows) }} hasContentAfter={false} keepDoseLineBreaks />
-          </div>
-        )}
+          )}
+
+          <RoshettaDisclaimer variant="footnote" marginTop={32} />
+        </div>
       </>
     )
   }
 
   // Side gap and max width come from Layout; this page adds top and bottom space only.
   return (
-    <div style={{ padding: `var(--space-3) 0 calc(var(--space-4) + ${controls.bar ? BAR_SPACE : 0}px)` }}>
-      {topRow}
+    <div style={{ padding: `${controls.menu ? 0 : 'var(--space-3)'} 0 calc(var(--space-4) + ${controls.bar ? BAR_SPACE : 0}px)` }}>
+      {controls.menu ? null : topRow}
       {content}
       {actionBar}
       <ShareRoshettaSheet

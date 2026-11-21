@@ -9,11 +9,29 @@
  *
  * Props:
  *   marginTop   optional number of pixels above the bar (the screen decides spacing)
+ *   variant     'bar' (default, the grey box) or 'footnote' (2026-11-21, step 8.3b): the same words as
+ *               a small quiet line at the end of the sheet, like the topic sheet's disclaimer. Still
+ *               on every view, no button, cannot be closed.
  */
 
 import { Info } from 'lucide-react'
 
-export default function RoshettaDisclaimer({ marginTop = 0 }) {
+export default function RoshettaDisclaimer({ marginTop = 0, variant = 'bar' }) {
+  if (variant === 'footnote') {
+    return (
+      <div
+        role="note"
+        style={{
+          marginTop, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+          fontSize: 12, lineHeight: 1.5, textAlign: 'center',
+          color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-body)',
+        }}
+      >
+        <Info size={13} aria-hidden="true" style={{ flexShrink: 0 }} />
+        <span>Doses written by the author. Not checked by Capsula.</span>
+      </div>
+    )
+  }
   return (
     <div
       role="note"
