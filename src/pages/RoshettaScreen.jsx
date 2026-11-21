@@ -59,7 +59,7 @@ import RoshettaPadHeader from '../components/roshettas/RoshettaPadHeader'
 import ShareRoshettaSheet from '../components/roshettas/ShareRoshettaSheet'
 import RoshettaDetailsSheet from '../components/roshettas/RoshettaDetailsSheet'
 import PrescriptionSheetBlock from '../components/conditions/PrescriptionSheetBlock'
-import { shimmer } from '../components/drugs/home/shimmer'
+import RoshettaPageSkeleton from '../components/roshettas/RoshettaPageSkeleton'
 import { useConditionContext } from '../context/ConditionContext'
 import { useFavouritesContext } from '../context/FavouritesContext'
 import { useAuth } from '../hooks/useAuth'
@@ -81,33 +81,6 @@ const font = 'var(--font-body)'
 const READ_ONLY_MESSAGE = 'Your roshettas are read only. Delete a roshetta or upgrade to edit.'
 // Room the floating Edit button needs under the content (46 + 12 above the tab bar + a gap), so the last line is never covered.
 const BAR_SPACE = 72
-
-// The loading placeholder is shaped like the real page (a header, then two drug boxes), so nothing jumps when it loads.
-function PageSkeleton() {
-  const box = {
-    background: 'var(--color-drug-card-bg)', borderRadius: 'var(--radius-lg)',
-    padding: 'var(--space-4)',
-  }
-  return (
-    <div aria-hidden="true">
-      <div style={{ background: 'var(--color-surface)', borderRadius: '0 0 22px 22px', padding: 'var(--space-4) var(--space-4) var(--space-5)' }}>
-        <div style={shimmer({ width: '62%', height: 24, marginBottom: 12 })} />
-        <div style={shimmer({ width: '88%', height: 13, marginBottom: 6 })} />
-        <div style={shimmer({ width: '45%', height: 13, marginBottom: 16 })} />
-        <div style={shimmer({ width: '34%', height: 11 })} />
-      </div>
-      <div style={{ padding: 'var(--space-5) calc(var(--space-6) - var(--page-gutter, 16px)) 0', display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {[0, 1].map(i => (
-          <div key={i} style={box}>
-            <div style={shimmer({ width: '58%', height: 16, marginBottom: 10 })} />
-            <div style={shimmer({ width: '40%', height: 12, marginBottom: 14 })} />
-            <div style={shimmer({ width: '78%', height: 13 })} />
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
 
 export default function RoshettaScreen() {
   useScrollToTopOnOpen()
@@ -342,7 +315,7 @@ export default function RoshettaScreen() {
 
   let content
   if (state === 'loading') {
-    content = <PageSkeleton />
+    content = <RoshettaPageSkeleton />
   } else if (state === 'guest') {
     content = (
       <GroupStateMessage

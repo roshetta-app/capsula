@@ -1,4 +1,6 @@
 // src/components/roshettas/RoshettaPadHeader.jsx
+// 2026-11-21 (step 8.5): the shared page uses this header too (no dates and no status line there, so the
+// foot row is not drawn at all when it has nothing to show).
 // 2026-11-21 (Roshetta plan, steps 8.3b to 8.3e): the header of the owner's roshetta page. A white block with a rounded bottom, like the topic sheet's header, and the Home roshetta card's faint
 // italic Rx in the bottom corner. Kept short on purpose (about 155 px with a one-line name).
 // Top to bottom:
@@ -347,6 +349,7 @@ export default function RoshettaPadHeader({
       {/* The last row: the dates. While a status message shows (waiting, saving, offline, not saved,
           all saved) it takes the dates' place on this same row, so there is no empty reserved line,
           nothing is cut and nothing moves; the dates come back when the message is gone. */}
+      {(created || showEdited || syncKind) && (
       <div style={{ position: 'relative', marginTop: 10, minHeight: LINE_H }}>
         <div
           style={{
@@ -360,6 +363,7 @@ export default function RoshettaPadHeader({
         </div>
         <HomeSyncLine inside kind={syncKind} text={syncText} actionLabel={syncActionLabel} onAction={onSyncAction} onActiveChange={setSyncActive} />
       </div>
+      )}
       <ConfirmSheet
         isOpen={discardOpen}
         onClose={() => setDiscardOpen(false)}

@@ -37,6 +37,14 @@
  * shows "Roshetta" in the app's blue. Save a copy gives the copy the same specialty. The
  * specialty is a public library item; the owner is still never shown.
  *
+ * 2026-11-21 (step 8.5): the page mirrors the owner's roshetta page (step 8.3): the same white header
+ * (RoshettaPadHeader) with the specialty icon, name and description, the same content area (no card,
+ * the topic sheet's margins, each drug in its own box), the same open-look states with a round icon,
+ * and the same loading shape. What differs, because it is someone else's roshetta: no Share, menu or
+ * Edit, no description editing, no dates or status line (the public link does not carry them), Back or
+ * the logo with Open Capsula in the header's top bar, the safety footnote kept at the end of the sheet
+ * (it is a stranger's dose text), and the fixed Save a copy bar.
+ *
  * 2026-11-14 (step 6.3): two analytics events, never a code, name or text: 'shared_roshetta_open'
  * once per link when the roshetta really shows (Try again or coming back online does not count
  * it twice) and 'shared_roshetta_save' when a copy is saved (the new roshetta's id).
@@ -44,12 +52,12 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
-import { FileX, WifiOff, CircleAlert, Check } from 'lucide-react'
+import { FileX, FileText, WifiOff, AlertTriangle, Check } from 'lucide-react'
 import RoshettaDisclaimer from '../components/roshettas/RoshettaDisclaimer'
-import RoshettaPageHeader from '../components/roshettas/RoshettaPageHeader'
+import RoshettaPadHeader from '../components/roshettas/RoshettaPadHeader'
+import RoshettaPageSkeleton from '../components/roshettas/RoshettaPageSkeleton'
 import PrescriptionSheetBlock from '../components/conditions/PrescriptionSheetBlock'
 import GroupStateMessage from '../components/drugs/groups/GroupStateMessage'
-import { shimmer } from '../components/drugs/home/shimmer'
 import { useAuth } from '../hooks/useAuth'
 import { useTapGuard } from '../hooks/useTapGuard'
 import { useIsPro } from '../hooks/useIsPro'
@@ -57,61 +65,18 @@ import { useFavouritesContext } from '../context/FavouritesContext'
 import useScrollToTopOnOpen from '../hooks/useScrollToTopOnOpen'
 import { fetchSharedRoshetta } from '../utils/sharedRoshetta'
 import { sheetRowsForDisplay } from '../utils/roshettaDrugLines'
+import { specialtyColors } from '../utils/roshettaSpecialty'
+import { useIsDark } from '../utils/specialtyIcon'
 import { sharedPageState, sharedProblemText } from '../utils/roshettaSharedPageState'
 import { copyFields, trimToDrugCap, savedCopyMessage, saveSignInId, isRoshettaSaveRequest, saveCopyAnswer, showSaveBar } from '../utils/roshettaSaveCopy'
 import { logUsageEvent } from '../analytics/usageEvents'
 import { ROUTES } from '../router'
 
-const PROBLEM_ICONS = { unavailable: FileX, offline: WifiOff, error: CircleAlert }
-
-function LinkProblem({ Icon, title, body, actionLabel, onAction }) {
-  return (
-    <div style={{
-      flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-      textAlign: 'center', padding: '0 var(--space-2) 12vh', fontFamily: 'var(--font-body)',
-    }}>
-      <img
-        src={`${import.meta.env.BASE_URL}logo.svg`}
-        alt="Capsula"
-        className="capsula-logo"
-        style={{ display: 'block', height: 24, width: 'auto', marginBottom: 'var(--space-6)' }}
-      />
-      <div style={{
-        width: 72, height: 72, borderRadius: '50%', marginBottom: 'var(--space-4)',
-        backgroundColor: 'var(--color-surface-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}>
-        <Icon size={32} color="var(--color-text-secondary)" strokeWidth={1.6} aria-hidden="true" />
-      </div>
-      <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, lineHeight: 1.3, color: 'var(--color-text-primary)' }}>
-        {title}
-      </h1>
-      <p style={{ margin: 'var(--space-2) 0 var(--space-5)', maxWidth: 320, fontSize: 15, lineHeight: 1.5, color: 'var(--color-text-secondary)' }}>
-        {body}
-      </p>
-      <button
-        onClick={onAction}
-        style={{
-          width: '100%', maxWidth: 320, minHeight: 48, border: 'none', padding: '0 16px',
-          borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-accent-solid)', color: '#fff',
-          fontSize: 15, fontWeight: 600, fontFamily: 'var(--font-body)', cursor: 'pointer',
-          WebkitTapHighlightColor: 'transparent', outline: 'none',
-        }}
-      >
-        {actionLabel}
-      </button>
-    </div>
-  )
-}
-
-function Placeholder() {
-  return (
-    <div aria-busy="true" aria-label="Loading">
-      <div style={shimmer({ width: '60%', height: 24, marginBottom: 10 })} />
-      <div style={shimmer({ width: '85%', height: 14, marginBottom: 18 })} />
-      <div style={shimmer({ width: '100%', height: 38, marginBottom: 18 })} />
-      <div style={shimmer({ width: '100%', height: 120 })} />
-    </div>
-  )
+// The three link problems use the open look of the owner's page: a big round icon, one title, one line, one button.
+const PROBLEM_LOOK = {
+  unavailable: { icon: FileX, accent: { bg: 'var(--color-surface-muted)', fg: 'var(--color-text-tertiary)' } },
+  offline: { icon: WifiOff, accent: { bg: 'var(--color-surface-muted)', fg: 'var(--color-text-tertiary)' } },
+  error: { icon: AlertTriangle, accent: { bg: 'var(--color-warning-light)', fg: 'var(--color-warning)' } },
 }
 
 export default function SharedRoshettaScreen() {
@@ -174,6 +139,7 @@ function SharedRoshettaBody({ code }) {
   const { promptSignIn, pendingFavourite, roshettasApi } = useFavouritesContext()
   const { roshettasStatus, createRoshetta, roshettaDrugCap, showRoshettaLimit, showRoshettaReadOnly } = roshettasApi
   const isPro = useIsPro()
+  const isDark = useIsDark()
   // { phase: 'idle' | 'saving' | 'saved', roshettaId?, saved?, total? }
   const [saveState, setSaveState] = useState({ phase: 'idle' })
   const savingRef = useRef(false)
@@ -245,6 +211,7 @@ function SharedRoshettaBody({ code }) {
 
   const backButton = (
     <button
+      type="button"
       onClick={() => navigate(-1)}
       aria-label="Back"
       style={{
@@ -262,78 +229,97 @@ function SharedRoshettaBody({ code }) {
     </button>
   )
 
-  const topBar = (
-    <div style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)',
-      minHeight: 44, marginBottom: 'var(--space-3)',
-    }}>
-      {canGoBack ? backButton : (
-        <img
-          src={`${import.meta.env.BASE_URL}logo.svg`}
-          alt="Capsula"
-          className="capsula-logo"
-          style={{ display: 'block', height: 22, width: 'auto' }}
-        />
-      )}
-      {!canGoBack && (
-        <button
-          onClick={() => navigate(ROUTES.HOME, { replace: true })}
-          style={{
-            flexShrink: 0, minHeight: 44, padding: '0 var(--space-1)', background: 'none', border: 'none',
-            cursor: 'pointer', fontSize: 14, fontWeight: 600, color: 'var(--color-accent-text)',
-            fontFamily: 'var(--font-body)', WebkitTapHighlightColor: 'transparent', outline: 'none',
-          }}
-        >
-          Open Capsula
-        </button>
-      )}
-    </div>
+  // The top bar: a person who came from inside the app gets Back; a first-time visitor gets the
+  // logo and an Open Capsula button on the end side.
+  const topLeft = canGoBack ? backButton : (
+    <img
+      src={`${import.meta.env.BASE_URL}logo.svg`}
+      alt="Capsula"
+      className="capsula-logo"
+      style={{ display: 'block', height: 22, width: 'auto' }}
+    />
+  )
+  const topRight = canGoBack ? null : (
+    <button
+      type="button"
+      onClick={() => navigate(ROUTES.HOME, { replace: true })}
+      style={{
+        flexShrink: 0, minHeight: 44, padding: '0 var(--space-1)', background: 'none', border: 'none',
+        cursor: 'pointer', fontSize: 14, fontWeight: 600, color: 'var(--color-accent-text)',
+        fontFamily: 'var(--font-body)', WebkitTapHighlightColor: 'transparent', outline: 'none',
+      }}
+    >
+      Open Capsula
+    </button>
   )
 
   let content
   if (state === 'loading') {
-    content = <Placeholder />
+    content = (
+      <RoshettaPageSkeleton
+        top={(
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, height: 36 }}>
+            {topLeft}
+            <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>{topRight}</div>
+          </div>
+        )}
+      />
+    )
   } else if (isProblem) {
     const t = sharedProblemText(state)
+    const look = PROBLEM_LOOK[state]
     content = (
-      <LinkProblem
-        Icon={PROBLEM_ICONS[state]}
-        title={t.title}
-        body={t.body}
-        actionLabel={t.actionLabel}
-        onAction={t.action === 'retry' ? retry : () => navigate(ROUTES.HOME, { replace: true })}
-      />
+      <>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, minHeight: 44, marginTop: 'var(--space-3)' }}>
+          {topLeft}
+          <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>{topRight}</div>
+        </div>
+        <GroupStateMessage
+          open
+          icon={look.icon}
+          accent={look.accent}
+          title={t.title}
+          body={t.body}
+          actionLabel={t.actionLabel}
+          onAction={t.action === 'retry' ? retry : () => navigate(ROUTES.HOME, { replace: true })}
+        />
+      </>
     )
   } else {
     const { roshetta } = result
-    const font = 'var(--font-body)'
+    const look = specialtyColors(roshetta.specialty, isDark)
     content = (
       <>
-        <RoshettaPageHeader name={roshetta.name} description={roshetta.description} specialty={roshetta.specialty} />
+        <RoshettaPadHeader
+          name={roshetta.name}
+          description={roshetta.description}
+          specialty={roshetta.specialty}
+          topLeft={topLeft}
+          topRight={topRight}
+        />
 
-        <RoshettaDisclaimer marginTop={14} />
-
-        {state === 'empty' ? (
-          <p style={{
-            margin: '24px 0 0', textAlign: 'center', fontSize: 14, lineHeight: 1.5,
-            color: 'var(--color-text-secondary)', fontFamily: font,
-          }}>
-            Nothing in this roshetta.
-          </p>
-        ) : (
-          <div style={{
-            marginTop: 'var(--space-4)',
-            padding: 'var(--space-3) var(--space-4)',
-            backgroundColor: 'var(--color-surface)',
-            border: '1px solid var(--color-border)',
-            borderRadius: 'var(--radius-lg)',
-          }}>
-            <PrescriptionSheetBlock sheet={{ rows: sheetRowsForDisplay(roshetta.rows) }} hasContentAfter={false} keepDoseLineBreaks separateDrugCards />
-          </div>
-        )}
+        {/* The sheet itself: no card, the topic sheet's side margins and spacing, as on the owner's page. */}
+        <div style={{ padding: 'var(--space-5) calc(var(--space-6) - var(--page-gutter, 16px)) 0' }}>
+          {state === 'empty' ? (
+            <GroupStateMessage
+              open
+              icon={FileText}
+              accent={{ bg: look.bg, fg: look.fg }}
+              title="Nothing here yet"
+              body="This roshetta has no drugs or notes in it."
+            />
+          ) : (
+            <>
+              <PrescriptionSheetBlock sheet={{ rows: sheetRowsForDisplay(roshetta.rows) }} hasContentAfter={false} keepDoseLineBreaks separateDrugCards />
+              <RoshettaDisclaimer variant="footnote" marginTop={24} />
+            </>
+          )}
+        </div>
       </>
     )
   }
+
+  const hasHeader = state === 'loading' || state === 'ready' || state === 'empty'
 
   return (
     <div style={{
@@ -342,19 +328,21 @@ function SharedRoshettaBody({ code }) {
       '--page-gutter': 'var(--space-4)',
       maxWidth: 680, margin: '0 auto',
       minHeight: '100dvh', display: 'flex', flexDirection: 'column',
-      padding: `calc(var(--space-3) + env(safe-area-inset-top, 0px)) var(--page-gutter) ${showSave ? '0' : 'calc(var(--space-4) + env(safe-area-inset-bottom, 0px))'}`,
+      padding: `0 var(--page-gutter) ${showSave ? '0' : 'calc(var(--space-4) + env(safe-area-inset-bottom, 0px))'}`,
     }}>
-      {isProblem ? (canGoBack && <div style={{ minHeight: 44, display: 'flex', alignItems: 'center' }}>{backButton}</div>) : topBar}
-      <div style={{
-        flex: '1 0 auto', paddingBottom: showSave ? 'var(--space-4)' : 0,
-        ...(isProblem ? { display: 'flex', flexDirection: 'column' } : null),
-      }}>{content}</div>
+      {/* The white header starts at the very top, so the phone's status bar area is painted the same white. */}
+      <div aria-hidden="true" style={{
+        height: 'env(safe-area-inset-top, 0px)', flexShrink: 0,
+        margin: '0 calc(-1 * var(--page-gutter))',
+        backgroundColor: hasHeader ? 'var(--color-surface)' : 'transparent',
+      }} />
+      <div style={{ flex: '1 0 auto', paddingBottom: showSave ? 'var(--space-4)' : 0 }}>{content}</div>
       {showSave && (
         <div style={{
           position: 'sticky', bottom: 0, zIndex: 5,
           margin: '0 calc(-1 * var(--page-gutter))',
           padding: 'var(--space-3) var(--page-gutter) calc(var(--space-3) + env(safe-area-inset-bottom, 0px))',
-          backgroundColor: 'var(--color-surface)', borderTop: '1px solid var(--color-border)',
+          backgroundColor: 'var(--color-surface)', boxShadow: '0 -6px 18px rgba(0,0,0,0.06)',
           fontFamily: 'var(--font-body)',
         }}>
           {saveState.phase === 'saved' ? (
@@ -370,7 +358,7 @@ function SharedRoshettaBody({ code }) {
                   onClick={() => openPage(ROUTES.ROSHETTA(saveState.roshettaId))}
                   style={{
                     flexShrink: 0, minHeight: 44, border: 'none', cursor: 'pointer', padding: '0 20px',
-                    borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-accent-solid)', color: '#fff',
+                    borderRadius: 999, backgroundColor: 'var(--color-accent-solid)', color: '#fff',
                     fontSize: 14, fontWeight: 600, fontFamily: 'var(--font-body)',
                     WebkitTapHighlightColor: 'transparent', outline: 'none',
                   }}
@@ -391,7 +379,7 @@ function SharedRoshettaBody({ code }) {
                 disabled={saveBusy}
                 style={{
                   display: 'block', width: '100%', minHeight: 48, border: 'none', padding: '0 16px',
-                  borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-accent-solid)', color: '#fff',
+                  borderRadius: 999, backgroundColor: 'var(--color-accent-solid)', color: '#fff',
                   fontSize: 15, fontWeight: 600, fontFamily: 'var(--font-body)',
                   cursor: saveBusy ? 'default' : 'pointer', opacity: saveBusy ? 0.6 : 1,
                   WebkitTapHighlightColor: 'transparent', outline: 'none',
