@@ -235,7 +235,9 @@ export default function BottomNav() {
       // Phase 4 (4.1) — replace instead of push, so switching tabs doesn't
       // stack a history entry per switch. What "back" does from here on is
       // fully owned by the back handler below, not by history depth.
-      navigate(path, { replace: true })
+      // 12.10: the mark tells the tab screen it was reached by a tab tap, so it comes back
+      // where the person left it (see hooks/useTabScrollMemory.js).
+      navigate(path, { replace: true, state: { tabReturn: true } })
     }
   }
 

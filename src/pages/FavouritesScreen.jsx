@@ -543,6 +543,7 @@ import { useCategories } from '../hooks/useCategories'
 import { useSortToggle } from '../hooks/useSortToggle'
 import { useSoftSwap } from '../hooks/useSoftSwap'
 import { useBackToTop } from '../hooks/useBackToTop'
+import useTabScrollMemory from '../hooks/useTabScrollMemory'
 import { useBackClose } from '../hooks/useBackClose'
 import { useAuth } from '../hooks/useAuth'
 import { useIsPro } from '../hooks/useIsPro'
@@ -791,6 +792,8 @@ export default function FavouritesScreen() {
   const { favourites, toggleDrug, toggleCondition, restoreConditionAt, restoreDrugAt, favClasses, toggleClass, restoreClassAt } = useFavouritesContext()
   const { conditions, specialties, loading: conditionsLoading } = useConditionContext()
   const { drugs, loading: drugsLoading } = useDrugContext()
+  // 12.10: a tap on the Favourites tab, or Back to it, brings the place back.
+  useTabScrollMemory('favourites', !conditionsLoading && !drugsLoading)
   const { user } = useAuth()
   const isPro = useIsPro()
 

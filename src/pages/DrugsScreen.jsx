@@ -327,6 +327,7 @@ import { normalizeSearchText } from '../utils/searchUtils'
 import { titleCaseWords } from '../utils/classSearch'
 import { useCategories } from '../hooks/useCategories'
 import { useBackToTop } from '../hooks/useBackToTop'
+import useTabScrollMemory from '../hooks/useTabScrollMemory'
 import { useRecentlyViewed } from '../hooks/useRecentlyViewed'
 import { useIsDark, SpecialtyIcon } from '../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN } from '../utils/specialtyTokens'
@@ -423,6 +424,9 @@ export default function DrugsScreen() {
   const { categories } = useCategories()
   const { toggleDrug, isDrugFavourited } = useFavouritesContext()
   const { visible: showBackToTop, scrollToTop: handleBackToTop } = useBackToTop()
+  // 12.10: a tap on the Drugs tab brings the place back. Back from a drug keeps using the
+  // list's own memory (drugListMemory), so Back is not restored here.
+  useTabScrollMemory('drugs', !loading, false)
   const isDark = useIsDark()
   const heroRef = useRef(null)
 

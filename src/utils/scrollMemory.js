@@ -37,3 +37,23 @@ export function startPosition(navType, saved) {
   if (!Number.isFinite(saved) || saved === 0) return 0
   return saved
 }
+
+/**
+ * 2026-11-21 (step 12.10): the key for a main tab's place, named like the list and row keys
+ * ('list:groups', 'row:home-groups'): 'tab:conditions', 'tab:drugs', 'tab:favourites'.
+ */
+export function tabScrollKey(name) {
+  return `tab:${name}`
+}
+
+/**
+ * Where a main tab screen starts. A tap on a tab (`fromTab`) brings back the place kept for that
+ * tab, or the top when nothing is kept. Back (`POP`) brings the kept place back only when
+ * `restoreOnBack` is on. Anything else returns null: the screen is left to do what it did before.
+ */
+export function startForTab(navType, fromTab, saved, restoreOnBack = true) {
+  const kept = Number.isFinite(saved) ? saved : 0
+  if (fromTab) return kept
+  if (navType === 'POP' && restoreOnBack && kept !== 0) return kept
+  return null
+}

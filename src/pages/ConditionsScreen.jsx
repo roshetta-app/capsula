@@ -175,6 +175,7 @@ import { useFavouritesContext } from '../context/FavouritesContext'
 import { useDarkMode }         from '../hooks/useDarkMode'
 import { useBackToTop }        from '../hooks/useBackToTop'
 import { useBackClose }        from '../hooks/useBackClose'
+import useTabScrollMemory       from '../hooks/useTabScrollMemory'
 import { alphabetGroup }                           from '../utils/alphabetGroup'
 import { SpecialtyIcon, useIsDark }                from '../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN, tintedBg }  from '../utils/specialtyTokens'
@@ -670,6 +671,8 @@ export default function ConditionsScreen() {
   const [notifSheetOpen, setNotifSheetOpen]       = useState(false)
   // The slim bar is shown and hidden by ScrollRevealHeader, watching heroRef (the tinted header block).
   const { visible: showBackToTop, scrollToTop: handleBackToTop } = useBackToTop()
+  // 12.10: a tap on the Topics tab, or Back to it, brings the place back.
+  useTabScrollMemory('conditions', !loading || conditions.length > 0)
   const heroRef        = useRef(null)
   const searchInputRef = useRef(null)
   const listHeaderRef  = useRef(null)

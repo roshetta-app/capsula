@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { rememberScroll, recalledScroll, clearScrollMemory, startPosition } from './scrollMemory.js';
+import { rememberScroll, recalledScroll, clearScrollMemory, startPosition, tabScrollKey, startForTab } from './scrollMemory.js';
 
 test('startPosition: Back brings the kept place back', () => {
   assert.equal(startPosition('POP', 640), 640);
@@ -46,4 +46,25 @@ test('clearScrollMemory: forgets everything', () => {
   rememberScroll('list:a', 90);
   clearScrollMemory();
   assert.equal(recalledScroll('list:a'), undefined);
+});
+
+test('tabScrollKey: named like the list and row keys', () => {
+  assert.equal(tabScrollKey('drugs'), 'tab:drugs');
+});
+
+test('startForTab: a tab tap brings the kept place back, or the top when nothing is kept', () => {
+  assert.equal(startForTab('REPLACE', true, 900), 900);
+  assert.equal(startForTab('REPLACE', true, undefined), 0);
+  assert.equal(startForTab('REPLACE', true, NaN), 0);
+});
+
+test('startForTab: Back brings the kept place back only when asked to', () => {
+  assert.equal(startForTab('POP', false, 500, true), 500);
+  assert.equal(startForTab('POP', false, 500, false), null);
+  assert.equal(startForTab('POP', false, undefined, true), null);
+});
+
+test('startForTab: any other open leaves the screen alone', () => {
+  assert.equal(startForTab('PUSH', false, 500), null);
+  assert.equal(startForTab('REPLACE', false, 500), null);
 });
