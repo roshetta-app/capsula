@@ -7,7 +7,7 @@
 //     (the prescription icon in the app's blue when there is none); the specialty's name is not
 //     shown, it is spoken to screen readers only;
 //   - the description, as plain text with no box or line (added and edited HERE, in
-//     place, never in a sheet): a dashed "Add description" box when there is none; the text, two
+//     place, never in a sheet): a small "+ Add description" text link when there is none; the text, two
 //     lines then "more", with a pencil at its end when there is one (tapping the text only opens
 //     or closes it; only the pencil edits); while editing a box that grows as you type, a clear
 //     button, and one slim row with the count, Cancel and Save (Save is grey until the text
@@ -331,10 +331,9 @@ export default function RoshettaPadHeader({
           type="button"
           onClick={startEdit}
           style={{
-            position: 'relative', display: 'flex', alignItems: 'center', gap: 6, width: '100%', minHeight: 40, marginTop: 8,
-            padding: '0 12px', boxSizing: 'border-box', background: 'none', cursor: 'pointer',
-            border: '1.5px dashed var(--color-border)', borderRadius: 12,
-            color: 'var(--color-accent-text)', fontSize: 14, fontWeight: 500, fontFamily: font,
+            position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 4, minHeight: 32, marginTop: 2,
+            padding: 0, background: 'none', cursor: 'pointer', border: 'none',
+            color: 'var(--color-accent-text)', fontSize: 13, fontWeight: 500, fontFamily: font,
             WebkitTapHighlightColor: 'transparent',
           }}
         >
