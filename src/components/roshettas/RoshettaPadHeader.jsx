@@ -1,11 +1,11 @@
 // src/components/roshettas/RoshettaPadHeader.jsx
 // 2026-11-21 (Roshetta plan, steps 8.3b to 8.3e): the header of the owner's roshetta page. A white
 // block with a rounded bottom, like the topic sheet's header, and the Home roshetta card's faint
-// italic Rx in the bottom corner. Kept short on purpose (about 140 px with a one-line name).
+// italic Rx in the bottom corner. Kept short on purpose (about 155 px with a one-line name).
 // Top to bottom:
-//   - the top bar: Back (an arrow only), the specialty (a small tinted tile with its icon and the
-//     name in its colour; "Roshetta" in the app's blue when there is none), and on the end side
-//     Share and the options menu. The block itself stays white;
+//   - the top bar: Back on the start side, Share and the options menu on the end side;
+//   - the specialty, small, in the header content (a tiny tinted tile with its icon and the name
+//     in its colour; "Roshetta" in the app's blue when there is none). The block stays white;
 //   - the name, 22, the full width, as many lines as it needs;
 //   - the description (added and edited HERE, in place, never in a sheet): "Add description" when
 //     there is none, the text with a small pencil icon at its end side when there is one, and a
@@ -17,7 +17,7 @@
 //
 // Props:
 //   name, description, specialty (the picker shape, or null), createdAt, updatedAt (ISO text)
-//   topLeft / topRight  nodes: the Back arrow, and the Share button with the options menu
+//   topLeft / topRight  nodes: the Back button, and the Share button with the options menu
 //   editable            the owner may change the description (false when read only)
 //   onSaveDescription   (text) => Promise<{ ok, reason? }>
 //   onEditingChange     (boolean) => void   the page hides its bottom bar while typing
@@ -115,31 +115,32 @@ export default function RoshettaPadHeader({
       </div>
 
       <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, height: 36, marginInlineEnd: -10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-          {topLeft}
-          <div
-            aria-hidden="true"
-            style={{
-              width: 22, height: 22, borderRadius: 6, flexShrink: 0,
-              backgroundColor: look.bg, color: look.fg,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}
-          >
-            {specialty
-              ? <SpecialtyIcon iconType={specialty.iconType ?? 'lucide'} iconValue={specialty.iconValue ?? 'Stethoscope'} size={13} color={look.fg} />
-              : <FileText size={13} strokeWidth={2} />}
-          </div>
-          <span dir="auto" style={{ minWidth: 0, fontSize: 13, fontWeight: 500, lineHeight: 1.3, color: look.fg, fontFamily: font, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {label}
-          </span>
-        </div>
+        {topLeft}
         <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>{topRight}</div>
+      </div>
+
+      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 6, marginTop: 2, minWidth: 0 }}>
+        <div
+          aria-hidden="true"
+          style={{
+            width: 18, height: 18, borderRadius: 5, flexShrink: 0,
+            backgroundColor: look.bg, color: look.fg,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          {specialty
+            ? <SpecialtyIcon iconType={specialty.iconType ?? 'lucide'} iconValue={specialty.iconValue ?? 'Stethoscope'} size={11} color={look.fg} />
+            : <FileText size={11} strokeWidth={2} />}
+        </div>
+        <span dir="auto" style={{ minWidth: 0, fontSize: 12, fontWeight: 500, lineHeight: 1.3, color: look.fg, fontFamily: font, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {label}
+        </span>
       </div>
 
       <h1
         dir="auto"
         style={{
-          position: 'relative', margin: '4px 0 0', textAlign: 'start', overflowWrap: 'anywhere',
+          position: 'relative', margin: '6px 0 0', textAlign: 'start', overflowWrap: 'anywhere',
           fontSize: 22, fontWeight: 600, lineHeight: 1.2, letterSpacing: '-0.4px',
           color: 'var(--color-text-primary)', fontFamily: font,
         }}

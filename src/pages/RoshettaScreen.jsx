@@ -13,8 +13,8 @@
  * an empty roshetta shows "Start your roshetta" and "Add drugs". The letterhead below is the
  * earlier look (still used by the shared page until step 8.5).
  *
- * 2026-11-21 (step 8.3e): the header was made short (about 140 px): Back is an arrow beside the
- * specialty, and the dates and the status line share one foot line.
+ * 2026-11-21 (step 8.3e): the header was made short (about 155 px): a small specialty row under the
+ * top bar, and the dates and the status line sharing one foot line.
  *
  * 2026-11-21 (step 8.3d): the header was redrawn on white (specialty tile and name above the title,
  * Created and Edited as small labelled days) and the one status line is the Home My roshettas line
@@ -210,26 +210,6 @@ export default function RoshettaScreen() {
     </button>
   )
 
-  // The header's Back is an arrow only (the specialty takes the room beside it); it still says
-  // where it goes to screen readers.
-  const backArrow = (
-    <button
-      type="button"
-      onClick={() => navigate(-1)}
-      aria-label={`Back to ${backLabel}`}
-      style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-        width: 40, height: 40, margin: '-2px 0 -2px -10px', background: 'none', border: 'none', padding: 0,
-        cursor: 'pointer', color: 'var(--color-accent-text)',
-        WebkitTapHighlightColor: 'transparent',
-      }}
-    >
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <polyline points="15 18 9 12 15 6" />
-      </svg>
-    </button>
-  )
-
   const moreMenu = controls.menu ? (
     <div ref={menuRef} style={{ position: 'relative', flexShrink: 0 }}>
       <button
@@ -383,7 +363,7 @@ export default function RoshettaScreen() {
           specialty={findSpecialty(roshetta.specialtyId, specialties)}
           createdAt={roshetta.createdAt}
           updatedAt={roshetta.updatedAt}
-          topLeft={backArrow}
+          topLeft={backButton}
           topRight={<>{shareButton}{moreMenu}</>}
           editable={!isReadOnly && !!saveRoshetta}
           onSaveDescription={text => saveRoshetta(roshetta.id, { description: text })}
