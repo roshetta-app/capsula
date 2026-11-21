@@ -194,6 +194,7 @@ import {
 import { useAuth } from '../hooks/useAuth'
 import { useFavouritesContext } from '../context/FavouritesContext'
 import NameSwitch from '../components/drugs/groups/NameSwitch'
+import { accountSwitchText } from '../utils/shareCredit'
 import { isDrugGroupsOn } from '../constants/features'
 import { signOutGroupNote } from '../utils/groupSignOutNote'
 import { useDarkMode } from '../hooks/useDarkMode'
@@ -385,10 +386,12 @@ function ThemeRow({ theme, onChange, last }) {
   )
 }
 
-// 2026-11-03 (optional owner name): the account-wide "Show my name on shared groups" switch. Off
-// (anonymous) is the default. Each shared group can still be changed in its own share sheet; this
-// only decides groups that have no choice of their own. Only for a signed-in person, only while
-// groups are on, and it leaves itself out until the profile has been read.
+// 2026-11-03 (optional owner name): the account-wide "Show my name" switch. Off (anonymous) is the
+// default. Each shared group can still be changed in its own share sheet; this only decides links
+// that have no choice of their own. 2026-11-21 (Phase L, step 13.3): it now reads "Show my name on
+// shared links" (words from shareCredit.js) because it covers shared roshettas too (step 13.5).
+// Only for a signed-in person, only while groups are on, and it leaves itself out until the
+// profile has been read.
 function ShareNameRow() {
   const { getShareNameInfo, setAccountShareName } = useFavouritesContext()
   const { toast } = useToast()
@@ -405,6 +408,7 @@ function ShareNameRow() {
   const hasName = !!info.fullName
   const on = hasName && info.on
   const Icon = on ? User : UserX
+  const words = accountSwitchText({ hasName, on })
 
   async function handleChange(next) {
     setInfo(i => ({ ...i, on: next }))
@@ -427,17 +431,13 @@ function ShareNameRow() {
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-text-primary)' }}>
-          Show my name on shared groups
+          {words.title}
         </div>
         <div style={{ marginTop: 2, fontSize: 12, lineHeight: 1.4, color: 'var(--color-text-secondary)' }}>
-          {!hasName
-            ? 'Add your name in Edit Profile first.'
-            : on
-              ? 'On. You can change it for each group when you share it.'
-              : 'Off. Your groups are shared anonymously.'}
+          {words.line}
         </div>
       </div>
-      <NameSwitch checked={on} onChange={handleChange} disabled={!hasName} label="Show my name on shared groups" />
+      <NameSwitch checked={on} onChange={handleChange} disabled={!hasName} label={words.title} />
     </div>
   )
 }

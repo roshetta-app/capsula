@@ -1,0 +1,91 @@
+/**
+ * src/utils/shareCredit.js
+ * 2026-11-21 (Roshetta plan, Phase L, step 13.2): the plain rules and words for the "Created by"
+ * line, the "Show my name" switch, the owner opening their own link, and "Already saved". Kept in
+ * a plain file so they are checked without a screen (shareCredit.check.js). Used by the share
+ * sheets, the Account screen and both shared pages.
+ *
+ *   dayText(iso, now)              "12 Nov", or "12 Nov 2025" for an earlier year; '' if unreadable
+ *   creditText({ ownerName, createdAt, now })
+ *                                  "Created by Dr Sara \u00b7 12 Nov", or "Created 12 Nov" when anonymous
+ *   groupCreditLine({ ownerName, createdAt, count, now })
+ *                                  the same plus the drug count: "Created 12 Nov \u00b7 12 drugs"
+ *   nameSwitchText({ fullName, on })
+ *                                  the share sheet row: { title, line, prefix, name }
+ *   accountSwitchText({ hasName, on })
+ *                                  the Account row: { title, line }
+ *   readOwner(raw)                 { isOwner, ownId } from what the database function returned
+ *   findSavedCopy(items, code)     the saved copy that came from this link, or null
+ *   sharedBarState({ kind, isOwner, ownId, savedId })
+ *                                  what the bottom bar of a shared page shows:
+ *                                  { mode: 'owner' | 'saved' | 'save', text, button, targetId }
+ */
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const DOT = ' \u00b7 ';
+
+export function dayText(iso, now = new Date()) {
+  if (iso === null || iso === undefined || iso === '') return '';
+  const then = new Date(iso);
+  if (Number.isNaN(then.getTime())) return '';
+  const base = `${then.getDate()} ${MONTHS[then.getMonth()]}`;
+  return then.getFullYear() === now.getFullYear() ? base : `${base} ${then.getFullYear()}`;
+}
+
+function cleanName(value) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+export function creditText({ ownerName, createdAt, now } = {}) {
+  const name = cleanName(ownerName);
+  const day = dayText(createdAt, now);
+  if (name && day) return `Created by ${name}${DOT}${day}`;
+  if (name) return `Created by ${name}`;
+  if (day) return `Created ${day}`;
+  return '';
+}
+
+export function groupCreditLine({ ownerName, createdAt, count, now } = {}) {
+  const credit = creditText({ ownerName, createdAt, now });
+  const n = Number.isFinite(count) && count >= 0 ? Math.floor(count) : null;
+  const drugs = n === null ? '' : `${n} ${n === 1 ? 'drug' : 'drugs'}`;
+  return [credit, drugs].filter(Boolean).join(DOT);
+}
+
+export function nameSwitchText({ fullName, on } = {}) {
+  const name = cleanName(fullName);
+  const title = 'Show my name';
+  if (!name) return { title, line: 'Add your name in Account', prefix: '', name: '' };
+  if (on) return { title, line: `Created by ${name}`, prefix: 'Created by ', name };
+  return { title, line: 'Anonymous', prefix: '', name: '' };
+}
+
+export function accountSwitchText({ hasName, on } = {}) {
+  const title = 'Show my name on shared links';
+  if (!hasName) return { title, line: 'Add your name in Edit Profile first.' };
+  return { title, line: on ? 'On by default' : 'Off by default' };
+}
+
+// The database says is_owner and own_id only to the owner. Anything else, or a half answer
+// (a flag with no id), counts as a visitor so a visitor never sees the owner bar.
+export function readOwner(raw) {
+  const isOwner = !!raw && raw.is_owner === true && typeof raw.own_id === 'string' && raw.own_id !== '';
+  return { isOwner, ownId: isOwner ? raw.own_id : null };
+}
+
+export function findSavedCopy(items, code) {
+  if (typeof code !== 'string' || code === '' || !Array.isArray(items)) return null;
+  return items.find(item => item && item.sourceCode === code) ?? null;
+}
+
+export function sharedBarState({ kind, isOwner, ownId, savedId } = {}) {
+  const one = kind === 'group' ? 'group' : 'roshetta';
+  const many = kind === 'group' ? 'groups' : 'roshettas';
+  if (isOwner && ownId) {
+    return { mode: 'owner', text: `This is your ${one}`, button: 'Open', targetId: ownId };
+  }
+  if (savedId) {
+    return { mode: 'saved', text: `Already in your ${many}`, button: 'View', targetId: savedId };
+  }
+  return { mode: 'save', text: '', button: '', targetId: null };
+}

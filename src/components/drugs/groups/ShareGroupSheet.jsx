@@ -30,6 +30,10 @@
  * message if it could not be saved). With no name in the profile the switch is off and disabled,
  * with "Add your name in Account first.". The first value comes from the Account setting.
  *
+ * 2026-11-21 (Phase L, step 13.3): the row is now the shared ShareNameRow component with the
+ * refined words ("Created by <name>" when on, "Anonymous" when off, "Add your name in Account").
+ * The shared page reads "Created by" now, not "Shared by".
+ *
  * Props:
  *   isOpen         boolean
  *   onClose        () => void
@@ -38,11 +42,11 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
-import { X, Eye, PencilOff, User, UserX, Check, Copy, Share2 } from 'lucide-react'
+import { X, Eye, PencilOff, Check, Copy, Share2 } from 'lucide-react'
 import SheetShell from '../../ui/SheetShell'
 import ConfirmSheet from '../../ui/ConfirmSheet'
 import GroupStateMessage from './GroupStateMessage'
-import NameSwitch from './NameSwitch'
+import ShareNameRow from './ShareNameRow'
 import { shimmer } from '../home/shimmer'
 import { useFavouritesContext } from '../../../context/FavouritesContext'
 import { useToast } from '../../../context/ToastContext'
@@ -91,32 +95,6 @@ function PrivacyLines() {
         </li>
       ))}
     </ul>
-  )
-}
-
-// "Show my name": one row with the switch. The line under it always says what the viewer will see.
-function NameRow({ fullName, checked, onChange }) {
-  const hasName = !!fullName
-  const on = hasName && checked
-  const Icon = on ? User : UserX
-  return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 10, padding: '4px 4px 4px 12px',
-      marginBottom: 'var(--space-4)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-surface-muted)',
-    }}>
-      <Icon size={18} color="var(--color-text-secondary)" strokeWidth={1.8} aria-hidden="true" style={{ flexShrink: 0 }} />
-      <div style={{ flex: 1, minWidth: 0, padding: '8px 0', fontFamily: 'var(--font-body)' }}>
-        <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text-primary)' }}>Show my name</div>
-        <div style={{ marginTop: 2, fontSize: 13, lineHeight: 1.4, color: 'var(--color-text-secondary)', overflowWrap: 'anywhere' }}>
-          {!hasName
-            ? 'Add your name in Account first.'
-            : on
-              ? <>Shown as <span dir="auto" style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{fullName}</span></>
-              : 'Anonymous. Nobody sees who shared it.'}
-        </div>
-      </div>
-      <NameSwitch checked={on} onChange={onChange} disabled={!hasName} label="Show my name on this shared group" />
-    </div>
   )
 }
 
@@ -253,7 +231,7 @@ export default function ShareGroupSheet({ isOpen, onClose, group, onShareChange 
     body = (
       <>
         <PrivacyLines />
-        {nameInfo && <NameRow fullName={nameInfo.fullName} checked={showName} onChange={handleNameToggle} />}
+        {nameInfo && <ShareNameRow fullName={nameInfo.fullName} checked={showName} onChange={handleNameToggle} label="Show my name on this shared group" />}
         <button onClick={handleCreate} disabled={busy} style={{ ...PRIMARY_BUTTON, opacity: busy ? 0.7 : 1 }}>
           {busy ? 'Creating\u2026' : 'Create link'}
         </button>
@@ -264,7 +242,7 @@ export default function ShareGroupSheet({ isOpen, onClose, group, onShareChange 
     body = (
       <>
         <PrivacyLines />
-        {nameInfo && <NameRow fullName={nameInfo.fullName} checked={showName} onChange={handleNameToggle} />}
+        {nameInfo && <ShareNameRow fullName={nameInfo.fullName} checked={showName} onChange={handleNameToggle} label="Show my name on this shared group" />}
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 'var(--space-2)' }}>
           <span style={{
