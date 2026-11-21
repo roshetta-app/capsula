@@ -86,7 +86,7 @@ const GRID_STYLE = { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 
 // Step 8.2a: on the home the groups sit in one sideways row of cards.
 const ROW_STYLE = {
   display: 'flex', gap: 10, overflowX: 'auto', scrollSnapType: 'x proximity',
-  scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch', paddingBottom: 2,
+  scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch', overscrollBehaviorX: 'contain', paddingBottom: 2,
 }
 const LIST_STYLE = { display: 'flex', flexDirection: 'column', gap: 8 }
 

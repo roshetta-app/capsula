@@ -47,7 +47,7 @@ const HIDE_BAR_CSS = '.home-groups-row::-webkit-scrollbar { display: none; }'
 // The row reaches both screen edges (the page keeps a 16 px gutter) so the next card can peek in.
 const ROW_STYLE = {
   display: 'flex', gap: 10, overflowX: 'auto', scrollSnapType: 'x proximity',
-  scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch',
+  scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch', overscrollBehaviorX: 'contain',
   marginInline: 'calc(var(--page-gutter) * -1)', paddingInline: 'var(--page-gutter)',
   scrollPaddingInline: 'var(--page-gutter)',
 }

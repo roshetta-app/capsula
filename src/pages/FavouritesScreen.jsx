@@ -552,6 +552,7 @@ import FavouriteClassesSheet from '../components/drugs/classes/FavouriteClassesS
 import FavouriteClassesCard from '../components/drugs/classes/FavouriteClassesCard'
 import ClassSheet from '../components/drugs/classes/ClassSheet'
 import { titleCaseWords } from '../utils/classSearch'
+import { startsAtScreenEdge } from '../utils/edgeSwipe'
 import { FAVOURITES_CAP_DRUGS, FAVOURITES_CAP_CONDITIONS, FAVOURITES_CAP_CLASSES } from '../constants/features'
 
 // Row remove/restore animation durations — must match the @keyframes
@@ -1204,6 +1205,13 @@ export default function FavouritesScreen() {
   const tabAxisLocked  = useRef(null) // 'x' | 'y' | null, decided once per gesture
 
   function handleTabTouchStart(e) {
+    // 12.12: a touch on the screen's edge strip is the system's Back swipe, not a tab swipe.
+    if (startsAtScreenEdge(e.touches[0].clientX, window.innerWidth)) {
+      tabTouchStartX.current = null
+      tabTouchStartY.current = null
+      tabAxisLocked.current  = null
+      return
+    }
     tabTouchStartX.current = e.touches[0].clientX
     tabTouchStartY.current = e.touches[0].clientY
     tabAxisLocked.current  = null

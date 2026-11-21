@@ -2,8 +2,15 @@
   "name": "Capsula",
   "short_name": "Capsula",
   "description": "Drug reference for Egyptian GPs",
+  "id": "/capsula/",
   "start_url": "/capsula/",
   "scope": "/capsula/",
+  "launch_handler": {
+    "client_mode": [
+      "navigate-existing",
+      "auto"
+    ]
+  },
   "display": "standalone",
   "background_color": "#FAFAF9",
   "theme_color": "#FAFAF9",
