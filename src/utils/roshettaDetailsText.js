@@ -12,7 +12,7 @@
  *                              the words when the hook refuses a create or a save
  *   specialtyRowText(specialty)
  *                              the words in the Specialty row: the name, or 'None'
- *   detailsFields({ name, description, specialtyId, start })
+ *   detailsFields({ name, specialtyId, start })
  *                              what the sheet sends to the hook; the specialty is
  *                              sent only when it was changed here (2026-11-16, 10.5)
  */
@@ -77,10 +77,11 @@ function cleanId(value) {
 // specialty is sent ONLY when the person changed it in this sheet (null = cleared), so saving
 // a new name never touches a specialty that was left alone (for example one the phone could
 // not find in its list yet). `start` is what the sheet opened with.
-export function detailsFields({ name, description, specialtyId, start } = {}) {
+// The description is not part of this sheet any more (2026-11-21): it is left out, so a save
+// keeps the roshetta's current description and a create starts with none.
+export function detailsFields({ name, specialtyId, start } = {}) {
   const fields = {
     name: typeof name === 'string' ? name.trim() : '',
-    description: typeof description === 'string' ? description.trim() : '',
   };
   const now = cleanId(specialtyId);
   if (now !== cleanId(start && start.specialtyId)) fields.specialtyId = now;

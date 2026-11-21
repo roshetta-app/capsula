@@ -60,28 +60,28 @@ test('specialty row words: the name, or None when there is no usable specialty',
 });
 
 test('a specialty left alone is not sent, so a rename never touches it', () => {
-  const start = { name: 'A', description: '', specialtyId: 'sp-1' };
+  const start = { name: 'A', specialtyId: 'sp-1' };
   assert.deepEqual(
-    detailsFields({ name: ' B ', description: ' x ', specialtyId: 'sp-1', start }),
-    { name: 'B', description: 'x' },
+    detailsFields({ name: ' B ', specialtyId: 'sp-1', start }),
+    { name: 'B' },
   );
-  assert.equal('specialtyId' in detailsFields({ name: 'B', description: '', specialtyId: 'sp-1', start }), false);
+  assert.equal('specialtyId' in detailsFields({ name: 'B', specialtyId: 'sp-1', start }), false);
   // a roshetta that opened with none, still none
-  assert.equal('specialtyId' in detailsFields({ name: 'B', description: '', specialtyId: null, start: { specialtyId: null } }), false);
-  assert.equal('specialtyId' in detailsFields({ name: 'B', description: '', specialtyId: '', start: { specialtyId: undefined } }), false);
+  assert.equal('specialtyId' in detailsFields({ name: 'B', specialtyId: null, start: { specialtyId: null } }), false);
+  assert.equal('specialtyId' in detailsFields({ name: 'B', specialtyId: '', start: { specialtyId: undefined } }), false);
 });
 
 test('a changed specialty is sent; clearing it sends null', () => {
   const start = { specialtyId: 'sp-1' };
-  assert.equal(detailsFields({ name: 'B', description: '', specialtyId: 'sp-2', start }).specialtyId, 'sp-2');
-  const cleared = detailsFields({ name: 'B', description: '', specialtyId: null, start });
+  assert.equal(detailsFields({ name: 'B', specialtyId: 'sp-2', start }).specialtyId, 'sp-2');
+  const cleared = detailsFields({ name: 'B', specialtyId: null, start });
   assert.equal(cleared.specialtyId, null);
   assert.equal('specialtyId' in cleared, true);
   // a new roshetta (opened with none) that picks one sends it
-  assert.equal(detailsFields({ name: 'B', description: '', specialtyId: 'sp-3', start: { specialtyId: null } }).specialtyId, 'sp-3');
+  assert.equal(detailsFields({ name: 'B', specialtyId: 'sp-3', start: { specialtyId: null } }).specialtyId, 'sp-3');
 });
 
 test('bad input never throws and sends nothing odd', () => {
-  assert.deepEqual(detailsFields(), { name: '', description: '' });
-  assert.deepEqual(detailsFields({ name: 5, description: null, specialtyId: 7, start: undefined }), { name: '', description: '' });
+  assert.deepEqual(detailsFields(), { name: '' });
+  assert.deepEqual(detailsFields({ name: 5, specialtyId: 7, start: undefined }), { name: '' });
 });
