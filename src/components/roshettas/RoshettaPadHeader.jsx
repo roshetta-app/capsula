@@ -215,7 +215,7 @@ export default function RoshettaPadHeader({
               dir="auto"
               disabled={saving}
               aria-label="Description"
-              placeholder="Who it's for, or when to use it"
+              placeholder="Tell us a little about this roshetta…"
               style={{
                 flex: 1, minWidth: 0, boxSizing: 'border-box', resize: 'none', outline: 'none', border: 'none',
                 background: 'transparent', padding: 0, margin: 0, overflow: 'hidden',
