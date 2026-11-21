@@ -342,6 +342,7 @@ export default function RoshettaScreen() {
           name={roshetta.name}
           description={roshetta.description ?? ''}
           specialty={findSpecialty(roshetta.specialtyId, specialties)}
+          createdAt={roshetta.createdAt}
           updatedAt={roshetta.updatedAt}
           waiting={waitingRoshettaIds.includes(id)}
           topLeft={backButton}
