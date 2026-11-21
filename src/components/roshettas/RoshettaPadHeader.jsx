@@ -4,9 +4,9 @@
 // italic Rx in the bottom corner. Kept short on purpose (about 155 px with a one-line name).
 // Top to bottom:
 //   - the top bar: Back on the start side, Share and the options menu on the end side;
-//   - the specialty, small, in the header content (a tiny tinted tile with its icon and the name
-//     in its colour; "Roshetta" in the app's blue when there is none). The wash fades to white towards the bottom;
-//   - the name, 22, the full width, as many lines as it needs;
+//   - the name, 22, as many lines as it needs, with the specialty icon before it in its colour
+//     (the prescription icon in the app's blue when there is none); the specialty's name is not
+//     shown, it is spoken to screen readers only;
 //   - the description, as plain text with no box or line (added and edited HERE, in
 //     place, never in a sheet): a dashed "Add description" box when there is none; the text, two
 //     lines then "more", with a pencil at its end when there is one (tapping the text only opens
@@ -174,34 +174,27 @@ export default function RoshettaPadHeader({
         <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>{topRight}</div>
       </div>
 
-      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 6, marginTop: 2, minWidth: 0 }}>
-        <div
-          aria-hidden="true"
-          style={{
-            width: 14, height: 14, flexShrink: 0,
-            color: look.fg,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}
+      <div style={{ position: 'relative', display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 4 }}>
+        <span
+          role="img"
+          aria-label={label}
+          style={{ flexShrink: 0, width: 22, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', color: look.fg }}
         >
           {specialty
-            ? <SpecialtyIcon iconType={specialty.iconType ?? 'lucide'} iconValue={specialty.iconValue ?? 'Stethoscope'} size={14} color={look.fg} />
-            : <FileText size={14} strokeWidth={2} />}
-        </div>
-        <span dir="auto" style={{ minWidth: 0, fontSize: 12, fontWeight: 600, lineHeight: 1.3, color: look.fg, fontFamily: font, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {label}
+            ? <SpecialtyIcon iconType={specialty.iconType ?? 'lucide'} iconValue={specialty.iconValue ?? 'Stethoscope'} size={20} color={look.fg} />
+            : <FileText size={20} strokeWidth={2} />}
         </span>
+        <h1
+          dir="auto"
+          style={{
+            position: 'relative', flex: 1, minWidth: 0, margin: 0, textAlign: 'start', overflowWrap: 'anywhere',
+            fontSize: 22, fontWeight: 600, lineHeight: 1.2, letterSpacing: '-0.4px',
+            color: 'var(--color-text-primary)', fontFamily: font,
+          }}
+        >
+          {name}
+        </h1>
       </div>
-
-      <h1
-        dir="auto"
-        style={{
-          position: 'relative', margin: '6px 0 0', textAlign: 'start', overflowWrap: 'anywhere',
-          fontSize: 22, fontWeight: 600, lineHeight: 1.2, letterSpacing: '-0.4px',
-          color: 'var(--color-text-primary)', fontFamily: font,
-        }}
-      >
-        {name}
-      </h1>
 
       {editing ? (
         <div style={{ position: 'relative', marginTop: 8 }}>
