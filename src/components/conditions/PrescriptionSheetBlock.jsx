@@ -884,7 +884,8 @@ function DoseLine({ title, text, note, keepBreaks = false }) {
         color: 'var(--color-dose)',
         lineHeight: 1.5,
         // 2026-11-13 (Roshetta step 3.1a): only when asked; off = no change.
-        ...(keepBreaks ? { whiteSpace: 'pre-line' } : null),
+        // A long link or word in a hand-typed dose wraps instead of running past the card.
+        ...(keepBreaks ? { whiteSpace: 'pre-line', overflowWrap: 'anywhere' } : null),
       }}>
         {text}
       </span>

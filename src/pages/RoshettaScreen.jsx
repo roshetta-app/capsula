@@ -10,7 +10,7 @@
  * colour, a faint Rx, the name, the description (added and edited in place there, never in a
  * sheet) and the day; the content below has no card, with the topic sheet's margins; the safety
  * label is a quiet footnote at the end of the sheet; one round "Edit roshetta" bar at the bottom;
- * an empty roshetta shows "Start your roshetta" and "Add drugs". The letterhead below is the
+ * an empty roshetta shows the group page's open empty state ("Nothing here yet", Add drugs). The letterhead below is the
  * earlier look (still used by the shared page until step 8.5).
  *
  * 2026-11-21 (step 8.3e): the header was made short (about 155 px): a small specialty row under the
@@ -49,6 +49,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { FileText, Plus } from 'lucide-react'
 import ConfirmSheet from '../components/ui/ConfirmSheet'
 import Icon from '../components/ui/Icon'
 import GroupStateMessage from '../components/drugs/groups/GroupStateMessage'
@@ -70,11 +71,13 @@ import useScrollToTopOnOpen from '../hooks/useScrollToTopOnOpen'
 import RoshettaFailedChangesSheet from '../components/roshettas/RoshettaFailedChangesSheet'
 import { noticeKind, statusText } from '../utils/homeRoshettas'
 import { sheetRowsForDisplay } from '../utils/roshettaDrugLines'
-import { findSpecialty } from '../utils/roshettaSpecialty'
+import { findSpecialty, specialtyColors } from '../utils/roshettaSpecialty'
+import { useIsDark } from '../utils/specialtyIcon'
 import { pageRoshetta, pageState, pageControls, deleteOutcome, shownRoshetta } from '../utils/roshettaPageState'
 import { ROUTES } from '../router'
 
 const font = 'var(--font-body)'
+const READ_ONLY_MESSAGE = 'Your roshettas are read only. Delete a roshetta or upgrade to edit.'
 // Height of the fixed Edit and Share bar (10 + 48 + 10 + 1 line), so the page can leave room for it.
 const BAR_SPACE = 72
 
@@ -106,6 +109,7 @@ export default function RoshettaScreen() {
     waitingRoshettaIds = [], getRoshettaShareCode, saveRoshetta, isReadOnly = false, roshettasLoadError = false,
   } = roshettasApi ?? {}
   const isPro = useIsPro()
+  const isDark = useIsDark()
   const { loading: authLoading, signInWithGoogle } = useAuth()
   const { isOnline } = useOnlineStatus()
 
@@ -377,24 +381,23 @@ export default function RoshettaScreen() {
 
         {/* The sheet itself: no card, the topic sheet's side margins and spacing. */}
         <div style={{ padding: 'var(--space-5) calc(var(--space-6) - var(--page-gutter, 16px)) 0' }}>
-          {state === 'empty' ? (
-            <div style={{ textAlign: 'center', padding: 'var(--space-8, 32px) 0 var(--space-4)' }}>
-              <Icon name="FileText" size={26} color="var(--color-accent-text)" />
-              <p style={{ margin: '8px 0 14px', fontSize: 16, fontWeight: 600, color: 'var(--color-text-primary)', fontFamily: font }}>
-                Start your roshetta
-              </p>
-              <button
-                type="button"
-                onClick={() => openPage(ROUTES.ROSHETTA_EDIT(id))}
-                style={{
-                  minHeight: 44, padding: '0 22px', borderRadius: 999, border: 'none', cursor: 'pointer',
-                  backgroundColor: 'var(--color-accent-solid)', color: '#fff',
-                  fontSize: 14, fontWeight: 600, fontFamily: font, WebkitTapHighlightColor: 'transparent',
-                }}
-              >
-                Add drugs
-              </button>
+          {isReadOnly && (
+            <div style={{ marginBottom: 'var(--space-4)' }}>
+              <GroupStateMessage variant="banner" tone="warning" title={READ_ONLY_MESSAGE} />
             </div>
+          )}
+          {state === 'empty' ? (
+            // The same open look as an empty drug group: a big tinted icon in the specialty's colour.
+            <GroupStateMessage
+              open
+              icon={FileText}
+              accent={(() => { const look = specialtyColors(findSpecialty(roshetta.specialtyId, specialties), isDark); return { bg: look.bg, fg: look.fg } })()}
+              title="Nothing here yet"
+              body={isReadOnly ? undefined : 'Add drugs and notes to build your roshetta.'}
+              actionLabel={isReadOnly ? undefined : 'Add drugs'}
+              actionIcon={Plus}
+              onAction={isReadOnly ? undefined : () => openPage(ROUTES.ROSHETTA_EDIT(id))}
+            />
           ) : (
             <PrescriptionSheetBlock sheet={{ rows: sheetRowsForDisplay(rows) }} hasContentAfter={false} keepDoseLineBreaks />
           )}
