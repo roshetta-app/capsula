@@ -9,7 +9,6 @@
  * heading (HomeTagline). The card opens its topic or drug; it is not drawn at all when there
  * is nothing to show.
  */
-import { useNavigate } from 'react-router-dom'
 import { useTapGuard } from '../hooks/useTapGuard'
 import HomeTopBar from '../components/home/HomeTopBar'
 import FeaturedCardView from '../components/home/FeaturedCardView'
@@ -28,7 +27,6 @@ import { welcomeParts } from '../utils/homeHeading'
 import { ROUTES } from '../router'
 
 export default function HomeScreen() {
-  const navigate = useNavigate()
   const { openPage } = useTapGuard()
   const { user, profile } = useAuth()
   const { conditions, loading: conditionsLoading } = useConditionContext()
@@ -69,15 +67,15 @@ export default function HomeScreen() {
 
       <div style={entrance(2)}>
         <HomeRoshettasSection
-          onOpenRoshetta={r => navigate(ROUTES.ROSHETTA(r.id))}
-          onSeeAll={() => navigate(ROUTES.ROSHETTAS)}
+          onOpenRoshetta={r => openPage(ROUTES.ROSHETTA(r.id))}
+          onSeeAll={() => openPage(ROUTES.ROSHETTAS)}
         />
       </div>
 
       <div style={entrance(3)}>
         <HomeGroupsSection
-          onOpenGroup={g => navigate(ROUTES.DRUGS_GROUP(g.id))}
-          onSeeAll={() => navigate(ROUTES.DRUGS_GROUPS)}
+          onOpenGroup={g => openPage(ROUTES.DRUGS_GROUP(g.id))}
+          onSeeAll={() => openPage(ROUTES.DRUGS_GROUPS)}
         />
       </div>
     </div>

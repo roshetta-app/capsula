@@ -40,6 +40,7 @@ import { shimmer } from '../components/drugs/home/shimmer'
 import { useDrugContext } from '../context/DrugContext'
 import { useFavouritesContext } from '../context/FavouritesContext'
 import { useAuth } from '../hooks/useAuth'
+import { useTapGuard } from '../hooks/useTapGuard'
 import { useToast } from '../context/ToastContext'
 import { useDeepLinkParent } from '../hooks/useDeepLinkParent'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
@@ -73,6 +74,7 @@ function SkeletonCards() {
 
 export default function RoshettaEditorScreen() {
   const navigate = useNavigate()
+  const { openPage } = useTapGuard()
   const { id } = useParams()
   useDeepLinkParent()
 
@@ -271,7 +273,7 @@ export default function RoshettaEditorScreen() {
                 count={rows.length}
                 libraryIds={libraryIds}
                 onChange={next => change(row.id, next)}
-                onAddPartner={() => { if (mayAdd('partner')) navigate(ROUTES.ROSHETTA_ADD(id) + addPartnerQuery(row.id)) }}
+                onAddPartner={() => { if (mayAdd('partner')) openPage(ROUTES.ROSHETTA_ADD(id) + addPartnerQuery(row.id)) }}
                 onMoveUp={() => move(row.id, 'up')}
                 onMoveDown={() => move(row.id, 'down')}
                 onDelete={() => requestDelete(row)}
@@ -324,7 +326,7 @@ export default function RoshettaEditorScreen() {
       <div style={{ maxWidth: 680, margin: '0 auto', padding: '8px var(--page-gutter) 10px', display: 'flex', gap: 10, boxSizing: 'border-box' }}>
         <button
           type="button"
-          onClick={() => { if (mayAdd('drug')) navigate(ROUTES.ROSHETTA_ADD(id)) }}
+          onClick={() => { if (mayAdd('drug')) openPage(ROUTES.ROSHETTA_ADD(id)) }}
           style={{ ...barButton, backgroundColor: 'var(--color-accent-solid)', color: '#fff', border: 'none' }}
         >
           <Icon name="Plus" size={16} />

@@ -29,7 +29,7 @@
  */
 
 import { useContext, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useTapGuard } from '../../hooks/useTapGuard'
 import { renderTitledMarkdown } from '../../lib/directiveRenderer'
 import { resolveTextLinks, fixDrugLinkNames, parseTextLink } from '../../lib/textLinks'
 import { PreviewModeContext } from '../../context/PreviewModeContext'
@@ -44,7 +44,7 @@ export default function FreeTextPostBlock({ block }) {
   // Drug links and class links (2026-11-12, plan step 4). A link whose drug, class or
   // family is gone (unpublished, renamed) shows as plain text. In the CMS phone preview
   // a tap must not leave the editor.
-  const realNavigate = useNavigate()
+  const { openPage } = useTapGuard()
   const inPreview = useContext(PreviewModeContext)
   const { drugs, loading } = useDrugContext()
   const [classTarget, setClassTarget] = useState(null)   // { className, familyName }
@@ -70,11 +70,11 @@ export default function FreeTextPostBlock({ block }) {
     const link = parseTextLink(a.getAttribute('href'))
     if (!link) return
     if (link.kind === 'drug') {
-      realNavigate(`/drugs/${link.slug}`)
+      openPage(`/drugs/${link.slug}`)
       return
     }
     if (link.kind === 'generic') {
-      realNavigate(`/drugs/generic/${link.slug}`)
+      openPage(`/drugs/generic/${link.slug}`)
       return
     }
     setClassTarget({ className: link.className, familyName: link.kind === 'family' ? link.familyName : null })
@@ -98,7 +98,7 @@ export default function FreeTextPostBlock({ block }) {
           classLabel={titleCaseWords(classTarget.className)}
           classDrugs={classDrugs}
           currentDrug={null}
-          onSelectBrand={d => { setClassOpen(false); realNavigate(`/drugs/${d.slug || d.id}`) }}
+          onSelectBrand={d => { setClassOpen(false); openPage(`/drugs/${d.slug || d.id}`) }}
           directSubclass={classTarget.familyName}
         />
       )}

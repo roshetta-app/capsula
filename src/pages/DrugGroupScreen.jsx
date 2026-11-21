@@ -90,6 +90,8 @@ import { shimmer } from '../components/drugs/home/shimmer'
 import { useDrugContext } from '../context/DrugContext'
 import { useFavouritesContext } from '../context/FavouritesContext'
 import { useAuth } from '../hooks/useAuth'
+import { useTapGuard } from '../hooks/useTapGuard'
+import { useOpenDrug } from '../hooks/useOpenDrug'
 import { useIsPro } from '../hooks/useIsPro'
 import { useCategories } from '../hooks/useCategories'
 import { useDeepLinkParent } from '../hooks/useDeepLinkParent'
@@ -118,6 +120,8 @@ function SkeletonCard() {
 export default function DrugGroupScreen() {
   useScrollToTopOnOpen()
   const navigate = useNavigate()
+  const { openPage } = useTapGuard()
+  const openDrug = useOpenDrug()
   const { groupId } = useParams()
   // Back goes to the real previous screen; opened straight from a link, the
   // Drugs home is put behind it first.
@@ -213,7 +217,7 @@ export default function DrugGroupScreen() {
 
   function openAddDrugs() {
     setRemoveMode(false)
-    navigate(ROUTES.DRUGS_GROUP_ADD(group.id))
+    openPage(ROUTES.DRUGS_GROUP_ADD(group.id))
   }
 
   // A minus in remove mode: the drug goes at once, with an Undo for 5 seconds. If the save is
@@ -352,7 +356,7 @@ export default function DrugGroupScreen() {
                 categories={categories}
                 isDark={isDark}
                 isLast={i === known.length - 1 && missing.length === 0}
-                onTap={() => navigate(ROUTES.DRUG_DETAIL(drug.slug || drug.id))}
+                onTap={() => openDrug(drug)}
                 disableTap={removing}
                 trailing={removing ? (
                   <button

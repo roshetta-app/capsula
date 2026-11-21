@@ -45,6 +45,7 @@ import { shimmer } from '../components/drugs/home/shimmer'
 import { useConditionContext } from '../context/ConditionContext'
 import { useFavouritesContext } from '../context/FavouritesContext'
 import { useAuth } from '../hooks/useAuth'
+import { useTapGuard } from '../hooks/useTapGuard'
 import { useBackLabel } from '../hooks/useBackLabel'
 import { useDeepLinkParent } from '../hooks/useDeepLinkParent'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
@@ -73,6 +74,7 @@ function PageSkeleton() {
 export default function RoshettaScreen() {
   useScrollToTopOnOpen()
   const navigate = useNavigate()
+  const { openPage } = useTapGuard()
   const { id } = useParams()
   // Back goes to the real previous screen; opened straight from a link, the Home screen is put behind it first.
   useDeepLinkParent()
@@ -269,7 +271,7 @@ export default function RoshettaScreen() {
       <div style={{ maxWidth: 680, margin: '0 auto', padding: '10px var(--page-gutter)', display: 'flex', gap: 10, boxSizing: 'border-box' }}>
         <button
           type="button"
-          onClick={() => navigate(ROUTES.ROSHETTA_EDIT(id))}
+          onClick={() => openPage(ROUTES.ROSHETTA_EDIT(id))}
           style={{ ...barButton, backgroundColor: 'var(--color-accent-solid)', color: '#fff', border: 'none' }}
         >
           <Icon name="Pencil" size={16} />

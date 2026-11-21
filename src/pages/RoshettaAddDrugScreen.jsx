@@ -44,6 +44,7 @@ import { useDrugContext } from '../context/DrugContext'
 import { useFavouritesContext } from '../context/FavouritesContext'
 import { useToast } from '../context/ToastContext'
 import { useAuth } from '../hooks/useAuth'
+import { useOpenDrug } from '../hooks/useOpenDrug'
 import { useCategories } from '../hooks/useCategories'
 import { useDrugSearch } from '../hooks/useDrugSearch'
 import { useSearchHistory } from '../hooks/useSearchHistory'
@@ -79,6 +80,7 @@ function SkeletonRows() {
 
 export default function RoshettaAddDrugScreen() {
   const navigate = useNavigate()
+  const openDrug = useOpenDrug()
   const { id } = useParams()
   const { search } = useLocation()
   useDeepLinkParent()
@@ -248,9 +250,8 @@ export default function RoshettaAddDrugScreen() {
     }
   }
   function handleOpen(drug) {
-    if (hasQuery) addSearch(savedName(drug), mode)
     keptSearch = { id, query, mode }
-    navigate(ROUTES.DRUG_DETAIL(drug.slug || drug.id))
+    if (openDrug(drug) && hasQuery) addSearch(savedName(drug), mode)
   }
 
   // ── What is drawn ──────────────────────────────────────────────────────────

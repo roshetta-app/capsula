@@ -41,7 +41,7 @@
  */
 
 import { useState, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useTapGuard } from '../../../hooks/useTapGuard'
 import { Layers, ChevronRight } from 'lucide-react'
 import DrugsSectionCard, { SECTION_TITLE_STYLE } from './DrugsSectionCard'
 import { shimmer } from './shimmer'
@@ -106,7 +106,7 @@ const STRIP_GRID = {
 }
 
 export default function DrugsBrowseSection() {
-  const navigate = useNavigate()
+  const { openPage } = useTapGuard()
   const isDark = useIsDark()
   const { drugs, loading: drugsLoading, error: drugsError, retry } = useDrugContext()
   const { categories, loading: catsLoading } = useCategories()
@@ -120,11 +120,11 @@ export default function DrugsBrowseSection() {
 
   const shown = withDrugs.slice(0, STRIP_COUNT)
 
-  function openAll() { navigate(ROUTES.DRUGS_BROWSE_CATEGORY) }
-  function openClasses() { navigate(ROUTES.DRUGS_BROWSE_CLASS) }
+  function openAll() { openPage(ROUTES.DRUGS_BROWSE_CATEGORY) }
+  function openClasses() { openPage(ROUTES.DRUGS_BROWSE_CLASS) }
   function openCategory(slug) {
     prepareCategoryOpen(slug)
-    navigate(ROUTES.DRUGS_CATEGORY(slug))
+    openPage(ROUTES.DRUGS_CATEGORY(slug))
   }
 
   const hasDrugs = drugs.length > 0

@@ -1,5 +1,5 @@
 import React, { useState, useContext } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useTapGuard } from '../../hooks/useTapGuard'
 import { useDrugContext } from '../../context/DrugContext'
 import { PreviewModeContext } from '../../context/PreviewModeContext'
 import { FileText, ChevronRight, Plus } from 'lucide-react'
@@ -126,10 +126,10 @@ const NAME_LINE_HEIGHT = 1.3
  *                     look exactly as before.
  */
 export default function PrescriptionSheetBlock({ sheet, hasContentAfter = true, keepDoseLineBreaks = false }) {
-  const realNavigate = useNavigate()
+  const { openPage: guardedOpen } = useTapGuard()
   // In the CMS phone preview, tapping a drug must not leave the editor.
   const inPreview = useContext(PreviewModeContext)
-  const navigate = inPreview ? () => {} : realNavigate
+  const openPage = inPreview ? () => {} : guardedOpen
   // BUG FIX (2026-08-09): this used to call useDrugs() directly, which
   // spins up its own independent cache-read + fetch cycle every time this
   // component mounts — completely separate from the app-wide DrugProvider
@@ -187,7 +187,7 @@ export default function PrescriptionSheetBlock({ sheet, hasContentAfter = true, 
             row={row}
             formulation={formulation}
             drugs={drugs}
-            navigate={navigate}
+            openPage={openPage}
             keepDoseLineBreaks={keepDoseLineBreaks}
             dividerType={
               nextRow?.row_type === 'drug' ? 'drug'
@@ -551,7 +551,7 @@ function buildFormulationClusters(row, drugs, mainFormulation) {
   })
 }
 
-function UnifiedDrugRow({ row, formulation, drugs, navigate, dividerType, keepDoseLineBreaks = false }) {
+function UnifiedDrugRow({ row, formulation, drugs, openPage, dividerType, keepDoseLineBreaks = false }) {
   const clusters = buildFormulationClusters(row, drugs, formulation)
 
   // TAP FEEDBACK (2026-08-09): tracks which unit (by uIdx) is currently
@@ -670,7 +670,7 @@ function UnifiedDrugRow({ row, formulation, drugs, navigate, dividerType, keepDo
                     transition: 'background-color var(--motion-fast) var(--ease-settle), transform var(--motion-fast) var(--ease-settle)',
                   }}
                   onClick={memberLinkEnabled && member.formulation?.slug
-                    ? () => navigate(`/drugs/${member.formulation.slug}`)
+                    ? () => openPage(`/drugs/${member.formulation.slug}`)
                     : undefined}
                   onPointerDown={memberLinkEnabled ? () => setPressedIdx(uIdx) : undefined}
                   onPointerUp={memberLinkEnabled ? () => setPressedIdx(null) : undefined}

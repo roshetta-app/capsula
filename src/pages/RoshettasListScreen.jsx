@@ -3,6 +3,7 @@
 
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTapGuard } from '../hooks/useTapGuard'
 import { ArrowUpDown, Plus, Search, X } from 'lucide-react'
 import GroupStateMessage from '../components/drugs/groups/GroupStateMessage'
 import { ProPill } from '../components/drugs/groups/GroupTile'
@@ -34,6 +35,7 @@ const LABEL_STYLE = {
 
 export default function RoshettasListScreen() {
   const navigate = useNavigate()
+  const { openPage } = useTapGuard()
   useDeepLinkParent()
   const backLabel = useBackLabel() || 'Home'
   const { roshettasApi } = useFavouritesContext()
@@ -241,7 +243,7 @@ export default function RoshettasListScreen() {
                     specialty={findSpecialty(r.specialtyId, specialties)}
                     waiting={waitingRoshettaIds.includes(r.id)}
                     showDivider={i < g.items.length - 1}
-                    onOpen={() => navigate(ROUTES.ROSHETTA(r.id))}
+                    onOpen={() => openPage(ROUTES.ROSHETTA(r.id))}
                   />
                 ))}
               </div>
@@ -287,7 +289,7 @@ export default function RoshettasListScreen() {
         isOpen={sheetOpen}
         onClose={() => setSheetOpen(false)}
         roshetta={null}
-        onSaved={r => { if (r) navigate(ROUTES.ROSHETTA(r.id)) }}
+        onSaved={r => { if (r) openPage(ROUTES.ROSHETTA(r.id)) }}
       />
     </div>
   )

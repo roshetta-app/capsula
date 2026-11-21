@@ -78,6 +78,8 @@ import { sortDrugsByTitle } from '../components/drugs/groups/groupDrugText'
 import { shimmer } from '../components/drugs/home/shimmer'
 import { useCategories } from '../hooks/useCategories'
 import { useAuth } from '../hooks/useAuth'
+import { useTapGuard } from '../hooks/useTapGuard'
+import { useOpenDrug } from '../hooks/useOpenDrug'
 import useScrollToTopOnOpen from '../hooks/useScrollToTopOnOpen'
 import { useFavouritesContext } from '../context/FavouritesContext'
 import { isDrugGroupsOn } from '../constants/features'
@@ -150,6 +152,8 @@ export default function SharedGroupScreen() {
 
 function SharedGroupBody({ code }) {
   const navigate = useNavigate()
+  const { openPage } = useTapGuard()
+  const openDrug = useOpenDrug()
   // A person opening a link just wants this page, so no screen is put behind it (navRules.js:
   // laysBehind false). A drug opened from here keeps this page behind it, because the page is
   // no longer the arrival once the person moves on.
@@ -277,7 +281,7 @@ function SharedGroupBody({ code }) {
   const backButton = (
     <button
       onClick={() => navigate(-1)}
-      aria-label="Back to Drugs"
+      aria-label="Back"
       style={{
         display: 'flex', alignItems: 'center', gap: 6,
         background: 'none', border: 'none', cursor: 'pointer',
@@ -289,7 +293,7 @@ function SharedGroupBody({ code }) {
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <polyline points="15 18 9 12 15 6" />
       </svg>
-      Drugs
+      Back
     </button>
   )
 
@@ -310,7 +314,7 @@ function SharedGroupBody({ code }) {
       )}
       {!canGoBack && (
         <button
-          onClick={() => navigate(ROUTES.DRUGS)}
+          onClick={() => navigate(ROUTES.HOME, { replace: true })}
           style={{
             flexShrink: 0, minHeight: 44, padding: '0 var(--space-1)', background: 'none', border: 'none',
             cursor: 'pointer', fontSize: 14, fontWeight: 600, color: 'var(--color-accent-text)',
@@ -336,7 +340,7 @@ function SharedGroupBody({ code }) {
         title="This link isn't available"
         body="The owner may have stopped sharing it, or the link is incomplete."
         actionLabel="Open Capsula"
-        onAction={() => navigate(ROUTES.DRUGS, { replace: true })}
+        onAction={() => navigate(ROUTES.HOME, { replace: true })}
       />
     )
   } else if (result.status === 'offline') {
@@ -415,7 +419,7 @@ function SharedGroupBody({ code }) {
                   categories={categories}
                   isDark={isDark}
                   isLast={i === drugs.length - 1}
-                  onTap={() => navigate(ROUTES.DRUG_DETAIL(drug.slug || drug.id))}
+                  onTap={() => openDrug(drug)}
                 />
               ))}
             </div>
@@ -459,7 +463,7 @@ function SharedGroupBody({ code }) {
                 </span>
               </span>
               <button
-                onClick={() => navigate(ROUTES.DRUGS_GROUP(saveState.groupId))}
+                onClick={() => openPage(ROUTES.DRUGS_GROUP(saveState.groupId))}
                 style={{
                   flexShrink: 0, minHeight: 44, border: 'none', cursor: 'pointer', padding: '0 20px',
                   borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-accent-solid)', color: '#fff',

@@ -51,6 +51,7 @@ import PrescriptionSheetBlock from '../components/conditions/PrescriptionSheetBl
 import GroupStateMessage from '../components/drugs/groups/GroupStateMessage'
 import { shimmer } from '../components/drugs/home/shimmer'
 import { useAuth } from '../hooks/useAuth'
+import { useTapGuard } from '../hooks/useTapGuard'
 import { useIsPro } from '../hooks/useIsPro'
 import { useFavouritesContext } from '../context/FavouritesContext'
 import useScrollToTopOnOpen from '../hooks/useScrollToTopOnOpen'
@@ -122,6 +123,7 @@ export default function SharedRoshettaScreen() {
 
 function SharedRoshettaBody({ code }) {
   const navigate = useNavigate()
+  const { openPage } = useTapGuard()
   // A person opening a link just wants this page, so no screen is put behind it (navRules.js:
   // laysBehind false). A drug opened from here keeps this page behind it, because the page is
   // no longer the arrival once the person moves on.
@@ -275,7 +277,7 @@ function SharedRoshettaBody({ code }) {
       )}
       {!canGoBack && (
         <button
-          onClick={() => navigate(ROUTES.DRUGS)}
+          onClick={() => navigate(ROUTES.HOME, { replace: true })}
           style={{
             flexShrink: 0, minHeight: 44, padding: '0 var(--space-1)', background: 'none', border: 'none',
             cursor: 'pointer', fontSize: 14, fontWeight: 600, color: 'var(--color-accent-text)',
@@ -299,7 +301,7 @@ function SharedRoshettaBody({ code }) {
         title={t.title}
         body={t.body}
         actionLabel={t.actionLabel}
-        onAction={t.action === 'retry' ? retry : () => navigate(ROUTES.DRUGS, { replace: true })}
+        onAction={t.action === 'retry' ? retry : () => navigate(ROUTES.HOME, { replace: true })}
       />
     )
   } else {
@@ -365,7 +367,7 @@ function SharedRoshettaBody({ code }) {
               </span>
               {saveState.roshettaId && (
                 <button
-                  onClick={() => navigate(ROUTES.ROSHETTA(saveState.roshettaId))}
+                  onClick={() => openPage(ROUTES.ROSHETTA(saveState.roshettaId))}
                   style={{
                     flexShrink: 0, minHeight: 44, border: 'none', cursor: 'pointer', padding: '0 20px',
                     borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-accent-solid)', color: '#fff',

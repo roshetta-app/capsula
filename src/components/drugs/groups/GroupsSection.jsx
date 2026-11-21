@@ -35,7 +35,7 @@
  */
 
 import { memo, useState, useEffect, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useTapGuard } from '../../../hooks/useTapGuard'
 import { ArrowUpDown, ChevronRight, Plus } from 'lucide-react'
 import BrowseHeader from '../home/BrowseHeader'
 import DrugsSectionCard, { SECTION_TITLE_STYLE } from '../home/DrugsSectionCard'
@@ -105,7 +105,7 @@ function GroupsSection({ all = false, headerProps = null }) {
   const isPro = useIsPro()
   const [editor, setEditor] = useState({ open: false, group: null })
 
-  const navigate = useNavigate()
+  const { openPage } = useTapGuard()
   const rowRef = useRowScrollMemory('row:drugs-groups')
 
   // Undo for Delete group (step 4.4): a message with Undo for 5 seconds. Starts
@@ -176,7 +176,7 @@ function GroupsSection({ all = false, headerProps = null }) {
   }
 
   function handleOpenGroup(g) {
-    navigate(ROUTES.DRUGS_GROUP(g.id))
+    openPage(ROUTES.DRUGS_GROUP(g.id))
   }
 
   async function handleUndo() {
@@ -221,7 +221,7 @@ function GroupsSection({ all = false, headerProps = null }) {
   ) : null
   const trailing = showControls && !all ? (
     <button
-      onClick={() => navigate(ROUTES.DRUGS_GROUPS)}
+      onClick={() => openPage(ROUTES.DRUGS_GROUPS)}
       aria-label="See all my drug groups"
       style={{
         display: 'flex', alignItems: 'center', gap: 2, background: 'none', border: 'none',

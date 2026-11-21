@@ -57,6 +57,7 @@ import { useDrugContext } from '../context/DrugContext'
 import { useFavouritesContext } from '../context/FavouritesContext'
 import { useToast } from '../context/ToastContext'
 import { useAuth } from '../hooks/useAuth'
+import { useOpenDrug } from '../hooks/useOpenDrug'
 import { useIsPro } from '../hooks/useIsPro'
 import { useKeyboardOpen } from '../hooks/useKeyboardOpen'
 import { useCategories } from '../hooks/useCategories'
@@ -94,6 +95,7 @@ function SkeletonRows() {
 
 export default function AddDrugsToGroupScreen() {
   const navigate = useNavigate()
+  const openDrug = useOpenDrug()
   const { groupId } = useParams()
   useDeepLinkParent()
 
@@ -257,9 +259,8 @@ export default function AddDrugsToGroupScreen() {
     edits.remove(drug.id)
   }
   function handleOpen(drug) {
-    if (hasQuery) addSearch(savedName(drug), mode)
     keptSearch = { groupId, query, mode }
-    navigate(ROUTES.DRUG_DETAIL(drug.slug || drug.id))
+    if (openDrug(drug) && hasQuery) addSearch(savedName(drug), mode)
   }
 
   // ── What is drawn ──────────────────────────────────────────────────────────
