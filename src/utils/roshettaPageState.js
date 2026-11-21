@@ -11,9 +11,10 @@
  * 'missing' is a roshetta the list does not hold (for example deleted on another device).
  *
  * 2026-11-14 (step 4.2b), also plain rules:
- *   pageControls(state)  -> { menu, statusLine, bar }  which extras are drawn: only while a
- *                           roshetta is shown ('ready' or 'empty'), never on loading, guest,
- *                           error or missing.
+ *   pageControls(state)  -> { menu, statusLine, bar }  which extras are drawn: menu and status line
+ *                           only while a roshetta is shown ('ready' or 'empty'); the floating Edit
+ *                           button (bar) only when it has content ('ready'); nothing on loading,
+ *                           guest, error or missing.
  *   deleteOutcome(res)   -> 'done' | 'failed'  what the answer from deleteRoshetta means.
  *                           Already gone (reason 'missing') counts as done: the person wanted
  *                           it gone and it is.
@@ -40,7 +41,7 @@ export function pageState({
 
 export function pageControls(state) {
   const shown = state === 'ready' || state === 'empty';
-  return { menu: shown, statusLine: shown, bar: shown };
+  return { menu: shown, statusLine: shown, bar: state === 'ready' };
 }
 
 export function deleteOutcome(res) {

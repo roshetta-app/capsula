@@ -8,8 +8,9 @@
  * 2026-11-21 (step 8.3b, your overhaul): the page is built like a topic sheet. A white header with
  * a rounded bottom (Back and the specialty, Share and the options menu), a hairline in the specialty
  * colour, a faint Rx, the name, the description (added and edited in place there, never in a
- * sheet) and the day; the content below has no card, with the topic sheet's margins; the safety
- * label is a quiet footnote at the end of the sheet; one round "Edit roshetta" bar at the bottom;
+ * sheet) and the day; the content below has no card, with the topic sheet's margins; there is no
+ * safety footnote at the bottom (removed 2026-11-21); a round floating Edit button sits at the bottom
+ * end like the Contents button on a topic page, only when the roshetta has content;
  * an empty roshetta shows the group page's open empty state ("Nothing here yet", Add drugs). The letterhead below is the
  * earlier look (still used by the shared page until step 8.5).
  *
@@ -27,8 +28,7 @@
  * 2026-11-14 (step 4.2b): a "more" button at the top right opens a small menu with
  * "Edit details" (name, description, specialty) and "Delete roshetta" (asks first, then goes back to Home); the one status line of the
  * groups wording sits under the Back row (saving, waiting, offline, changes that could not
- * be saved, with Try again); and a fixed Edit and Share bar sits just above the bottom tab
- * bar. 2026-11-14 (step 6.1b): Share opens the share sheet, and the delete question adds
+ * be saved, with Try again). 2026-11-14 (step 6.1b): Share opens the share sheet, and the delete question adds
  * "Its share link will stop working too." when the roshetta has a live link. 2026-11-14 (step 5.3a): Edit opens
  * the editor, /roshetta/:id/edit. The extras show only while a roshetta is shown (pageControls).
  *
@@ -54,7 +54,6 @@ import ConfirmSheet from '../components/ui/ConfirmSheet'
 import Icon from '../components/ui/Icon'
 import GroupStateMessage from '../components/drugs/groups/GroupStateMessage'
 import RoshettaPadHeader from '../components/roshettas/RoshettaPadHeader'
-import RoshettaDisclaimer from '../components/roshettas/RoshettaDisclaimer'
 import ShareRoshettaSheet from '../components/roshettas/ShareRoshettaSheet'
 import RoshettaDetailsSheet from '../components/roshettas/RoshettaDetailsSheet'
 import PrescriptionSheetBlock from '../components/conditions/PrescriptionSheetBlock'
@@ -78,7 +77,7 @@ import { ROUTES } from '../router'
 
 const font = 'var(--font-body)'
 const READ_ONLY_MESSAGE = 'Your roshettas are read only. Delete a roshetta or upgrade to edit.'
-// Height of the fixed Edit and Share bar (10 + 48 + 10 + 1 line), so the page can leave room for it.
+// Room the floating Edit button needs under the content (46 + 12 above the tab bar + a gap), so the last line is never covered.
 const BAR_SPACE = 72
 
 function PageSkeleton() {
@@ -301,36 +300,26 @@ export default function RoshettaScreen() {
     </div>
   )
 
-  const barButton = {
-    flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-    minHeight: 48, padding: '8px 12px', borderRadius: 24, boxSizing: 'border-box', cursor: 'pointer',
-    fontSize: 15, fontWeight: 600, fontFamily: font,
-    WebkitTapHighlightColor: 'transparent',
-  }
-
-  // Edit opens the editor (Share moved up into the header, 2026-11-21).
-  // Fixed just above the bottom tab bar (60 px plus the phone's bottom safe area); it steps aside
-  // while the description is being typed.
+  // Edit opens the editor. A round floating button at the bottom end, the same size, place and look
+  // as the Contents button on a topic page; drawn only when the roshetta has content, and it steps
+  // aside while the description is being typed.
   const actionBar = controls.bar && !editingDescription ? (
-    <div
+    <button
+      type="button"
+      onClick={() => openPage(ROUTES.ROSHETTA_EDIT(id))}
+      aria-label="Edit roshetta"
       style={{
-        position: 'fixed', left: 0, right: 0, zIndex: 90,
-        bottom: 'calc(60px + env(safe-area-inset-bottom))',
-        backgroundColor: 'var(--color-surface)',
-        borderTop: '1px solid var(--color-border)',
+        position: 'fixed', insetInlineEnd: 16, zIndex: 90,
+        bottom: 'calc(60px + env(safe-area-inset-bottom) + 12px)',
+        width: 46, height: 46, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        color: '#fff', background: 'var(--color-accent-solid)',
+        border: 'none', borderRadius: '50%', padding: 0,
+        boxShadow: '0 6px 18px rgba(0,0,0,0.22)', cursor: 'pointer',
+        WebkitTapHighlightColor: 'transparent',
       }}
     >
-      <div style={{ maxWidth: 680, margin: '0 auto', padding: '10px var(--page-gutter)', boxSizing: 'border-box' }}>
-        <button
-          type="button"
-          onClick={() => openPage(ROUTES.ROSHETTA_EDIT(id))}
-          style={{ ...barButton, width: '100%', backgroundColor: 'var(--color-accent-solid)', color: '#fff', border: 'none' }}
-        >
-          <Icon name="Pencil" size={16} />
-          Edit roshetta
-        </button>
-      </div>
-    </div>
+      <Icon name="Pencil" size={20} />
+    </button>
   ) : null
 
   let content
@@ -402,7 +391,6 @@ export default function RoshettaScreen() {
             <PrescriptionSheetBlock sheet={{ rows: sheetRowsForDisplay(rows) }} hasContentAfter={false} keepDoseLineBreaks />
           )}
 
-          <RoshettaDisclaimer variant="footnote" marginTop={32} />
         </div>
       </>
     )

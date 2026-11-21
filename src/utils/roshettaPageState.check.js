@@ -32,10 +32,9 @@ test('pageRoshetta: finds by id, nothing for a missing or blank id or a bad list
 
 // ── Step 4.2b: controls, the delete answer, what the page draws while a delete runs ──
 
-test('pageControls: the menu, the status line and the Edit and Share bar only while a roshetta is shown', () => {
-  for (const s of ['ready', 'empty']) {
-    assert.deepEqual(pageControls(s), { menu: true, statusLine: true, bar: true }, s);
-  }
+test('pageControls: the menu and status line while a roshetta is shown; the floating Edit button only with content', () => {
+  assert.deepEqual(pageControls('ready'), { menu: true, statusLine: true, bar: true });
+  assert.deepEqual(pageControls('empty'), { menu: true, statusLine: true, bar: false });
   for (const s of ['loading', 'guest', 'error', 'missing', 'anything else', undefined]) {
     assert.deepEqual(pageControls(s), { menu: false, statusLine: false, bar: false }, String(s));
   }
