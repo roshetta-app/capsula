@@ -1,11 +1,11 @@
 // src/components/roshettas/RoshettaPadHeader.jsx
-// 2026-11-21 (Roshetta plan, steps 8.3b to 8.3e): the header of the owner's roshetta page. A white
-// block with a rounded bottom, like the topic sheet's header, and the Home roshetta card's faint
+// 2026-11-21 (Roshetta plan, steps 8.3b to 8.3e): the header of the owner's roshetta page. A block with a soft wash of the
+// specialty colour and a rounded bottom, like the topic sheet's header, and the Home roshetta card's faint
 // italic Rx in the bottom corner. Kept short on purpose (about 155 px with a one-line name).
 // Top to bottom:
 //   - the top bar: Back on the start side, Share and the options menu on the end side;
 //   - the specialty, small, in the header content (a tiny tinted tile with its icon and the name
-//     in its colour; "Roshetta" in the app's blue when there is none). The block stays white;
+//     in its colour; "Roshetta" in the app's blue when there is none). The wash fades to white towards the bottom;
 //   - the name, 22, the full width, as many lines as it needs;
 //   - the description, as an indented note with a thin line at its start (no fill, so the Rx behind it stays visible) (added and edited HERE, in
 //     place, never in a sheet): a dashed "Add description" box when there is none; the text, two
@@ -147,6 +147,10 @@ export default function RoshettaPadHeader({
     <div
       style={{
         position: 'relative', backgroundColor: 'var(--color-surface)',
+        // A soft wash of the specialty colour at the top fading to the page surface (older phones
+        // that cannot mix colours keep the plain surface), with a fine edge in the same colour.
+        backgroundImage: `linear-gradient(165deg, color-mix(in srgb, ${look.bg} ${isDark ? 60 : 85}%, var(--color-surface)) 0%, color-mix(in srgb, ${look.bg} ${isDark ? 22 : 38}%, var(--color-surface)) 55%, var(--color-surface) 100%)`,
+        boxShadow: `inset 0 -1px 0 color-mix(in srgb, ${look.fg} ${isDark ? 18 : 14}%, transparent)`,
         borderRadius: '0 0 22px 22px',
         margin: '0 calc(-1 * var(--page-gutter, 16px))',
         padding: '4px calc(var(--page-gutter, 16px) + 2px) 12px',
@@ -157,7 +161,7 @@ export default function RoshettaPadHeader({
           style={{
             position: 'absolute', insetInlineEnd: -6, bottom: -14, userSelect: 'none',
             fontSize: 76, fontWeight: 700, fontStyle: 'italic', lineHeight: 1,
-            color: isDark ? 'var(--color-text-primary)' : look.bg, opacity: isDark ? 0.035 : 0.85,
+            color: isDark ? 'var(--color-text-primary)' : look.fg, opacity: isDark ? 0.045 : 0.12,
             fontFamily: 'Georgia, \'Times New Roman\', serif',
           }}
         >
