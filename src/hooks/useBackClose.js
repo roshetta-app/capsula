@@ -113,6 +113,7 @@
 
 import { useEffect, useRef } from 'react'
 import { Capacitor } from '@capacitor/core'
+import { decideBack } from '../utils/backOrder'
 import { App as CapacitorApp } from '@capacitor/app'
 
 let openBackCloseCount = 0
@@ -268,7 +269,8 @@ export function useBackClose(isOpen, onClose) {
 
     const backListenerPromise = CapacitorApp.addListener('backButton', () => {
       if (Date.now() - lastResumedAt < RESUME_GUARD_MS) return
-      if (runBackLayer() !== 'none') return
+      // Step 12.9a: the written order says whether this press is a layer's or the sheet's.
+      if (decideBack({ sheetOpen: true, layerOpen: backLayers.length > 0 }) === 'layer' && runBackLayer() !== 'none') return
       onCloseRef.current()
     })
     openBackCloseCount++
@@ -316,7 +318,7 @@ export function useBackClose(isOpen, onClose) {
       // sheet stays. Go forward onto the placeholder step this press just
       // left, so the stack is exactly what it was. No new history step is
       // added here (see the 2026-10-03 note above).
-      const layerResult = runBackLayer()
+      const layerResult = decideBack({ sheetOpen: true, layerOpen: backLayers.length > 0 }) === 'layer' ? runBackLayer() : 'none'
       if (layerResult === 'handled') {
         rearmPending = true
         window.history.forward()

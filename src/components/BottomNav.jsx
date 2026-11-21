@@ -165,6 +165,8 @@ import { useBackToTop }                 from '../hooks/useBackToTop'
 import { useAuth }                      from '../hooks/useAuth'
 import { isAnyBackCloseOpen, isSheetLayerPress, isSheetClosePress } from '../hooks/useBackClose'
 import { isTabActive, isExactTabScreen, isTopScreen, backTarget } from '../utils/homePaths'
+import { decideBack } from '../utils/backOrder'
+import { hasUnsaved } from '../utils/leaveGuard'
 
 // ─── BottomNav ────────────────────────────────────────────────────────────────
 
@@ -246,11 +248,19 @@ export default function BottomNav() {
     function goBack() {
       // A sheet/popup is already claiming this back press (Phase 1/3) —
       // step aside so it isn't also treated as a tab-level back.
-      if (isAnyBackCloseOpen()) return true
+      // Step 12.9a: what this press is for comes from the written order (utils/backOrder.js).
+      const target = backTarget(locationRef.current.pathname)
+      const action = decideBack({
+        sheetOpen: isAnyBackCloseOpen(),
+        unsavedPending: hasUnsaved(),
+        onTabScreen: true,
+        onHome: !target,
+      })
+      // A sheet, or an unsaved-work question, owns this press: step aside.
+      if (action === 'sheet' || action === 'layer' || action === 'unsaved') return true
 
       // Phase H 9.3a: Back from Topics, Drugs, Favourites or Account goes to Home.
-      const target = backTarget(locationRef.current.pathname)
-      if (target) {
+      if (action === 'home') {
         navigate(target, { replace: true })
         return true
       }
