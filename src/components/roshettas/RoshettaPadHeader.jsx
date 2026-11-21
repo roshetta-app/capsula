@@ -1,6 +1,5 @@
 // src/components/roshettas/RoshettaPadHeader.jsx
-// 2026-11-21 (Roshetta plan, steps 8.3b to 8.3e): the header of the owner's roshetta page. A block with a soft wash of the
-// specialty colour and a rounded bottom, like the topic sheet's header, and the Home roshetta card's faint
+// 2026-11-21 (Roshetta plan, steps 8.3b to 8.3e): the header of the owner's roshetta page. A white block with a rounded bottom, like the topic sheet's header, and the Home roshetta card's faint
 // italic Rx in the bottom corner. Kept short on purpose (about 155 px with a one-line name).
 // Top to bottom:
 //   - the top bar: Back on the start side, Share and the options menu on the end side;
@@ -159,9 +158,9 @@ export default function RoshettaPadHeader({
       <div aria-hidden="true" style={{ position: 'absolute', inset: 0, overflow: 'hidden', borderRadius: 'inherit', pointerEvents: 'none' }}>
         <span
           style={{
-            position: 'absolute', insetInlineEnd: 18, bottom: 34, userSelect: 'none',
-            fontSize: 60, fontWeight: 700, fontStyle: 'italic', lineHeight: 1,
-            color: isDark ? 'var(--color-text-primary)' : look.fg, opacity: isDark ? 0.05 : 0.08,
+            position: 'absolute', insetInlineEnd: -4, bottom: -12, userSelect: 'none',
+            fontSize: 72, fontWeight: 700, fontStyle: 'italic', lineHeight: 1,
+            color: isDark ? 'var(--color-text-primary)' : look.fg, opacity: isDark ? 0.05 : 0.09,
             fontFamily: 'Georgia, \'Times New Roman\', serif',
           }}
         >
