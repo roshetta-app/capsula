@@ -13,6 +13,11 @@
  * an empty roshetta shows "Start your roshetta" and "Add drugs". The letterhead below is the
  * earlier look (still used by the shared page until step 8.5).
  *
+ * 2026-11-21 (step 8.3d): the header was redrawn on white (specialty tile and name above the title,
+ * Created and Edited as small labelled days) and the one status line is the Home My roshettas line
+ * (HomeSyncLine, same words, "See" opens the failed-changes sheet), inside the header's foot; the
+ * grey status box above the content is gone.
+ *
  * 2026-11-16 (step 10.7): the name and description sit in the letterhead (RoshettaPageHeader): a
  * header band with the roshetta's specialty (or "Roshetta" in the app's blue when there is none).
  *
@@ -59,7 +64,8 @@ import { useBackLabel } from '../hooks/useBackLabel'
 import { useDeepLinkParent } from '../hooks/useDeepLinkParent'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
 import useScrollToTopOnOpen from '../hooks/useScrollToTopOnOpen'
-import { syncStatusLine } from '../utils/groupSyncStatus'
+import RoshettaFailedChangesSheet from '../components/roshettas/RoshettaFailedChangesSheet'
+import { noticeKind, statusText } from '../utils/homeRoshettas'
 import { sheetRowsForDisplay } from '../utils/roshettaDrugLines'
 import { findSpecialty } from '../utils/roshettaSpecialty'
 import { pageRoshetta, pageState, pageControls, deleteOutcome, shownRoshetta } from '../utils/roshettaPageState'
@@ -93,8 +99,8 @@ export default function RoshettaScreen() {
   const { specialties } = useConditionContext()
   const {
     roshettas = [], roshettasStatus = 'loading', isGuest = false, reloadRoshettas,
-    waitingCount = 0, failedCount = 0, syncState = 'idle', retryFailedChanges, deleteRoshetta,
-    waitingRoshettaIds = [], getRoshettaShareCode, saveRoshetta, isReadOnly = false,
+    waitingCount = 0, failedCount = 0, syncState = 'idle', deleteRoshetta,
+    waitingRoshettaIds = [], getRoshettaShareCode, saveRoshetta, isReadOnly = false, roshettasLoadError = false,
   } = roshettasApi ?? {}
   const isPro = useIsPro()
   const { loading: authLoading, signInWithGoogle } = useAuth()
@@ -106,6 +112,8 @@ export default function RoshettaScreen() {
   const [detailsOpen, setDetailsOpen] = useState(false)
   // True while the description is being typed in the header: the bottom bar steps aside.
   const [editingDescription, setEditingDescription] = useState(false)
+  // The "See" list of changes that could not be saved (the same sheet the Home section opens).
+  const [seeOpen, setSeeOpen] = useState(false)
   // The live share code (null = not shared or not known), so the delete question can say the link stops working.
   const [shareCode, setShareCode] = useState(null)
   // The roshetta as it was when Delete was confirmed: kept on screen while the delete runs.
@@ -119,9 +127,17 @@ export default function RoshettaScreen() {
     found: !!roshetta, rowCount: rows.length, listCount: roshettas.length,
   })
   const controls = pageControls(state)
-  const line = controls.statusLine
-    ? syncStatusLine({ online: isOnline, failedCount, waitingCount, syncState })
-    : null
+  // The one status line, the same words and rules as the My roshettas section on Home.
+  const syncArgs = { online: isOnline, failedCount, waitingCount, syncState }
+  const refreshFailed = controls.statusLine && roshettasLoadError && isOnline
+  let syncKind = controls.statusLine ? noticeKind(syncArgs) : ''
+  let syncText = statusText(syncKind, failedCount)
+  let syncAction = failedCount > 0 && syncKind === 'failed' ? { label: 'See', run: () => setSeeOpen(true) } : null
+  if (!syncKind && refreshFailed) {
+    syncKind = 'refresh'
+    syncText = statusText('refresh')
+    syncAction = { label: 'Try again', run: reloadRoshettas }
+  }
 
   // Learn once per roshetta whether it has a live link (online only; unknown counts as not shared).
   const roshettaId = roshetta?.id
@@ -344,29 +360,20 @@ export default function RoshettaScreen() {
           specialty={findSpecialty(roshetta.specialtyId, specialties)}
           createdAt={roshetta.createdAt}
           updatedAt={roshetta.updatedAt}
-          waiting={waitingRoshettaIds.includes(id)}
           topLeft={backButton}
           topRight={<>{shareButton}{moreMenu}</>}
           editable={!isReadOnly && !!saveRoshetta}
           onSaveDescription={text => saveRoshetta(roshetta.id, { description: text })}
           onEditingChange={setEditingDescription}
           isPro={isPro}
+          syncKind={syncKind}
+          syncText={syncText}
+          syncActionLabel={syncAction?.label}
+          onSyncAction={syncAction?.run}
         />
 
         {/* The sheet itself: no card, the topic sheet's side margins and spacing. */}
         <div style={{ padding: 'var(--space-5) calc(var(--space-6) - var(--page-gutter, 16px)) 0' }}>
-          {line && (
-            <div style={{ marginBottom: 'var(--space-4)' }}>
-              <GroupStateMessage
-                variant="banner"
-                tone={line.tone}
-                title={line.title}
-                actionLabel={failedCount > 0 ? 'Try again' : undefined}
-                onAction={failedCount > 0 ? retryFailedChanges : undefined}
-              />
-            </div>
-          )}
-
           {state === 'empty' ? (
             <div style={{ textAlign: 'center', padding: 'var(--space-8, 32px) 0 var(--space-4)' }}>
               <Icon name="FileText" size={26} color="var(--color-accent-text)" />
@@ -414,6 +421,7 @@ export default function RoshettaScreen() {
         roshetta={roshetta}
         onSaved={() => {}}
       />
+      <RoshettaFailedChangesSheet isOpen={seeOpen} onClose={() => setSeeOpen(false)} />
       <ConfirmSheet
         isOpen={deleteOpen}
         onClose={() => setDeleteOpen(false)}

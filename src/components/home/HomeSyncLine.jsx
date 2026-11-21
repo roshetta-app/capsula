@@ -13,7 +13,9 @@
  *
  * Must be placed inside a parent that is position: relative and ends at the row (the section's
  * content column does). Props: kind (from noticeKind, 'refresh' or '' for none), text (from
- * statusText), actionLabel, onAction (the amber lines only)
+ * statusText), actionLabel, onAction (the amber lines only), inside (2026-11-21: true when the
+ * line sits INSIDE a box instead of under a row, as on the roshetta page header: it then fills
+ * its relative parent, which should be one line high)
  */
 
 import { useEffect, useState } from 'react'
@@ -41,7 +43,7 @@ const LOOK = {
   saved: { Icon: CheckCircle2, icon: 'var(--color-success)' },
 }
 
-export default function HomeSyncLine({ kind = '', text = '', actionLabel, onAction }) {
+export default function HomeSyncLine({ kind = '', text = '', actionLabel, onAction, inside = false }) {
   const [shown, setShown] = useState(null)
   const [visible, setVisible] = useState(false)
   const [prevKey, setPrevKey] = useState('')
@@ -71,7 +73,7 @@ export default function HomeSyncLine({ kind = '', text = '', actionLabel, onActi
     <div
       role="status"
       aria-live="polite"
-      style={{ position: 'absolute', insetInline: 0, top: '100%', marginTop: 4, height: LINE_H, display: 'flex', alignItems: 'center', pointerEvents: 'none' }}
+      style={{ position: 'absolute', insetInline: 0, top: inside ? 0 : '100%', marginTop: inside ? 0 : 4, height: LINE_H, display: 'flex', alignItems: 'center', pointerEvents: 'none' }}
     >
       <style>{CSS}</style>
       {shown && (
