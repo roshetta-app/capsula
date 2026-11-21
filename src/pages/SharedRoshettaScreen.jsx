@@ -78,6 +78,7 @@ import { specialtyColors } from '../utils/roshettaSpecialty'
 import { useIsDark } from '../utils/specialtyIcon'
 import { sharedPageState, sharedProblemText } from '../utils/roshettaSharedPageState'
 import { findSavedCopy, sharedBarState } from '../utils/shareCredit'
+import { countDrugs } from '../utils/roshettaRows'
 import { copyFields, trimToDrugCap, savedCopyMessage, saveSignInId, isRoshettaSaveRequest, saveCopyAnswer, showSaveBar } from '../utils/roshettaSaveCopy'
 import { logUsageEvent } from '../analytics/usageEvents'
 import { ROUTES } from '../router'
@@ -236,6 +237,8 @@ function SharedRoshettaBody({ code }) {
     isOwner: result.status === 'ok' && result.roshetta.isOwner,
     ownId: result.status === 'ok' ? result.roshetta.ownId : null,
     savedId: savedCopy ? savedCopy.id : null,
+    savedCount: savedCopy ? countDrugs(savedCopy.rows) : undefined,
+    totalCount: result.status === 'ok' ? countDrugs(result.roshetta.rows) : undefined,
   })
   const showOwnerBar = result.status === 'ok' && bar.mode === 'owner'
   const showSave = showSaveBar(state) && !showOwnerBar

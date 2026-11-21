@@ -23,6 +23,8 @@
  *                              for a create, Stage 1): everything waiting for it is dropped
  *              drug limit      too many drugs. A create is dropped with everything waiting for
  *                              it; a save is dropped alone, so a later, smaller save can still go
+ *              already saved   the same link already made a copy: the waiting copy is dropped and
+ *                              told (not shown as a loss), step 13.8
  *              read only       plan lapsed: waiting changes are dropped (deletes still go)
  *              other error     the change is marked failed and not sent again until the person
  *                              taps Retry or Discard
@@ -36,6 +38,7 @@ export const REFUSAL = {
   DRUG_LIMIT: 'drug_limit',
   READ_ONLY: 'read_only',
   ROSHETTA_GONE: 'roshetta_gone',
+  ALREADY_SAVED: 'already_saved',
   ERROR: 'error',
 }
 
@@ -53,7 +56,12 @@ export function classifyError(error, status) {
   if (status === 401 || code === 'PGRST301' || /jwt/i.test(text)) return { kind: 'retry' }
   if (typeof status === 'number' && status >= 500) return { kind: 'retry' }
 
-  if (code === '23505') return { kind: 'exists' } // the same roshetta is already there
+  if (code === '23505') {
+    // A second copy of the same share link for the same person (step 13.8): not "already there",
+    // because it is a different roshetta (another id); the waiting copy is dropped and told.
+    if (text.includes('roshettas_user_source_unique')) return { kind: 'refused', reason: REFUSAL.ALREADY_SAVED }
+    return { kind: 'exists' } // the same roshetta is already there
+  }
   if (text.includes('roshetta_drug_limit_reached')) return { kind: 'refused', reason: REFUSAL.DRUG_LIMIT }
   if (text.includes('roshetta_limit_reached')) return { kind: 'refused', reason: REFUSAL.ROSHETTA_LIMIT }
   if (code === '42501' || /row-level security/i.test(text)) return { kind: 'refused', reason: REFUSAL.READ_ONLY }
@@ -160,6 +168,8 @@ function settle(change, out, roshettaName) {
   switch (out.reason) {
     case REFUSAL.ROSHETTA_GONE:
       return { status: 'dropped_roshetta', event: { kind: 'roshetta_gone', roshettaId, name } }
+    case REFUSAL.ALREADY_SAVED:
+      return { status: 'dropped_roshetta', event: { kind: 'already_saved', roshettaId, name } }
     case REFUSAL.ROSHETTA_LIMIT:
       return { status: 'dropped_roshetta', event: { kind: 'roshetta_limit', roshettaId, name } }
     case REFUSAL.DRUG_LIMIT:
@@ -245,6 +255,10 @@ export function describeEvents(events = [], failed = 0) {
   if (gone.length === 1) messages.push(`${quote(gone[0].name || 'A roshetta')} was deleted on another device, so your changes to it were not saved.`)
   else if (gone.length > 1) messages.push(`${gone.length} roshettas were deleted on another device, so your changes to them were not saved.`)
 
+  const dup = by('already_saved')
+  if (dup.length === 1) messages.push(`${quote(dup[0].name || 'A roshetta')} was not saved again: this link is already in your roshettas.`)
+  else if (dup.length > 1) messages.push(`${dup.length} roshettas were not saved again: those links are already in your roshettas.`)
+
   const full = by('roshetta_limit')
   if (full.length === 1) messages.push(`${quote(full[0].name || 'A roshetta')} could not be saved because you have reached the limit of roshettas.`)
   else if (full.length > 1) messages.push(`${full.length} roshettas could not be saved because you have reached the limit of roshettas.`)
@@ -259,6 +273,7 @@ export function describeEvents(events = [], failed = 0) {
 
   if (failed > 0) messages.push(`${failed} change${failed === 1 ? '' : 's'} could not be saved.`)
 
-  const severe = events.length > 0 || failed > 0
+  // Told, but nothing was lost: the copy the link made earlier is still there.
+  const severe = events.some(e => e.kind !== 'already_saved') || failed > 0
   return { messages, severe }
 }

@@ -18,7 +18,7 @@
  *   readCredit(raw)                everything the shared pages read from the database answer:
  *                                  { ownerName, createdAt, isOwner, ownId }
  *   findSavedCopy(items, code)     the saved copy that came from this link, or null
- *   sharedBarState({ kind, isOwner, ownId, savedId })
+ *   sharedBarState({ kind, isOwner, ownId, savedId, savedCount, totalCount })
  *                                  what the bottom bar of a shared page shows:
  *                                  { mode: 'owner' | 'saved' | 'save', text, button, targetId }
  */
@@ -87,14 +87,18 @@ export function findSavedCopy(items, code) {
   return items.find(item => item && item.sourceCode === code) ?? null;
 }
 
-export function sharedBarState({ kind, isOwner, ownId, savedId } = {}) {
+export function sharedBarState({ kind, isOwner, ownId, savedId, savedCount, totalCount } = {}) {
   const one = kind === 'group' ? 'group' : 'roshetta';
   const many = kind === 'group' ? 'groups' : 'roshettas';
   if (isOwner && ownId) {
     return { mode: 'owner', text: `This is your ${one}`, button: 'Open', targetId: ownId };
   }
   if (savedId) {
-    return { mode: 'saved', text: `Already in your ${many}`, button: 'View', targetId: savedId };
+    // Step 13.8: a copy with fewer drugs than the link (a free account keeps only the first ones)
+    // says so, so the person knows to delete it before saving the full list.
+    const partial = Number.isInteger(savedCount) && Number.isInteger(totalCount) && savedCount < totalCount;
+    const note = partial ? ` \u00b7 ${savedCount} of ${totalCount} drugs` : '';
+    return { mode: 'saved', text: `Already in your ${many}${note}`, button: 'View', targetId: savedId };
   }
   return { mode: 'save', text: '', button: '', targetId: null };
 }

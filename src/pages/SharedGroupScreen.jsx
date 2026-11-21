@@ -230,6 +230,7 @@ function SharedGroupBody({ code }) {
     if (r.reason === 'limit') showGroupLimit('groups')
     else if (r.reason === 'read_only') setNotice(SAVE_READ_ONLY_MESSAGE)
     else if (r.reason === 'offline') setNotice(SAVE_OFFLINE_MESSAGE)
+    else if (r.reason === 'already_saved') setNotice(null)   // another phone saved it first: the bar now says so (step 13.8)
     else if (r.reason !== 'guest') setNotice(SAVE_ERROR_MESSAGE)
   }, [result, drugs, saveSharedGroup, signInId, showGroupLimit, code, savedCopy])
 
@@ -270,6 +271,8 @@ function SharedGroupBody({ code }) {
     isOwner: result.status === 'ok' && result.group.isOwner,
     ownId: result.status === 'ok' ? result.group.ownId : null,
     savedId: savedCopy ? savedCopy.id : null,
+    savedCount: savedCopy ? (savedCopy.brandIds ?? []).length : undefined,
+    totalCount: drugs.length,
   })
   const showOwnerBar = result.status === 'ok' && bar.mode === 'owner'
   const showSave = groupsOn && result.status === 'ok' && drugs.length > 0 && !showOwnerBar

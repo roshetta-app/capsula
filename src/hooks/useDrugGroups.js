@@ -115,7 +115,8 @@ import { supabase } from '../lib/supabase'
 import { logUsageEvent } from '../analytics/usageEvents'
 import { readGroupsCache, writeGroupsCache, clearGroupsCache, readGroupChanges, writeGroupChanges } from '../utils/cache'
 import { newId, makeChange, applyChange, applyQueue, addChange, cancelDelete, clearSending, nextToSend, summarizeQueue, retryFailed, discardFailed } from '../utils/groupChanges'
-import { runSync, sendChange, describeEvents } from '../utils/groupSync'
+import { runSync, sendChange, describeEvents, isSourceClash } from '../utils/groupSync'
+import { removeWithRetry } from '../utils/groupSaveCleanup'
 import { SAVE_OFFLINE_MESSAGE, SAVE_ERROR_MESSAGE } from '../components/drugs/groups/groupMessages'
 import {
   DRUG_GROUPS_CAP_FREE,
@@ -830,14 +831,23 @@ export function useDrugGroups(fav) {
       return (await restoreLocally()) ? { ok: true, queued: true } : { ok: false, reason: 'error' }
     }
 
-    const { error } = await withLimit(supabase.from('drug_groups').insert({
+    const restoreRow = {
       id: group.id,
       name: restoredName,
       description: group.description ?? '',
       color: group.color,
       created_at: group.createdAt,
       ...(group.sourceCode ? { source_code: group.sourceCode } : {}),
-    }))
+    }
+    let { error } = await withLimit(supabase.from('drug_groups').insert(restoreRow))
+    // The same link was saved again after this copy was deleted (step 13.8): the restored group
+    // is made without the link, as an ordinary group, so the restore never fails over it.
+    let linkDropped = false
+    if (isSourceClash(error) && restoreRow.source_code) {
+      delete restoreRow.source_code
+      linkDropped = true
+      ;({ error } = await withLimit(supabase.from('drug_groups').insert(restoreRow)))
+    }
     if (error) {
       if (isTimeout(error)) {
         if (await restoreLocally()) return { ok: true, queued: true }
@@ -855,13 +865,15 @@ export function useDrugGroups(fav) {
         .from('drug_group_items')
         .insert(group.brandIds.map(brand_id => ({ group_id: group.id, brand_id }))))
       if (itemsError) {
-        await withLimit(supabase.from('drug_groups').delete().eq('id', group.id))
+        await removeWithRetry(() => withLimit(supabase.from('drug_groups').delete().eq('id', group.id)))
         toast.error("Couldn't restore the group. Check your connection and try again.")
         return { ok: false, reason: 'error' }
       }
     }
 
-    const restored = restoredName === group.name ? group : { ...group, name: restoredName }
+    const restored = restoredName === group.name && !linkDropped
+      ? group
+      : { ...group, name: restoredName, ...(linkDropped ? { sourceCode: null } : {}) }
     setGroups(prev => newestFirst([restored, ...prev.filter(g => g.id !== group.id)]))
     return { ok: true }
   }, [refuseChange, commitQueue, timedOut, toast])
@@ -906,6 +918,20 @@ export function useDrugGroups(fav) {
       if (String(error?.message ?? '').includes('drug_group_limit_reached')) {
         return { ok: false, reason: 'limit' }
       }
+      if (sourceCode && isSourceClash(error)) {
+        // Another phone (or tab) already saved this link (step 13.8). No second copy is made: the
+        // copy that exists is brought into the list, so the bar says "Already in your groups".
+        const { data: existing } = await withLimit(supabase
+          .from('drug_groups')
+          .select('id, name, description, color, created_at, source_code, drug_group_items(brand_id)')
+          .eq('source_code', sourceCode)
+          .maybeSingle())
+        if (existing) {
+          const found = mapGroupRow(existing)
+          setGroups(prev => (prev.some(g => g.id === found.id) ? prev : newestFirst([found, ...prev])))
+        }
+        return { ok: false, reason: 'already_saved' }
+      }
       if (!quiet) toast.error(SAVE_ERROR_MESSAGE)
       return { ok: false, reason: 'error' }
     }
@@ -915,7 +941,9 @@ export function useDrugGroups(fav) {
         .from('drug_group_items')
         .insert(kept.map(brand_id => ({ group_id: data.id, brand_id }))))
       if (itemsError) {
-        await withLimit(supabase.from('drug_groups').delete().eq('id', data.id))
+        // The delete is checked and tried again: an empty group with its link set must not stay
+        // behind (step 13.8). If every try fails, the bar still shows it as "0 of N drugs".
+        await removeWithRetry(() => withLimit(supabase.from('drug_groups').delete().eq('id', data.id)))
         if (isTimeout(itemsError)) return timedOut(SAVE_OFFLINE_MESSAGE, quiet)
         if (!quiet) toast.error(SAVE_ERROR_MESSAGE)
         return { ok: false, reason: 'error' }

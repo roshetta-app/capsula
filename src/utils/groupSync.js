@@ -35,18 +35,25 @@ export function numberedName(base, n) {
   return String(base).slice(0, NAME_MAX - suffix.length).trimEnd() + suffix
 }
 
-import { markSending, removeChange, markFailed, nextToSend, dropGroup } from './groupChanges'
+import { markSending, removeChange, markFailed, nextToSend, dropGroup } from './groupChanges.js'
 
 export const REFUSAL = {
   NAME_TAKEN: 'name_taken',
   GROUP_LIMIT: 'group_limit',
   DRUG_LIMIT: 'drug_limit',
+  SOURCE_TAKEN: 'source_taken',
   READ_ONLY: 'read_only',
   GROUP_GONE: 'group_gone',
   ERROR: 'error',
 }
 
 const NETWORK_WORDS = /failed to fetch|networkerror|network request failed|load failed|fetch failed|network error/i
+
+// The database refused a second copy of one share link for the same person (step 13.8).
+export function isSourceClash(error) {
+  return String(error?.code ?? '') === '23505'
+    && `${error?.message ?? ''} ${error?.details ?? ''}`.includes('drug_groups_user_source_unique')
+}
 
 // Sorts one database answer into done / retry / refused.
 // error: the Supabase error (or the timeout error); status: the HTTP status when known.
@@ -62,6 +69,7 @@ export function classifyError(error, status) {
 
   if (code === '23505') {
     if (text.includes('drug_groups_user_name_unique')) return { kind: 'refused', reason: REFUSAL.NAME_TAKEN }
+    if (text.includes('drug_groups_user_source_unique')) return { kind: 'refused', reason: REFUSAL.SOURCE_TAKEN }
     return { kind: 'exists' } // the same row is already there
   }
   if (text.includes('drug_group_items_limit_reached')) return { kind: 'refused', reason: REFUSAL.DRUG_LIMIT }
@@ -92,7 +100,7 @@ export async function sendChange(client, change, limit = x => x) {
   try {
     switch (type) {
       case 'create': {
-        const res = await limit(client.from('drug_groups').insert({
+        const row = {
           id: groupId,
           name: data.name,
           description: data.description ?? '',
@@ -100,7 +108,15 @@ export async function sendChange(client, change, limit = x => x) {
           created_at: data.createdAt,
           // Kept when a deleted copy is restored while offline (step 13.7); never changed later.
           ...(data.sourceCode ? { source_code: data.sourceCode } : {}),
-        }))
+        }
+        let res = await limit(client.from('drug_groups').insert(row))
+        if (isSourceClash(res?.error) && 'source_code' in row) {
+          // The same link was saved again while this waited: the restored group is made as an
+          // ordinary group, without the link, so nothing is lost (step 13.8).
+          const without = { ...row }
+          delete without.source_code
+          res = await limit(client.from('drug_groups').insert(without))
+        }
         return toResult(res)
       }
       case 'update': {
