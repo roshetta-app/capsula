@@ -16,7 +16,8 @@
  * statusText), actionLabel, onAction (the amber lines only), inside (2026-11-21: true when the
  * line sits INSIDE a box instead of under a row, as on the roshetta page header: it then fills
  * its relative parent, which should be one line high), end (true: the message is pushed to
- * the end side of that parent)
+ * the end side of that parent), onActiveChange (2026-11-21, optional: called with true while a
+ * message is showing and false when it is gone, so the roshetta header can hand the line its place)
  */
 
 import { useEffect, useState } from 'react'
@@ -44,7 +45,7 @@ const LOOK = {
   saved: { Icon: CheckCircle2, icon: 'var(--color-success)' },
 }
 
-export default function HomeSyncLine({ kind = '', text = '', actionLabel, onAction, inside = false, end = false }) {
+export default function HomeSyncLine({ kind = '', text = '', actionLabel, onAction, inside = false, end = false, onActiveChange }) {
   const [shown, setShown] = useState(null)
   const [visible, setVisible] = useState(false)
   const [prevKey, setPrevKey] = useState('')
@@ -64,6 +65,8 @@ export default function HomeSyncLine({ kind = '', text = '', actionLabel, onActi
     const t = setTimeout(() => setVisible(false), SAVED_SHOWN_MS)
     return () => clearTimeout(t)
   }, [visible, shown])
+
+  useEffect(() => { onActiveChange?.(visible) }, [visible, onActiveChange])
 
   const look = LOOK[shown?.kind] ?? LOOK.waiting
   const Icon = look.Icon

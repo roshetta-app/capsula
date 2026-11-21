@@ -13,11 +13,11 @@
 //     button, and one slim row with the count, Cancel and Save (Save is grey until the text
 //     changes; a refusal shows in words and the text stays; Back closes the editing first and,
 //     if the text changed, asks before discarding);
-//   - the dates: "Created 12 Nov" and, when it is a different day, "Edited Today", each with a small
-//     icon, on one line;
-//   - under them, on its own row, the one status line the Home roshetta section uses (Waiting to
-//     save, Saving, Offline, changes not saved with See, All saved). The row is always one line
-//     high, so nothing moves when a message appears and the message is never cut by the dates.
+//   - the last row: the dates, "Created 12 Nov" and, when it is a different day, "Edited Today",
+//     each with a small icon. While a status message shows (the one the Home roshetta section uses:
+//     Waiting to save, Saving, Offline, changes not saved with See, All saved) it takes the dates'
+//     place on that same row, so there is no empty reserved line and nothing is cut or moves;
+//     the dates return when the message is gone.
 //
 // Props:
 //   name, description, specialty (the picker shape, or null), createdAt, updatedAt (ISO text)
@@ -64,6 +64,7 @@ export default function RoshettaPadHeader({
   const [open, setOpen] = useState(false)          // a long description shown in full
   const [clamps, setClamps] = useState(false)      // the text is longer than two lines
   const [discardOpen, setDiscardOpen] = useState(false)
+  const [syncActive, setSyncActive] = useState(false)   // a status message is showing
   const textRef = useRef(null)
   const boxRef = useRef(null)
   const areaRef = useRef(null)
@@ -343,15 +344,21 @@ export default function RoshettaPadHeader({
         </button>
       ) : null}
 
-      {(created || showEdited) && (
-        <div style={{ position: 'relative', display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: 12, rowGap: 2, marginTop: 10, fontSize: 12, lineHeight: 1.3, color: 'var(--color-text-tertiary)', fontFamily: font }}>
+      {/* The last row: the dates. While a status message shows (waiting, saving, offline, not saved,
+          all saved) it takes the dates' place on this same row, so there is no empty reserved line,
+          nothing is cut and nothing moves; the dates come back when the message is gone. */}
+      <div style={{ position: 'relative', marginTop: 10, minHeight: LINE_H }}>
+        <div
+          style={{
+            display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: 12, rowGap: 2,
+            fontSize: 12, lineHeight: 1.3, color: 'var(--color-text-tertiary)', fontFamily: font,
+            opacity: syncActive ? 0 : 1, transition: 'opacity var(--motion-base) var(--ease-reveal)',
+          }}
+        >
           {created && dateText(CalendarDays, 'Created', created)}
           {showEdited && dateText(Clock, 'Edited', edited)}
         </div>
-      )}
-      {/* The status line has its own row, always one line high, so it is never cut and nothing moves when it appears. */}
-      <div style={{ position: 'relative', height: LINE_H, marginTop: 4 }}>
-        <HomeSyncLine inside kind={syncKind} text={syncText} actionLabel={syncActionLabel} onAction={onSyncAction} />
+        <HomeSyncLine inside kind={syncKind} text={syncText} actionLabel={syncActionLabel} onAction={onSyncAction} onActiveChange={setSyncActive} />
       </div>
       <ConfirmSheet
         isOpen={discardOpen}
