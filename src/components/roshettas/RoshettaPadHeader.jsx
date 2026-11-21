@@ -29,7 +29,7 @@
 //   syncKind, syncText, syncActionLabel, onSyncAction   the status line (see HomeSyncLine)
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { AlertCircle, CircleX, FileText, Pencil, Plus } from 'lucide-react'
+import { AlertCircle, CalendarDays, CircleX, Clock, FileText, Pencil, Plus } from 'lucide-react'
 import ConfirmSheet from '../ui/ConfirmSheet'
 import HomeSyncLine, { LINE_H } from '../home/HomeSyncLine'
 import { useBackClose } from '../../hooks/useBackClose'
@@ -137,20 +137,19 @@ export default function RoshettaPadHeader({
     else stopEdit()
   })
 
-  const dateText = (title, value) => (
-    <span style={{ whiteSpace: 'nowrap' }}>
-      {title}{' '}<span style={{ fontWeight: 500, color: 'var(--color-text-secondary)' }}>{value}</span>
+  const dateText = (Icon, title, value) => (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
+      <Icon size={12} strokeWidth={2} aria-hidden="true" style={{ flexShrink: 0 }} />
+      <span>{title}{' '}<span style={{ fontWeight: 500, color: 'var(--color-text-secondary)' }}>{value}</span></span>
     </span>
   )
 
   return (
     <div
       style={{
-        position: 'relative', backgroundColor: 'var(--color-surface)',
-        // A soft wash of the specialty colour at the top fading to the page surface (older phones
-        // that cannot mix colours keep the plain surface), with a fine edge in the same colour.
-        backgroundImage: `linear-gradient(165deg, color-mix(in srgb, ${look.bg} ${isDark ? 60 : 85}%, var(--color-surface)) 0%, color-mix(in srgb, ${look.bg} ${isDark ? 22 : 38}%, var(--color-surface)) 55%, var(--color-surface) 100%)`,
-        boxShadow: `inset 0 -1px 0 color-mix(in srgb, ${look.fg} ${isDark ? 18 : 14}%, transparent)`,
+        position: 'relative',
+        // One flat, light tint of the specialty colour. No gradient and no edge line: the soft rounded bottom is the only shape.
+        backgroundColor: `color-mix(in srgb, ${look.bg} ${isDark ? 45 : 55}%, var(--color-surface))`,
         borderRadius: '0 0 22px 22px',
         margin: '0 calc(-1 * var(--page-gutter, 16px))',
         padding: '4px calc(var(--page-gutter, 16px) + 2px) 12px',
@@ -354,8 +353,8 @@ export default function RoshettaPadHeader({
       <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 12, marginTop: 10, minHeight: LINE_H }}>
         {(created || showEdited) && (
           <div style={{ display: 'flex', flexShrink: 0, gap: 12, fontSize: 12, lineHeight: 1.3, color: 'var(--color-text-tertiary)', fontFamily: font }}>
-            {created && dateText('Created', created)}
-            {showEdited && dateText('Edited', edited)}
+            {created && dateText(CalendarDays, 'Created', created)}
+            {showEdited && dateText(Clock, 'Edited', edited)}
           </div>
         )}
         <div style={{ position: 'relative', flex: 1, minWidth: 0, height: LINE_H }}>
