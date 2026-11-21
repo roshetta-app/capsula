@@ -457,6 +457,19 @@ export default function DrugGroupScreen() {
             {group.name}
           </h1>
 
+          <InlineDescription
+            text={group.description}
+            editable={canEdit && !!updateGroup}
+            onSave={text => updateGroup(group.id, { description: text })}
+            failureMessage={descriptionFailureMessage}
+            max={GROUP_DESCRIPTION_MAX}
+            placeholder="Tell us a little about this group…"
+            dir="ltr"
+            lines={3}
+            textColor="color-mix(in srgb, var(--color-text-primary) 72%, transparent)"
+            discardMessage="Your change to the description won't be saved."
+          />
+
           <div>
             <div
               role="progressbar"
@@ -475,19 +488,6 @@ export default function DrugGroupScreen() {
               }} />
             </div>
           </div>
-
-          <InlineDescription
-            text={group.description}
-            editable={canEdit && !!updateGroup}
-            onSave={text => updateGroup(group.id, { description: text })}
-            failureMessage={descriptionFailureMessage}
-            max={GROUP_DESCRIPTION_MAX}
-            placeholder="Tell us a little about this group…"
-            dir="ltr"
-            lines={3}
-            textColor="color-mix(in srgb, var(--color-text-primary) 72%, transparent)"
-            discardMessage="Your change to the description won't be saved."
-          />
         </FolderShell>
 
         <GroupSyncStatus marginTop="var(--space-3)" />
