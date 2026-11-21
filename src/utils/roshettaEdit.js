@@ -42,11 +42,19 @@ function cleanFields({ name, description, rows, specialtyId }) {
 
 // New roshetta. The id is made here, so it can be changed again before it
 // reaches the server, and sending it twice makes only one roshetta.
-export function prepareCreate({ name, description = '', rows = [], specialtyId } = {}, { makeId = newId, now = () => new Date().toISOString() } = {}) {
+// sourceCode (Phase L, step 13.7): the share link this copy was saved from. Only a create carries it
+// (the database takes it at insert and never lets it change); a share code is 32 to 128 characters.
+export function prepareCreate({ name, description = '', rows = [], specialtyId, sourceCode } = {}, { makeId = newId, now = () => new Date().toISOString() } = {}) {
   const clean = cleanFields({ name, description, rows, specialtyId })
   if (!clean.ok) return clean
+  const extra = {}
+  if (sourceCode !== undefined) {
+    const okCode = typeof sourceCode === 'string' && sourceCode.trim().length >= 32 && sourceCode.trim().length <= 128
+    if (!okCode) return { ok: false, reason: 'invalid', detail: 'source_invalid' }
+    extra.sourceCode = sourceCode.trim()
+  }
   const id = makeId()
-  return { ok: true, id, change: makeChange('create', id, { ...clean.fields, createdAt: now() }) }
+  return { ok: true, id, change: makeChange('create', id, { ...clean.fields, ...extra, createdAt: now() }) }
 }
 
 // Saves the WHOLE roshetta. A field that is left out keeps its current value.

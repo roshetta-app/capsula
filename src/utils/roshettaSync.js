@@ -96,6 +96,8 @@ export async function sendChange(client, change, limit = x => x) {
           rows: data.rows ?? [],
           created_at: data.createdAt,
           ...specialtyField(data),
+          // The link a copy was saved from (step 13.7): sent on the create only, never changed later.
+          ...(data.sourceCode ? { source_code: data.sourceCode } : {}),
         }
         let res = await limit(client.from('roshettas').insert(row))
         if (specialtyGone(res?.error) && 'specialty_id' in row) {

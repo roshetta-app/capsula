@@ -31,7 +31,7 @@
 
 import { applyQueue, clearSending, newestChangedFirst } from './roshettaChanges.js'
 
-export const ROSHETTA_COLUMNS = 'id, name, description, rows, specialty_id, created_at, updated_at'
+export const ROSHETTA_COLUMNS = 'id, name, description, rows, specialty_id, source_code, created_at, updated_at'
 export const REQUEST_TIMEOUT_MS = 8000
 
 const TIMEOUT_ERROR = { code: 'request_timeout', message: 'request_timeout' }
@@ -44,6 +44,8 @@ export function mapRoshettaRow(r) {
     description: r.description ?? '',
     rows: Array.isArray(r.rows) ? r.rows : [],
     specialtyId: typeof r.specialty_id === 'string' && r.specialty_id ? r.specialty_id : null,
+    // The share link this roshetta was saved from (Save a copy), or none. Set once, at the create.
+    sourceCode: typeof r.source_code === 'string' && r.source_code ? r.source_code : null,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   }

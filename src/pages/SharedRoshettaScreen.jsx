@@ -59,7 +59,7 @@
  * it twice) and 'shared_roshetta_save' when a copy is saved (the new roshetta's id).
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { FileX, FileText, WifiOff, AlertTriangle, Check } from 'lucide-react'
 import RoshettaDisclaimer from '../components/roshettas/RoshettaDisclaimer'
@@ -77,7 +77,7 @@ import { sheetRowsForDisplay } from '../utils/roshettaDrugLines'
 import { specialtyColors } from '../utils/roshettaSpecialty'
 import { useIsDark } from '../utils/specialtyIcon'
 import { sharedPageState, sharedProblemText } from '../utils/roshettaSharedPageState'
-import { sharedBarState } from '../utils/shareCredit'
+import { findSavedCopy, sharedBarState } from '../utils/shareCredit'
 import { copyFields, trimToDrugCap, savedCopyMessage, saveSignInId, isRoshettaSaveRequest, saveCopyAnswer, showSaveBar } from '../utils/roshettaSaveCopy'
 import { logUsageEvent } from '../analytics/usageEvents'
 import { ROUTES } from '../router'
@@ -152,7 +152,7 @@ function SharedRoshettaBody({ code }) {
 
   // ── Save a copy (step 6.2c) ───────────────────────────────────────────────
   const { promptSignIn, pendingFavourite, roshettasApi } = useFavouritesContext()
-  const { roshettasStatus, createRoshetta, roshettaDrugCap, showRoshettaLimit, showRoshettaReadOnly } = roshettasApi
+  const { roshettas, roshettasStatus, createRoshetta, roshettaDrugCap, showRoshettaLimit, showRoshettaReadOnly } = roshettasApi
   const isPro = useIsPro()
   const isDark = useIsDark()
   // { phase: 'idle' | 'saving' | 'saved', roshettaId?, saved?, total? }
@@ -164,14 +164,19 @@ function SharedRoshettaBody({ code }) {
   // because the prompt keeps the request.
   const armedRef = useRef(isRoshettaSaveRequest(pendingFavourite, code))
 
+  // The copy this link already made in the person's own roshettas, if any (step 13.7). One saved
+  // while offline counts at once: the waiting create carries the link too.
+  const savedCopy = useMemo(() => findSavedCopy(roshettas, code), [roshettas, code])
+
   const runSave = useCallback(async () => {
     if (savingRef.current || result.status !== 'ok') return
     if (result.roshetta.isOwner) return   // your own roshetta is never saved again as a copy
+    if (savedCopy) return                 // this link is already saved in your roshettas (step 13.7)
     savingRef.current = true
     setNotice(null)
     setSaveState({ phase: 'saving' })
     // Over the account's drug limit: keep the first drugs (step 6.2d) and say so afterwards.
-    const fields = copyFields(result.roshetta)
+    const fields = copyFields(result.roshetta, code)   // the link code, so the same link later says "Already in your roshettas"
     const kept = trimToDrugCap(fields.rows, roshettaDrugCap)
     let answer
     try {
@@ -193,7 +198,7 @@ function SharedRoshettaBody({ code }) {
     } else if (r.kind === 'notice') {
       setNotice(r.message)
     }
-  }, [result, createRoshetta, roshettaDrugCap, showRoshettaLimit, showRoshettaReadOnly])
+  }, [result, createRoshetta, roshettaDrugCap, showRoshettaLimit, showRoshettaReadOnly, code, savedCopy])
 
   function handleSaveTap() {
     if (authLoading || saveState.phase !== 'idle' || answerIsStale) return
@@ -230,6 +235,7 @@ function SharedRoshettaBody({ code }) {
     kind: 'roshetta',
     isOwner: result.status === 'ok' && result.roshetta.isOwner,
     ownId: result.status === 'ok' ? result.roshetta.ownId : null,
+    savedId: savedCopy ? savedCopy.id : null,
   })
   const showOwnerBar = result.status === 'ok' && bar.mode === 'owner'
   const showSave = showSaveBar(state) && !showOwnerBar
@@ -378,6 +384,24 @@ function SharedRoshettaBody({ code }) {
               <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
                 <FileText size={18} strokeWidth={1.8} color="var(--color-text-secondary)" aria-hidden="true" style={{ flexShrink: 0 }} />
                 <span style={{ fontSize: 14, lineHeight: 1.4, color: 'var(--color-text-primary)' }}>{bar.text}</span>
+              </span>
+              <button
+                onClick={() => openPage(ROUTES.ROSHETTA(bar.targetId))}
+                style={{
+                  flexShrink: 0, minHeight: 44, border: 'none', cursor: 'pointer', padding: '0 20px',
+                  borderRadius: 999, backgroundColor: 'var(--color-accent-solid)', color: '#fff',
+                  fontSize: 14, fontWeight: 600, fontFamily: 'var(--font-body)',
+                  WebkitTapHighlightColor: 'transparent', outline: 'none',
+                }}
+              >
+                {bar.button}
+              </button>
+            </div>
+          ) : saveState.phase !== 'saved' && bar.mode === 'saved' ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                <Check size={18} strokeWidth={2.6} color="var(--color-success)" aria-hidden="true" style={{ flexShrink: 0 }} />
+                <span role="status" style={{ fontSize: 14, lineHeight: 1.4, color: 'var(--color-text-primary)' }}>{bar.text}</span>
               </span>
               <button
                 onClick={() => openPage(ROUTES.ROSHETTA(bar.targetId))}

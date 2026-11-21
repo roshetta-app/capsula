@@ -98,6 +98,8 @@ export async function sendChange(client, change, limit = x => x) {
           description: data.description ?? '',
           color: data.color ?? 'blue',
           created_at: data.createdAt,
+          // Kept when a deleted copy is restored while offline (step 13.7); never changed later.
+          ...(data.sourceCode ? { source_code: data.sourceCode } : {}),
         }))
         return toResult(res)
       }

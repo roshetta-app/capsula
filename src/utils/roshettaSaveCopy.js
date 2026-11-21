@@ -10,13 +10,15 @@
 
 // What the copy is made from. Only name, description, rows and the specialty are taken
 // (assumption J: the copy keeps the specialty; a shared roshetta without one makes a copy without one).
-export function copyFields(roshetta) {
+// sourceCode (step 13.7): the link code the copy is saved from, so the same link later says "Already in your roshettas".
+export function copyFields(roshetta, sourceCode) {
   const fields = {
     name: roshetta.name,
     description: roshetta.description || '',
     rows: Array.isArray(roshetta.rows) ? roshetta.rows : [],
   }
   if (typeof roshetta.specialtyId === 'string' && roshetta.specialtyId) fields.specialtyId = roshetta.specialtyId
+  if (typeof sourceCode === 'string' && sourceCode.trim()) fields.sourceCode = sourceCode.trim()
   return fields
 }
 

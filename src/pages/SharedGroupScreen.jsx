@@ -99,7 +99,7 @@ import { SAVE_OFFLINE_MESSAGE, SAVE_READ_ONLY_MESSAGE, SAVE_ERROR_MESSAGE, saved
 import { useIsDark } from '../utils/specialtyIcon'
 import { resolveToken } from '../utils/specialtyTokens'
 import { fetchSharedGroup } from '../utils/sharedGroup'
-import { dayText, sharedBarState } from '../utils/shareCredit'
+import { dayText, findSavedCopy, sharedBarState } from '../utils/shareCredit'
 import { logUsageEvent } from '../analytics/usageEvents'
 import { ROUTES } from '../router'
 
@@ -136,7 +136,7 @@ function SharedGroupBody({ code }) {
   // The first screen of the session has nothing behind it, so no Back button.
   const canGoBack = location.key !== 'default'
   const { user, loading: authLoading } = useAuth()
-  const { promptSignIn, pendingFavourite, groupsStatus, saveSharedGroup, showGroupLimit } = useFavouritesContext()
+  const { promptSignIn, pendingFavourite, groups, groupsStatus, saveSharedGroup, showGroupLimit } = useFavouritesContext()
   const groupsOn = isDrugGroupsOn()
 
   const isDark = useIsDark()
@@ -198,9 +198,14 @@ function SharedGroupBody({ code }) {
   // reloaded the page, because the prompt keeps the request.
   const armedRef = useRef(pendingFavourite?.type === 'groups' && pendingFavourite.id === signInId)
 
+  // The copy this link already made in the person's own groups, if any (step 13.7). A group saved
+  // while offline counts at once: the waiting create carries the link too.
+  const savedCopy = useMemo(() => findSavedCopy(groups, code), [groups, code])
+
   const runSave = useCallback(async () => {
     if (savingRef.current || result.status !== 'ok') return
     if (result.group.isOwner) return   // your own group is never saved again as a copy
+    if (savedCopy) return              // this link is already saved in your groups (step 13.7)
     savingRef.current = true
     setNotice(null)
     setSaveState({ phase: 'saving' })
@@ -210,6 +215,7 @@ function SharedGroupBody({ code }) {
       description: g.description,
       color: g.color,
       brandIds: drugs.map(d => d.id),
+      sourceCode: code,   // so the same link later says "Already in your groups"
       signInId,
       quiet: true,
     })
@@ -225,7 +231,7 @@ function SharedGroupBody({ code }) {
     else if (r.reason === 'read_only') setNotice(SAVE_READ_ONLY_MESSAGE)
     else if (r.reason === 'offline') setNotice(SAVE_OFFLINE_MESSAGE)
     else if (r.reason !== 'guest') setNotice(SAVE_ERROR_MESSAGE)
-  }, [result, drugs, saveSharedGroup, signInId, showGroupLimit])
+  }, [result, drugs, saveSharedGroup, signInId, showGroupLimit, code, savedCopy])
 
   function handleSaveTap() {
     if (authLoading || saveState.phase !== 'idle' || answerIsStale) return
@@ -263,6 +269,7 @@ function SharedGroupBody({ code }) {
     kind: 'group',
     isOwner: result.status === 'ok' && result.group.isOwner,
     ownId: result.status === 'ok' ? result.group.ownId : null,
+    savedId: savedCopy ? savedCopy.id : null,
   })
   const showOwnerBar = result.status === 'ok' && bar.mode === 'owner'
   const showSave = groupsOn && result.status === 'ok' && drugs.length > 0 && !showOwnerBar
@@ -430,6 +437,24 @@ function SharedGroupBody({ code }) {
               <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
                 <FolderOpen size={18} strokeWidth={1.8} color="var(--color-text-secondary)" aria-hidden="true" style={{ flexShrink: 0 }} />
                 <span style={{ fontSize: 14, lineHeight: 1.4, color: 'var(--color-text-primary)' }}>{bar.text}</span>
+              </span>
+              <button
+                onClick={() => openPage(ROUTES.DRUGS_GROUP(bar.targetId))}
+                style={{
+                  flexShrink: 0, minHeight: 44, border: 'none', cursor: 'pointer', padding: '0 20px',
+                  borderRadius: 999, backgroundColor: 'var(--color-accent-solid)', color: '#fff',
+                  fontSize: 14, fontWeight: 600, fontFamily: 'var(--font-body)',
+                  WebkitTapHighlightColor: 'transparent', outline: 'none',
+                }}
+              >
+                {bar.button}
+              </button>
+            </div>
+          ) : saveState.phase !== 'saved' && bar.mode === 'saved' ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                <Check size={18} strokeWidth={2.6} color="var(--color-success)" aria-hidden="true" style={{ flexShrink: 0 }} />
+                <span role="status" style={{ fontSize: 14, lineHeight: 1.4, color: 'var(--color-text-primary)' }}>{bar.text}</span>
               </span>
               <button
                 onClick={() => openPage(ROUTES.DRUGS_GROUP(bar.targetId))}

@@ -60,6 +60,7 @@ export function applyChange(groups, change) {
         description: data.description ?? '',
         color: data.color ?? 'blue',
         createdAt: data.createdAt ?? change.at,
+        ...(data.sourceCode ? { sourceCode: data.sourceCode } : {}),
         brandIds: [],
       }
       return newestFirst([group, ...groups])

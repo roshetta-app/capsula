@@ -10,7 +10,8 @@
  *
  * A change is one small thing the person did:
  *   { id, type, roshettaId, data, at, sending? }
- *   type 'create'  data { name, description, rows, createdAt, specialtyId? }
+ *   type 'create'  data { name, description, rows, createdAt, specialtyId?, sourceCode? }
+ *                  (sourceCode: the share link a copy was saved from; set once, here, never by a save)
  *   type 'save'    data { name, description, rows, specialtyId? }   the WHOLE roshetta
  *                  (specialtyId: left out = the server keeps its value; null = none)
  *   type 'delete'  data {}
@@ -61,6 +62,7 @@ export function applyChange(roshettas, change) {
         description: data.description ?? '',
         rows: data.rows ?? [],
         ...(data.specialtyId !== undefined ? { specialtyId: data.specialtyId } : {}),
+        ...(data.sourceCode ? { sourceCode: data.sourceCode } : {}),
         createdAt: data.createdAt ?? change.at,
         updatedAt: change.at,
       }

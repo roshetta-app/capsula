@@ -54,7 +54,8 @@
  * with useFavouritesContext().
  *
  * Returns:
- *   groups          { id, name, description, color, createdAt, brandIds }[]  newest first
+ *   groups          { id, name, description, color, createdAt, sourceCode, brandIds }[]  newest first
+ *                   (sourceCode: the share link a copy was saved from, or null)
  *   groupsStatus    'loading' | 'ready' | 'error'
  *   groupsFromCache true while the list shown is the saved copy
  *   groupsLoadError true when the last refresh failed (with a saved copy still shown)
@@ -85,7 +86,7 @@
  *   showGroupLimit  (kind) => void  opens the limit sheet (Free: with Upgrade; Pro: with OK)
  *   showGroupReadOnly () => void    opens the sheet with the read only message (not counted as a limit hit)
  *   dismissGroupLimit () => void
- *   saveSharedGroup ({ name, description, color, brandIds, signInId, quiet }) =>
+ *   saveSharedGroup ({ name, description, color, brandIds, sourceCode, signInId, quiet }) =>
  *                   Promise<{ ok, reason?, group?, saved?, total? }>   (2026-10-19, step 8.3)
  *                   Makes the viewer's own copy of a shared group: a new group
  *                   (new id, not linked to the original, no share link, nothing
@@ -169,6 +170,8 @@ function mapGroupRow(r) {
     description: r.description ?? '',
     color: r.color,
     createdAt: r.created_at,
+    // The share link this group was saved from (Save to my groups), or none (step 13.7).
+    sourceCode: typeof r.source_code === 'string' && r.source_code ? r.source_code : null,
     brandIds: (r.drug_group_items ?? []).map(i => i.brand_id),
   }
 }
@@ -370,7 +373,7 @@ export function useDrugGroups(fav) {
     // 3. Live list.
     const { data, error } = await withLimit(supabase
       .from('drug_groups')
-      .select('id, name, description, color, created_at, drug_group_items(brand_id)')
+      .select('id, name, description, color, created_at, source_code, drug_group_items(brand_id)')
       .order('created_at', { ascending: false }))
     if (stale()) return
 
@@ -812,6 +815,7 @@ export function useDrugGroups(fav) {
             description: group.description ?? '',
             color: group.color,
             createdAt: group.createdAt,
+            ...(group.sourceCode ? { sourceCode: group.sourceCode } : {}),
           }),
           ...(group.brandIds ?? []).map(brandId => makeChange('add_drug', group.id, { brandId })),
         ]
@@ -832,6 +836,7 @@ export function useDrugGroups(fav) {
       description: group.description ?? '',
       color: group.color,
       created_at: group.createdAt,
+      ...(group.sourceCode ? { source_code: group.sourceCode } : {}),
     }))
     if (error) {
       if (isTimeout(error)) {
@@ -867,7 +872,7 @@ export function useDrugGroups(fav) {
   // shared page lists them A to Z), Pro the first 50. The copy is an ordinary
   // group: new id, no share link, and the shared page never carries the owner.
   // If the drugs fail to save, the new group row is removed again.
-  const saveSharedGroup = useCallback(async ({ name, description = '', color = 'blue', brandIds = [], signInId, quiet = false } = {}) => {
+  const saveSharedGroup = useCallback(async ({ name, description = '', color = 'blue', brandIds = [], sourceCode, signInId, quiet = false } = {}) => {
     const refused = refuseChange({ signInId, offlineMessage: SAVE_OFFLINE_MESSAGE, quiet })
     if (refused) return refused
     const groupCap = isProRef.current ? DRUG_GROUPS_CAP_PRO : DRUG_GROUPS_CAP_FREE
@@ -888,8 +893,8 @@ export function useDrugGroups(fav) {
     for (let attempt = 0; attempt < 3; attempt += 1) {
       const res = await withLimit(supabase
         .from('drug_groups')
-        .insert({ ...fields, name: copyName })
-        .select('id, name, description, color, created_at')
+        .insert({ ...fields, name: copyName, ...(sourceCode ? { source_code: sourceCode } : {}) })
+        .select('id, name, description, color, created_at, source_code')
         .single())
       data = res.data
       error = res.error
