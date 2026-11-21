@@ -1,8 +1,8 @@
 /**
  * src/components/drugs/groups/GroupEditorSheet.jsx
  * 2026-10-19 (Drug groups plan, step 4.1): the bottom sheet for making a group
- * or changing one. Name (required, 40 characters), description (optional,
- * 200 characters with a counter), colour (one of five), and Save.
+ * or changing one. Name (required, 40 characters), colour, and Save. The description is
+ * edited on the group page, never here (2026-11-21).
  *
  * Props:
  *   isOpen   boolean
@@ -64,13 +64,13 @@
  */
 
 import { useMemo, useRef, useState } from 'react'
-import { Check, Trash2, X } from 'lucide-react'
+import { AlertCircle, Check, Folder, Trash2, X } from 'lucide-react'
 import SheetShell from '../../ui/SheetShell'
 import ConfirmSheet from '../../ui/ConfirmSheet'
 import { useFavouritesContext } from '../../../context/FavouritesContext'
 import { useIsPro } from '../../../hooks/useIsPro'
 import { useDirtyState } from '../../../hooks/useDirtyState'
-import { GROUP_NAME_MAX, GROUP_DESCRIPTION_MAX, GROUP_COLORS, NAME_TAKEN_MESSAGE, groupNameKey } from '../../../hooks/useDrugGroups'
+import { GROUP_NAME_MAX, GROUP_COLORS, NAME_TAKEN_MESSAGE, groupNameKey } from '../../../hooks/useDrugGroups'
 import { resolveToken } from '../../../utils/specialtyTokens'
 import { useIsDark } from '../../../utils/specialtyIcon'
 import { groupsLimitMessage, drugsLimitMessage } from './groupMessages'
@@ -79,7 +79,7 @@ const COLOR_LABELS = {
   blue: 'Blue', teal: 'Teal', violet: 'Violet', amber: 'Amber', rose: 'Rose',
   green: 'Green', orange: 'Orange', pink: 'Pink', indigo: 'Indigo', cyan: 'Cyan',
 }
-const BLANK = { name: '', description: '', color: GROUP_COLORS[0], brandIds: [] }
+const BLANK = { name: '', color: GROUP_COLORS[0], brandIds: [] }
 
 function sameIds(a, b) {
   return a.length === b.length && a.slice().sort().join('|') === b.slice().sort().join('|')
@@ -99,7 +99,7 @@ function saveFailureMessage(reason, isPro) {
 
 const LABEL_STYLE = {
   display: 'block', marginBottom: 6,
-  fontSize: 12, fontWeight: 600, letterSpacing: '0.02em',
+  fontSize: 13, fontWeight: 500,
   color: 'var(--color-text-secondary)', fontFamily: 'var(--font-body)',
 }
 
@@ -107,7 +107,7 @@ const FIELD_STYLE = {
   width: '100%', boxSizing: 'border-box',
   fontSize: 15, lineHeight: 1.4,
   color: 'var(--color-text-primary)',
-  backgroundColor: 'var(--color-surface-muted)',
+  backgroundColor: 'var(--color-surface)',
   borderRadius: 12, padding: '12px 14px',
   fontFamily: 'var(--font-body)', outline: 'none',
 }
@@ -122,14 +122,13 @@ export default function GroupEditorSheet({ isOpen, onClose, group = null, onSave
   const startKey = initialBrandIds.join('|')
   const initial = useMemo(
     () => (group
-      ? { name: group.name ?? '', description: group.description ?? '', color: group.color ?? BLANK.color, brandIds: group.brandIds ?? [] }
+      ? { name: group.name ?? '', color: group.color ?? BLANK.color, brandIds: group.brandIds ?? [] }
       : { ...BLANK, brandIds: initialBrandIds }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [isOpen, group?.id, startKey],
   )
 
   const [name, setName] = useState(initial.name)
-  const [description, setDescription] = useState(initial.description)
   const [color, setColor] = useState(initial.color)
   const [createdId, setCreatedId] = useState(null)
   const [nameError, setNameError] = useState(false)
@@ -147,7 +146,6 @@ export default function GroupEditorSheet({ isOpen, onClose, group = null, onSave
     setWasOpen(isOpen)
     if (isOpen) {
       setName(initial.name)
-      setDescription(initial.description)
       setColor(initial.color)
       setCreatedId(null)
       setNameError(false)
@@ -158,8 +156,8 @@ export default function GroupEditorSheet({ isOpen, onClose, group = null, onSave
     }
   }
 
-  const current = useMemo(() => ({ name, description, color }), [name, description, color])
-  const initialCompare = useMemo(() => ({ name: initial.name, description: initial.description, color: initial.color }), [initial])
+  const current = useMemo(() => ({ name, color }), [name, color])
+  const initialCompare = useMemo(() => ({ name: initial.name, color: initial.color }), [initial])
   const isDirty = useDirtyState(initialCompare, current)
 
   // Unique names (step 13.5): checked while typing, ignoring capitals and spaces at the ends.
@@ -199,7 +197,8 @@ export default function GroupEditorSheet({ isOpen, onClose, group = null, onSave
     }
     setSaving(true)
     setSaveError('')
-    const fields = { name: cleanName, description: description.trim(), color }
+    // The description is not edited here (2026-11-21): leaving it out keeps the group's own.
+    const fields = { name: cleanName, color }
 
     // 1. The group itself (made first when new, so it has an id).
     let id = group?.id ?? createdId
@@ -252,7 +251,7 @@ export default function GroupEditorSheet({ isOpen, onClose, group = null, onSave
       <SheetShell
         isOpen={isOpen}
         onClose={requestClose}
-        ariaLabel={isEdit ? 'Edit group' : 'New group'}
+        ariaLabel={isEdit ? 'Edit details' : 'New group'}
         keyboardAware
         dismissOnlyByBackdrop
       >
@@ -261,11 +260,21 @@ export default function GroupEditorSheet({ isOpen, onClose, group = null, onSave
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '0 var(--space-4) var(--space-2)', flexShrink: 0,
         }}>
-          <div style={{
-            fontSize: 18, fontWeight: 700, color: 'var(--color-text-primary)',
-            fontFamily: 'var(--font-body)',
-          }}>
-            {isEdit ? 'Edit group' : 'New group'}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+            <div aria-hidden="true" style={{
+              width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+              backgroundColor: resolveToken(color, isDark).pill, color: '#fff',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              transition: 'background-color var(--motion-fast) var(--ease-settle)',
+            }}>
+              <Folder size={18} strokeWidth={2} />
+            </div>
+            <div style={{
+              fontSize: 18, fontWeight: 600, color: 'var(--color-text-primary)',
+              fontFamily: 'var(--font-body)',
+            }}>
+              {isEdit ? 'Edit details' : 'New group'}
+            </div>
           </div>
           <button
             onClick={requestClose}
@@ -296,42 +305,32 @@ export default function GroupEditorSheet({ isOpen, onClose, group = null, onSave
               value={name}
               onChange={e => { setName(e.target.value.slice(0, GROUP_NAME_MAX)); if (nameError) setNameError(false); if (nameTakenByServer) setNameTakenByServer(false) }}
               maxLength={GROUP_NAME_MAX}
-              placeholder="e.g. Nausea and vomiting"
+              placeholder="Nausea and vomiting"
               dir="ltr"
               aria-invalid={nameError || showNameTaken}
               aria-describedby={nameError || showNameTaken ? 'group-name-error' : undefined}
               style={{
                 ...FIELD_STYLE,
-                border: nameError || showNameTaken ? '1.5px solid var(--color-danger)' : '1.5px solid transparent',
+                border: nameError || showNameTaken ? '1.5px solid var(--color-danger)' : '1.5px solid var(--color-border)',
               }}
             />
             {(nameError || showNameTaken) && (
               <div id="group-name-error" role="alert" style={{
-                marginTop: 6, fontSize: 12, color: 'var(--color-danger)', fontFamily: 'var(--font-body)',
+                marginTop: 6, display: 'flex', alignItems: 'center', gap: 4,
+                fontSize: 12, color: 'var(--color-danger)', fontFamily: 'var(--font-body)',
               }}>
+                <AlertCircle size={14} aria-hidden="true" />
                 {showNameTaken ? NAME_TAKEN_MESSAGE : 'Enter a group name'}
               </div>
             )}
-          </div>
-
-          <div>
-            <label htmlFor="group-description" style={LABEL_STYLE}>Description (optional)</label>
-            <textarea
-              id="group-description"
-              value={description}
-              onChange={e => setDescription(e.target.value.slice(0, GROUP_DESCRIPTION_MAX))}
-              maxLength={GROUP_DESCRIPTION_MAX}
-              rows={3}
-              placeholder="e.g. Antiemetics for ED and ward use"
-              dir="ltr"
-              style={{ ...FIELD_STYLE, border: '1.5px solid transparent', resize: 'none' }}
-            />
-            <div style={{
-              marginTop: 4, textAlign: 'end', fontSize: 11,
-              color: 'var(--color-text-secondary)', fontFamily: 'var(--font-body)',
-            }}>
-              {description.length}/{GROUP_DESCRIPTION_MAX}
-            </div>
+            {name.length >= Math.floor(GROUP_NAME_MAX * 0.8) && (
+              <div style={{
+                marginTop: 4, textAlign: 'end', fontSize: 12,
+                color: 'var(--color-text-secondary)', fontFamily: 'var(--font-body)',
+              }}>
+                {name.length}/{GROUP_NAME_MAX}
+              </div>
+            )}
           </div>
 
           <div>
@@ -399,14 +398,14 @@ export default function GroupEditorSheet({ isOpen, onClose, group = null, onSave
           <button
             onClick={handleSave}
             style={{
-              width: '100%', minHeight: 48, borderRadius: 'var(--radius-md)', border: 'none',
+              width: '100%', minHeight: 48, borderRadius: 999, border: 'none',
               backgroundColor: 'var(--color-accent-solid)', color: '#fff',
               fontSize: 15, fontWeight: 600, fontFamily: 'var(--font-body)',
               cursor: saving ? 'default' : 'pointer', opacity: saving ? 0.75 : 1,
               WebkitTapHighlightColor: 'transparent', outline: 'none',
             }}
           >
-            {saving ? 'Saving\u2026' : 'Save'}
+            {saving ? 'Saving\u2026' : (isEdit ? 'Save changes' : 'Create group')}
           </button>
         </div>
       </SheetShell>
