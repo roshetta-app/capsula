@@ -35,6 +35,7 @@ test('pageRoshetta: finds by id, nothing for a missing or blank id or a bad list
 test('pageControls: the menu and status line while a roshetta is shown; the floating Edit button only with content', () => {
   assert.deepEqual(pageControls('ready'), { menu: true, statusLine: true, bar: true });
   assert.deepEqual(pageControls('empty'), { menu: true, statusLine: true, bar: false });
+  assert.deepEqual(pageControls('ready', { readOnly: true }), { menu: true, statusLine: true, bar: false }, 'read only hides Edit');
   for (const s of ['loading', 'guest', 'error', 'missing', 'anything else', undefined]) {
     assert.deepEqual(pageControls(s), { menu: false, statusLine: false, bar: false }, String(s));
   }

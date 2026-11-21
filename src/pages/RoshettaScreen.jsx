@@ -43,13 +43,15 @@
  *     My roshettas area does).
  *   - could not load, nothing saved: "Try again".
  *   - not found (deleted on another device): "This roshetta isn't available".
+ *   (2026-11-21: these three use the open look like the empty roshetta, each with its own round
+ *   icon; the loading placeholder is shaped like the page; the Edit button is hidden when read only.)
  *   - empty roshetta (no drugs or text yet): the name, description and label, and one plain line.
  *   - ready: the sheet.
  */
 
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { FileText, Plus } from 'lucide-react'
+import { AlertTriangle, FileText, FileX, LogIn, Plus } from 'lucide-react'
 import ConfirmSheet from '../components/ui/ConfirmSheet'
 import Icon from '../components/ui/Icon'
 import GroupStateMessage from '../components/drugs/groups/GroupStateMessage'
@@ -80,13 +82,29 @@ const READ_ONLY_MESSAGE = 'Your roshettas are read only. Delete a roshetta or up
 // Room the floating Edit button needs under the content (46 + 12 above the tab bar + a gap), so the last line is never covered.
 const BAR_SPACE = 72
 
+// The loading placeholder is shaped like the real page (a header, then two drug boxes), so nothing jumps when it loads.
 function PageSkeleton() {
+  const box = {
+    background: 'var(--color-drug-card-bg)', borderRadius: 'var(--radius-lg)',
+    padding: 'var(--space-4)',
+  }
   return (
     <div aria-hidden="true">
-      <div style={shimmer({ width: '60%', height: 22, marginBottom: 10 })} />
-      <div style={shimmer({ width: '85%', height: 13, marginBottom: 6 })} />
-      <div style={shimmer({ width: '40%', height: 13, marginBottom: 20 })} />
-      <div style={shimmer({ width: '100%', height: 120 })} />
+      <div style={{ background: 'var(--color-surface)', borderRadius: '0 0 22px 22px', padding: 'var(--space-4) var(--space-4) var(--space-5)' }}>
+        <div style={shimmer({ width: '62%', height: 24, marginBottom: 12 })} />
+        <div style={shimmer({ width: '88%', height: 13, marginBottom: 6 })} />
+        <div style={shimmer({ width: '45%', height: 13, marginBottom: 16 })} />
+        <div style={shimmer({ width: '34%', height: 11 })} />
+      </div>
+      <div style={{ padding: 'var(--space-5) calc(var(--space-6) - var(--page-gutter, 16px)) 0', display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {[0, 1].map(i => (
+          <div key={i} style={box}>
+            <div style={shimmer({ width: '58%', height: 16, marginBottom: 10 })} />
+            <div style={shimmer({ width: '40%', height: 12, marginBottom: 14 })} />
+            <div style={shimmer({ width: '78%', height: 13 })} />
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
@@ -132,7 +150,7 @@ export default function RoshettaScreen() {
     authLoading, isGuest, status: roshettasStatus,
     found: !!roshetta, rowCount: rows.length, listCount: roshettas.length,
   })
-  const controls = pageControls(state)
+  const controls = pageControls(state, { readOnly: isReadOnly })
   // The one status line, the same words and rules as the My roshettas section on Home.
   const syncArgs = { online: isOnline, failedCount, waitingCount, syncState }
   const refreshFailed = controls.statusLine && roshettasLoadError && isOnline
@@ -328,6 +346,8 @@ export default function RoshettaScreen() {
   } else if (state === 'guest') {
     content = (
       <GroupStateMessage
+        open
+        icon={LogIn}
         title="Sign in to see this roshetta"
         body="Your roshettas are saved to your account."
         actionLabel="Sign in"
@@ -336,15 +356,26 @@ export default function RoshettaScreen() {
     )
   } else if (state === 'error') {
     content = (
-      <GroupStateMessage title="Couldn't load your roshettas" actionLabel="Try again" onAction={reloadRoshettas} />
+      <GroupStateMessage
+        open
+        icon={AlertTriangle}
+        accent={{ bg: 'var(--color-warning-light)', fg: 'var(--color-warning)' }}
+        title="Couldn't load your roshettas"
+        body={isOnline ? 'Something went wrong. Please try again.' : "You're offline. Check your connection and try again."}
+        actionLabel="Try again"
+        onAction={reloadRoshettas}
+      />
     )
   } else if (state === 'missing') {
     content = (
       <GroupStateMessage
+        open
+        icon={FileX}
+        accent={{ bg: 'var(--color-surface-muted)', fg: 'var(--color-text-tertiary)' }}
         title="This roshetta isn't available"
         body="It may have been deleted on another device."
-        actionLabel="Back to Home"
-        onAction={goHome}
+        actionLabel={`Back to ${backLabel}`}
+        onAction={() => navigate(-1)}
       />
     )
   } else {

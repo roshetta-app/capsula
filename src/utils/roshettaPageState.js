@@ -13,7 +13,7 @@
  * 2026-11-14 (step 4.2b), also plain rules:
  *   pageControls(state)  -> { menu, statusLine, bar }  which extras are drawn: menu and status line
  *                           only while a roshetta is shown ('ready' or 'empty'); the floating Edit
- *                           button (bar) only when it has content ('ready'); nothing on loading,
+ *                           button (bar) only when it has content ('ready') and the account can edit; nothing on loading,
  *                           guest, error or missing.
  *   deleteOutcome(res)   -> 'done' | 'failed'  what the answer from deleteRoshetta means.
  *                           Already gone (reason 'missing') counts as done: the person wanted
@@ -39,9 +39,9 @@ export function pageState({
   return 'missing';
 }
 
-export function pageControls(state) {
+export function pageControls(state, { readOnly = false } = {}) {
   const shown = state === 'ready' || state === 'empty';
-  return { menu: shown, statusLine: shown, bar: state === 'ready' };
+  return { menu: shown, statusLine: shown, bar: state === 'ready' && !readOnly };
 }
 
 export function deleteOutcome(res) {
