@@ -46,6 +46,8 @@ import { useDeepLinkParent } from '../hooks/useDeepLinkParent'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
 import { useKeyboardOpen } from '../hooks/useKeyboardOpen'
 import { pageRoshetta } from '../utils/roshettaPageState'
+import { editorUnsaved, leaveQuestion } from '../utils/editorLeave'
+import { requestLeave, setLeaveAsker, setUnsavedCheck } from '../utils/leaveGuard'
 import { addPartnerQuery } from '../utils/roshettaAddDrugState'
 import {
   AUTOSAVE_DELAY_MS, addRefusal, addTextRows, barCounts, limitMessage, changeEntry, deleteEntryById, deleteNeedsQuestion, deleteQuestion, editorHint, editorState,
@@ -74,7 +76,7 @@ function SkeletonCards() {
 
 export default function RoshettaEditorScreen() {
   const navigate = useNavigate()
-  const { openPage } = useTapGuard()
+  const { openPage, goBack } = useTapGuard()
   const { id } = useParams()
   useDeepLinkParent()
 
@@ -111,6 +113,8 @@ export default function RoshettaEditorScreen() {
   const timer = useRef(null)
   const mounted = useRef(true)
   const live = useRef({})                         // what a save needs, kept current for the exit save
+  const refusedNow = useRef(false)                // the last save was refused, readable right after it
+  const failedNow = useRef(false)                 // the server refused a change of this roshetta
   useEffect(() => {
     live.current = { id, saveRoshetta, showRoshettaLimit, showRoshettaReadOnly }
   })
@@ -134,6 +138,7 @@ export default function RoshettaEditorScreen() {
       res = null
     }
     const answer = saveAnswer(res)
+    refusedNow.current = saveRefused(answer)
     if (answer === 'drugs_full') openLimit?.('drugs')
     else if (answer === 'read_only') openReadOnly?.()
     if (mounted.current) {
@@ -211,10 +216,24 @@ export default function RoshettaEditorScreen() {
     syncState,
   })
 
+  // Step 12.9b: leaving. Pending changes are handed over first (the exit save does the same, this
+  // just waits for it), and only a change that could not be saved asks Leave or Stay. The same
+  // question serves a tapped notification (it asks through the leave guard).
+  const failedHereNow = failedList.some(c => c.roshettaId === id)
+  useEffect(() => { failedNow.current = failedHereNow })
+  const [leaveAsk, setLeaveAsk] = useState(null)
+  useEffect(() => setLeaveAsker(request => setLeaveAsk(request)), [])
+  useEffect(() => setUnsavedCheck(() => editorUnsaved({ refused: refusedNow.current, failedHere: failedNow.current })), [])
+  async function leaveBack() {
+    await flush()
+    requestLeave(() => goBack())
+  }
+  const leaveText = leaveQuestion()
+
   const backButton = (
     <button
       type="button"
-      onClick={() => navigate(-1)}
+      onClick={leaveBack}
       aria-label="Back to roshetta"
       style={{
         display: 'flex', alignItems: 'center', gap: 6,
@@ -366,6 +385,15 @@ export default function RoshettaEditorScreen() {
       )}
       {content}
       {addBar}
+      <ConfirmSheet
+        isOpen={leaveAsk !== null}
+        onClose={() => { leaveAsk?.stay(); setLeaveAsk(null) }}
+        onConfirm={() => leaveAsk?.leave()}
+        title={leaveText.title}
+        message={leaveText.message}
+        confirmLabel={leaveText.confirmLabel}
+        destructive
+      />
       <ConfirmSheet
         isOpen={!!askDeleteRow}
         onClose={() => setAskDeleteId(null)}
