@@ -1,8 +1,15 @@
 /**
  * src/components/roshettas/ShareRoshettaSheet.jsx
  * 2026-11-14 (Roshetta plan, step 6.1b): the share sheet of the roshetta page.
- * Modelled on ShareGroupSheet.jsx, without the group colour and the "Show my
- * name" switch (a roshetta link never shows its owner, assumption L).
+ * Modelled on ShareGroupSheet.jsx, without the group colour.
+ *
+ * 2026-11-21 (Phase L, step 13.5): the old line "Your name is never shown." is replaced by the same
+ * "Show my name" row the group sheet has (ShareNameRow): off means anonymous (the default), on shows
+ * "Created by <profile name>" on the shared page. The choice is saved with the link: before the link
+ * exists it is kept in the sheet and saved when Create link is tapped; after, each tap saves at once
+ * (and puts the switch back with a message if it could not be saved). With no name in the profile the
+ * switch is off and disabled. The first value is the account setting (Account > Show my name on shared
+ * links).
  *
  * States: loading; not shared yet (Create link); shared (the link, Copy, Share link,
  * Stop sharing); offline ("You're offline. Reconnect to share."); could not check
@@ -25,10 +32,11 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
-import { X, Eye, PencilOff, UserX, Check, Copy, Share2 } from 'lucide-react'
+import { X, Eye, PencilOff, Check, Copy, Share2 } from 'lucide-react'
 import SheetShell from '../ui/SheetShell'
 import ConfirmSheet from '../ui/ConfirmSheet'
 import GroupStateMessage from '../drugs/groups/GroupStateMessage'
+import ShareNameRow from '../drugs/groups/ShareNameRow'
 import { shimmer } from '../drugs/home/shimmer'
 import { useFavouritesContext } from '../../context/FavouritesContext'
 import { useToast } from '../../context/ToastContext'
@@ -49,11 +57,10 @@ const PRIMARY_BUTTON = {
   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
 }
 
-// The same privacy lines before and after the link exists.
+// The same privacy lines before and after the link exists. Who made it is the switch row's job now.
 const PRIVACY_LINES = [
   { Icon: Eye,       text: 'Anyone with the link can view this roshetta: its name, description, drugs, doses and text.' },
   { Icon: PencilOff, text: "They can't change it." },
-  { Icon: UserX,     text: 'Your name is never shown.' },
 ]
 
 // One line, shortened in the middle: the start of the code and its last 4 characters.
@@ -80,8 +87,8 @@ function PrivacyLines() {
 }
 
 export default function ShareRoshettaSheet({ isOpen, onClose, roshetta, waiting = false, onShareChange }) {
-  const { roshettasApi } = useFavouritesContext()
-  const { getRoshettaShareCode, createRoshettaShare, stopRoshettaSharing, showRoshettaReadOnly } = roshettasApi
+  const { roshettasApi, getShareNameInfo } = useFavouritesContext()
+  const { getRoshettaShareCode, createRoshettaShare, setRoshettaShareName, stopRoshettaSharing, showRoshettaReadOnly } = roshettasApi
   const { toast } = useToast()
 
   // Copy feedback: the Copy button shows a tick and "Copied" for two seconds.
@@ -99,6 +106,10 @@ export default function ShareRoshettaSheet({ isOpen, onClose, roshetta, waiting 
   const [attempt, setAttempt] = useState(0)
   const [busy, setBusy] = useState(false)
   const [stopOpen, setStopOpen] = useState(false)
+  // nameInfo: null until known (or when it could not be read: then the switch is left out),
+  // else { fullName, accountDefault }. showName: the switch for this roshetta's link.
+  const [nameInfo, setNameInfo] = useState(null)
+  const [showName, setShowName] = useState(false)
 
   // Every time the sheet opens it asks again, so another device's change shows.
   const [wasOpen, setWasOpen] = useState(false)
@@ -112,9 +123,15 @@ export default function ShareRoshettaSheet({ isOpen, onClose, roshetta, waiting 
     if (!isOpen || !roshettaId) return
     let cancelled = false
     ;(async () => {
-      const r = await getRoshettaShareCode(roshettaId)
+      const [r, info] = await Promise.all([getRoshettaShareCode(roshettaId), getShareNameInfo()])
       if (cancelled) return
       if (r.ok) {
+        if (info.ok) {
+          setNameInfo({ fullName: info.fullName, accountDefault: info.accountDefault })
+          setShowName(r.showName ?? info.accountDefault)
+        } else {
+          setNameInfo(null)
+        }
         setResult(r.code ? { phase: 'shared', code: r.code } : { phase: 'none' })
         onShareChange?.(r.code ?? null)
       } else {
@@ -124,7 +141,7 @@ export default function ShareRoshettaSheet({ isOpen, onClose, roshetta, waiting 
     return () => { cancelled = true }
     // onShareChange is a plain callback from the page; it is not a reason to ask again.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, roshettaId, attempt, getRoshettaShareCode])
+  }, [isOpen, roshettaId, attempt, getRoshettaShareCode, getShareNameInfo])
 
   function retry() {
     setResult(null)
@@ -135,7 +152,7 @@ export default function ShareRoshettaSheet({ isOpen, onClose, roshetta, waiting 
     if (busy || !roshetta) return
     setBusy(true)
     try {
-      const r = await createRoshettaShare(roshetta.id)
+      const r = await createRoshettaShare(roshetta.id, nameInfo?.fullName ? showName : undefined)
       if (r.ok) {
         setResult({ phase: 'shared', code: r.code })
         onShareChange?.(r.code)
@@ -150,6 +167,21 @@ export default function ShareRoshettaSheet({ isOpen, onClose, roshetta, waiting 
     } finally {
       setBusy(false)
     }
+  }
+
+  // Before the link exists the choice is only kept here (Create link saves it). After, it is saved
+  // at once; if that fails the switch goes back and says why.
+  async function handleNameToggle(next) {
+    if (!nameInfo) return
+    const before = showName
+    setShowName(next)
+    if (result?.phase !== 'shared') return
+    const r = await setRoshettaShareName(roshetta.id, next)
+    if (r.ok) return
+    setShowName(before)
+    if (r.reason === 'read_only') showRoshettaReadOnly()
+    else if (r.reason === 'offline') toast.error(OFFLINE_SHARE_MESSAGE)
+    else toast.error("Couldn't save that. Try again.")
   }
 
   async function handleCopy(code) {
@@ -198,6 +230,7 @@ export default function ShareRoshettaSheet({ isOpen, onClose, roshetta, waiting 
     body = (
       <>
         <PrivacyLines />
+        {nameInfo && <ShareNameRow fullName={nameInfo.fullName} checked={showName} onChange={handleNameToggle} label="Show my name on this shared roshetta" />}
         <button onClick={handleCreate} disabled={busy} style={{ ...PRIMARY_BUTTON, opacity: busy ? 0.7 : 1 }}>
           {busy ? 'Creating…' : 'Create link'}
         </button>
@@ -208,6 +241,7 @@ export default function ShareRoshettaSheet({ isOpen, onClose, roshetta, waiting 
     body = (
       <>
         <PrivacyLines />
+        {nameInfo && <ShareNameRow fullName={nameInfo.fullName} checked={showName} onChange={handleNameToggle} label="Show my name on this shared roshetta" />}
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 'var(--space-2)' }}>
           <span style={{

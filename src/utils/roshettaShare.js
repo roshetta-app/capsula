@@ -6,8 +6,13 @@
  * yet) and passes the real database and the time limit.
  *
  * Table roshetta_shares: roshetta_id (one live code per roshetta), share_code (the
- * database makes it), created_at. Stop sharing = delete the row; sharing again makes
+ * database makes it), show_name, created_at. Stop sharing = delete the row; sharing again makes
  * a new code.
+ *
+ * 2026-11-21 (Phase L, step 13.5): show_name is the owner's choice for this link (true = the page
+ * says "Created by <name>", false = anonymous, empty = follow the account setting), the same as
+ * for groups. readShareCode returns it as showName, createShare can set it at insert, and
+ * setShareName changes it later.
  *
  * Every function resolves { ok: true, ... } or { ok: false, reason }:
  *   offline   the request timed out (a Wi-Fi with no internet counts as offline)
@@ -26,23 +31,26 @@ export function shareErrorReason(error) {
   return 'error'
 }
 
-// The live share code of this roshetta, or null when it is not shared.
+// The live share code of this roshetta, or null when it is not shared. showName: true or false when
+// the owner chose for this link, null when it follows the account setting (or there is no link).
 export async function readShareCode(client, roshettaId, limit = x => x) {
   const { data, error } = await limit(client
     .from(TABLE)
-    .select('share_code')
+    .select('share_code, show_name')
     .eq('roshetta_id', roshettaId)
     .maybeSingle())
   if (error) return { ok: false, reason: error.code === TIMEOUT_CODE ? 'offline' : 'error' }
-  return { ok: true, code: data?.share_code ?? null }
+  return { ok: true, code: data?.share_code ?? null, showName: typeof data?.show_name === 'boolean' ? data.show_name : null }
 }
 
 // Makes the link. created: true only when a new code was made now (an existing live
-// code, from another phone or a double tap, comes back with created: false).
-export async function createShare(client, roshettaId, limit = x => x) {
+// code, from another phone or a double tap, comes back with created: false). showName (true or
+// false) is the owner's choice for this link; anything else leaves it empty, so the account
+// setting decides.
+export async function createShare(client, roshettaId, limit = x => x, showName) {
   const { data, error } = await limit(client
     .from(TABLE)
-    .insert({ roshetta_id: roshettaId })
+    .insert(typeof showName === 'boolean' ? { roshetta_id: roshettaId, show_name: showName } : { roshetta_id: roshettaId })
     .select('share_code')
     .single())
   if (!error && data?.share_code) return { ok: true, code: data.share_code, created: true }
@@ -58,5 +66,19 @@ export async function createShare(client, roshettaId, limit = x => x) {
 export async function removeShare(client, roshettaId, limit = x => x) {
   const { error } = await limit(client.from(TABLE).delete().eq('roshetta_id', roshettaId))
   if (error) return { ok: false, reason: error.code === TIMEOUT_CODE ? 'offline' : 'error' }
+  return { ok: true }
+}
+
+// The owner's choice for this link (true = show my name, false = anonymous). The database only lets
+// the owner change it; a change that touched no row (not the owner, a read only account, or the link
+// was stopped on another phone) comes back as 'refused'.
+export async function setShareName(client, roshettaId, show, limit = x => x) {
+  const { data, error } = await limit(client
+    .from(TABLE)
+    .update({ show_name: !!show })
+    .eq('roshetta_id', roshettaId)
+    .select('roshetta_id'))
+  if (error) return { ok: false, reason: shareErrorReason(error) }
+  if (!Array.isArray(data) || data.length === 0) return { ok: false, reason: 'refused' }
   return { ok: true }
 }

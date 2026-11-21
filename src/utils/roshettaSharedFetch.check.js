@@ -21,7 +21,7 @@ async function run(code, { reply = { data: { name: 'Chest pain', description: 'd
 
 test('a good code: name, description and rows come back, asked through get_shared_roshetta with the code as given', async () => {
   const { result, asked } = await run(CODE);
-  assert.deepEqual(result, { status: 'ok', roshetta: { name: 'Chest pain', description: 'd', rows: [drug, text], specialtyId: null, specialty: null } });
+  assert.deepEqual(result, { status: 'ok', roshetta: { name: 'Chest pain', description: 'd', rows: [drug, text], specialtyId: null, specialty: null, ownerName: null, createdAt: null, isOwner: false, ownId: null } });
   assert.deepEqual(asked, [['get_shared_roshetta', { p_code: CODE }]]);
 });
 
@@ -65,8 +65,8 @@ test('only drug and text rows are kept; anything else (a free_text row would be 
   assert.equal(m.description, '');
 });
 
-test('rows that are not a list become an empty list; only name, description and rows are passed on', () => {
-  assert.deepEqual(mapSharedRoshetta({ name: 'N', description: 'd', rows: 'x', owner: 'u1', user_id: 'u1' }), { name: 'N', description: 'd', rows: [], specialtyId: null, specialty: null });
+test('rows that are not a list become an empty list; only the listed things are passed on, never a user id', () => {
+  assert.deepEqual(mapSharedRoshetta({ name: 'N', description: 'd', rows: 'x', owner: 'u1', user_id: 'u1', owner_id: 'u1' }), { name: 'N', description: 'd', rows: [], specialtyId: null, specialty: null, ownerName: null, createdAt: null, isOwner: false, ownId: null });
 });
 
 // Phase I step 10.8: the specialty comes through for the header, and its id for Save a copy.
@@ -76,7 +76,7 @@ test('a shared roshetta with a specialty: the id and the picker-shaped specialty
   const m = mapSharedRoshetta({ name: 'N', description: '', rows: [], specialty: CARDIO });
   assert.equal(m.specialtyId, 's1');
   assert.deepEqual(m.specialty, { id: 's1', name: 'Cardiology', iconType: 'lucide', iconValue: 'HeartPulse', colorToken: 'rose' });
-  assert.deepEqual(Object.keys(m).sort(), ['description', 'name', 'rows', 'specialty', 'specialtyId']);
+  assert.deepEqual(Object.keys(m).sort(), ['createdAt', 'description', 'isOwner', 'name', 'ownId', 'ownerName', 'rows', 'specialty', 'specialtyId']);
 });
 
 test('no specialty, or anything that is not a proper one, gives none (the default blue) and no id to copy', () => {
@@ -102,4 +102,39 @@ test('loadSharedRoshetta passes the specialty on, and Save a copy takes it from 
 test('Save a copy from a shared roshetta keeps the specialty; without one the copy has none', () => {
   assert.equal(copyFields(mapSharedRoshetta({ name: 'N', rows: [], specialty: CARDIO })).specialtyId, 's1');
   assert.equal('specialtyId' in copyFields(mapSharedRoshetta({ name: 'N', rows: [], specialty: null })), false);
+});
+
+// Phase L step 13.5: who made it, when, and whether the viewer is the owner.
+test('credit: the owner name and the created day come through, trimmed; an empty name is none', () => {
+  const m = mapSharedRoshetta({ name: 'N', rows: [], owner_name: '  Dr Sara  ', created_at: '2026-11-12T09:30:00Z' });
+  assert.equal(m.ownerName, 'Dr Sara');
+  assert.equal(m.createdAt, '2026-11-12T09:30:00Z');
+  for (const v of [null, undefined, '', '   ', 5, {}]) assert.equal(mapSharedRoshetta({ name: 'N', rows: [], owner_name: v }).ownerName, null, String(v));
+  for (const v of [null, undefined, '', 'not a date', 5]) assert.equal(mapSharedRoshetta({ name: 'N', rows: [], created_at: v }).createdAt, null, String(v));
+});
+
+test('credit: the owner flag needs both is_owner true and the roshetta id; a stranger and a half answer are visitors', () => {
+  const own = mapSharedRoshetta({ name: 'N', rows: [], is_owner: true, own_id: 'rid-1' });
+  assert.equal(own.isOwner, true);
+  assert.equal(own.ownId, 'rid-1');
+  for (const extra of [{}, { is_owner: false, own_id: 'rid-1' }, { is_owner: true }, { is_owner: true, own_id: '' }, { is_owner: 'true', own_id: 'rid-1' }, { is_owner: true, own_id: 7 }, { own_id: 'rid-1' }]) {
+    const m = mapSharedRoshetta({ name: 'N', rows: [], ...extra });
+    assert.equal(m.isOwner, false, JSON.stringify(extra));
+    assert.equal(m.ownId, null, JSON.stringify(extra));
+  }
+});
+
+test('credit: loadSharedRoshetta passes the credit on, and a user id the database might add never gets through', async () => {
+  const reply = { data: { name: 'Chest pain', description: '', rows: [drug], owner_name: 'Dr Sara', created_at: '2026-11-12T09:30:00Z', is_owner: true, own_id: 'rid-1', user_id: 'u-secret', owner_id: 'u-secret' }, error: null };
+  const { result } = await run(CODE, { reply });
+  assert.equal(result.status, 'ok');
+  assert.equal(result.roshetta.ownerName, 'Dr Sara');
+  assert.equal(result.roshetta.isOwner, true);
+  assert.equal(result.roshetta.ownId, 'rid-1');
+  assert.equal(JSON.stringify(result).includes('u-secret'), false);
+});
+
+test('credit: Save a copy takes nothing about the owner from a shared roshetta', () => {
+  const m = mapSharedRoshetta({ name: 'N', description: 'd', rows: [drug], specialty: CARDIO, owner_name: 'Dr Sara', created_at: '2026-11-12T09:30:00Z', is_owner: true, own_id: 'rid-1' });
+  assert.deepEqual(copyFields(m), { name: 'N', description: 'd', rows: [drug], specialtyId: 's1' });
 });

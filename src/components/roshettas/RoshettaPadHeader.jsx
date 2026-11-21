@@ -1,4 +1,8 @@
 // src/components/roshettas/RoshettaPadHeader.jsx
+// 2026-11-21 (Phase L, step 13.5): the shared page passes credit = { ownerName, createdAt } and the last row
+// reads "Created by Dr Sara · 12 Nov" (the name in bold), or "Created 12 Nov" when the owner is anonymous,
+// with the same words as creditText in shareCredit.js (always the day, never "Today"). The owner's own page
+// does not pass it and keeps its dates.
 // 2026-11-21 (step 8.6a): the description's showing and editing moved to the shared component
 // ui/InlineDescription.jsx, which the drug group page uses too; nothing about how it looks or works changed.
 // 2026-11-21 (step 8.5): the shared page uses this header too (no dates and no status line there, so the
@@ -25,6 +29,7 @@
 //
 // Props:
 //   name, description, specialty (the picker shape, or null), createdAt, updatedAt (ISO text)
+//   credit              the shared page only: { ownerName, createdAt }; shows who made it and the day
 //   topLeft / topRight  nodes: the Back button, and the Share button with the options menu
 //   editable            the owner may change the description (false when read only)
 //   onSaveDescription   (text) => Promise<{ ok, reason? }>
@@ -33,19 +38,20 @@
 //   syncKind, syncText, syncActionLabel, onSyncAction   the status line (see HomeSyncLine)
 
 import { useState } from 'react'
-import { CalendarDays, Clock, FileText } from 'lucide-react'
+import { CalendarDays, Clock, FileText, User } from 'lucide-react'
 import InlineDescription from '../ui/InlineDescription'
 import HomeSyncLine, { LINE_H } from '../home/HomeSyncLine'
 import { SpecialtyIcon, useIsDark } from '../../utils/specialtyIcon'
 import { specialtyColors, specialtyHeaderText } from '../../utils/roshettaSpecialty'
 import { shortDateText } from '../../utils/roshettaShelfText'
+import { dayText } from '../../utils/shareCredit'
 import { ROSHETTA_DESCRIPTION_MAX } from '../../utils/roshettaRows'
 import { saveFailureMessage } from '../../utils/roshettaDetailsText'
 
 const font = 'var(--font-body)'
 
 export default function RoshettaPadHeader({
-  name, description = '', specialty = null, createdAt, updatedAt,
+  name, description = '', specialty = null, createdAt, updatedAt, credit = null,
   topLeft, topRight, editable = false, onSaveDescription, onEditingChange, isPro = false,
   syncKind = '', syncText = '', syncActionLabel, onSyncAction,
 }) {
@@ -56,6 +62,11 @@ export default function RoshettaPadHeader({
   const edited = shortDateText(updatedAt)
   // A roshetta not changed since the day it was made shows only when it was created.
   const showEdited = !!edited && edited !== created
+
+  // The shared page's line: who made it (when the owner chose to show it) and the day.
+  const creditName = credit && typeof credit.ownerName === 'string' ? credit.ownerName.trim() : ''
+  const creditDay = credit ? dayText(credit.createdAt) : ''
+  const showCredit = !!(creditName || creditDay)
 
   const [syncActive, setSyncActive] = useState(false)   // a status message is showing
 
@@ -134,7 +145,7 @@ export default function RoshettaPadHeader({
       {/* The last row: the dates. While a status message shows (waiting, saving, offline, not saved,
           all saved) it takes the dates' place on this same row, so there is no empty reserved line,
           nothing is cut and nothing moves; the dates come back when the message is gone. */}
-      {(created || showEdited || syncKind) && (
+      {(created || showEdited || syncKind || showCredit) && (
       <div style={{ position: 'relative', marginTop: 10, minHeight: LINE_H }}>
         <div
           style={{
@@ -145,6 +156,18 @@ export default function RoshettaPadHeader({
         >
           {created && dateText(CalendarDays, 'Created', created)}
           {showEdited && dateText(Clock, 'Edited', edited)}
+          {showCredit && (
+            <span style={{ display: 'inline-flex', alignItems: 'flex-start', gap: 4, minWidth: 0 }}>
+              {creditName
+                ? <User size={12} strokeWidth={2} aria-hidden="true" style={{ flexShrink: 0, marginTop: 1 }} />
+                : <CalendarDays size={12} strokeWidth={2} aria-hidden="true" style={{ flexShrink: 0, marginTop: 1 }} />}
+              <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>
+                {creditName
+                  ? <>Created by{' '}<span dir="auto" style={{ fontWeight: 600, color: 'var(--color-text-secondary)' }}>{creditName}</span>{creditDay && ` \u00b7 ${creditDay}`}</>
+                  : `Created ${creditDay}`}
+              </span>
+            </span>
+          )}
         </div>
         <HomeSyncLine inside kind={syncKind} text={syncText} actionLabel={syncActionLabel} onAction={onSyncAction} onActiveChange={setSyncActive} />
       </div>

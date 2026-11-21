@@ -45,6 +45,15 @@
  * the logo with Open Capsula in the header's top bar, the safety footnote kept at the end of the sheet
  * (it is a stranger's dose text), and the fixed Save a copy bar.
  *
+ * 2026-11-21 (Phase L, step 13.5): who made it and when, and the owner opening their own link. The header's
+ * last line reads "Created by Dr Sara · 12 Nov", or "Created 12 Nov" when the owner is anonymous (the name
+ * shows only when the owner chose it for this link or in Account; the database decides, the page just
+ * draws what it is given). When the signed-in viewer is the owner, the page looks exactly as a visitor
+ * sees it, and the bottom bar says "This is your roshetta" with an Open button to their own page, so no
+ * copy can be made of your own roshetta. The answer depends on who is asking, so the page asks again when
+ * the signed-in person changes, and a save that waited for sign-in waits for that second answer first:
+ * signing in can never save a copy of your own roshetta.
+ *
  * 2026-11-14 (step 6.3): two analytics events, never a code, name or text: 'shared_roshetta_open'
  * once per link when the roshetta really shows (Try again or coming back online does not count
  * it twice) and 'shared_roshetta_save' when a copy is saved (the new roshetta's id).
@@ -68,6 +77,7 @@ import { sheetRowsForDisplay } from '../utils/roshettaDrugLines'
 import { specialtyColors } from '../utils/roshettaSpecialty'
 import { useIsDark } from '../utils/specialtyIcon'
 import { sharedPageState, sharedProblemText } from '../utils/roshettaSharedPageState'
+import { sharedBarState } from '../utils/shareCredit'
 import { copyFields, trimToDrugCap, savedCopyMessage, saveSignInId, isRoshettaSaveRequest, saveCopyAnswer, showSaveBar } from '../utils/roshettaSaveCopy'
 import { logUsageEvent } from '../analytics/usageEvents'
 import { ROUTES } from '../router'
@@ -97,18 +107,24 @@ function SharedRoshettaBody({ code }) {
   // The first screen of the session has nothing behind it, so no Back button.
   const canGoBack = location.key !== 'default'
 
-  // { status: 'loading' | 'ok' | 'unavailable' | 'offline' | 'error', roshetta? }
+  // { status: 'loading' | 'ok' | 'unavailable' | 'offline' | 'error', roshetta?, forUser? }
   const [result, setResult] = useState({ status: 'loading' })
   // Bumped by Try again, so the effect below asks again.
   const [attempt, setAttempt] = useState(0)
 
+  // The answer depends on who is asking (the owner is told so), so it is asked again when the signed-in
+  // person changes, and each answer remembers who it was asked for (forUser). A page that was already
+  // showing is kept if the second ask fails.
+  const { user, loading: authLoading } = useAuth()
+  const userId = user?.id ?? null
   useEffect(() => {
     let cancelled = false
     fetchSharedRoshetta(code).then(r => {
-      if (!cancelled) setResult(r)
+      if (cancelled) return
+      setResult(prev => (prev.status === 'ok' && r.status !== 'ok' ? prev : { ...r, forUser: userId }))
     })
     return () => { cancelled = true }
-  }, [code, attempt])
+  }, [code, attempt, userId])
 
   // Analytics (step 6.3): one 'shared_roshetta_open' per link opened, when the roshetta really
   // shows. No code, name or text is sent.
@@ -135,7 +151,6 @@ function SharedRoshettaBody({ code }) {
   const isProblem = state === 'unavailable' || state === 'offline' || state === 'error'
 
   // ── Save a copy (step 6.2c) ───────────────────────────────────────────────
-  const { user, loading: authLoading } = useAuth()
   const { promptSignIn, pendingFavourite, roshettasApi } = useFavouritesContext()
   const { roshettasStatus, createRoshetta, roshettaDrugCap, showRoshettaLimit, showRoshettaReadOnly } = roshettasApi
   const isPro = useIsPro()
@@ -151,6 +166,7 @@ function SharedRoshettaBody({ code }) {
 
   const runSave = useCallback(async () => {
     if (savingRef.current || result.status !== 'ok') return
+    if (result.roshetta.isOwner) return   // your own roshetta is never saved again as a copy
     savingRef.current = true
     setNotice(null)
     setSaveState({ phase: 'saving' })
@@ -180,7 +196,7 @@ function SharedRoshettaBody({ code }) {
   }, [result, createRoshetta, roshettaDrugCap, showRoshettaLimit, showRoshettaReadOnly])
 
   function handleSaveTap() {
-    if (authLoading || saveState.phase !== 'idle') return
+    if (authLoading || saveState.phase !== 'idle' || answerIsStale) return
     if (!user) {
       armedRef.current = true
       promptSignIn('groups', saveSignInId(code))
@@ -198,16 +214,27 @@ function SharedRoshettaBody({ code }) {
       return undefined
     }
     if (roshettasStatus === 'loading' || result.status !== 'ok') return undefined
+    // Wait for the answer asked after signing in: it tells whether this is the person's own roshetta.
+    if (result.forUser !== user.id) return undefined
     // Started on the next tick, so the save's own state change is not made inside this effect.
     const t = setTimeout(() => {
       armedRef.current = false
       runSave()
     }, 0)
     return () => clearTimeout(t)
-  }, [authLoading, user, pendingFavourite, roshettasStatus, result.status, runSave])
+  }, [authLoading, user, pendingFavourite, roshettasStatus, result.status, result.forUser, runSave])
 
-  const showSave = showSaveBar(state)
-  const saveBusy = saveState.phase === 'saving' || authLoading || (!!user && roshettasStatus === 'loading')
+  // The page shows an answer asked before the person signed in: the Save bar waits a moment.
+  const answerIsStale = result.status === 'ok' && !!user && result.forUser !== user.id
+  const bar = sharedBarState({
+    kind: 'roshetta',
+    isOwner: result.status === 'ok' && result.roshetta.isOwner,
+    ownId: result.status === 'ok' ? result.roshetta.ownId : null,
+  })
+  const showOwnerBar = result.status === 'ok' && bar.mode === 'owner'
+  const showSave = showSaveBar(state) && !showOwnerBar
+  const showBottom = showSave || showOwnerBar
+  const saveBusy = saveState.phase === 'saving' || authLoading || answerIsStale || (!!user && roshettasStatus === 'loading')
 
   const backButton = (
     <button
@@ -294,6 +321,7 @@ function SharedRoshettaBody({ code }) {
           name={roshetta.name}
           description={roshetta.description}
           specialty={roshetta.specialty}
+          credit={{ ownerName: roshetta.ownerName, createdAt: roshetta.createdAt }}
           topLeft={topLeft}
           topRight={topRight}
         />
@@ -328,7 +356,7 @@ function SharedRoshettaBody({ code }) {
       '--page-gutter': 'var(--space-4)',
       maxWidth: 680, margin: '0 auto',
       minHeight: '100dvh', display: 'flex', flexDirection: 'column',
-      padding: `0 var(--page-gutter) ${showSave ? '0' : 'calc(var(--space-4) + env(safe-area-inset-bottom, 0px))'}`,
+      padding: `0 var(--page-gutter) ${showBottom ? '0' : 'calc(var(--space-4) + env(safe-area-inset-bottom, 0px))'}`,
     }}>
       {/* The white header starts at the very top, so the phone's status bar area is painted the same white. */}
       <div aria-hidden="true" style={{
@@ -336,8 +364,8 @@ function SharedRoshettaBody({ code }) {
         margin: '0 calc(-1 * var(--page-gutter))',
         backgroundColor: hasHeader ? 'var(--color-surface)' : 'transparent',
       }} />
-      <div style={{ flex: '1 0 auto', paddingBottom: showSave ? 'var(--space-4)' : 0 }}>{content}</div>
-      {showSave && (
+      <div style={{ flex: '1 0 auto', paddingBottom: showBottom ? 'var(--space-4)' : 0 }}>{content}</div>
+      {showBottom && (
         <div style={{
           position: 'sticky', bottom: 0, zIndex: 5,
           margin: '0 calc(-1 * var(--page-gutter))',
@@ -345,7 +373,25 @@ function SharedRoshettaBody({ code }) {
           backgroundColor: 'var(--color-surface)', boxShadow: '0 -6px 18px rgba(0,0,0,0.06)',
           fontFamily: 'var(--font-body)',
         }}>
-          {saveState.phase === 'saved' ? (
+          {showOwnerBar ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                <FileText size={18} strokeWidth={1.8} color="var(--color-text-secondary)" aria-hidden="true" style={{ flexShrink: 0 }} />
+                <span style={{ fontSize: 14, lineHeight: 1.4, color: 'var(--color-text-primary)' }}>{bar.text}</span>
+              </span>
+              <button
+                onClick={() => openPage(ROUTES.ROSHETTA(bar.targetId))}
+                style={{
+                  flexShrink: 0, minHeight: 44, border: 'none', cursor: 'pointer', padding: '0 20px',
+                  borderRadius: 999, backgroundColor: 'var(--color-accent-solid)', color: '#fff',
+                  fontSize: 14, fontWeight: 600, fontFamily: 'var(--font-body)',
+                  WebkitTapHighlightColor: 'transparent', outline: 'none',
+                }}
+              >
+                {bar.button}
+              </button>
+            </div>
+          ) : saveState.phase === 'saved' ? (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)' }}>
               <span style={{ display: 'flex', alignItems: 'flex-start', gap: 8, minWidth: 0 }}>
                 <Check size={18} strokeWidth={2.6} color="var(--color-success)" aria-hidden="true" style={{ flexShrink: 0, marginTop: 1 }} />
