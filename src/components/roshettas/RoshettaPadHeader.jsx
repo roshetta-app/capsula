@@ -1,23 +1,23 @@
 // src/components/roshettas/RoshettaPadHeader.jsx
-// 2026-11-21 (Roshetta plan, steps 8.3b to 8.3d): the header of the owner's roshetta page. A white
-// block with a rounded bottom, like the topic sheet's header, and the Home roshetta card's
-// faint italic Rx in the bottom corner. Top to bottom:
-//   - the top bar: Back on the start side, Share and the options menu on the end side;
-//   - the specialty: a small tinted tile with its icon and the name in its colour ("Roshetta" in
-//     the app's blue when there is none). The block itself stays white;
-//   - the name, 24, the full width, as many lines as it needs;
+// 2026-11-21 (Roshetta plan, steps 8.3b to 8.3e): the header of the owner's roshetta page. A white
+// block with a rounded bottom, like the topic sheet's header, and the Home roshetta card's faint
+// italic Rx in the bottom corner. Kept short on purpose (about 140 px with a one-line name).
+// Top to bottom:
+//   - the top bar: Back (an arrow only), the specialty (a small tinted tile with its icon and the
+//     name in its colour; "Roshetta" in the app's blue when there is none), and on the end side
+//     Share and the options menu. The block itself stays white;
+//   - the name, 22, the full width, as many lines as it needs;
 //   - the description (added and edited HERE, in place, never in a sheet): "Add description" when
 //     there is none, the text with a small pencil icon at its end side when there is one, and a
 //     text box with Cancel and Save while editing;
-//   - Created and Edited, each a small label over its day (Edited only when it is a different day
-//     than Created);
-//   - the one status line the Home roshetta section uses (Waiting to save, Saving, Offline,
-//     changes not saved with See, All saved), at the foot of the white block. It takes the
-//     block's bottom padding, so nothing moves when it appears.
+//   - one foot line: "Created 12 Nov" and, when it is a different day, "Edited Today" on the
+//     start side; on the end side the one status line the Home roshetta section uses (Waiting to
+//     save, Saving, Offline, changes not saved with See, All saved). The line is always one line
+//     high, so nothing moves when a message appears.
 //
 // Props:
 //   name, description, specialty (the picker shape, or null), createdAt, updatedAt (ISO text)
-//   topLeft / topRight  nodes: the Back button, and the Share button with the options menu
+//   topLeft / topRight  nodes: the Back arrow, and the Share button with the options menu
 //   editable            the owner may change the description (false when read only)
 //   onSaveDescription   (text) => Promise<{ ok, reason? }>
 //   onEditingChange     (boolean) => void   the page hides its bottom bar while typing
@@ -86,11 +86,10 @@ export default function RoshettaPadHeader({
     stopEdit()
   }
 
-  const dateBlock = (title, value) => (
-    <div style={{ minWidth: 0 }}>
-      <div style={{ fontSize: 11, letterSpacing: '0.03em', lineHeight: 1.3, color: 'var(--color-text-tertiary)', fontFamily: font }}>{title}</div>
-      <div style={{ marginTop: 2, fontSize: 13, fontWeight: 500, lineHeight: 1.3, color: 'var(--color-text-secondary)', fontFamily: font }}>{value}</div>
-    </div>
+  const dateText = (title, value) => (
+    <span style={{ whiteSpace: 'nowrap' }}>
+      {title}{' '}<span style={{ fontWeight: 500, color: 'var(--color-text-secondary)' }}>{value}</span>
+    </span>
   )
 
   return (
@@ -99,14 +98,14 @@ export default function RoshettaPadHeader({
         position: 'relative', backgroundColor: 'var(--color-surface)',
         borderRadius: '0 0 22px 22px',
         margin: '0 calc(-1 * var(--page-gutter, 16px))',
-        padding: `8px calc(var(--page-gutter, 16px) + 2px) ${LINE_H + 22}px`,
+        padding: '4px calc(var(--page-gutter, 16px) + 2px) 12px',
       }}
     >
       <div aria-hidden="true" style={{ position: 'absolute', inset: 0, overflow: 'hidden', borderRadius: 'inherit', pointerEvents: 'none' }}>
         <span
           style={{
             position: 'absolute', insetInlineEnd: -6, bottom: -14, userSelect: 'none',
-            fontSize: 84, fontWeight: 700, fontStyle: 'italic', lineHeight: 1,
+            fontSize: 76, fontWeight: 700, fontStyle: 'italic', lineHeight: 1,
             color: isDark ? 'var(--color-text-primary)' : look.bg, opacity: isDark ? 0.035 : 0.85,
             fontFamily: 'Georgia, \'Times New Roman\', serif',
           }}
@@ -116,33 +115,32 @@ export default function RoshettaPadHeader({
       </div>
 
       <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, height: 36, marginInlineEnd: -10 }}>
-        {topLeft}
-        <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>{topRight}</div>
-      </div>
-
-      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, minWidth: 0 }}>
-        <div
-          aria-hidden="true"
-          style={{
-            width: 24, height: 24, borderRadius: 7, flexShrink: 0,
-            backgroundColor: look.bg, color: look.fg,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}
-        >
-          {specialty
-            ? <SpecialtyIcon iconType={specialty.iconType ?? 'lucide'} iconValue={specialty.iconValue ?? 'Stethoscope'} size={14} color={look.fg} />
-            : <FileText size={14} strokeWidth={2} />}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+          {topLeft}
+          <div
+            aria-hidden="true"
+            style={{
+              width: 22, height: 22, borderRadius: 6, flexShrink: 0,
+              backgroundColor: look.bg, color: look.fg,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            {specialty
+              ? <SpecialtyIcon iconType={specialty.iconType ?? 'lucide'} iconValue={specialty.iconValue ?? 'Stethoscope'} size={13} color={look.fg} />
+              : <FileText size={13} strokeWidth={2} />}
+          </div>
+          <span dir="auto" style={{ minWidth: 0, fontSize: 13, fontWeight: 500, lineHeight: 1.3, color: look.fg, fontFamily: font, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {label}
+          </span>
         </div>
-        <span dir="auto" style={{ minWidth: 0, fontSize: 13, fontWeight: 500, lineHeight: 1.3, color: look.fg, fontFamily: font, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {label}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>{topRight}</div>
       </div>
 
       <h1
         dir="auto"
         style={{
-          position: 'relative', margin: '8px 0 0', textAlign: 'start', overflowWrap: 'anywhere',
-          fontSize: 24, fontWeight: 600, lineHeight: 1.2, letterSpacing: '-0.4px',
+          position: 'relative', margin: '4px 0 0', textAlign: 'start', overflowWrap: 'anywhere',
+          fontSize: 22, fontWeight: 600, lineHeight: 1.2, letterSpacing: '-0.4px',
           color: 'var(--color-text-primary)', fontFamily: font,
         }}
       >
@@ -150,7 +148,7 @@ export default function RoshettaPadHeader({
       </h1>
 
       {editing ? (
-        <div style={{ position: 'relative', marginTop: 10 }}>
+        <div style={{ position: 'relative', marginTop: 8 }}>
           <textarea
             value={draft}
             onChange={e => setDraft(limitText(e.target.value, ROSHETTA_DESCRIPTION_MAX))}
@@ -196,7 +194,7 @@ export default function RoshettaPadHeader({
           </div>
         </div>
       ) : text ? (
-        <div style={{ position: 'relative', display: 'flex', alignItems: 'flex-start', gap: 6, marginTop: 8 }}>
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'flex-start', gap: 6, marginTop: 4 }}>
           <p
             dir="auto"
             onClick={editable ? startEdit : undefined}
@@ -229,7 +227,7 @@ export default function RoshettaPadHeader({
           type="button"
           onClick={startEdit}
           style={{
-            position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 5, minHeight: 36, marginTop: 4, padding: 0,
+            position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 5, minHeight: 36, marginTop: 0, padding: 0,
             background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-accent-text)',
             fontSize: 14, fontWeight: 500, fontFamily: font, WebkitTapHighlightColor: 'transparent',
           }}
@@ -239,15 +237,16 @@ export default function RoshettaPadHeader({
         </button>
       ) : null}
 
-      {!editing && (created || showEdited) && (
-        <div style={{ position: 'relative', display: 'flex', flexWrap: 'wrap', columnGap: 28, rowGap: 8, marginTop: 20 }}>
-          {created && dateBlock('Created', created)}
-          {showEdited && dateBlock('Edited', edited)}
+      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 12, marginTop: 10, minHeight: LINE_H }}>
+        {(created || showEdited) && (
+          <div style={{ display: 'flex', flexShrink: 0, gap: 12, fontSize: 12, lineHeight: 1.3, color: 'var(--color-text-tertiary)', fontFamily: font }}>
+            {created && dateText('Created', created)}
+            {showEdited && dateText('Edited', edited)}
+          </div>
+        )}
+        <div style={{ position: 'relative', flex: 1, minWidth: 0, height: LINE_H }}>
+          <HomeSyncLine inside end kind={syncKind} text={syncText} actionLabel={syncActionLabel} onAction={onSyncAction} />
         </div>
-      )}
-
-      <div style={{ position: 'absolute', insetInline: 'calc(var(--page-gutter, 16px) + 2px)', bottom: 10, height: LINE_H }}>
-        <HomeSyncLine inside kind={syncKind} text={syncText} actionLabel={syncActionLabel} onAction={onSyncAction} />
       </div>
     </div>
   )
