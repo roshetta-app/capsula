@@ -226,6 +226,11 @@ export function PublicRoutes() {
         <Route path="*"                    element={<UnknownAddressScreen />} />
       </Route>
 
+      {/* 2026-11-21: App.jsx draws this tree and AdminRoutes side by side, so the catch-all
+          above also matched every /admin address and drew "This page isn't available" under
+          each CMS screen. The admin pages belong to AdminRoutes: here they draw nothing. */}
+      <Route path="/admin/*" element={null} />
+
     </Routes>
     </>
   )
