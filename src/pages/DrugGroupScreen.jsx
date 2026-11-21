@@ -55,6 +55,15 @@
  * states: the empty group invites Add (opens the Add drugs screen); a full group shows
  * its limit line under the list header. The Edit sheet is unchanged until step 13.2.
  *
+ * 2026-11-21 (polish step 8.6a): the page follows the roshetta page. The description is added and edited
+ * IN PLACE in the header (ui/InlineDescription.jsx, the same one the roshetta page uses): a small "+ Add
+ * description" link when there is none, the text with a pencil at its end, a box with a count, Cancel and
+ * Save while editing; hidden for a read-only account. It is saved through updateGroup (offline first), so
+ * the rest of the group is never touched. The Back label is the real previous screen (it said "Drugs"
+ * even though the groups moved to Home). The states use the open look: signed out (sign-in icon), could not
+ * load (amber icon; the offline wording when offline), not available (crossed-folder icon; Back goes one
+ * step back), and the loading placeholder is shaped like the page (GroupPageSkeleton).
+ *
  * 2026-10-19 (step 8.1): a Share icon left of Edit opens ShareGroupSheet (not
  * shown to a read-only account, whose database rules refuse making or stopping
  * a link). The page also asks whether the group has a live link, so the delete
@@ -69,7 +78,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Check, Minus, Pencil, Pill, Plus, Share2, Trash2 } from 'lucide-react'
+import { AlertTriangle, Check, FolderX, LogIn, Minus, Pencil, Pill, Plus, Share2, Trash2 } from 'lucide-react'
 import SharedDrugCard from '../components/SharedDrugCard'
 import RowStarButton from '../components/ui/RowStarButton'
 import ConfirmSheet from '../components/ui/ConfirmSheet'
@@ -79,10 +88,11 @@ import ShareGroupSheet from '../components/drugs/groups/ShareGroupSheet'
 import GroupStateMessage from '../components/drugs/groups/GroupStateMessage'
 import GroupSyncStatus from '../components/drugs/groups/GroupSyncStatus'
 import FolderShell from '../components/drugs/groups/FolderShell'
-import GroupDescription from '../components/drugs/groups/GroupDescription'
+import InlineDescription from '../components/ui/InlineDescription'
+import GroupPageSkeleton from '../components/drugs/groups/GroupPageSkeleton'
 import { folderWash } from '../components/drugs/groups/folderStyles'
 import { drugRowTitle, sortDrugsByTitle } from '../components/drugs/groups/groupDrugText'
-import { drugsLimitMessage } from '../components/drugs/groups/groupMessages'
+import { drugsLimitMessage, descriptionFailureMessage } from '../components/drugs/groups/groupMessages'
 import ProUpsellBanner from '../components/ui/ProUpsellBanner'
 import { useGroupDrugEdits } from '../components/drugs/groups/useGroupDrugEdits'
 import { setPendingUndo } from '../components/drugs/groups/pendingUndo'
@@ -95,10 +105,13 @@ import { useOpenDrug } from '../hooks/useOpenDrug'
 import { useIsPro } from '../hooks/useIsPro'
 import { useCategories } from '../hooks/useCategories'
 import { useDeepLinkParent } from '../hooks/useDeepLinkParent'
+import { useBackLabel } from '../hooks/useBackLabel'
+import { useOnlineStatus } from '../hooks/useOnlineStatus'
 import useScrollToTopOnOpen from '../hooks/useScrollToTopOnOpen'
 import { useIsDark } from '../utils/specialtyIcon'
 import { resolveToken } from '../utils/specialtyTokens'
 import { DRUG_GROUP_DRUGS_CAP_FREE, DRUG_GROUP_DRUGS_CAP_PRO } from '../constants/features'
+import { GROUP_DESCRIPTION_MAX } from '../hooks/useDrugGroups'
 import { ROUTES } from '../router'
 
 const REMOVE_ROW_STYLE = {
@@ -126,11 +139,13 @@ export default function DrugGroupScreen() {
   // Back goes to the real previous screen; opened straight from a link, the
   // Drugs home is put behind it first.
   useDeepLinkParent()
+  const backLabel = useBackLabel() || 'Home'
+  const { isOnline } = useOnlineStatus()
 
   const { drugs, loading: drugsLoading } = useDrugContext()
   const {
     groups, groupsStatus, isReadOnly, reloadGroups, deleteGroup,
-    isDrugFavourited, promptSignIn, getShareCode,
+    isDrugFavourited, promptSignIn, getShareCode, updateGroup,
   } = useFavouritesContext()
   const { user, loading: authLoading } = useAuth()
   const isPro = useIsPro()
@@ -244,7 +259,7 @@ export default function DrugGroupScreen() {
   const backButton = (
     <button
       onClick={() => navigate(-1)}
-      aria-label="Back to Drugs"
+      aria-label={`Back to ${backLabel}`}
       style={{
         display: 'flex', alignItems: 'center', gap: 6,
         background: 'none', border: 'none', cursor: 'pointer',
@@ -256,7 +271,7 @@ export default function DrugGroupScreen() {
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <polyline points="15 18 9 12 15 6" />
       </svg>
-      Drugs
+      {backLabel}
     </button>
   )
 
@@ -299,10 +314,12 @@ export default function DrugGroupScreen() {
 
   let content
   if (authLoading || (user && groupsStatus === 'loading')) {
-    content = <div><SkeletonCard /><SkeletonCard /><SkeletonCard /></div>
+    content = <GroupPageSkeleton />
   } else if (!user) {
     content = (
       <GroupStateMessage
+        open
+        icon={LogIn}
         title="Sign in to see this group"
         body="Your groups are saved to your account."
         actionLabel="Sign in"
@@ -311,15 +328,26 @@ export default function DrugGroupScreen() {
     )
   } else if (groupsStatus === 'error' && groups.length === 0) {
     content = (
-      <GroupStateMessage title="Couldn't load your groups" actionLabel="Try again" onAction={reloadGroups} />
+      <GroupStateMessage
+        open
+        icon={AlertTriangle}
+        accent={{ bg: 'var(--color-warning-light)', fg: 'var(--color-warning)' }}
+        title="Couldn't load your groups"
+        body={isOnline ? 'Something went wrong. Please try again.' : "You're offline. Check your connection and try again."}
+        actionLabel="Try again"
+        onAction={reloadGroups}
+      />
     )
   } else if (!group) {
     content = (
       <GroupStateMessage
+        open
+        icon={FolderX}
+        accent={{ bg: 'var(--color-surface-muted)', fg: 'var(--color-text-tertiary)' }}
         title="This group isn't available"
         body="It may have been deleted on another device."
-        actionLabel="Back to Home"
-        onAction={goHome}
+        actionLabel={`Back to ${backLabel}`}
+        onAction={() => navigate(-1)}
       />
     )
   } else {
@@ -448,7 +476,18 @@ export default function DrugGroupScreen() {
             </div>
           </div>
 
-          <GroupDescription text={group.description} />
+          <InlineDescription
+            text={group.description}
+            editable={canEdit && !!updateGroup}
+            onSave={text => updateGroup(group.id, { description: text })}
+            failureMessage={descriptionFailureMessage}
+            max={GROUP_DESCRIPTION_MAX}
+            placeholder="Tell us a little about this group…"
+            dir="ltr"
+            lines={3}
+            textColor="color-mix(in srgb, var(--color-text-primary) 72%, transparent)"
+            discardMessage="Your change to the description won't be saved."
+          />
         </FolderShell>
 
         <GroupSyncStatus marginTop="var(--space-3)" />

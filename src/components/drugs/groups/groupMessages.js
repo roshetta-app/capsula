@@ -37,3 +37,17 @@ export function savedGroupMessage(saved, total) {
     ? `Saved ${saved} of ${total} drugs. Upgrade to Pro to keep all of them.`
     : 'Saved to your groups'
 }
+
+// 2026-11-21 (polish step 8.6a): why a change to a group's description was refused, in plain words,
+// shown under the description box on the group page. 'reason' is the hook's answer (guest, offline,
+// read_only, invalid, missing, error; anything else counts as error).
+export function descriptionFailureMessage(reason) {
+  switch (reason) {
+    case 'guest':     return 'Sign in to save groups.'
+    case 'offline':   return OFFLINE_MESSAGE
+    case 'read_only': return READ_ONLY_MESSAGE
+    case 'invalid':   return 'Check the description, then try again.'
+    case 'missing':   return "This group isn't available. It may have been deleted on another device."
+    default:          return "Couldn't save the description. Try again."
+  }
+}

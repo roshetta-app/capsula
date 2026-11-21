@@ -1,4 +1,6 @@
 // src/components/roshettas/RoshettaPadHeader.jsx
+// 2026-11-21 (step 8.6a): the description's showing and editing moved to the shared component
+// ui/InlineDescription.jsx, which the drug group page uses too; nothing about how it looks or works changed.
 // 2026-11-21 (step 8.5): the shared page uses this header too (no dates and no status line there, so the
 // foot row is not drawn at all when it has nothing to show).
 // 2026-11-21 (Roshetta plan, steps 8.3b to 8.3e): the header of the owner's roshetta page. A white block with a rounded bottom, like the topic sheet's header, and the Home roshetta card's faint
@@ -30,20 +32,17 @@
 //   isPro               boolean (for the limit wording of a refusal)
 //   syncKind, syncText, syncActionLabel, onSyncAction   the status line (see HomeSyncLine)
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { AlertCircle, CalendarDays, CircleX, Clock, FileText, Pencil, Plus } from 'lucide-react'
-import ConfirmSheet from '../ui/ConfirmSheet'
+import { useState } from 'react'
+import { CalendarDays, Clock, FileText } from 'lucide-react'
+import InlineDescription from '../ui/InlineDescription'
 import HomeSyncLine, { LINE_H } from '../home/HomeSyncLine'
-import { useBackClose } from '../../hooks/useBackClose'
 import { SpecialtyIcon, useIsDark } from '../../utils/specialtyIcon'
 import { specialtyColors, specialtyHeaderText } from '../../utils/roshettaSpecialty'
 import { shortDateText } from '../../utils/roshettaShelfText'
 import { ROSHETTA_DESCRIPTION_MAX } from '../../utils/roshettaRows'
-import { countText, limitText, saveFailureMessage } from '../../utils/roshettaDetailsText'
+import { saveFailureMessage } from '../../utils/roshettaDetailsText'
 
 const font = 'var(--font-body)'
-const NEAR_LIMIT = Math.floor(ROSHETTA_DESCRIPTION_MAX * 0.9)
-const NOTE_BG = 'var(--color-surface-muted)'
 
 export default function RoshettaPadHeader({
   name, description = '', specialty = null, createdAt, updatedAt,
@@ -53,92 +52,12 @@ export default function RoshettaPadHeader({
   const isDark = useIsDark()
   const look = specialtyColors(specialty, isDark)
   const label = specialtyHeaderText(specialty, 'Roshetta')
-  const text = typeof description === 'string' ? description.trim() : ''
   const created = shortDateText(createdAt)
   const edited = shortDateText(updatedAt)
   // A roshetta not changed since the day it was made shows only when it was created.
   const showEdited = !!edited && edited !== created
 
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
-  const [open, setOpen] = useState(false)          // a long description shown in full
-  const [clamps, setClamps] = useState(false)      // the text is longer than two lines
-  const [discardOpen, setDiscardOpen] = useState(false)
   const [syncActive, setSyncActive] = useState(false)   // a status message is showing
-  const textRef = useRef(null)
-  const boxRef = useRef(null)
-  const areaRef = useRef(null)
-
-  const next = draft.trim()
-  const changed = next !== text
-
-  // Does the text run past two lines? (measured while it is clamped)
-  useLayoutEffect(() => {
-    const el = textRef.current
-    if (!el || open) return undefined
-    const measure = () => setClamps(el.scrollHeight > el.clientHeight + 1)
-    measure()
-    if (typeof ResizeObserver === 'undefined') return undefined
-    const ro = new ResizeObserver(measure)
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [text, open, editing])
-
-  // The box grows with the text.
-  useLayoutEffect(() => {
-    const el = areaRef.current
-    if (!el || !editing) return
-    el.style.height = 'auto'
-    el.style.height = `${el.scrollHeight}px`
-  }, [draft, editing])
-
-  // When editing starts, bring the box into view above the keyboard.
-  useEffect(() => {
-    if (!editing) return undefined
-    const t = setTimeout(() => boxRef.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' }), 250)
-    return () => clearTimeout(t)
-  }, [editing])
-
-  function startEdit() {
-    setDraft(text)
-    setError('')
-    setEditing(true)
-    onEditingChange?.(true)
-  }
-  function stopEdit() {
-    setEditing(false)
-    setSaving(false)
-    setError('')
-    setDiscardOpen(false)
-    onEditingChange?.(false)
-  }
-  async function save() {
-    if (saving || !changed) return
-    setSaving(true)
-    setError('')
-    let res
-    try {
-      res = await onSaveDescription?.(next)
-    } catch {
-      res = { ok: false, reason: 'error' }
-    }
-    if (!res?.ok) {
-      setSaving(false)
-      setError(saveFailureMessage(res?.reason, isPro))
-      return
-    }
-    stopEdit()
-  }
-
-  // Back closes the editing first: straight away when nothing changed, after a question when it did.
-  // The layer is off while the question is open, so "Keep editing" puts it back.
-  useBackClose(editing && !discardOpen, () => {
-    if (saving) return
-    if (changed) setDiscardOpen(true)
-    else stopEdit()
-  })
 
   const dateText = (Icon, title, value) => (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
@@ -199,152 +118,18 @@ export default function RoshettaPadHeader({
         </h1>
       </div>
 
-      {editing ? (
-        <div style={{ position: 'relative', marginTop: 8 }}>
-          <div
-            ref={boxRef}
-            style={{
-              display: 'flex', alignItems: 'flex-start', gap: 4,
-              borderRadius: 12, padding: '8px 4px 8px 12px',
-              border: `1.5px solid ${error ? 'var(--color-danger)' : 'var(--color-accent)'}`,
-              opacity: saving ? 0.6 : 1,
-            }}
-          >
-            <textarea
-              ref={areaRef}
-              value={draft}
-              onChange={e => { setError(''); setDraft(limitText(e.target.value, ROSHETTA_DESCRIPTION_MAX)) }}
-              autoFocus
-              rows={2}
-              dir="auto"
-              disabled={saving}
-              aria-label="Description"
-              placeholder="Tell us a little about this roshetta…"
-              style={{
-                flex: 1, minWidth: 0, boxSizing: 'border-box', resize: 'none', outline: 'none', border: 'none',
-                background: 'transparent', padding: 0, margin: 0, overflow: 'hidden',
-                fontSize: 14, lineHeight: 1.5, fontFamily: font, textAlign: 'start',
-                color: 'var(--color-text-primary)',
-              }}
-            />
-            {draft && !saving && (
-              <button
-                type="button"
-                onClick={() => { setDraft(''); areaRef.current?.focus() }}
-                aria-label="Clear description"
-                style={{
-                  flexShrink: 0, width: 32, height: 32, margin: '-6px 0 -6px 0', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--color-text-tertiary)',
-                  WebkitTapHighlightColor: 'transparent',
-                }}
-              >
-                <CircleX size={16} aria-hidden="true" />
-              </button>
-            )}
-          </div>
-          {error && (
-            <div role="alert" style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--color-danger)', fontFamily: font }}>
-              <AlertCircle size={13} aria-hidden="true" style={{ flexShrink: 0 }} />
-              {error}
-            </div>
-          )}
-          <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span
-              style={{
-                flex: 1, fontSize: 12, fontFamily: font,
-                color: countText(draft) >= NEAR_LIMIT ? 'var(--color-warning)' : 'var(--color-text-tertiary)',
-                fontWeight: countText(draft) >= NEAR_LIMIT ? 500 : 400,
-              }}
-            >
-              {countText(draft)}/{ROSHETTA_DESCRIPTION_MAX}
-            </span>
-            <button
-              type="button"
-              onClick={stopEdit}
-              disabled={saving}
-              style={{ minHeight: 40, padding: '0 12px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-secondary)', fontSize: 13, fontWeight: 500, fontFamily: font, opacity: saving ? 0.5 : 1, WebkitTapHighlightColor: 'transparent' }}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={save}
-              aria-disabled={!changed || saving}
-              style={{
-                minHeight: 36, padding: '0 18px', borderRadius: 999, border: 'none',
-                cursor: changed && !saving ? 'pointer' : 'default',
-                backgroundColor: changed || saving ? 'var(--color-accent-solid)' : NOTE_BG,
-                color: changed || saving ? '#fff' : 'var(--color-text-tertiary)',
-                fontSize: 13, fontWeight: 600, fontFamily: font, opacity: saving ? 0.75 : 1,
-                WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              {saving ? 'Saving\u2026' : 'Save'}
-            </button>
-          </div>
-        </div>
-      ) : text ? (
-        <div style={{ position: 'relative', marginTop: 8, display: 'flex', alignItems: 'flex-start', gap: 4, padding: 0 }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <p
-              ref={textRef}
-              dir="auto"
-              onClick={clamps || open ? () => setOpen(v => !v) : undefined}
-              style={{
-                margin: 0, textAlign: 'start', whiteSpace: 'pre-line', overflowWrap: 'anywhere',
-                fontSize: 14, lineHeight: 1.5, color: 'var(--color-text-secondary)', fontFamily: font,
-                cursor: clamps || open ? 'pointer' : 'default',
-                ...(open ? {} : { display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }),
-              }}
-            >
-              {text}
-            </p>
-            {(clamps || open) && (
-              <button
-                type="button"
-                onClick={() => setOpen(v => !v)}
-                aria-expanded={open}
-                style={{
-                  minHeight: 24, padding: 0, background: 'none', border: 'none', cursor: 'pointer',
-                  color: 'var(--color-accent-text)', fontSize: 12, fontWeight: 500, fontFamily: font,
-                  WebkitTapHighlightColor: 'transparent',
-                }}
-              >
-                {open ? 'less' : 'more'}
-              </button>
-            )}
-          </div>
-          {editable && (
-            <button
-              type="button"
-              onClick={startEdit}
-              aria-label="Edit description"
-              style={{
-                flexShrink: 0, width: 36, height: 36, margin: '-6px 0 -6px 0',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--color-text-tertiary)',
-                WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              <Pencil size={16} aria-hidden="true" />
-            </button>
-          )}
-        </div>
-      ) : editable ? (
-        <button
-          type="button"
-          onClick={startEdit}
-          style={{
-            position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 4, minHeight: 32, marginTop: 2,
-            padding: 0, background: 'none', cursor: 'pointer', border: 'none',
-            color: 'var(--color-accent-text)', fontSize: 13, fontWeight: 500, fontFamily: font,
-            WebkitTapHighlightColor: 'transparent',
-          }}
-        >
-          <Plus size={14} aria-hidden="true" />
-          Add description
-        </button>
-      ) : null}
+      {/* The description, added and edited in place (the same component the drug group page uses). */}
+      <div style={{ position: 'relative' }}>
+        <InlineDescription
+          text={description}
+          editable={editable}
+          onSave={onSaveDescription}
+          failureMessage={reason => saveFailureMessage(reason, isPro)}
+          onEditingChange={onEditingChange}
+          max={ROSHETTA_DESCRIPTION_MAX}
+          placeholder="Tell us a little about this roshetta…"
+        />
+      </div>
 
       {/* The last row: the dates. While a status message shows (waiting, saving, offline, not saved,
           all saved) it takes the dates' place on this same row, so there is no empty reserved line,
@@ -364,15 +149,6 @@ export default function RoshettaPadHeader({
         <HomeSyncLine inside kind={syncKind} text={syncText} actionLabel={syncActionLabel} onAction={onSyncAction} onActiveChange={setSyncActive} />
       </div>
       )}
-      <ConfirmSheet
-        isOpen={discardOpen}
-        onClose={() => setDiscardOpen(false)}
-        onConfirm={stopEdit}
-        title="Discard changes?"
-        message="Your change to the description won't be saved."
-        confirmLabel="Discard"
-        destructive
-      />
     </div>
   )
 }
