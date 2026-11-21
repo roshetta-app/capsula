@@ -7,7 +7,7 @@
 //   - the specialty, small, in the header content (a tiny tinted tile with its icon and the name
 //     in its colour; "Roshetta" in the app's blue when there is none). The block stays white;
 //   - the name, 22, the full width, as many lines as it needs;
-//   - the description, in a soft note box so it reads as its own thing (added and edited HERE, in
+//   - the description, as an indented note with a thin line at its start (no fill, so the Rx behind it stays visible) (added and edited HERE, in
 //     place, never in a sheet): a dashed "Add description" box when there is none; the text, two
 //     lines then "more", with a pencil at its end when there is one (tapping the text only opens
 //     or closes it; only the pencil edits); while editing a box that grows as you type, a clear
@@ -205,7 +205,7 @@ export default function RoshettaPadHeader({
             ref={boxRef}
             style={{
               display: 'flex', alignItems: 'flex-start', gap: 4,
-              backgroundColor: NOTE_BG, borderRadius: 12, padding: '8px 4px 8px 12px',
+              borderRadius: 12, padding: '8px 4px 8px 12px',
               border: `1.5px solid ${error ? 'var(--color-danger)' : 'var(--color-accent)'}`,
               opacity: saving ? 0.6 : 1,
             }}
@@ -284,7 +284,7 @@ export default function RoshettaPadHeader({
           </div>
         </div>
       ) : text ? (
-        <div style={{ position: 'relative', marginTop: 8, display: 'flex', alignItems: 'flex-start', gap: 4, backgroundColor: NOTE_BG, borderRadius: 12, padding: '8px 4px 8px 12px' }}>
+        <div style={{ position: 'relative', marginTop: 8, display: 'flex', alignItems: 'flex-start', gap: 4, borderInlineStart: '3px solid var(--color-border)', borderRadius: 2, padding: '2px 4px 2px 12px' }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <p
               ref={textRef}
