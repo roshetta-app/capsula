@@ -10,11 +10,15 @@
  * to the public.
  *
  * fetchSharedGroup(code) answers one of:
- *   { status: 'ok', group: { name, description, color, ownerName, drugs } }
+ *   { status: 'ok', group: { name, description, color, ownerName, createdAt, isOwner, ownId, drugs } }
  *   { status: 'unavailable' }  wrong, short, stopped or deleted-group link
  *                              (all the same answer, so nothing is revealed)
  *   { status: 'offline' }      the phone has no connection
  *   { status: 'error' }        the database could not be reached or failed
+ *
+ * 2026-11-21 (Phase L, step 13.4): it also returns created_at, and, only when the signed-in
+ * viewer is the owner, is_owner and own_id (the group's own id). No user id is ever returned.
+ * The answer depends on who is asking, so the page asks again after a sign-in.
  *
  * Each drug is shaped like the app's normal drug objects (same names as
  * mapFlatDrugRows in lib/queries.js) so the normal drug card can draw it.
@@ -22,6 +26,7 @@
  */
 
 import { supabase } from '../lib/supabase'
+import { readCredit } from './shareCredit'
 
 // The database refuses codes shorter than this; no need to ask it.
 const MIN_CODE_LENGTH = 32
@@ -96,7 +101,7 @@ export async function fetchSharedGroup(code) {
       name: data.name,
       description: data.description ?? '',
       color: data.color,
-      ownerName: typeof data.owner_name === 'string' && data.owner_name.trim() ? data.owner_name.trim() : null,
+      ...readCredit(data),   // ownerName, createdAt, isOwner, ownId
       drugs,
     },
   }

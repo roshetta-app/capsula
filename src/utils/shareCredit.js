@@ -15,6 +15,8 @@
  *   accountSwitchText({ hasName, on })
  *                                  the Account row: { title, line }
  *   readOwner(raw)                 { isOwner, ownId } from what the database function returned
+ *   readCredit(raw)                everything the shared pages read from the database answer:
+ *                                  { ownerName, createdAt, isOwner, ownId }
  *   findSavedCopy(items, code)     the saved copy that came from this link, or null
  *   sharedBarState({ kind, isOwner, ownId, savedId })
  *                                  what the bottom bar of a shared page shows:
@@ -71,6 +73,13 @@ export function accountSwitchText({ hasName, on } = {}) {
 export function readOwner(raw) {
   const isOwner = !!raw && raw.is_owner === true && typeof raw.own_id === 'string' && raw.own_id !== '';
   return { isOwner, ownId: isOwner ? raw.own_id : null };
+}
+
+export function readCredit(raw) {
+  const r = raw && typeof raw === 'object' ? raw : {};
+  const name = cleanName(r.owner_name);
+  const created = typeof r.created_at === 'string' && dayText(r.created_at) !== '' ? r.created_at : null;
+  return { ownerName: name || null, createdAt: created, ...readOwner(r) };
 }
 
 export function findSavedCopy(items, code) {

@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   dayText, creditText, groupCreditLine, nameSwitchText, accountSwitchText,
-  readOwner, findSavedCopy, sharedBarState,
+  readOwner, readCredit, findSavedCopy, sharedBarState,
 } from './shareCredit.js';
 
 const NOW = new Date(2026, 10, 21, 9, 30); // Sat 21 Nov 2026
@@ -94,4 +94,17 @@ test('bottom bar: owner first, then already saved, else the normal Save bar', ()
   assert.equal(sharedBarState({ kind: 'group', isOwner: true, savedId: 'g2' }).mode, 'saved', 'a flag with no id is not an owner');
   assert.equal(sharedBarState({ kind: 'roshetta' }).mode, 'save');
   assert.equal(sharedBarState().mode, 'save');
+});
+
+test('reading the database answer: name, day and owner, with safe defaults', () => {
+  const d = at(2026, 10, 12);
+  assert.deepEqual(readCredit({ owner_name: ' Dr Sara ', created_at: d, is_owner: true, own_id: 'g1' }),
+    { ownerName: 'Dr Sara', createdAt: d, isOwner: true, ownId: 'g1' });
+  assert.deepEqual(readCredit({ owner_name: null, created_at: d }),
+    { ownerName: null, createdAt: d, isOwner: false, ownId: null });
+  assert.deepEqual(readCredit({ owner_name: '  ', created_at: 'garbage' }),
+    { ownerName: null, createdAt: null, isOwner: false, ownId: null });
+  for (const bad of [null, undefined, 'x', 5]) {
+    assert.deepEqual(readCredit(bad), { ownerName: null, createdAt: null, isOwner: false, ownId: null }, String(bad));
+  }
 });

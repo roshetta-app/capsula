@@ -17,6 +17,12 @@
  * No edit controls, no heart. The owner is anonymous unless they chose to show their name
  * (2026-11-03): then the line under the group name reads "Shared by <name> \u00b7 3 drugs" (the
  * database function only returns the name when the owner turned it on).
+ * 2026-11-21 (Roshetta plan, Phase L, step 13.4): the line now reads "Created by <name> \u00b7 12 Nov \u00b7
+ * 3 drugs" ("Created 12 Nov \u00b7 3 drugs" when anonymous), the day being when the group was first
+ * made. The owner opening their own link sees this same page, and the Save bar becomes "This is
+ * your group" with an Open button to their own page (no copy can be made). The answer depends on
+ * who asks, so the page asks again after a sign-in, and a save that waited for sign-in waits for
+ * that answer first.
  * 2026-11-03: the "Shared by a Capsula user. The name and description were written by them..."
  * note is gone from the folder; the "Shared group" tag already says what the page is.
  *
@@ -93,6 +99,7 @@ import { SAVE_OFFLINE_MESSAGE, SAVE_READ_ONLY_MESSAGE, SAVE_ERROR_MESSAGE, saved
 import { useIsDark } from '../utils/specialtyIcon'
 import { resolveToken } from '../utils/specialtyTokens'
 import { fetchSharedGroup } from '../utils/sharedGroup'
+import { dayText, sharedBarState } from '../utils/shareCredit'
 import { logUsageEvent } from '../analytics/usageEvents'
 import { ROUTES } from '../router'
 
@@ -141,13 +148,18 @@ function SharedGroupBody({ code }) {
   // Bumped by Retry, so the effect below asks again.
   const [attempt, setAttempt] = useState(0)
 
+  // The answer depends on who is asking (the owner is told so), so it is asked again when the
+  // signed-in person changes, and each answer remembers who it was asked for (forUser). A page
+  // that was already showing is kept if the second ask fails.
+  const userId = user?.id ?? null
   useEffect(() => {
     let cancelled = false
     fetchSharedGroup(code).then(r => {
-      if (!cancelled) setResult(r)
+      if (cancelled) return
+      setResult(prev => (prev.status === 'ok' && r.status !== 'ok' ? prev : { ...r, forUser: userId }))
     })
     return () => { cancelled = true }
-  }, [code, attempt])
+  }, [code, attempt, userId])
 
   // Analytics (step 9.5): one 'shared_group_open' per link opened, when the group
   // really shows. No code, name or description is sent, and Retry or coming back
@@ -188,6 +200,7 @@ function SharedGroupBody({ code }) {
 
   const runSave = useCallback(async () => {
     if (savingRef.current || result.status !== 'ok') return
+    if (result.group.isOwner) return   // your own group is never saved again as a copy
     savingRef.current = true
     setNotice(null)
     setSaveState({ phase: 'saving' })
@@ -215,7 +228,7 @@ function SharedGroupBody({ code }) {
   }, [result, drugs, saveSharedGroup, signInId, showGroupLimit])
 
   function handleSaveTap() {
-    if (authLoading || saveState.phase !== 'idle') return
+    if (authLoading || saveState.phase !== 'idle' || answerIsStale) return
     if (!user) {
       armedRef.current = true
       promptSignIn('groups', signInId)
@@ -233,6 +246,8 @@ function SharedGroupBody({ code }) {
       return
     }
     if (groupsStatus === 'loading' || result.status !== 'ok') return
+    // Wait for the answer asked after signing in: it tells whether this is the person's own group.
+    if (result.forUser !== user.id) return
     // Started on the next tick, so the save's own state change is not made
     // inside this effect. The request is only cleared when it really starts.
     const t = setTimeout(() => {
@@ -240,10 +255,19 @@ function SharedGroupBody({ code }) {
       runSave()
     }, 0)
     return () => clearTimeout(t)
-  }, [authLoading, user, pendingFavourite, groupsStatus, result.status, runSave])
+  }, [authLoading, user, pendingFavourite, groupsStatus, result.status, result.forUser, runSave])
 
-  const showSave = groupsOn && result.status === 'ok' && drugs.length > 0
-  const saveBusy = saveState.phase === 'saving' || authLoading || (!!user && groupsStatus === 'loading')
+  // The page shows an answer asked before the person signed in: the Save bar waits a moment.
+  const answerIsStale = result.status === 'ok' && !!user && result.forUser !== user.id
+  const bar = sharedBarState({
+    kind: 'group',
+    isOwner: result.status === 'ok' && result.group.isOwner,
+    ownId: result.status === 'ok' ? result.group.ownId : null,
+  })
+  const showOwnerBar = result.status === 'ok' && bar.mode === 'owner'
+  const showSave = groupsOn && result.status === 'ok' && drugs.length > 0 && !showOwnerBar
+  const showBottom = showSave || showOwnerBar
+  const saveBusy = saveState.phase === 'saving' || authLoading || answerIsStale || (!!user && groupsStatus === 'loading')
 
   const backButton = (
     <button
@@ -314,6 +338,7 @@ function SharedGroupBody({ code }) {
     const { group } = result
     const tone = resolveToken(group.color, isDark)
     const count = drugs.length
+    const day = dayText(group.createdAt)
 
     content = (
       <>
@@ -340,14 +365,16 @@ function SharedGroupBody({ code }) {
             display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 6, rowGap: 2,
             fontSize: 13, color: 'color-mix(in srgb, var(--color-text-primary) 72%, transparent)', fontFamily: 'var(--font-body)',
           }}>
+            {/* "Created by X · 12 Nov · 12 drugs", or "Created 12 Nov · 12 drugs" when anonymous
+                (the same words as groupCreditLine in shareCredit.js, with the name in bold). */}
             {group.ownerName && (
-              <>
-                <span>
-                  Shared by <span dir="auto" style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{group.ownerName}</span>
-                </span>
-                <span aria-hidden="true">{'\u00b7'}</span>
-              </>
+              <span>
+                Created by <span dir="auto" style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{group.ownerName}</span>
+              </span>
             )}
+            {group.ownerName && day && <span aria-hidden="true">{'\u00b7'}</span>}
+            {day && <span>{group.ownerName ? day : `Created ${day}`}</span>}
+            {(group.ownerName || day) && <span aria-hidden="true">{'\u00b7'}</span>}
             <span>{count} {count === 1 ? 'drug' : 'drugs'}</span>
           </div>
 
@@ -386,11 +413,11 @@ function SharedGroupBody({ code }) {
       // Step 14.2: a full-height column, so the Save bar sits at the bottom of the screen
       // even when the group is short. With a Save bar the bar carries the bottom gap.
       minHeight: '100dvh', display: 'flex', flexDirection: 'column',
-      padding: `calc(var(--space-3) + env(safe-area-inset-top, 0px)) var(--page-gutter) ${showSave ? '0' : 'calc(var(--space-4) + env(safe-area-inset-bottom, 0px))'}`,
+      padding: `calc(var(--space-3) + env(safe-area-inset-top, 0px)) var(--page-gutter) ${showBottom ? '0' : 'calc(var(--space-4) + env(safe-area-inset-bottom, 0px))'}`,
     }}>
       {topBar}
-      <div style={{ flex: '1 0 auto', paddingBottom: showSave ? 'var(--space-4)' : 0 }}>{content}</div>
-      {showSave && (
+      <div style={{ flex: '1 0 auto', paddingBottom: showBottom ? 'var(--space-4)' : 0 }}>{content}</div>
+      {showBottom && (
         <div style={{
           position: 'sticky', bottom: 0, zIndex: 5,
           margin: '0 calc(-1 * var(--page-gutter))',
@@ -398,7 +425,25 @@ function SharedGroupBody({ code }) {
           backgroundColor: 'var(--color-surface)', boxShadow: '0 -6px 18px rgba(0,0,0,0.06)',
           fontFamily: 'var(--font-body)',
         }}>
-          {saveState.phase === 'saved' ? (
+          {showOwnerBar ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                <FolderOpen size={18} strokeWidth={1.8} color="var(--color-text-secondary)" aria-hidden="true" style={{ flexShrink: 0 }} />
+                <span style={{ fontSize: 14, lineHeight: 1.4, color: 'var(--color-text-primary)' }}>{bar.text}</span>
+              </span>
+              <button
+                onClick={() => openPage(ROUTES.DRUGS_GROUP(bar.targetId))}
+                style={{
+                  flexShrink: 0, minHeight: 44, border: 'none', cursor: 'pointer', padding: '0 20px',
+                  borderRadius: 999, backgroundColor: 'var(--color-accent-solid)', color: '#fff',
+                  fontSize: 14, fontWeight: 600, fontFamily: 'var(--font-body)',
+                  WebkitTapHighlightColor: 'transparent', outline: 'none',
+                }}
+              >
+                {bar.button}
+              </button>
+            </div>
+          ) : saveState.phase === 'saved' ? (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)' }}>
               <span style={{ display: 'flex', alignItems: 'flex-start', gap: 8, minWidth: 0 }}>
                 <Check size={18} strokeWidth={2.6} color="var(--color-success)" aria-hidden="true" style={{ flexShrink: 0, marginTop: 1 }} />
