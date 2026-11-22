@@ -1,7 +1,7 @@
 /**
  * src/components/ui/ProfileAvatar.jsx
  * unify-profile-avatar (2026-08-25) — the one shared avatar circle, used by
- * AccountScreen.jsx, ProfileWizard.jsx, and AccountEditScreen.jsx. Each of
+ * AccountScreen.jsx and AccountEditScreen.jsx. Each of
  * those previously had its own separate, hand-built copy of this (photo
  * with a fallback-to-initials circle) block, and they had drifted apart
  * from each other over time: different circle sizes (64px on Edit Profile

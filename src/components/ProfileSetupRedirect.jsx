@@ -5,7 +5,7 @@
  * Same trigger condition ProfileSetupModal used (signed-in user whose
  * profiles.profile_setup_dismissed is still false), but instead of
  * rendering a popup form itself, it navigates to /account/edit and lets
- * AccountEditScreen + ProfileWizard handle the actual form — per the
+ * AccountEditScreen (welcome mode) handles the actual form — per the
  * redesign spec, the modal is gone, both entry points now share one
  * wizard. AccountEditScreen independently reads the same dismissed flag
  * to decide whether to open straight into edit mode, so this component's

@@ -2,7 +2,7 @@
  * src/components/profile/FormParts.jsx
  * 2026-11-22 (step 14.7c-1): the form pieces of the old wizard (field wrapper, dropdown with search,
  * phone country-code sheet and the shared field styles), moved here unchanged so the one Edit
- * screen can use them. ProfileWizard.jsx keeps its own copy until it is retired in 14.7c-2.
+ * screen can use them. The old wizard file was deleted in 14.7c-2.
  */
 
 import { useState, useMemo, useRef, useEffect } from 'react'

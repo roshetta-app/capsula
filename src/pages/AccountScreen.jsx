@@ -185,7 +185,7 @@
  *
  * unify-profile-avatar (2026-08-25) — the hand-built avatar circle (initials
  * fallback, broken-image handling) is now the shared ProfileAvatar.jsx
- * component, also used by ProfileWizard.jsx and AccountEditScreen.jsx, so
+ * component, also used by AccountEditScreen.jsx, so
  * the three screens can't drift out of sync with each other again. No
  * visual change here — this screen's avatar was already the 72px/two-letter
  * version the shared component adopted as the standard.

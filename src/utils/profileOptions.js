@@ -1,7 +1,7 @@
 /**
  * src/utils/profileOptions.js
  * 2026-11-22 (step 14.7c-1): the choice lists and phone helpers for the Edit screen, moved out of
- * ProfileWizard.jsx so the one Edit screen does not depend on the wizard (retired in 14.7c-2).
+ * the old ProfileWizard.jsx (deleted in 14.7c-2).
  * Same values, same stored words as before: existing profiles keep working. Plain data and
  * functions, no React.
  */

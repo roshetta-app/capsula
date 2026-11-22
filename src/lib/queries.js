@@ -847,12 +847,12 @@ export async function fetchCmsConfig(supabase, key) {
  * dismissed flag, on the signed-in user's own profiles row. Kept separate
  * from useAuth.js's loadProfile (which only ever needs role/tier) so every
  * component using useAuth() doesn't carry these extra fields — only
- * AccountEditScreen/ProfileWizard need them.
+ * the old Edit screen needed them.
  *
  * profile-wizard-redesign: added gender, phoneCountryCode, phoneNumber,
  * studentType (new profiles columns: gender, phone_country_code,
  * phone_number, student_type). ProfileSetupModal is gone — replaced by
- * ProfileSetupRedirect + the shared ProfileWizard on AccountEditScreen.
+ * ProfileSetupRedirect + the old wizard on AccountEditScreen.
  *
  * @param {import('@supabase/supabase-js').SupabaseClient} supabase
  * @param {string} userId

@@ -149,7 +149,7 @@ export function removedWaitDaysLeft(profile, now = Date.now()) {
 }
 
 // ---- the two states, worked out from filled-in data, never from a flag ----
-// The three stored occupation values the wizard uses for physicians (ProfileWizard.jsx OCCUPATION_OPTIONS).
+// The three stored occupation values the old wizard used for physicians (now OCCUPATION_OPTIONS in profileOptions.js).
 export const PHYSICIAN_OCCUPATIONS = ['Specialist Physician', 'Junior Resident Physician', 'Senior Resident Physician']
 const filled = (v) => typeof v === 'string' && v.trim() !== ''
 export const isPhysician = (profile) => PHYSICIAN_OCCUPATIONS.includes(String(profile?.occupation ?? '').trim())
