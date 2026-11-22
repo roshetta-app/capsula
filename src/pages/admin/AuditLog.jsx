@@ -32,6 +32,10 @@ const ACTION_STYLES = {
   sharing_off:   { bg: '#FEE2E2', color: '#991B1B', border: '#FCA5A5', label: 'Sharing off'   },
   sharing_on:    { bg: '#D1FAE5', color: '#065F46', border: '#6EE7B7', label: 'Sharing restored' },
   take_handle:   { bg: '#FEE2E2', color: '#991B1B', border: '#FCA5A5', label: 'Username taken back' },
+  // I5: reports about Topic and drug pages (the database writes these itself)
+  page_report:    { bg: '#FEF9C3', color: '#854D0E', border: '#FDE047', label: 'Page problem reported' },
+  page_fixed:     { bg: '#D1FAE5', color: '#065F46', border: '#6EE7B7', label: 'Marked fixed' },
+  page_dismissed: { bg: '#F3F4F6', color: '#374151', border: '#D1D5DB', label: 'Dismissed' },
 }
 
 const TABLE_LABELS = {
@@ -210,7 +214,7 @@ export default function AuditLog() {
                   {/* Main row */}
                   <div style={{
                     display: 'grid',
-                    gridTemplateColumns: '160px 90px 110px minmax(0,1fr) 60px',
+                    gridTemplateColumns: '160px 150px 110px minmax(0,1fr) 60px',
                     gap: 'var(--space-3)',
                     alignItems: 'center',
                     padding: 'var(--space-3) var(--space-4)',
@@ -321,7 +325,7 @@ export default function AuditLog() {
 
 const theadStyle = {
   display: 'grid',
-  gridTemplateColumns: '160px 90px 110px minmax(0,1fr) 60px',
+  gridTemplateColumns: '160px 150px 110px minmax(0,1fr) 60px',
   gap: 'var(--space-3)',
   padding: 'var(--space-2) var(--space-4)',
   backgroundColor: 'var(--color-bg)',

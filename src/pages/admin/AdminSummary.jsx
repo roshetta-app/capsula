@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faUsers, faCapsules, faNotesMedical, faFlag } from '@fortawesome/free-solid-svg-icons'
+import { faUsers, faCapsules, faNotesMedical, faFlag, faTriangleExclamation } from '@fortawesome/free-solid-svg-icons'
 import { supabase } from '../../lib/supabase'
 import { fetchAllUsers } from '../../lib/adminQueries'
 import { fetchReportCount } from '../../utils/reportsAdminContent'
+import { fetchPageProblemCount } from '../../utils/pageProblemsAdminContent'
 import AdminPageHeader from '../../components/admin/AdminPageHeader'
 import DawaaGateCard from '../../components/admin/DawaaGateCard'
 
@@ -35,10 +36,13 @@ export default function AdminSummary() {
   const [error, setError]     = useState(null)
   // 14.9c-1: open reports and appeals waiting; asked separately so a failure here never hides the other counts.
   const [reports, setReports]   = useState({ status: 'loading', count: 0 })
+  // I5: pages with open problem reports; asked on its own for the same reason.
+  const [pageProblems, setPageProblems] = useState({ status: 'loading', count: 0 })
 
   useEffect(() => {
     let cancelled = false
     fetchReportCount().then((r) => { if (!cancelled) setReports({ status: r.status, count: r.count ?? 0 }) })
+    fetchPageProblemCount().then((r) => { if (!cancelled) setPageProblems({ status: r.status, count: r.count ?? 0 }) })
     return () => { cancelled = true }
   }, [])
 
@@ -162,6 +166,31 @@ export default function AdminSummary() {
             </div>
             <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', marginTop: 2 }}>
               Open reports
+            </div>
+          </div>
+        </Link>
+        <Link
+          to="/admin/reports"
+          style={{
+            display: 'flex', alignItems: 'center', gap: 'var(--space-4)', padding: 'var(--space-4)',
+            backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)',
+            borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-card)', textDecoration: 'none',
+          }}
+        >
+          <div style={{
+            width: 48, height: 48, borderRadius: 'var(--radius-md)', flexShrink: 0,
+            backgroundColor: pageProblems.count > 0 ? '#FEE2E2' : 'var(--color-accent-light)',
+            color: pageProblems.count > 0 ? '#991B1B' : 'var(--color-accent)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <FontAwesomeIcon icon={faTriangleExclamation} style={{ width: 20, height: 20 }} />
+          </div>
+          <div>
+            <div style={{ fontSize: 24, fontWeight: 700, fontFamily: 'var(--font-body)', color: 'var(--color-text-primary)', lineHeight: 1.2 }}>
+              {pageProblems.status === 'ok' ? pageProblems.count : '—'}
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', marginTop: 2 }}>
+              Page problems
             </div>
           </div>
         </Link>

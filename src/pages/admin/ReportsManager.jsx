@@ -13,6 +13,8 @@
  * 14.9c-4b adds, on profile cards, the buttons Turn off sharing / Restore sharing / Take username back
  * (components/admin/TakedownActions.jsx, rules in utils/takedownAdmin.js), a Sharing off tag, and below the cards the
  * list of people whose sharing is turned off (SharingOffList), so Restore sharing is always reachable.
+ * 2026-11-23 (Track I, step I5): below the cards, a Page problems section (components/admin/PageProblemsSection.jsx):
+ * reports about Topic, brand and generic pages. Refresh reads it again too.
  */
 
 import { useEffect, useState } from 'react'
@@ -22,6 +24,7 @@ import AdminPageHeader from '../../components/admin/AdminPageHeader'
 import ConfirmModal from '../../components/admin/ConfirmModal'
 import TakedownActions from '../../components/admin/TakedownActions'
 import SharingOffList from '../../components/admin/SharingOffList'
+import PageProblemsSection from '../../components/admin/PageProblemsSection'
 import { fetchReports, actOnReport, fetchPreview } from '../../utils/reportsAdminContent'
 import { fetchSharingOff } from '../../utils/takedownAdminContent'
 import { TAKEDOWN_WORDS } from '../../utils/takedownAdmin'
@@ -302,6 +305,8 @@ export default function ReportsManager() {
           ))}
         </div>
       )}
+
+      {status !== 'forbidden' && <PageProblemsSection reloadKey={reloadKey} />}
 
       {status !== 'forbidden' && <SharingOffList off={off} onChanged={reload} />}
 
