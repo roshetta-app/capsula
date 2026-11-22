@@ -16,6 +16,10 @@
  * no account, and are cleared nightly; day numbers older than 90 days are added into one total per item; deleting a
  * roshetta, a drug group or an account removes its counts). They replace the idea of "no visitor tracking".
  *
+ * 2026-11-23 (Track H, step H6c): the lines about the saved-copy count (checked against the live database and Migration 9:
+ * a copy stores the code of the link it came from; one copy per person per link; the owner gets a number only through
+ * owner_item_views, never a name or id; a deleted copy or account stops counting).
+ *
  * Who runs Capsula and how to reach them are not known to the app. Fill in OPERATOR_NAME and
  * CONTACT_EMAIL below; while they are empty their lines are simply left out (nothing invented).
  */
@@ -84,6 +88,7 @@ export function termsSections(facts) {
         'Everything is private unless you make it public. A public roshetta or drug group has a link and appears on your public profile with your name and username. Your profile also has its own link.',
         'Anyone with a link can view the item, save their own copy and change that copy. A copy belongs to whoever saved it, and changes they make do not change your original.',
         'The person who made a public item can see an approximate count of how many visitors opened it, with repeat visits on the same day counted once. Capsula does not show who visited.',
+        'The person who made a public item can also see how many other people saved a copy from its link. Capsula does not show who saved it.',
         'Links you shared before public profiles existed keep working until you stop sharing them.',
         'Titles such as "Dr" are written by the person and are not checked by Capsula. You can use a nickname instead of your real name.',
         'When you make an item private, its link stops working for new visits at once. Someone who already opened it may still see what they loaded, and anyone who saved a copy keeps their copy.',
@@ -146,6 +151,7 @@ export function privacySections(facts) {
         'Reports you send: which item or page, the reason and the day. The person who made the item never sees who reported. The people who run Capsula see how old the reporting accounts are, not who they are.',
         'Notes on page reports: when you report a problem on a Topic or drug page, the optional note (up to 300 letters) is kept with the report. Only the people who run Capsula see it. It is kept after the report is closed and after you delete your account, without your name.',
         'View counts: for each public roshetta and drug group, how many visitors opened it each day, as a number only. The day by day numbers are held for 90 days and then added into one running total for that item. Only the person who made the item sees them. Your own visits while signed in are not counted.',
+        'Saved copies: a copy you save remembers which link it came from, so the same link cannot be saved twice by you. The person who made the original sees only how many other people hold a copy, never who. If you delete your copy or your account, you are no longer counted.',
         'Crash records: the technical error and the app version. They are not linked to your account.',
         'Username checks: how many times you check whether a username is free, so that guessing can be stopped.',
       ],
@@ -162,7 +168,7 @@ export function privacySections(facts) {
     {
       title: 'How we use it',
       paragraphs: [
-        'To run the app and keep your things in your account, to review reports, to show owners how many visitors opened their public items, and to understand how the app is used.',
+        'To run the app and keep your things in your account, to review reports, to show owners how many visitors opened their public items and how many people saved a copy, and to understand how the app is used.',
         'Your phone number is used to reach you about your plan. It is not used for offers unless you tick "Send me offers and deals", which is off until you choose it. We record the date you ticked it, and you can untick it at any time.',
       ],
     },

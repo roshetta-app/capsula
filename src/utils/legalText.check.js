@@ -109,3 +109,17 @@ test('the view count lines say what the database really does and make no promise
   // A count is not a list: nothing says or implies the owner can see who looked.
   assert.doesNotMatch(t + p, /who opened it|see who|who viewed|names of visitors/i);
 });
+
+test('the saved-copy lines say what the database really does and show owners a number only (Track H, H6c)', () => {
+  const t = textOf(termsSections()).join('\n');
+  for (const must of ['how many other people saved a copy from its link', 'does not show who saved it']) {
+    assert.ok(t.includes(must), `Terms: ${must}`);
+  }
+  const p = textOf(privacySections()).join('\n');
+  for (const must of [
+    'Saved copies:', 'remembers which link it came from', 'cannot be saved twice by you',
+    'only how many other people hold a copy, never who', 'you are no longer counted', 'how many people saved a copy',
+  ]) assert.ok(p.includes(must), `Privacy: ${must}`);
+  // A number is not a list: nothing says or implies the owner can learn who saved a copy.
+  assert.doesNotMatch(t + p, /see who saved|who saved a copy of your|names of people who saved/i);
+});
