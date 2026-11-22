@@ -23,7 +23,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { ArrowLeft, Mail, Stethoscope, PenLine, HeartPulse, GraduationCap, MapPin, User, Phone, Trash2, UserX, WifiOff, ChevronDown, Contact } from 'lucide-react'
+import { ArrowLeft, Mail, Stethoscope, PenLine, HeartPulse, GraduationCap, MapPin, User, Phone, Trash2, UserX, Check, WifiOff, ChevronDown, Contact } from 'lucide-react'
 import { validatePhoneNumberLength } from 'libphonenumber-js'
 import { useAuth } from '../hooks/useAuth'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
@@ -50,7 +50,7 @@ import { handleChangeDaysLeft } from '../utils/profileRules'
 import {
   valuesFromRow, applyChange, visibleFields, detailsProblems, detailsPayload, publicPayload, publicProblems,
   fieldForPublicRefusal, hasChanges, hasHandle, mergeDetails, groupFromState, NOT_PUBLIC_LINE, PHONE_HELP,
-  REMOVE_PUBLIC, setUpWaitLine,
+  REMOVE_PUBLIC, setUpWaitLine, OFFERS_LABEL, OFFERS_HELP,
 } from '../utils/editProfile'
 
 const TEXT = { fontFamily: 'var(--font-body)' }
@@ -409,7 +409,7 @@ export default function AccountEditScreen() {
               )}
 
               {show.phone && (
-                <WizardField label="Phone (optional)" icon={<Phone {...iconProps} />} error={errors.phone} last>
+                <WizardField label="Phone (optional)" icon={<Phone {...iconProps} />} error={errors.phone} last={!show.offers}>
                   <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
                     <button
                       type="button"
@@ -443,6 +443,31 @@ export default function AccountEditScreen() {
                   </div>
                   <p style={{ margin: '6px 0 0', fontSize: 12, lineHeight: 1.4, color: 'var(--color-text-secondary)', ...TEXT }}>{PHONE_HELP}</p>
                 </WizardField>
+              )}
+
+              {show.offers && (
+                <button
+                  type="button"
+                  role="checkbox"
+                  aria-checked={values.marketingOptIn}
+                  onClick={() => change('marketingOptIn', !values.marketingOptIn)}
+                  style={{
+                    width: '100%', display: 'flex', alignItems: 'flex-start', gap: 'var(--space-3)', padding: 0, marginTop: 'var(--space-2)',
+                    border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer', fontFamily: 'var(--font-body)', WebkitTapHighlightColor: 'transparent',
+                  }}
+                >
+                  <span style={{
+                    flexShrink: 0, width: 24, height: 24, marginTop: 1, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    border: values.marketingOptIn ? '2px solid var(--color-accent-solid)' : '2px solid var(--color-border)',
+                    backgroundColor: values.marketingOptIn ? 'var(--color-accent-solid)' : 'transparent',
+                  }}>
+                    {values.marketingOptIn && <Check size={16} strokeWidth={3} color="#fff" />}
+                  </span>
+                  <span>
+                    <span style={{ display: 'block', fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)' }}>{OFFERS_LABEL}</span>
+                    <span style={{ display: 'block', marginTop: 2, fontSize: 12, lineHeight: 1.4, color: 'var(--color-text-secondary)' }}>{OFFERS_HELP}</span>
+                  </span>
+                </button>
               )}
             </div>
 

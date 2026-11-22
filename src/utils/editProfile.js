@@ -26,6 +26,10 @@ const str = (v) => (typeof v === 'string' ? v : '')
 export const WELCOME_FIELDS = ['fullName', 'occupation', 'occupationOther', 'specialty', 'studentType', 'country']
 export const NOT_PUBLIC_LINE = 'Not shown on your public profile'
 export const PHONE_HELP = 'Optional. Not shown on your public profile.'
+// 14.7d: offers and deals are their own unticked box. The database stamps the date when it is ticked
+// and clears it when unticked (profiles_rules_guard); the app never sends a date.
+export const OFFERS_LABEL = 'Send me offers and deals'
+export const OFFERS_HELP = 'Optional. Off unless you tick it. You can untick it any time.'
 export const FORWARDING_LABEL = 'Old addresses keep working'
 export const FORWARDING_HELP = 'When you change your username, the old link still opens your profile.'
 
@@ -41,6 +45,7 @@ export function valuesFromRow(row) {
     specialty: str(row?.specialty),
     studentType: str(row?.student_type),
     country: str(row?.country),
+    marketingOptIn: row?.marketing_opt_in === true,
     handle: str(row?.handle).trim(),
     bio: str(row?.bio),
     avatarCode: isAvatarCode(row?.avatar_code) ? row.avatar_code : null,
@@ -78,6 +83,7 @@ export function visibleFields(values, { welcome = false } = {}) {
     country: true,
     gender: !welcome,
     phone: !welcome,
+    offers: !welcome,
     publicGroup: !welcome,
   }
 }
@@ -116,6 +122,7 @@ export function detailsPayload(values, { welcome = false } = {}) {
     out.gender = values.gender
     out.phone_country_code = hasNumber ? values.phoneCountryCode : ''
     out.phone_number = hasNumber ? values.phoneNumber : ''
+    out.marketing_opt_in = values.marketingOptIn === true
   }
   return out
 }
@@ -171,7 +178,7 @@ export function hasChanges(values, saved) {
 // next tap on Save does not send them again. The name counts only when it went with the details.
 export function mergeDetails(saved, values) {
   const next = { ...saved }
-  for (const k of ['gender', 'phoneCountryCode', 'phoneNumber', 'occupation', 'occupationOther', 'specialty', 'studentType', 'country']) next[k] = values[k]
+  for (const k of ['gender', 'phoneCountryCode', 'phoneNumber', 'occupation', 'occupationOther', 'specialty', 'studentType', 'country', 'marketingOptIn']) next[k] = values[k]
   if (!hasHandle(saved)) next.fullName = values.fullName
   return next
 }

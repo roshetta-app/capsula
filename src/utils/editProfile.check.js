@@ -174,3 +174,19 @@ test('after a removal the Set up button shows the wait; no wait, no line', async
   assert.equal(setUpWaitLine({ public_removed_at: '2026-10-01T12:00:00Z' }, now), null)
   assert.equal(setUpWaitLine({ public_removed_at: '2026-10-24T12:00:00Z' }, now), 'You can set up a new profile in 1 day.')
 })
+
+test('offers box: off by default, only in the full Edit screen, sent as a plain true or false (the database stamps the date)', async () => {
+  const { OFFERS_LABEL, mergeDetails: merge } = await import('./editProfile.js')
+  assert.equal(OFFERS_LABEL, 'Send me offers and deals')
+  assert.equal(valuesFromRow(null).marketingOptIn, false)
+  assert.equal(valuesFromRow({ marketing_opt_in: true }).marketingOptIn, true)
+  assert.equal(valuesFromRow({ marketing_opt_in: 'yes' }).marketingOptIn, false)
+  assert.equal(visibleFields(valuesFromRow(row), { welcome: true }).offers, false)
+  assert.equal(visibleFields(valuesFromRow(row), { welcome: false }).offers, true)
+  const on = { ...valuesFromRow(row), marketingOptIn: true }
+  assert.equal(detailsPayload(on).marketing_opt_in, true)
+  assert.equal(detailsPayload(valuesFromRow(row)).marketing_opt_in, false)
+  assert.equal('marketing_opt_in' in detailsPayload(on, { welcome: true }), false)
+  assert.equal('marketing_opt_in_at' in detailsPayload(on), false)
+  assert.equal(merge(valuesFromRow(row), on).marketingOptIn, true)
+})
