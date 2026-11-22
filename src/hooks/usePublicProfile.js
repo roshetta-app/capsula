@@ -11,6 +11,10 @@
  *                            saves through save_public_profile; with no connection the change
  *                            waits on the phone ({ ok: true, waiting: true })
  *
+ *   loadSharedIds ()        => Promise<{ ok: true, roshettas: Set, groups: Set } | { ok: false, kind, message }>
+ *                            (14.5c) the ids of the person's roshettas and groups that already have a share
+ *                            row (a link), for the Add to profile picker; the rest are private
+ *
  * Every answer is a plain object and nothing throws. A request that takes longer than 8 seconds
  * counts as no connection, the same as the other hooks. Nothing about the profile is kept on
  * the phone except that small waiting record (a change made offline).
@@ -22,6 +26,7 @@ import { supabase } from '../lib/supabase'
 import {
   fetchProfile, savePublicCardOrWait, applyWaiting, hasWaiting, localProfileStore,
 } from '../utils/profileData'
+import { readSharedIds } from '../utils/addToProfile'
 
 const REQUEST_TIMEOUT_MS = 8000
 const TIMEOUT_ERROR = { code: 'request_timeout', message: 'request_timeout' }
@@ -64,5 +69,16 @@ export function usePublicProfile() {
     return res
   }, [userId, store])
 
-  return { signedIn: Boolean(userId), loadProfile, savePublicCard }
+  const loadSharedIds = useCallback(async () => {
+    if (!userId) return { ok: false, kind: 'retry', code: 'not_signed_in', message: 'Sign in first.' }
+    const [r, g] = await Promise.all([
+      readSharedIds(supabase, 'roshetta_shares', 'roshetta_id', withLimit),
+      readSharedIds(supabase, 'drug_group_shares', 'group_id', withLimit),
+    ])
+    if (r.ok && g.ok) return { ok: true, roshettas: r.ids, groups: g.ids }
+    const offline = r.reason === 'offline' || g.reason === 'offline'
+    return { ok: false, kind: offline ? 'retry' : 'error', message: offline ? 'No connection.' : 'Something went wrong. Try again.' }
+  }, [userId])
+
+  return { signedIn: Boolean(userId), loadProfile, savePublicCard, loadSharedIds }
 }
