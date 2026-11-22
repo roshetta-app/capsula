@@ -1,7 +1,7 @@
 // Checks for roshettaShare.js (step 6.1b). Run with: node --test src/utils/roshettaShare.check.js
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readShareCode, createShare, removeShare, setShareName, shareErrorReason } from './roshettaShare.js';
+import { readShareCode, createShare, removeShare, setShareName, setOnProfile, shareErrorReason } from './roshettaShare.js';
 
 // A fake database for the roshetta_shares table: records every call, answers from a script.
 function fake({ select = { data: null, error: null }, insert = { data: { share_code: 'c'.repeat(64) }, error: null }, del = { error: null }, update = { data: [{ roshetta_id: 'r1' }], error: null } } = {}) {
@@ -23,9 +23,9 @@ const TIMEOUT = { code: 'request_timeout', message: 'request_timeout' };
 
 test('read: a live code is returned, none is null', async () => {
   const a = fake({ select: { data: { share_code: 'x'.repeat(64) }, error: null } });
-  assert.deepEqual(await readShareCode(a.client, 'r1'), { ok: true, code: 'x'.repeat(64), showName: null });
-  assert.deepEqual(a.calls.slice(0, 3), [['from', 'roshetta_shares'], ['select', 'share_code, show_name'], ['eq', 'roshetta_id', 'r1']]);
-  assert.deepEqual(await readShareCode(fake().client, 'r1'), { ok: true, code: null, showName: null });
+  assert.deepEqual(await readShareCode(a.client, 'r1'), { ok: true, code: 'x'.repeat(64), showName: null, onProfile: false });
+  assert.deepEqual(a.calls.slice(0, 3), [['from', 'roshetta_shares'], ['select', 'share_code, show_name, on_profile'], ['eq', 'roshetta_id', 'r1']]);
+  assert.deepEqual(await readShareCode(fake().client, 'r1'), { ok: true, code: null, showName: null, onProfile: false });
 });
 
 // Phase L step 13.5: the owner's choice for this link comes back as true, false, or null (follows the account).
@@ -111,4 +111,42 @@ test('error names: a row rule refusal is "refused", anything unknown is "error"'
   assert.equal(shareErrorReason({ code: '42501' }), 'refused');
   assert.equal(shareErrorReason({ message: 'violates row-level security policy' }), 'refused');
   assert.equal(shareErrorReason({ code: 'XX000' }), 'error');
+});
+
+// Step 14.5a: Public (on the profile), Old link, Make public.
+test('read: on_profile true comes back as onProfile true, anything else as false (an old link)', async () => {
+  const read = async (on_profile) => readShareCode(fake({ select: { data: { share_code: 'x'.repeat(64), on_profile }, error: null } }).client, 'r1');
+  assert.equal((await read(true)).onProfile, true);
+  assert.equal((await read(false)).onProfile, false);
+  assert.equal((await read(null)).onProfile, false);
+  assert.equal((await read(undefined)).onProfile, false);
+});
+
+test('create: onProfile true inserts on_profile true; without it the row has no on_profile', async () => {
+  const a = fake();
+  await createShare(a.client, 'r1', x => x, undefined, true);
+  assert.deepEqual(a.calls.find(c => c[0] === 'insert'), ['insert', { roshetta_id: 'r1', on_profile: true }]);
+  const b = fake();
+  await createShare(b.client, 'r1', x => x, false, true);
+  assert.deepEqual(b.calls.find(c => c[0] === 'insert'), ['insert', { roshetta_id: 'r1', show_name: false, on_profile: true }]);
+  const c = fake();
+  await createShare(c.client, 'r1', x => x, undefined, false);
+  assert.deepEqual(c.calls.find(c2 => c2[0] === 'insert'), ['insert', { roshetta_id: 'r1' }]);
+});
+
+test('create: a web address or phone number in the item is refused with its own reason', async () => {
+  const web = fake({ insert: { data: null, error: { code: 'P0001', message: 'item_web' } } });
+  assert.deepEqual(await createShare(web.client, 'r1', x => x, undefined, true), { ok: false, reason: 'item_web' });
+  const phone = fake({ insert: { data: null, error: { code: 'P0001', message: 'item_phone' } } });
+  assert.deepEqual(await createShare(phone.client, 'r1', x => x, undefined, true), { ok: false, reason: 'item_phone' });
+});
+
+test('setOnProfile: changes only on_profile, one row; refusals keep their reason', async () => {
+  const f = fake();
+  assert.deepEqual(await setOnProfile(f.client, 'r1'), { ok: true });
+  assert.deepEqual(f.calls.find(c => c[0] === 'update'), ['update', { on_profile: true }]);
+  assert.deepEqual(f.calls.find(c => c[0] === 'eq'), ['eq', 'roshetta_id', 'r1']);
+  assert.deepEqual(await setOnProfile(fake({ update: { data: [], error: null } }).client, 'r1'), { ok: false, reason: 'refused' });
+  assert.deepEqual(await setOnProfile(fake({ update: { data: null, error: { code: 'P0001', message: 'item_phone' } } }).client, 'r1'), { ok: false, reason: 'item_phone' });
+  assert.deepEqual(await setOnProfile(fake({ update: { data: null, error: TIMEOUT } }).client, 'r1'), { ok: false, reason: 'offline' });
 });

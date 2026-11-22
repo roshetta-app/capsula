@@ -72,13 +72,15 @@
  *   createGroup     ({ name, description?, color? }) => Promise<{ ok, reason?, group? }>
  *   updateGroup     (id, { name?, description?, color? }) => Promise<{ ok, reason? }>
  *   deleteGroup     (id) => Promise<{ ok, reason?, group?, index? }>
- *   getShareCode    (groupId) => Promise<{ ok, code?, reason? }>   (2026-10-19, step 8.1)
- *                   Reads this group's live share code (null when not shared).
- *   createShareLink (groupId, showName?) => Promise<{ ok, code?, reason? }>
+ *   getShareCode    (groupId) => Promise<{ ok, code?, showName?, onProfile?, reason? }>   (2026-10-19, step 8.1)
+ *                   Reads this group's live share code (null when not shared). onProfile (14.5a): true = Public, false = old link.
+ *   createShareLink (groupId, showName?, onProfile?) => Promise<{ ok, code?, reason? }>
  *                   Makes the share link (the database makes the code); if one
- *                   already exists it returns that one.
+ *                   already exists it returns that one. onProfile true (14.5a) makes it Public from the start.
+ *                   reasons also: item_web, item_phone (a web address or phone number in the name or description).
+ *   makeGroupPublic (groupId) => Promise<{ ok, reason? }>   (14.5a) moves an old link onto the profile; the code stays the same.
  *   stopSharing     (groupId) => Promise<{ ok, reason? }>   Deletes the code, so the link stops at once.
- *   getShareNameInfo () => Promise<{ ok, fullName?, accountDefault?, reason? }>   (2026-11-03)
+ *   getShareNameInfo () => Promise<{ ok, fullName?, accountDefault?, hasHandle?, reason? }>   (2026-11-03; hasHandle 14.5a)
  *                   The owner's profile name and their account-wide "show my name" choice.
  *   setShareName    (groupId, show) => Promise<{ ok, reason? }>   The choice for one shared group.
  *   setAccountShareName (show) => Promise<{ ok, reason? }>   The account-wide choice (groups with no choice of their own follow it).
@@ -117,6 +119,7 @@ import { readGroupsCache, writeGroupsCache, clearGroupsCache, readGroupChanges, 
 import { newId, makeChange, applyChange, applyQueue, addChange, cancelDelete, clearSending, nextToSend, summarizeQueue, retryFailed, discardFailed } from '../utils/groupChanges'
 import { runSync, sendChange, describeEvents, isSourceClash } from '../utils/groupSync'
 import { removeWithRetry } from '../utils/groupSaveCleanup'
+import { itemRefusalReason } from '../utils/publicShare'
 import { SAVE_OFFLINE_MESSAGE, SAVE_ERROR_MESSAGE } from '../components/drugs/groups/groupMessages'
 import {
   DRUG_GROUPS_CAP_FREE,
@@ -966,13 +969,14 @@ export function useDrugGroups(fav) {
     if (isOffline()) return { ok: false, reason: 'offline' }
     const { data, error } = await withLimit(supabase
       .from('drug_group_shares')
-      .select('share_code, show_name')
+      .select('share_code, show_name, on_profile')
       .eq('group_id', groupId)
       .maybeSingle())
     if (isTimeout(error)) return { ok: false, reason: 'offline' }
     if (error) return { ok: false, reason: 'error' }
     // showName: true / false = the owner chose for this group; null = follows the account setting.
-    return { ok: true, code: data?.share_code ?? null, showName: data?.show_name ?? null }
+    // onProfile (14.5a): true = Public (on the profile), false = an old link.
+    return { ok: true, code: data?.share_code ?? null, showName: data?.show_name ?? null, onProfile: data?.on_profile === true }
   }, [])
 
   // 2026-11-03 (optional owner name): the owner's profile name and their account-wide choice,
@@ -983,12 +987,13 @@ export function useDrugGroups(fav) {
     if (isOffline()) return { ok: false, reason: 'offline' }
     const { data, error } = await withLimit(supabase
       .from('profiles')
-      .select('full_name, share_name_default')
+      .select('full_name, share_name_default, handle')
       .eq('id', u.id)
       .maybeSingle())
     if (isTimeout(error)) return { ok: false, reason: 'offline' }
     if (error) return { ok: false, reason: 'error' }
-    return { ok: true, fullName: (data?.full_name ?? '').trim(), accountDefault: !!data?.share_name_default }
+    // hasHandle (14.5a): the public card is set up (a username exists), so something may be made public.
+    return { ok: true, fullName: (data?.full_name ?? '').trim(), accountDefault: !!data?.share_name_default, hasHandle: !!(data?.handle && String(data.handle).trim()) }
   }, [])
 
   // The owner's choice for one shared group (true = show my name, false = anonymous).
@@ -1019,14 +1024,18 @@ export function useDrugGroups(fav) {
     return { ok: true }
   }, [])
 
-  const createShareLink = useCallback(async (groupId, showName) => {
+  const createShareLink = useCallback(async (groupId, showName, onProfile = false) => {
     if (userRef.current && isOffline()) return { ok: false, reason: 'offline' }
     const refused = refuseChange()
     if (refused) return refused
     if (!groupsRef.current.some(g => g.id === groupId)) return { ok: false, reason: 'missing' }
     const { data, error } = await withLimit(supabase
       .from('drug_group_shares')
-      .insert(typeof showName === 'boolean' ? { group_id: groupId, show_name: showName } : { group_id: groupId })
+      .insert({
+        group_id: groupId,
+        ...(typeof showName === 'boolean' ? { show_name: showName } : {}),
+        ...(onProfile === true ? { on_profile: true } : {}),
+      })
       .select('share_code')
       .single())
     if (isTimeout(error)) return { ok: false, reason: 'offline' }
@@ -1040,9 +1049,32 @@ export function useDrugGroups(fav) {
       const existing = await getShareCode(groupId)
       if (existing.ok && existing.code) return { ok: true, code: existing.code }
     }
+    // 14.5a: a web address or phone number in the name or description is refused by the database.
+    // The sheet says why, so there is no general message on top of it.
+    const item = itemRefusalReason(error)
+    if (item) return { ok: false, reason: item }
     toast.error("Couldn't create the link. Check your connection and try again.")
     return { ok: false, reason: 'error' }
   }, [refuseChange, getShareCode, toast])
+
+  // 2026-11-22 (Public profile plan, step 14.5a): an old link becomes Public (on the profile). The code
+  // never changes; only on_profile is written.
+  const makeGroupPublic = useCallback(async (groupId) => {
+    if (userRef.current && isOffline()) return { ok: false, reason: 'offline' }
+    const refused = refuseChange()
+    if (refused) return refused
+    const { data, error } = await withLimit(supabase
+      .from('drug_group_shares')
+      .update({ on_profile: true })
+      .eq('group_id', groupId)
+      .select('group_id'))
+    if (isTimeout(error)) return { ok: false, reason: 'offline' }
+    const item = itemRefusalReason(error)
+    if (item) return { ok: false, reason: item }
+    if (error) return { ok: false, reason: 'error' }
+    if (!Array.isArray(data) || data.length === 0) return { ok: false, reason: 'refused' }
+    return { ok: true }
+  }, [refuseChange])
 
   const stopSharing = useCallback(async (groupId) => {
     if (userRef.current && isOffline()) return { ok: false, reason: 'offline' }
@@ -1094,6 +1126,7 @@ export function useDrugGroups(fav) {
     saveSharedGroup,
     getShareCode,
     getShareNameInfo,
+    makeGroupPublic,
     setShareName,
     setAccountShareName,
     createShareLink,

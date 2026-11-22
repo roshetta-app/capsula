@@ -34,6 +34,14 @@
  * refined words ("Created by <name>" when on, "Anonymous" when off, "Add your name in Account").
  * The shared page reads "Created by" now, not "Shared by".
  *
+ * 2026-11-22 (Public profile plan, step 14.5a): the Private / Public choice, the same as the roshetta
+ * sheet. No link yet = Private; Public asks "Make it public to share it?" (what it shows, the copy
+ * notice) and makes the link already on the owner's profile (name always shown, so no name switch for
+ * it; with no username yet: "Set up your public profile first.", the setup sheet is step 14.5b).
+ * Public = the link plus Private, which asks first and says honestly what stops. An old link (made
+ * before the profile) is tagged "Old link", keeps the name switch and Stop sharing, and has Make
+ * public (same link). A web address or phone number in the name or description refuses Make public.
+ *
  * Props:
  *   isOpen         boolean
  *   onClose        () => void
@@ -47,6 +55,8 @@ import SheetShell from '../../ui/SheetShell'
 import ConfirmSheet from '../../ui/ConfirmSheet'
 import GroupStateMessage from './GroupStateMessage'
 import ShareNameRow from './ShareNameRow'
+import { VisibilityRow, OldLinkTag, MakePublicPanel } from '../../ui/PublicShareParts'
+import { shareMode, canMakePublic, isItemRefusal, MAKE_PRIVATE_MESSAGE } from '../../../utils/publicShare'
 import { shimmer } from '../home/shimmer'
 import { useFavouritesContext } from '../../../context/FavouritesContext'
 import { useToast } from '../../../context/ToastContext'
@@ -99,7 +109,7 @@ function PrivacyLines() {
 }
 
 export default function ShareGroupSheet({ isOpen, onClose, group, onShareChange }) {
-  const { getShareCode, getShareNameInfo, setShareName, createShareLink, stopSharing, showGroupReadOnly } = useFavouritesContext()
+  const { getShareCode, getShareNameInfo, setShareName, createShareLink, stopSharing, makeGroupPublic, showGroupReadOnly } = useFavouritesContext()
   const { toast } = useToast()
   const isDark = useIsDark()
   const dot = resolveToken(group?.color, isDark).pill
@@ -116,6 +126,9 @@ export default function ShareGroupSheet({ isOpen, onClose, group, onShareChange 
 
   // result: null while loading, else { phase: 'none' | 'shared' | 'offline' | 'error', code? }.
   const [result, setResult] = useState(null)
+  // The "Make it public to share it?" panel, and the reason the database gave if it refused.
+  const [askOpen, setAskOpen] = useState(false)
+  const [refusal, setRefusal] = useState(null)
   const [attempt, setAttempt] = useState(0)
   const [busy, setBusy] = useState(false)
   const [stopOpen, setStopOpen] = useState(false)
@@ -128,7 +141,7 @@ export default function ShareGroupSheet({ isOpen, onClose, group, onShareChange 
   const [wasOpen, setWasOpen] = useState(false)
   if (isOpen !== wasOpen) {
     setWasOpen(isOpen)
-    if (isOpen) { setResult(null); setCopied(false) }
+    if (isOpen) { setResult(null); setCopied(false); setAskOpen(false); setRefusal(null) }
   }
 
   const groupId = group?.id
@@ -138,17 +151,15 @@ export default function ShareGroupSheet({ isOpen, onClose, group, onShareChange 
     ;(async () => {
       const [r, info] = await Promise.all([getShareCode(groupId), getShareNameInfo()])
       if (cancelled) return
-      if (r.ok) {
-        if (info.ok) {
-          setNameInfo({ fullName: info.fullName, accountDefault: info.accountDefault })
-          setShowName(r.showName ?? info.accountDefault)
-        } else {
-          setNameInfo(null)
-        }
-        setResult(r.code ? { phase: 'shared', code: r.code } : { phase: 'none' })
+      if (r.ok && info.ok) {
+        setNameInfo({ fullName: info.fullName, accountDefault: info.accountDefault, hasHandle: info.hasHandle === true })
+        setShowName(r.showName ?? info.accountDefault)
+        setResult(r.code ? { phase: 'shared', code: r.code, onProfile: r.onProfile === true } : { phase: 'none' })
         onShareChange?.(r.code ?? null)
       } else {
-        setResult({ phase: r.reason === 'offline' ? 'offline' : 'error' })
+        // Whether the owner has a username decides what Public may do, so it must be known.
+        const reason = !r.ok ? r.reason : info.reason
+        setResult({ phase: reason === 'offline' ? 'offline' : 'error' })
       }
     })()
     return () => { cancelled = true }
@@ -161,18 +172,27 @@ export default function ShareGroupSheet({ isOpen, onClose, group, onShareChange 
     setAttempt(a => a + 1)
   }
 
-  async function handleCreate() {
+  // Make public: a new link already on the profile, or an old link moved onto it (same code).
+  async function handleMakePublic() {
     if (busy || !group) return
     setBusy(true)
+    setRefusal(null)
     try {
-      const r = await createShareLink(group.id, nameInfo?.fullName ? showName : undefined)
+      const old = result?.phase === 'shared'
+      const r = old ? await makeGroupPublic(group.id) : await createShareLink(group.id, undefined, true)
       if (r.ok) {
-        setResult({ phase: 'shared', code: r.code })
-        onShareChange?.(r.code)
+        const code = old ? result.code : r.code
+        setResult({ phase: 'shared', code, onProfile: true })
+        setAskOpen(false)
+        onShareChange?.(code)
+      } else if (isItemRefusal(r.reason)) {
+        setRefusal(r.reason)
       } else if (r.reason === 'offline') {
         setResult({ phase: 'offline' })
       } else if (r.reason === 'read_only') {
         showGroupReadOnly()
+      } else if (old) {
+        toast.error("Couldn't make it public. Try again.")
       }
     } finally {
       setBusy(false)
@@ -210,9 +230,11 @@ export default function ShareGroupSheet({ isOpen, onClose, group, onShareChange 
   async function handleStop() {
     const r = await stopSharing(group.id)
     if (!r.ok) throw new Error(r.reason ?? 'error')
+    const wasPublic = result?.onProfile === true
     setResult({ phase: 'none' })
+    setAskOpen(false)
     onShareChange?.(null)
-    toast.success('Sharing stopped. The old link no longer works.')
+    toast.success(wasPublic ? 'Now private. The link no longer works for new visits.' : 'Sharing stopped. The old link no longer works.')
   }
 
   let body
@@ -230,19 +252,43 @@ export default function ShareGroupSheet({ isOpen, onClose, group, onShareChange 
   } else if (result.phase === 'none') {
     body = (
       <>
-        <PrivacyLines />
-        {nameInfo && <ShareNameRow fullName={nameInfo.fullName} checked={showName} onChange={handleNameToggle} label="Show my name on this shared group" />}
-        <button onClick={handleCreate} disabled={busy} style={{ ...PRIMARY_BUTTON, opacity: busy ? 0.7 : 1 }}>
-          {busy ? 'Creating\u2026' : 'Create link'}
-        </button>
+        <VisibilityRow mode="private" disabled={busy} onChoosePublic={() => { setRefusal(null); setAskOpen(true) }} />
+        {askOpen ? (
+          <MakePublicPanel
+            kind="group"
+            canSetUp={canMakePublic(nameInfo?.hasHandle)}
+            busy={busy}
+            refusal={refusal}
+            onConfirm={handleMakePublic}
+            onCancel={() => { setAskOpen(false); setRefusal(null) }}
+          />
+        ) : (
+          <p style={{ margin: 0, fontSize: 15, lineHeight: 1.45, color: 'var(--color-text-secondary)', fontFamily: 'var(--font-body)' }}>
+            Only you can see this group. It has no link. Choose Public to share it.
+          </p>
+        )}
       </>
     )
+  } else if (shareMode(result.code, result.onProfile) === 'old' && askOpen) {
+    body = (
+      <MakePublicPanel
+        kind="group"
+        old
+        canSetUp={canMakePublic(nameInfo?.hasHandle)}
+        busy={busy}
+        refusal={refusal}
+        onConfirm={handleMakePublic}
+        onCancel={() => { setAskOpen(false); setRefusal(null) }}
+      />
+    )
   } else {
+    const mode = shareMode(result.code, result.onProfile)
     const link = buildGroupLink(result.code)
     body = (
       <>
+        {mode === 'public' && <VisibilityRow mode="public" onChoosePrivate={() => setStopOpen(true)} />}
         <PrivacyLines />
-        {nameInfo && <ShareNameRow fullName={nameInfo.fullName} checked={showName} onChange={handleNameToggle} label="Show my name on this shared group" />}
+        {mode === 'old' && nameInfo && <ShareNameRow fullName={nameInfo.fullName} checked={showName} onChange={handleNameToggle} label="Show my name on this shared group" />}
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 'var(--space-2)' }}>
           <span style={{
@@ -253,7 +299,13 @@ export default function ShareGroupSheet({ isOpen, onClose, group, onShareChange 
             <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: 'var(--color-success)' }} />
             Link is on
           </span>
+          {mode === 'old' && <OldLinkTag />}
         </div>
+        {mode === 'public' && (
+          <p style={{ margin: '0 0 var(--space-3)', fontSize: 13, lineHeight: 1.45, color: 'var(--color-text-secondary)', fontFamily: 'var(--font-body)' }}>
+            Shown on your public profile with your name.
+          </p>
+        )}
 
         <div style={{
           display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '4px 4px 4px 12px',
@@ -287,21 +339,32 @@ export default function ShareGroupSheet({ isOpen, onClose, group, onShareChange 
           Share link
         </button>
 
-        <div style={{ marginTop: 'var(--space-4)', paddingTop: 'var(--space-2)', borderTop: '1px solid var(--color-border)', textAlign: 'center' }}>
-          <button
-            onClick={() => setStopOpen(true)}
-            style={{
-              display: 'block', width: '100%', minHeight: 44, background: 'none', border: 'none', cursor: 'pointer',
-              padding: '8px 12px', fontSize: 15, fontWeight: 600, color: 'var(--color-danger)',
-              fontFamily: 'var(--font-body)', WebkitTapHighlightColor: 'transparent', outline: 'none',
-            }}
-          >
-            Stop sharing
-          </button>
-          <p style={{ margin: 0, fontSize: 13, lineHeight: 1.45, color: 'var(--color-text-secondary)', fontFamily: 'var(--font-body)' }}>
-            The link stops working at once. Copies people already saved are kept.
-          </p>
-        </div>
+        {mode === 'old' && (
+          <>
+            <button
+              type="button"
+              onClick={() => { setRefusal(null); setAskOpen(true) }}
+              style={{ ...PRIMARY_BUTTON, marginTop: 'var(--space-2)', backgroundColor: 'var(--color-surface-muted)', color: 'var(--color-text-primary)' }}
+            >
+              Make public
+            </button>
+            <div style={{ marginTop: 'var(--space-4)', paddingTop: 'var(--space-2)', borderTop: '1px solid var(--color-border)', textAlign: 'center' }}>
+              <button
+                onClick={() => setStopOpen(true)}
+                style={{
+                  display: 'block', width: '100%', minHeight: 44, background: 'none', border: 'none', cursor: 'pointer',
+                  padding: '8px 12px', fontSize: 15, fontWeight: 600, color: 'var(--color-danger)',
+                  fontFamily: 'var(--font-body)', WebkitTapHighlightColor: 'transparent', outline: 'none',
+                }}
+              >
+                Stop sharing
+              </button>
+              <p style={{ margin: 0, fontSize: 13, lineHeight: 1.45, color: 'var(--color-text-secondary)', fontFamily: 'var(--font-body)' }}>
+                The link stops working at once. Copies people already saved are kept.
+              </p>
+            </div>
+          </>
+        )}
       </>
     )
   }
@@ -347,10 +410,10 @@ export default function ShareGroupSheet({ isOpen, onClose, group, onShareChange 
         isOpen={stopOpen}
         onClose={() => setStopOpen(false)}
         onConfirm={handleStop}
-        title="Stop sharing?"
-        message="The link will stop working at once. Sharing again makes a new link."
-        confirmLabel="Stop sharing"
-        confirmingLabel={'Stopping\u2026'}
+        title={result?.onProfile === true ? 'Make private?' : 'Stop sharing?'}
+        message={result?.onProfile === true ? MAKE_PRIVATE_MESSAGE : 'The link will stop working at once. Sharing again makes a new link.'}
+        confirmLabel={result?.onProfile === true ? 'Make private' : 'Stop sharing'}
+        confirmingLabel={result?.onProfile === true ? 'Making private\u2026' : 'Stopping\u2026'}
         destructive
       />
     </>

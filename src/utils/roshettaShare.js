@@ -14,6 +14,12 @@
  * for groups. readShareCode returns it as showName, createShare can set it at insert, and
  * setShareName changes it later.
  *
+ * 2026-11-22 (Public profile plan, step 14.5a): on_profile says the link is on the owner's public
+ * profile (Public). readShareCode returns it as onProfile (false for old links), createShare can
+ * make a link already on the profile, and setOnProfile moves an old link onto it (the code never
+ * changes). A web address or phone number in the name or description refuses it with the reason
+ * item_web or item_phone.
+ *
  * Every function resolves { ok: true, ... } or { ok: false, reason }:
  *   offline   the request timed out (a Wi-Fi with no internet counts as offline)
  *   refused   the row rule said no (the roshetta is not on the server, or was deleted
@@ -21,11 +27,15 @@
  *   error     anything else
  */
 
+import { itemRefusalReason } from './publicShare.js'
+
 const TIMEOUT_CODE = 'request_timeout'
 const TABLE = 'roshetta_shares'
 
 // Postgres 42501 = refused by a row rule.
 export function shareErrorReason(error) {
+  const item = itemRefusalReason(error)
+  if (item) return item
   if (error?.code === TIMEOUT_CODE) return 'offline'
   if (error?.code === '42501' || /row-level security/i.test(String(error?.message ?? ''))) return 'refused'
   return 'error'
@@ -36,21 +46,29 @@ export function shareErrorReason(error) {
 export async function readShareCode(client, roshettaId, limit = x => x) {
   const { data, error } = await limit(client
     .from(TABLE)
-    .select('share_code, show_name')
+    .select('share_code, show_name, on_profile')
     .eq('roshetta_id', roshettaId)
     .maybeSingle())
   if (error) return { ok: false, reason: error.code === TIMEOUT_CODE ? 'offline' : 'error' }
-  return { ok: true, code: data?.share_code ?? null, showName: typeof data?.show_name === 'boolean' ? data.show_name : null }
+  return {
+    ok: true,
+    code: data?.share_code ?? null,
+    showName: typeof data?.show_name === 'boolean' ? data.show_name : null,
+    onProfile: data?.on_profile === true,
+  }
 }
 
 // Makes the link. created: true only when a new code was made now (an existing live
 // code, from another phone or a double tap, comes back with created: false). showName (true or
 // false) is the owner's choice for this link; anything else leaves it empty, so the account
-// setting decides.
-export async function createShare(client, roshettaId, limit = x => x, showName) {
+// setting decides. onProfile true makes the link Public (on the profile) from the start.
+export async function createShare(client, roshettaId, limit = x => x, showName, onProfile = false) {
+  const row = { roshetta_id: roshettaId }
+  if (typeof showName === 'boolean') row.show_name = showName
+  if (onProfile === true) row.on_profile = true
   const { data, error } = await limit(client
     .from(TABLE)
-    .insert(typeof showName === 'boolean' ? { roshetta_id: roshettaId, show_name: showName } : { roshetta_id: roshettaId })
+    .insert(row)
     .select('share_code')
     .single())
   if (!error && data?.share_code) return { ok: true, code: data.share_code, created: true }
@@ -76,6 +94,19 @@ export async function setShareName(client, roshettaId, show, limit = x => x) {
   const { data, error } = await limit(client
     .from(TABLE)
     .update({ show_name: !!show })
+    .eq('roshetta_id', roshettaId)
+    .select('roshetta_id'))
+  if (error) return { ok: false, reason: shareErrorReason(error) }
+  if (!Array.isArray(data) || data.length === 0) return { ok: false, reason: 'refused' }
+  return { ok: true }
+}
+
+// Moves an old link onto the owner's profile (Make public). Only on_profile is changed; the code
+// stays the same. A change that touched no row comes back as 'refused'.
+export async function setOnProfile(client, roshettaId, limit = x => x) {
+  const { data, error } = await limit(client
+    .from(TABLE)
+    .update({ on_profile: true })
     .eq('roshetta_id', roshettaId)
     .select('roshetta_id'))
   if (error) return { ok: false, reason: shareErrorReason(error) }

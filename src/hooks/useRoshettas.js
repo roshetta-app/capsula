@@ -63,10 +63,14 @@
  *   saveRoshetta         (id, { name?, description?, rows?, specialtyId? }) => Promise<{ ok, reason?, queued? }>
  *   deleteRoshetta       (id) => Promise<{ ok, reason?, roshetta?, index?, queued? }>
  *   reasons: guest, not_loaded, read_only, limit, drug_limit, invalid, missing, error
- *   getRoshettaShareCode (id) => Promise<{ ok, code?, showName?, reason? }>   (step 6.1b) the live share code, null when not shared;
- *                        showName (13.5): true / false = the owner chose for this link, null = follows the account setting
- *   createRoshettaShare  (id, showName?) => Promise<{ ok, code?, reason? }>    makes the link (the database makes the code);
- *                        showName (true / false, 13.5) is the choice for this link, left out = follow the account setting
+ *   getRoshettaShareCode (id) => Promise<{ ok, code?, showName?, onProfile?, reason? }>   (step 6.1b) the live share code, null when not shared;
+ *                        showName (13.5): true / false = the owner chose for this link, null = follows the account setting;
+ *                        onProfile (14.5a): true = Public (on the profile), false = an old link
+ *   createRoshettaShare  (id, showName?, onProfile?) => Promise<{ ok, code?, reason? }>    makes the link (the database makes the code);
+ *                        showName (true / false, 13.5) is the choice for this link, left out = follow the account setting;
+ *                        onProfile true (14.5a) makes it Public from the start
+ *   makeRoshettaPublic   (id) => Promise<{ ok, reason? }>           (14.5a) moves an old link onto the profile; the code stays the same
+ *   share reasons also: item_web, item_phone (a web address or phone number in the name or description)
  *   setRoshettaShareName (id, show) => Promise<{ ok, reason? }>     (13.5) the owner's choice for one link: true = show my name
  *   stopRoshettaSharing  (id) => Promise<{ ok, reason? }>           the link stops working at once
  *   share reasons: guest, offline, not_loaded, missing, not_sent (the roshetta is still waiting to be
@@ -93,7 +97,8 @@ import { loadRoshettas, fetchRoshettas, withTimeLimit, viewFor } from '../utils/
 import { summarizeQueue, sameSummary, nextToSend, retryFailed, discardFailed } from '../utils/roshettaChanges'
 import { runSync, sendChange } from '../utils/roshettaSync'
 import { prepareCreate, prepareSave, prepareDelete, commitChange } from '../utils/roshettaEdit'
-import { readShareCode, createShare, removeShare, setShareName } from '../utils/roshettaShare'
+import { readShareCode, createShare, removeShare, setShareName, setOnProfile } from '../utils/roshettaShare'
+import { isItemRefusal } from '../utils/publicShare'
 import { isReadOnly as listIsReadOnly, canCreate, roshettaCap, roshettaDrugCap, tapRefusal, rowsRefusal, afterRun } from '../utils/roshettaLimits'
 
 const NO_SUMMARY = { userId: null, failed: 0, waiting: 0, ids: [], failedList: [] }
@@ -410,7 +415,7 @@ export function useRoshettas() {
     return readShareCode(supabase, id, withTimeLimit)
   }, [isOffline])
 
-  const createRoshettaShare = useCallback(async (id, showName) => {
+  const createRoshettaShare = useCallback(async (id, showName, onProfile = false) => {
     if (userRef.current && isOffline()) return { ok: false, reason: 'offline' }
     const refused = refuseChange()
     if (refused) return refused
@@ -418,15 +423,28 @@ export function useRoshettas() {
     if (!h.list.some(r => r.id === id)) return { ok: false, reason: 'missing' }
     if (h.queue.some(c => c.type === 'create' && c.roshettaId === id)) return { ok: false, reason: 'not_sent' }
     if (listIsReadOnly(h.list, isProRef.current)) return { ok: false, reason: 'read_only' }
-    const made = await createShare(supabase, id, withTimeLimit, showName)
+    const made = await createShare(supabase, id, withTimeLimit, showName, onProfile)
     if (made.ok) {
       // Analytics: only a link that was really made now, not one found again. Id only.
       if (made.created) logUsageEvent('roshetta_share_create', id)
       return { ok: true, code: made.code }
     }
-    if (made.reason !== 'offline') toast.error("Couldn't create the link. Check your connection and try again.")
+    // The sheet says why a web address or phone number was refused; no general message on top of it.
+    if (made.reason !== 'offline' && !isItemRefusal(made.reason)) toast.error("Couldn't create the link. Check your connection and try again.")
     return made
   }, [refuseChange, isOffline, toast])
+
+  // 2026-11-22 (Public profile plan, step 14.5a): an old link becomes Public (on the profile). The code
+  // never changes. A read only account may not.
+  const makeRoshettaPublic = useCallback(async (id) => {
+    if (userRef.current && isOffline()) return { ok: false, reason: 'offline' }
+    const refused = refuseChange()
+    if (refused) return refused
+    const h = holderRef.current
+    if (!h.list.some(r => r.id === id)) return { ok: false, reason: 'missing' }
+    if (listIsReadOnly(h.list, isProRef.current)) return { ok: false, reason: 'read_only' }
+    return setOnProfile(supabase, id, withTimeLimit)
+  }, [refuseChange, isOffline])
 
   // 2026-11-21 (Phase L, step 13.5): the owner's choice for one link (true = show my name, false =
   // anonymous), the same as for groups. A read only account may not change it. A roshetta still waiting
@@ -471,6 +489,7 @@ export function useRoshettas() {
     createRoshettaShare,
     setRoshettaShareName,
     stopRoshettaSharing,
+    makeRoshettaPublic,
     isReadOnly: readOnly,
     canCreateRoshetta: canCreate(roshettas, isPro),
     roshettaCap: roshettaCap(isPro),

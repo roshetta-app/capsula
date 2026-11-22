@@ -23,6 +23,16 @@
  * Changes still waiting to be saved are not on the link yet: when there are some,
  * one quiet line says so.
  *
+ * 2026-11-22 (Public profile plan, step 14.5a): the Private / Public choice.
+ *   - No link yet = Private. Tapping Public asks "Make it public to share it?" (what it shows, the copy
+ *     notice) with Make public / Not now. Make public makes the link already on the owner's profile; the
+ *     name is always shown on a public link, so there is no name switch for it. With no username yet
+ *     the panel says "Set up your public profile first." (the setup sheet is step 14.5b).
+ *   - Public = the link, Copy, Share link, and Private, which asks first and says honestly what stops.
+ *   - Old link (made before the profile existed) = tagged "Old link", works exactly as before (name
+ *     switch, Stop sharing) and has Make public, which keeps the same link and puts it on the profile.
+ *   - A web address or phone number in the name or description refuses Make public; the panel says so.
+ *
  * Props:
  *   isOpen         boolean
  *   onClose        () => void
@@ -37,6 +47,8 @@ import SheetShell from '../ui/SheetShell'
 import ConfirmSheet from '../ui/ConfirmSheet'
 import GroupStateMessage from '../drugs/groups/GroupStateMessage'
 import ShareNameRow from '../drugs/groups/ShareNameRow'
+import { VisibilityRow, OldLinkTag, MakePublicPanel } from '../ui/PublicShareParts'
+import { shareMode, canMakePublic, isItemRefusal, MAKE_PRIVATE_MESSAGE } from '../../utils/publicShare'
 import { shimmer } from '../drugs/home/shimmer'
 import { useFavouritesContext } from '../../context/FavouritesContext'
 import { useToast } from '../../context/ToastContext'
@@ -88,7 +100,7 @@ function PrivacyLines() {
 
 export default function ShareRoshettaSheet({ isOpen, onClose, roshetta, waiting = false, onShareChange }) {
   const { roshettasApi, getShareNameInfo } = useFavouritesContext()
-  const { getRoshettaShareCode, createRoshettaShare, setRoshettaShareName, stopRoshettaSharing, showRoshettaReadOnly } = roshettasApi
+  const { getRoshettaShareCode, createRoshettaShare, setRoshettaShareName, stopRoshettaSharing, makeRoshettaPublic, showRoshettaReadOnly } = roshettasApi
   const { toast } = useToast()
 
   // Copy feedback: the Copy button shows a tick and "Copied" for two seconds.
@@ -101,8 +113,11 @@ export default function ShareRoshettaSheet({ isOpen, onClose, roshetta, waiting 
   }
   useEffect(() => () => clearTimeout(copiedTimer.current), [])
 
-  // result: null while loading, else { phase: 'none' | 'shared' | 'offline' | 'error' | 'unsent', code? }.
+  // result: null while loading, else { phase: 'none' | 'shared' | 'offline' | 'error' | 'unsent', code?, onProfile? }.
   const [result, setResult] = useState(null)
+  // The "Make it public to share it?" panel, and the reason the database gave if it refused.
+  const [askOpen, setAskOpen] = useState(false)
+  const [refusal, setRefusal] = useState(null)
   const [attempt, setAttempt] = useState(0)
   const [busy, setBusy] = useState(false)
   const [stopOpen, setStopOpen] = useState(false)
@@ -115,7 +130,7 @@ export default function ShareRoshettaSheet({ isOpen, onClose, roshetta, waiting 
   const [wasOpen, setWasOpen] = useState(false)
   if (isOpen !== wasOpen) {
     setWasOpen(isOpen)
-    if (isOpen) { setResult(null); setCopied(false) }
+    if (isOpen) { setResult(null); setCopied(false); setAskOpen(false); setRefusal(null) }
   }
 
   const roshettaId = roshetta?.id
@@ -125,17 +140,15 @@ export default function ShareRoshettaSheet({ isOpen, onClose, roshetta, waiting 
     ;(async () => {
       const [r, info] = await Promise.all([getRoshettaShareCode(roshettaId), getShareNameInfo()])
       if (cancelled) return
-      if (r.ok) {
-        if (info.ok) {
-          setNameInfo({ fullName: info.fullName, accountDefault: info.accountDefault })
-          setShowName(r.showName ?? info.accountDefault)
-        } else {
-          setNameInfo(null)
-        }
-        setResult(r.code ? { phase: 'shared', code: r.code } : { phase: 'none' })
+      if (r.ok && info.ok) {
+        setNameInfo({ fullName: info.fullName, accountDefault: info.accountDefault, hasHandle: info.hasHandle === true })
+        setShowName(r.showName ?? info.accountDefault)
+        setResult(r.code ? { phase: 'shared', code: r.code, onProfile: r.onProfile === true } : { phase: 'none' })
         onShareChange?.(r.code ?? null)
       } else {
-        setResult({ phase: r.reason === 'offline' ? 'offline' : 'error' })
+        // Whether the owner has a username decides what Public may do, so it must be known.
+        const reason = !r.ok ? r.reason : info.reason
+        setResult({ phase: reason === 'offline' ? 'offline' : 'error' })
       }
     })()
     return () => { cancelled = true }
@@ -148,22 +161,31 @@ export default function ShareRoshettaSheet({ isOpen, onClose, roshetta, waiting 
     setAttempt(a => a + 1)
   }
 
-  async function handleCreate() {
+  // Make public: a new link already on the profile, or an old link moved onto it (same code).
+  async function handleMakePublic() {
     if (busy || !roshetta) return
     setBusy(true)
+    setRefusal(null)
     try {
-      const r = await createRoshettaShare(roshetta.id, nameInfo?.fullName ? showName : undefined)
+      const old = result?.phase === 'shared'
+      const r = old ? await makeRoshettaPublic(roshetta.id) : await createRoshettaShare(roshetta.id, undefined, true)
       if (r.ok) {
-        setResult({ phase: 'shared', code: r.code })
-        onShareChange?.(r.code)
+        const code = old ? result.code : r.code
+        setResult({ phase: 'shared', code, onProfile: true })
+        setAskOpen(false)
+        onShareChange?.(code)
+      } else if (isItemRefusal(r.reason)) {
+        setRefusal(r.reason)
       } else if (r.reason === 'offline') {
         setResult({ phase: 'offline' })
       } else if (r.reason === 'not_sent') {
         setResult({ phase: 'unsent' })
       } else if (r.reason === 'read_only') {
         showRoshettaReadOnly()
+      } else if (old) {
+        toast.error("Couldn't make it public. Try again.")
       }
-      // Any other refusal: the hook already showed its own message; the sheet stays as it was.
+      // Any other refusal of a new link: the hook already showed its own message; the sheet stays as it was.
     } finally {
       setBusy(false)
     }
@@ -200,9 +222,11 @@ export default function ShareRoshettaSheet({ isOpen, onClose, roshetta, waiting 
   async function handleStop() {
     const r = await stopRoshettaSharing(roshetta.id)
     if (!r.ok) throw new Error(r.reason ?? 'error')
+    const wasPublic = result?.onProfile === true
     setResult({ phase: 'none' })
+    setAskOpen(false)
     onShareChange?.(null)
-    toast.success('Sharing stopped. The old link no longer works.')
+    toast.success(wasPublic ? 'Now private. The link no longer works for new visits.' : 'Sharing stopped. The old link no longer works.')
   }
 
   let body
@@ -229,19 +253,43 @@ export default function ShareRoshettaSheet({ isOpen, onClose, roshetta, waiting 
   } else if (result.phase === 'none') {
     body = (
       <>
-        <PrivacyLines />
-        {nameInfo && <ShareNameRow fullName={nameInfo.fullName} checked={showName} onChange={handleNameToggle} label="Show my name on this shared roshetta" />}
-        <button onClick={handleCreate} disabled={busy} style={{ ...PRIMARY_BUTTON, opacity: busy ? 0.7 : 1 }}>
-          {busy ? 'Creating…' : 'Create link'}
-        </button>
+        <VisibilityRow mode="private" disabled={busy} onChoosePublic={() => { setRefusal(null); setAskOpen(true) }} />
+        {askOpen ? (
+          <MakePublicPanel
+            kind="roshetta"
+            canSetUp={canMakePublic(nameInfo?.hasHandle)}
+            busy={busy}
+            refusal={refusal}
+            onConfirm={handleMakePublic}
+            onCancel={() => { setAskOpen(false); setRefusal(null) }}
+          />
+        ) : (
+          <p style={{ margin: 0, fontSize: 15, lineHeight: 1.45, color: 'var(--color-text-secondary)', fontFamily: 'var(--font-body)' }}>
+            Only you can see this roshetta. It has no link. Choose Public to share it.
+          </p>
+        )}
       </>
     )
+  } else if (shareMode(result.code, result.onProfile) === 'old' && askOpen) {
+    body = (
+      <MakePublicPanel
+        kind="roshetta"
+        old
+        canSetUp={canMakePublic(nameInfo?.hasHandle)}
+        busy={busy}
+        refusal={refusal}
+        onConfirm={handleMakePublic}
+        onCancel={() => { setAskOpen(false); setRefusal(null) }}
+      />
+    )
   } else {
+    const mode = shareMode(result.code, result.onProfile)
     const link = buildRoshettaLink(result.code)
     body = (
       <>
+        {mode === 'public' && <VisibilityRow mode="public" onChoosePrivate={() => setStopOpen(true)} />}
         <PrivacyLines />
-        {nameInfo && <ShareNameRow fullName={nameInfo.fullName} checked={showName} onChange={handleNameToggle} label="Show my name on this shared roshetta" />}
+        {mode === 'old' && nameInfo && <ShareNameRow fullName={nameInfo.fullName} checked={showName} onChange={handleNameToggle} label="Show my name on this shared roshetta" />}
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 'var(--space-2)' }}>
           <span style={{
@@ -252,7 +300,13 @@ export default function ShareRoshettaSheet({ isOpen, onClose, roshetta, waiting 
             <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: 'var(--color-success)' }} />
             Link is on
           </span>
+          {mode === 'old' && <OldLinkTag />}
         </div>
+        {mode === 'public' && (
+          <p style={{ margin: '0 0 var(--space-3)', fontSize: 13, lineHeight: 1.45, color: 'var(--color-text-secondary)', fontFamily: 'var(--font-body)' }}>
+            Shown on your public profile with your name.
+          </p>
+        )}
 
         <div style={{
           display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '4px 4px 4px 12px',
@@ -292,21 +346,32 @@ export default function ShareRoshettaSheet({ isOpen, onClose, roshetta, waiting 
           Share link
         </button>
 
-        <div style={{ marginTop: 'var(--space-4)', paddingTop: 'var(--space-2)', borderTop: '1px solid var(--color-border)', textAlign: 'center' }}>
-          <button
-            onClick={() => setStopOpen(true)}
-            style={{
-              display: 'block', width: '100%', minHeight: 44, background: 'none', border: 'none', cursor: 'pointer',
-              padding: '8px 12px', fontSize: 15, fontWeight: 600, color: 'var(--color-danger)',
-              fontFamily: 'var(--font-body)', WebkitTapHighlightColor: 'transparent', outline: 'none',
-            }}
-          >
-            Stop sharing
-          </button>
-          <p style={{ margin: 0, fontSize: 13, lineHeight: 1.45, color: 'var(--color-text-secondary)', fontFamily: 'var(--font-body)' }}>
-            The link stops working at once. Copies people already saved are kept.
-          </p>
-        </div>
+        {mode === 'old' && (
+          <>
+            <button
+              type="button"
+              onClick={() => { setRefusal(null); setAskOpen(true) }}
+              style={{ ...PRIMARY_BUTTON, marginTop: 'var(--space-2)', backgroundColor: 'var(--color-surface-muted)', color: 'var(--color-text-primary)' }}
+            >
+              Make public
+            </button>
+            <div style={{ marginTop: 'var(--space-4)', paddingTop: 'var(--space-2)', borderTop: '1px solid var(--color-border)', textAlign: 'center' }}>
+              <button
+                onClick={() => setStopOpen(true)}
+                style={{
+                  display: 'block', width: '100%', minHeight: 44, background: 'none', border: 'none', cursor: 'pointer',
+                  padding: '8px 12px', fontSize: 15, fontWeight: 600, color: 'var(--color-danger)',
+                  fontFamily: 'var(--font-body)', WebkitTapHighlightColor: 'transparent', outline: 'none',
+                }}
+              >
+                Stop sharing
+              </button>
+              <p style={{ margin: 0, fontSize: 13, lineHeight: 1.45, color: 'var(--color-text-secondary)', fontFamily: 'var(--font-body)' }}>
+                The link stops working at once. Copies people already saved are kept.
+              </p>
+            </div>
+          </>
+        )}
       </>
     )
   }
@@ -351,10 +416,10 @@ export default function ShareRoshettaSheet({ isOpen, onClose, roshetta, waiting 
         isOpen={stopOpen}
         onClose={() => setStopOpen(false)}
         onConfirm={handleStop}
-        title="Stop sharing?"
-        message="The link will stop working at once. Sharing again makes a new link."
-        confirmLabel="Stop sharing"
-        confirmingLabel={'Stopping…'}
+        title={result?.onProfile === true ? 'Make private?' : 'Stop sharing?'}
+        message={result?.onProfile === true ? MAKE_PRIVATE_MESSAGE : 'The link will stop working at once. Sharing again makes a new link.'}
+        confirmLabel={result?.onProfile === true ? 'Make private' : 'Stop sharing'}
+        confirmingLabel={result?.onProfile === true ? 'Making private\u2026' : 'Stopping…'}
         destructive
       />
     </>
