@@ -27,6 +27,7 @@ import { FileX, WifiOff, AlertTriangle, Clock } from 'lucide-react'
 import GroupStateMessage from '../components/drugs/groups/GroupStateMessage'
 import { shimmer } from '../components/drugs/home/shimmer'
 import { ProfileHeader, ShareProfileButton, ProfileLists, SafetyLine } from '../components/profile/PublicProfileView'
+import ReportSheet, { ReportLink } from '../components/ui/ReportSheet'
 import { useAuth } from '../hooks/useAuth'
 import useScrollToTopOnOpen from '../hooks/useScrollToTopOnOpen'
 import { fetchPublicProfile } from '../utils/publicProfile'
@@ -37,6 +38,7 @@ import { ROUTES } from '../router'
 const MUTED = { bg: 'var(--color-surface-muted)', fg: 'var(--color-text-tertiary)' }
 const PROBLEM_LOOK = {
   not_found: { icon: FileX, accent: MUTED },
+  hidden: { icon: FileX, accent: MUTED },
   too_many: { icon: Clock, accent: MUTED },
   offline: { icon: WifiOff, accent: MUTED },
   error: { icon: AlertTriangle, accent: { bg: 'var(--color-warning-light)', fg: 'var(--color-warning)' } },
@@ -57,6 +59,7 @@ function PublicProfileBody({ handle }) {
 
   const [result, setResult] = useState({ status: 'loading' })
   const [attempt, setAttempt] = useState(0)
+  const [reportOpen, setReportOpen] = useState(false)
   const { user } = useAuth()
   const userId = user?.id ?? null
 
@@ -187,6 +190,12 @@ function PublicProfileBody({ handle }) {
         </div>
         <ProfileLists profile={profile} own={profile.isOwner} />
         <SafetyLine />
+        {!profile.isOwner && (
+          <>
+            <ReportLink onClick={() => setReportOpen(true)} />
+            <ReportSheet isOpen={reportOpen} onClose={() => setReportOpen(false)} kind="profile" reference={profile.handle} />
+          </>
+        )}
       </div>
     )
   }

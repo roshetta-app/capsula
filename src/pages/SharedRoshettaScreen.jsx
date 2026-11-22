@@ -69,6 +69,7 @@ import PrescriptionSheetBlock from '../components/conditions/PrescriptionSheetBl
 import GroupStateMessage from '../components/drugs/groups/GroupStateMessage'
 import { useAuth } from '../hooks/useAuth'
 import { useTapGuard } from '../hooks/useTapGuard'
+import ReportSheet, { ReportLink } from '../components/ui/ReportSheet'
 import { useIsPro } from '../hooks/useIsPro'
 import { useFavouritesContext } from '../context/FavouritesContext'
 import useScrollToTopOnOpen from '../hooks/useScrollToTopOnOpen'
@@ -110,6 +111,7 @@ function SharedRoshettaBody({ code }) {
 
   // { status: 'loading' | 'ok' | 'unavailable' | 'offline' | 'error', roshetta?, forUser? }
   const [result, setResult] = useState({ status: 'loading' })
+  const [reportOpen, setReportOpen] = useState(false)
   // Bumped by Try again, so the effect below asks again.
   const [attempt, setAttempt] = useState(0)
 
@@ -350,6 +352,7 @@ function SharedRoshettaBody({ code }) {
             <>
               <PrescriptionSheetBlock sheet={{ rows: sheetRowsForDisplay(roshetta.rows) }} hasContentAfter={false} keepDoseLineBreaks separateDrugCards />
               <RoshettaDisclaimer variant="footnote" marginTop={24} />
+              {!roshetta.isOwner && <ReportLink onClick={() => setReportOpen(true)} />}
             </>
           )}
         </div>
@@ -465,6 +468,7 @@ function SharedRoshettaBody({ code }) {
           )}
         </div>
       )}
+      <ReportSheet isOpen={reportOpen} onClose={() => setReportOpen(false)} kind="roshetta" reference={code} />
     </div>
   )
 }

@@ -85,11 +85,14 @@ export function emptyLine(tabKey, own) {
 // Which state the profile page draws from the answer of fetchPublicProfile.
 export function profilePageState(result) {
   const s = result && result.status
-  if (s === 'ok' || s === 'not_found' || s === 'too_many' || s === 'offline' || s === 'error') return s
+  if (s === 'ok' || s === 'not_found' || s === 'hidden' || s === 'too_many' || s === 'offline' || s === 'error') return s
   return 'loading'
 }
 
 export function problemText(state) {
+  if (state === 'hidden') {
+    return { title: 'Not available', body: 'This profile is not available right now.', actionLabel: 'Open Capsula', action: 'open' }
+  }
   if (state === 'too_many') {
     return { title: 'Too many tries', body: 'Try again later.', actionLabel: 'Open Capsula', action: 'open' }
   }

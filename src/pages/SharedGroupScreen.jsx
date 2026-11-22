@@ -91,6 +91,7 @@ import GroupPageSkeleton from '../components/drugs/groups/GroupPageSkeleton'
 import { useCategories } from '../hooks/useCategories'
 import { useAuth } from '../hooks/useAuth'
 import { useTapGuard } from '../hooks/useTapGuard'
+import ReportSheet, { ReportLink } from '../components/ui/ReportSheet'
 import { useOpenDrug } from '../hooks/useOpenDrug'
 import useScrollToTopOnOpen from '../hooks/useScrollToTopOnOpen'
 import { useFavouritesContext } from '../context/FavouritesContext'
@@ -144,6 +145,7 @@ function SharedGroupBody({ code }) {
 
   // { status: 'loading' | 'ok' | 'unavailable' | 'offline' | 'error', group? }
   const [result, setResult] = useState({ status: 'loading' })
+  const [reportOpen, setReportOpen] = useState(false)
 
   // Bumped by Retry, so the effect below asks again.
   const [attempt, setAttempt] = useState(0)
@@ -412,6 +414,7 @@ function SharedGroupBody({ code }) {
               ))}
             </div>
           )}
+          {!group.isOwner && <ReportLink onClick={() => setReportOpen(true)} />}
         </div>
       </>
     )
@@ -519,6 +522,7 @@ function SharedGroupBody({ code }) {
           )}
         </div>
       )}
+      <ReportSheet isOpen={reportOpen} onClose={() => setReportOpen(false)} kind="group" reference={code} />
     </div>
   )
 }

@@ -39,7 +39,7 @@ test('a good answer is mapped: only what the page shows, items without a code dr
 
 test('missing pieces are tolerated: empty name and bio, no avatar, zero counts', () => {
   const p = mapPublicProfile({ status: 'ok', handle: 'a-b', roshettas: {}, groups: null });
-  assert.deepEqual(p, { handle: 'a-b', name: '', bio: '', avatarCode: null, redirected: false, isOwner: false, roshettas: { total: 0, items: [] }, groups: { total: 0, items: [] } });
+  assert.deepEqual(p, { handle: 'a-b', name: '', bio: '', avatarCode: null, redirected: false, isOwner: false, hidden: false, roshettas: { total: 0, items: [] }, groups: { total: 0, items: [] } });
 });
 
 test('redirected and owner flags only count when exactly true', () => {
@@ -106,4 +106,10 @@ test('nothing here keeps anything on the phone: no storage or cache words in the
 test('the service worker lets other websites\' requests through untouched, so the database answers are never kept', () => {
   const sw = readFileSync(new URL('../../public/sw.js', import.meta.url), 'utf8');
   assert.match(sw, /if \(url\.origin !== location\.origin\) return/);
+});
+
+test('14.9: a hidden profile answers hidden; only the owner ever gets hidden: true on a normal answer', async () => {
+  assert.deepEqual((await load('x', { reply: { data: { status: 'hidden' }, error: null } })).result, { status: 'hidden' });
+  assert.equal(mapPublicProfile({ ...GOOD, hidden: true }).hidden, true);
+  for (const v of [false, 'true', 1, null, undefined]) assert.equal(mapPublicProfile({ ...GOOD, hidden: v }).hidden, false, String(v));
 });

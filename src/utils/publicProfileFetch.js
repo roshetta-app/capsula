@@ -15,6 +15,7 @@
  *       groups:    { total, items: { name, drugCount, createdAt, code, color }[] } } }
  *   { status: 'not_found' }   no such profile, an old username with forwarding off, a removed one, or a
  *                             badly written one: all the same answer, so nothing is revealed
+ *   { status: 'hidden' }      hidden after a report (14.9): the page says "Not available"; the owner never gets this
  *   { status: 'too_many' }    too many failed tries from this connection; wait a few minutes
  *   { status: 'offline' }     the phone has no connection (or the database stayed silent)
  *   { status: 'error' }       the database could not be reached or failed
@@ -58,6 +59,7 @@ export function mapPublicProfile(data) {
     avatarCode: typeof data.avatar_code === 'string' && data.avatar_code ? data.avatar_code : null,
     redirected: data.redirected === true,
     isOwner: data.is_owner === true,
+    hidden: data.hidden === true,   // only ever sent to the owner of a hidden profile
     roshettas: section(data.roshettas, false),
     groups: section(data.groups, true),
   }
@@ -81,6 +83,7 @@ export async function loadPublicProfile(handle, { rpc, isOnline, timeLimitMs }) 
   const data = res?.data
   if (!data || typeof data !== 'object' || Array.isArray(data)) return { status: 'error' }
   if (data.status === 'too_many') return { status: 'too_many' }
+  if (data.status === 'hidden') return { status: 'hidden' }
   if (data.status === 'ok' && typeof data.handle === 'string') return { status: 'ok', profile: mapPublicProfile(data) }
   return { status: 'not_found' }
 }

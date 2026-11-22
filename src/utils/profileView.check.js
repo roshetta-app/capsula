@@ -58,7 +58,7 @@ test('empty lists: a visitor and the owner read different lines', () => {
 })
 
 test('every answer maps to one page state, and every problem state has words', () => {
-  for (const s of ['ok', 'not_found', 'too_many', 'offline', 'error']) assert.equal(profilePageState({ status: s }), s)
+  for (const s of ['ok', 'not_found', 'hidden', 'too_many', 'offline', 'error']) assert.equal(profilePageState({ status: s }), s)
   assert.equal(profilePageState(undefined), 'loading')
   assert.equal(profilePageState({ status: 'weird' }), 'loading')
   assert.equal(problemText('too_many').title, 'Too many tries')
@@ -111,3 +111,10 @@ test('new public profile code never writes to the phone (no local storage, sessi
     assert.ok(!/localStorage|sessionStorage|indexedDB|caches\.|Preferences\.set/.test(code), f)
   }
 })
+
+test('14.9: a hidden profile reads Not available, different from Profile not found, and offers Open Capsula', () => {
+  const t = problemText('hidden');
+  assert.equal(t.title, 'Not available');
+  assert.notEqual(t.title, problemText('not_found').title);
+  assert.equal(t.action, 'open');
+});
