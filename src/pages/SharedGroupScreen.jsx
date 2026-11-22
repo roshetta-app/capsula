@@ -92,6 +92,7 @@ import { useCategories } from '../hooks/useCategories'
 import { useAuth } from '../hooks/useAuth'
 import { useTapGuard } from '../hooks/useTapGuard'
 import ReportSheet, { ReportLink } from '../components/ui/ReportSheet'
+import { useViewCount } from '../hooks/useViewCount'
 import { useOpenDrug } from '../hooks/useOpenDrug'
 import useScrollToTopOnOpen from '../hooks/useScrollToTopOnOpen'
 import { useFavouritesContext } from '../context/FavouritesContext'
@@ -172,6 +173,9 @@ function SharedGroupBody({ code }) {
     openLoggedFor.current = code
     logUsageEvent('shared_group_open')
   }, [result.status, code])
+
+  // Unique view count (step H3): sent once the group shows and has been visible about 2 seconds; never the owner.
+  useViewCount('group', code, result.status === 'ok' && !result.group?.isOwner)
 
   const retry = useCallback(() => {
     setResult({ status: 'loading' })
