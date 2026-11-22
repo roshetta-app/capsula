@@ -22,6 +22,12 @@ const ACTION_STYLES = {
   unpublish: { bg: '#FEF9C3', color: '#854D0E', border: '#FDE047', label: 'Unpublish' },
   // Phase F9 Stage 1 — cancelling a still-pending notification
   cancel:    { bg: '#FEE2E2', color: '#991B1B', border: '#FCA5A5', label: 'Cancel'    },
+  // 14.9c-1: reports and hiding (the database writes these itself)
+  hide:          { bg: '#FEE2E2', color: '#991B1B', border: '#FCA5A5', label: 'Hide'          },
+  restore:       { bg: '#D1FAE5', color: '#065F46', border: '#6EE7B7', label: 'Restore'       },
+  dismiss:       { bg: '#F3F4F6', color: '#374151', border: '#D1D5DB', label: 'Dismiss'       },
+  appeal:        { bg: '#FEF9C3', color: '#854D0E', border: '#FDE047', label: 'Appeal'        },
+  appeal_answer: { bg: '#DBEAFE', color: '#1E40AF', border: '#93C5FD', label: 'Appeal answer' },
 }
 
 const TABLE_LABELS = {
@@ -32,6 +38,8 @@ const TABLE_LABELS = {
   specialties:      'Specialties',
   notification_log: 'Notifications',
   class_keywords:   'Class keywords',
+  content_flags:    'Hidden items',
+  reports:          'Reports',
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
