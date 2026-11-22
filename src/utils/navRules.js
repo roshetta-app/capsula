@@ -63,6 +63,8 @@ export const SCREENS = [
   // ── Shared pages: public, stand alone (no screen is placed behind them)
   { pattern: '/g/:code',                   kind: 'page', parent: '/',                        label: 'Group',        signIn: false, laysBehind: false },
   { pattern: '/r/:code',                   kind: 'page', parent: '/',                        label: 'Roshetta',     signIn: false, laysBehind: false },
+  // 14.7b (2026-11-22): a public profile stands alone like the shared pages (Open Capsula instead of a parent).
+  { pattern: '/u/:handle',                 kind: 'page', parent: '/',                        label: 'Profile',      signIn: false, laysBehind: false },
 
   // ── Account pages. Today no screen places Account behind them on a link arrival; the rule
   // says it should (plan rule 3), and step 12.3 is where that gets built.

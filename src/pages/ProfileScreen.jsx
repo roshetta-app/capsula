@@ -7,7 +7,8 @@
  * What it shows, one thing at a time (the rules are in utils/profileTab.js):
  *   - the avatar the person chose (never the sign-in photo), their name and @username
  *   - ONE card: "Finish your details" first (name, occupation, country, specialty for a physician),
- *     then "Set up your public profile", then nothing until 14.7b adds the two lists
+ *     then "Set up your public profile", then (14.7b) the person's own view of their public profile: bio,
+ *     Share profile, Add to profile, and the two lists (Roshettas, Drug groups) as other people see them
  *   - a guest sees a sign-in card; a failed read says no connection or could not load, with Try again
  *
  * The profile is read from the server every time this screen opens and is never kept on the phone.
@@ -22,6 +23,11 @@ import { useAuth } from '../hooks/useAuth'
 import { usePublicProfile } from '../hooks/usePublicProfile'
 import PublicAvatar from '../components/ui/PublicAvatar'
 import PublicSetupSheet from '../components/ui/PublicSetupSheet'
+import AddToProfileSheet from '../components/ui/AddToProfileSheet'
+import { ProfileHeader, ShareProfileButton, ProfileLists, SafetyLine } from '../components/profile/PublicProfileView'
+import { useFavouritesContext } from '../context/FavouritesContext'
+import { fetchPublicProfile } from '../utils/publicProfile'
+import { PROFILE_WORDS } from '../utils/profileView'
 import { shimmer } from '../components/drugs/home/shimmer'
 import { ROUTES } from '../router'
 import {
@@ -120,6 +126,31 @@ export default function ProfileScreen() {
     })
     return () => { cancelled = true }
   }, [authLoading, signedIn, loadProfile, reloadKey])
+
+  // 14.7b: once both cards are done, the public profile is read from the server (the same answer a visitor
+  // gets, so the person sees exactly what others see). Read again every time the tab opens, never kept.
+  const handle = profile?.handle ?? null
+  const [pub, setPub] = useState({ status: 'loading' })
+  const [pubKey, setPubKey] = useState(0)
+  const [addOpen, setAddOpen] = useState(false)
+  const [addTab, setAddTab] = useState('roshettas')
+  const { roshettasApi, groups, createShareLink } = useFavouritesContext()
+
+  useEffect(() => {
+    if (!signedIn || !handle || authLoading) return undefined
+    let cancelled = false
+    fetchPublicProfile(handle).then((r) => { if (!cancelled) setPub(r) })
+    return () => { cancelled = true }
+  }, [signedIn, handle, authLoading, pubKey])
+
+  function reloadPub() {
+    setPub({ status: 'loading' })
+    setPubKey((n) => n + 1)
+  }
+  function openAdd(tab) {
+    setAddTab(tab === 'groups' ? 'groups' : 'roshettas')
+    setAddOpen(true)
+  }
 
   const view = profileTabView({ authLoading, signedIn, status, profile })
   const hero = heroLines(profile)
@@ -220,6 +251,55 @@ export default function ProfileScreen() {
           <PillButton onClick={() => setSetupOpen(true)}>Set up</PillButton>
         </div>
       )}
+
+      {view === 'ready' && pub.status === 'loading' && (
+        <div>
+          <div style={shimmer({ width: '100%', height: 60, borderRadius: 'var(--radius-lg)', marginBottom: 'var(--space-2)' })} />
+          <div style={shimmer({ width: '100%', height: 60, borderRadius: 'var(--radius-lg)' })} />
+        </div>
+      )}
+
+      {view === 'ready' && (pub.status === 'offline' || pub.status === 'error' || pub.status === 'not_found' || pub.status === 'too_many') && (
+        <MessageCard
+          icon={pub.status === 'offline' ? <WifiOff size={20} strokeWidth={1.8} /> : <AlertCircle size={20} strokeWidth={1.8} />}
+          title={pub.status === 'offline' ? TAB_WORDS.offlineTitle : TAB_WORDS.errorTitle}
+          line={pub.status === 'offline' ? TAB_WORDS.offlineLine : TAB_WORDS.errorLine}
+          action={<PillButton onClick={reloadPub}>Try again</PillButton>}
+        />
+      )}
+
+      {view === 'ready' && pub.status === 'ok' && (
+        <div>
+          <ProfileHeader profile={pub.profile} showAvatarAndName={false} />
+          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'flex-start', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
+            <ShareProfileButton name={pub.profile.name} handle={pub.profile.handle} />
+            <button
+              type="button"
+              onClick={() => openAdd(null)}
+              style={{
+                minHeight: 44, padding: '0 var(--space-4)', borderRadius: 'var(--radius-full)', border: 'none',
+                backgroundColor: 'var(--color-accent)', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer',
+                fontFamily: 'var(--font-body)', WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              {PROFILE_WORDS.addToProfile}
+            </button>
+          </div>
+          <ProfileLists profile={pub.profile} own onAdd={openAdd} />
+          <SafetyLine />
+        </div>
+      )}
+
+      <AddToProfileSheet
+        isOpen={addOpen}
+        onClose={() => setAddOpen(false)}
+        roshettas={roshettasApi?.roshettas ?? []}
+        groups={groups ?? []}
+        publishRoshetta={(id) => roshettasApi.createRoshettaShare(id, undefined, true)}
+        publishGroup={(id) => createShareLink(id, undefined, true)}
+        initialTab={addTab}
+        onChanged={reloadPub}
+      />
 
       <PublicSetupSheet
         isOpen={setupOpen}

@@ -13,7 +13,7 @@
 import { Capacitor } from '@capacitor/core'
 import { toTitleCase, getDrugTitleSuffix, TITLE_HIDDEN_MODIFIER_TAGS } from './drugTitleFormat'
 
-const PUBLIC_SITE = 'https://roshetta-app.github.io/capsula'
+export const PUBLIC_SITE = 'https://roshetta-app.github.io/capsula'
 
 export function buildDrugLink(drug) {
   const slug = encodeURIComponent(drug.slug || drug.id)

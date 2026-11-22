@@ -24,9 +24,10 @@ import OnboardingScreen from '../../screens/OnboardingScreen'
 // welcome screen, and nothing is downloaded for them (the drug library starts
 // from the welcome screen's last slide). 2026-11-14 (Roshetta plan, step 6.2b): a shared
 // roshetta link (/r/<code>) is public in the same way. The welcome screen appears when they
-// go on into the app (Open Capsula, or opening a drug).
+// go on into the app (Open Capsula, or opening a drug). 2026-11-22 (step 14.7b): a public profile
+// (/u/<username>) is public in the same way.
 function isPublicSharedPage(pathname) {
-  return pathname.startsWith('/g/') || pathname.startsWith('/r/')
+  return pathname.startsWith('/g/') || pathname.startsWith('/r/') || pathname.startsWith('/u/')
 }
 
 export default function OnboardingGate({ children }) {

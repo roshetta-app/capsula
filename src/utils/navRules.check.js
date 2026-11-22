@@ -120,6 +120,7 @@ function legacyLabel(path) {
   if (/^\/drugs\/group\/[^/]+\/add$/.test(path)) return 'Add drugs'
   if (path.startsWith('/drugs/group/') || path.startsWith('/g/')) return 'Group'
   if (path.startsWith('/r/')) return 'Roshetta'
+  if (path.startsWith('/u/')) return 'Profile'   // 14.7b: a public profile
   if (path === '/roshettas') return 'My roshettas'
   if (path.startsWith('/drugs/generic/')) return 'Generic'
   if (path.startsWith('/drugs/')) return 'Drug'
@@ -190,7 +191,9 @@ test('kinds, sign-in and shared pages', () => {
   assert.equal(needsSignIn('/g/abc'), false)
   assert.equal(needsSignIn('/nowhere'), false)
   // shared pages stand alone; everything else gets its parent behind it
-  assert.deepEqual(SCREENS.filter((s) => !s.laysBehind).map((s) => s.pattern).sort(), ['/g/:code', '/r/:code'])
+  assert.deepEqual(SCREENS.filter((s) => !s.laysBehind).map((s) => s.pattern).sort(), ['/g/:code', '/r/:code', '/u/:handle'])   // 14.7b adds the public profile
+  assert.equal(laysBehind('/u/sara-ahmed'), false)
+  assert.equal(needsSignIn('/u/sara-ahmed'), false)
   assert.equal(laysBehind('/g/abc'), false)
   assert.equal(laysBehind('/drugs/x'), true)
   assert.equal(laysBehind('/nowhere'), false)
