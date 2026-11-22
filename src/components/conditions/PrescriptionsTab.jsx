@@ -150,7 +150,7 @@ import { getRxBlocks, trimDividerEdges } from '../../utils/blockFilters'
 // footerBleed — true on the real screen: the footer section breaks out of the page's side
 // padding to run edge to edge. bottomInset — space under the footer (the screen passes the
 // bottom-nav clearance so the footer reaches down to the nav bar instead of leaving a gap).
-export default function PrescriptionsTab({ blocks, conditionId, activeIndex: activeIndexProp, onActiveIndexChange, footerBleed = false, bottomInset = 'var(--space-6)' }) {
+export default function PrescriptionsTab({ blocks, conditionId, activeIndex: activeIndexProp, onActiveIndexChange, footerBleed = false, footerExtra = null, bottomInset = 'var(--space-6)' }) {
   const [localIndex, setLocalIndex] = useState(0)
   const activeIndex    = activeIndexProp ?? localIndex
   const setActiveIndex = onActiveIndexChange ?? setLocalIndex
@@ -251,6 +251,8 @@ export default function PrescriptionsTab({ blocks, conditionId, activeIndex: act
           </p>
         </div>
       </div>
+      {/* 2026-11-22 (Track I, I4): the screen's Report a problem link sits under the disclaimer. */}
+      {footerExtra}
       </div>
     </div>
   )

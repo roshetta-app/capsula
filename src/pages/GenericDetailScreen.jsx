@@ -28,6 +28,8 @@ import { WifiOff } from 'lucide-react'
 import DrugHeader from '../components/drugs/DrugHeader'
 import DrugDetailSheet from '../components/drugs/DrugDetailSheet'
 import BottomNav from '../components/BottomNav'
+import ReportSheet, { ReportLink } from '../components/ui/ReportSheet'
+import { LIBRARY_REPORT_WORDS } from '../utils/libraryReportRules'
 import GenericOverviewSection from '../components/drugs/sections/GenericOverviewSection'
 import UsesSection from '../components/drugs/sections/UsesSection'
 import DoseSection from '../components/drugs/sections/DoseSection'
@@ -90,6 +92,8 @@ export default function GenericDetailScreen() {
   useDeepLinkParent()
 
   const { drugs, loading, error, retry } = useDrugContext()
+  // 2026-11-22 (Track I, I4): the Report a problem sheet. It reports THIS generic page (its own generic slug).
+  const [reportOpen, setReportOpen] = useState(false)
 
   // One brand of this generic carries the generic's data into the sections. It is never shown.
   const drug = useMemo(() => drugs.find(d => d.genericSlug === slug), [drugs, slug])
@@ -215,9 +219,11 @@ export default function GenericDetailScreen() {
             <DrugInteractionsSection drug={drug} />
             <PharmacologySection drug={drug} />
             <SourcesSection drug={drug} />
+            <ReportLink label={LIBRARY_REPORT_WORDS.link} onClick={() => setReportOpen(true)} />
           </div>
         </DrugDetailSheet>
       </div>
+      <ReportSheet isOpen={reportOpen} onClose={() => setReportOpen(false)} kind="generic" reference={drug.genericSlug} />
       <BottomNav />
     </>
   )

@@ -106,6 +106,8 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { WifiOff }                       from 'lucide-react'
 import DrugHeader                        from '../components/drugs/DrugHeader'
 import AddToGroupSheet                   from '../components/drugs/groups/AddToGroupSheet'
+import ReportSheet, { ReportLink }       from '../components/ui/ReportSheet'
+import { LIBRARY_REPORT_WORDS }          from '../utils/libraryReportRules'
 import { isDrugGroupsOn }                from '../constants/features'
 import { useAuth }                       from '../hooks/useAuth'
 import DrugMediaStrip                    from '../components/drugs/DrugMediaStrip'
@@ -243,6 +245,8 @@ export default function DrugDetailScreen() {
   const { user: groupsUser, loading: groupsAuthLoading } = useAuth()
   const groupsOn = isDrugGroupsOn()
   const [groupSheetOpen, setGroupSheetOpen] = useState(false)
+  // 2026-11-22 (Track I, I4): the Report a problem sheet. It reports THIS brand page (its own brand slug).
+  const [reportOpen, setReportOpen] = useState(false)
   const [armedId, setArmedId] = useState(() => (
     pendingFavourite?.type === 'groups' && pendingFavourite.id !== 'new' ? pendingFavourite.id : null
   ))
@@ -539,9 +543,13 @@ export default function DrugDetailScreen() {
             <PharmacologySection drug={drug} />
 
             <SourcesSection drug={drug} />
+
+            <ReportLink label={LIBRARY_REPORT_WORDS.link} onClick={() => setReportOpen(true)} />
           </div>
         </DrugDetailSheet>
       </div>
+
+      <ReportSheet isOpen={reportOpen} onClose={() => setReportOpen(false)} kind="brand" reference={drug.slug} />
 
       <BottomNav />
     </>

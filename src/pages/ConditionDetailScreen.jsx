@@ -14,6 +14,8 @@ import PrescriptionsTab from '../components/conditions/PrescriptionsTab'
 import ClinicalDataTab from '../components/conditions/ClinicalDataTab'
 import SectionIndex from '../components/conditions/SectionIndex'
 import BottomNav from '../components/BottomNav'
+import ReportSheet, { ReportLink } from '../components/ui/ReportSheet'
+import { LIBRARY_REPORT_WORDS } from '../utils/libraryReportRules'
 import { logUsageEvent } from '../analytics/usageEvents'
 import { SpecialtyIcon, useIsDark } from '../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN } from '../utils/specialtyTokens'
@@ -81,6 +83,8 @@ export default function ConditionDetailScreen() {
   // Chosen treatment plan (Rx tab dropdown). Lives here, not inside the Rx tab,
   // so it survives switching to the Clinical tab and back; planMemory carries it
   // across the condition -> drug -> Back round trip.
+  // 2026-11-22 (Track I, I4): the Report a problem sheet; both tabs report the same topic.
+  const [reportOpen, setReportOpen] = useState(false)
   const [rxPlanIndex, setRxPlanIndex] = useState(
     () => (navigationType === 'POP' ? planMemory.get(slug) ?? 0 : 0)
   )
@@ -462,12 +466,16 @@ export default function ConditionDetailScreen() {
               activeIndex={rxPlanIndex}
               onActiveIndexChange={setRxPlanIndex}
               footerBleed
+              footerExtra={<ReportLink label={LIBRARY_REPORT_WORDS.link} onClick={() => setReportOpen(true)} />}
               bottomInset={keyboardOpen
                 ? 'var(--space-4)'
                 : 'calc(60px + env(safe-area-inset-bottom) + var(--space-4))'}
             />
           ) : (
-            <ClinicalDataTab blocks={condition.blocks ?? []} />
+            <>
+              <ClinicalDataTab blocks={condition.blocks ?? []} />
+              <ReportLink label={LIBRARY_REPORT_WORDS.link} onClick={() => setReportOpen(true)} />
+            </>
           )}
         </div>
       </div>
@@ -479,6 +487,8 @@ export default function ConditionDetailScreen() {
         hidden={keyboardOpen}
         bottomClearance={keyboardOpen ? '0px' : 'calc(60px + env(safe-area-inset-bottom))'}
       />
+
+      <ReportSheet isOpen={reportOpen} onClose={() => setReportOpen(false)} kind="topic" reference={condition.slug} />
 
       <BottomNav />
     </div>
