@@ -99,7 +99,7 @@ import { SAVE_OFFLINE_MESSAGE, SAVE_READ_ONLY_MESSAGE, SAVE_ERROR_MESSAGE, saved
 import { useIsDark } from '../utils/specialtyIcon'
 import { resolveToken } from '../utils/specialtyTokens'
 import { fetchSharedGroup } from '../utils/sharedGroup'
-import { dayText, findSavedCopy, sharedBarState } from '../utils/shareCredit'
+import { creditLinkHandle, dayText, findSavedCopy, sharedBarState } from '../utils/shareCredit'
 import { logUsageEvent } from '../analytics/usageEvents'
 import { ROUTES } from '../router'
 
@@ -379,7 +379,11 @@ function SharedGroupBody({ code }) {
                 (the same words as groupCreditLine in shareCredit.js, with the name in bold). */}
             {group.ownerName && (
               <span>
-                Created by <span dir="auto" style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{group.ownerName}</span>
+                Created by{' '}
+                {creditLinkHandle(group)
+                  ? <button type="button" dir="auto" onClick={() => openPage(ROUTES.PUBLIC_PROFILE(group.ownerHandle))}
+                      style={{ all: 'unset', cursor: 'pointer', fontWeight: 600, color: 'var(--color-text-primary)', textDecoration: 'underline', textUnderlineOffset: 2 }}>{group.ownerName}</button>
+                  : <span dir="auto" style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{group.ownerName}</span>}
               </span>
             )}
             {group.ownerName && day && <span aria-hidden="true">{'\u00b7'}</span>}

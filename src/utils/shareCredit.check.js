@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   dayText, creditText, groupCreditLine, nameSwitchText, accountSwitchText,
-  readOwner, readCredit, findSavedCopy, sharedBarState,
+  readOwner, readCredit, readHandle, creditLinkHandle, findSavedCopy, sharedBarState,
 } from './shareCredit.js';
 
 const NOW = new Date(2026, 10, 21, 9, 30); // Sat 21 Nov 2026
@@ -22,8 +22,8 @@ test('an unreadable date gives nothing', () => {
 
 test('credit line: name and date, date only when anonymous, name only without a date', () => {
   const d = at(2026, 10, 12);
-  assert.equal(creditText({ ownerName: 'Dr Sara', createdAt: d, now: NOW }), 'Created by Dr Sara \u00b7 12 Nov');
-  assert.equal(creditText({ ownerName: null, createdAt: d, now: NOW }), 'Created 12 Nov');
+  assert.equal(creditText({ ownerName: 'Dr Sara', ownerHandle: null, createdAt: d, now: NOW }), 'Created by Dr Sara \u00b7 12 Nov');
+  assert.equal(creditText({ ownerName: null, ownerHandle: null, createdAt: d, now: NOW }), 'Created 12 Nov');
   assert.equal(creditText({ ownerName: '   ', createdAt: d, now: NOW }), 'Created 12 Nov');
   assert.equal(creditText({ ownerName: 'Dr Sara', createdAt: undefined, now: NOW }), 'Created by Dr Sara');
   assert.equal(creditText({ ownerName: null, createdAt: 'x', now: NOW }), '');
@@ -38,10 +38,10 @@ test('the credit line trims the name and keeps an Arabic name as it is', () => {
 test('group line: the drug count follows, "1 drug" for one, nothing invented when unknown', () => {
   const d = at(2026, 10, 12);
   assert.equal(groupCreditLine({ ownerName: 'X', createdAt: d, count: 12, now: NOW }), 'Created by X \u00b7 12 Nov \u00b7 12 drugs');
-  assert.equal(groupCreditLine({ ownerName: null, createdAt: d, count: 12, now: NOW }), 'Created 12 Nov \u00b7 12 drugs');
-  assert.equal(groupCreditLine({ ownerName: null, createdAt: d, count: 1, now: NOW }), 'Created 12 Nov \u00b7 1 drug');
-  assert.equal(groupCreditLine({ ownerName: null, createdAt: d, count: 0, now: NOW }), 'Created 12 Nov \u00b7 0 drugs');
-  assert.equal(groupCreditLine({ ownerName: null, createdAt: d, now: NOW }), 'Created 12 Nov');
+  assert.equal(groupCreditLine({ ownerName: null, ownerHandle: null, createdAt: d, count: 12, now: NOW }), 'Created 12 Nov \u00b7 12 drugs');
+  assert.equal(groupCreditLine({ ownerName: null, ownerHandle: null, createdAt: d, count: 1, now: NOW }), 'Created 12 Nov \u00b7 1 drug');
+  assert.equal(groupCreditLine({ ownerName: null, ownerHandle: null, createdAt: d, count: 0, now: NOW }), 'Created 12 Nov \u00b7 0 drugs');
+  assert.equal(groupCreditLine({ ownerName: null, ownerHandle: null, createdAt: d, now: NOW }), 'Created 12 Nov');
   assert.equal(groupCreditLine({ ownerName: null, createdAt: 'x', count: 3, now: NOW }), '3 drugs');
 });
 
@@ -99,12 +99,25 @@ test('bottom bar: owner first, then already saved, else the normal Save bar', ()
 test('reading the database answer: name, day and owner, with safe defaults', () => {
   const d = at(2026, 10, 12);
   assert.deepEqual(readCredit({ owner_name: ' Dr Sara ', created_at: d, is_owner: true, own_id: 'g1' }),
-    { ownerName: 'Dr Sara', createdAt: d, isOwner: true, ownId: 'g1' });
+    { ownerName: 'Dr Sara', ownerHandle: null, createdAt: d, isOwner: true, ownId: 'g1' });
   assert.deepEqual(readCredit({ owner_name: null, created_at: d }),
-    { ownerName: null, createdAt: d, isOwner: false, ownId: null });
+    { ownerName: null, ownerHandle: null, createdAt: d, isOwner: false, ownId: null });
   assert.deepEqual(readCredit({ owner_name: '  ', created_at: 'garbage' }),
-    { ownerName: null, createdAt: null, isOwner: false, ownId: null });
+    { ownerName: null, ownerHandle: null, createdAt: null, isOwner: false, ownId: null });
   for (const bad of [null, undefined, 'x', 5]) {
-    assert.deepEqual(readCredit(bad), { ownerName: null, createdAt: null, isOwner: false, ownId: null }, String(bad));
+    assert.deepEqual(readCredit(bad), { ownerName: null, ownerHandle: null, createdAt: null, isOwner: false, ownId: null }, String(bad));
   }
+});
+
+test('14.8: the username comes through only with the right shape; the name opens the profile only with both', () => {
+  assert.equal(readHandle({ owner_handle: ' sara-ahmed ' }), 'sara-ahmed');
+  for (const bad of [null, undefined, '', 'ab', 'Sara', 'sara_ahmed', '-sara', 'sara--a', 'a'.repeat(31), 7, {}, 'a b c']) {
+    assert.equal(readHandle({ owner_handle: bad }), null, String(bad));
+  }
+  assert.equal(readHandle(null), null);
+  assert.equal(readCredit({ owner_name: 'Sara', owner_handle: 'sara-ahmed' }).ownerHandle, 'sara-ahmed');
+  assert.equal(creditLinkHandle({ ownerName: 'Sara', ownerHandle: 'sara-ahmed' }), 'sara-ahmed');
+  assert.equal(creditLinkHandle({ ownerName: null, ownerHandle: 'sara-ahmed' }), null);
+  assert.equal(creditLinkHandle({ ownerName: 'Sara', ownerHandle: null }), null);
+  assert.equal(creditLinkHandle(), null);
 });

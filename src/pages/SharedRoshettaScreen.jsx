@@ -330,7 +330,8 @@ function SharedRoshettaBody({ code }) {
           name={roshetta.name}
           description={roshetta.description}
           specialty={roshetta.specialty}
-          credit={{ ownerName: roshetta.ownerName, createdAt: roshetta.createdAt }}
+          credit={{ ownerName: roshetta.ownerName, ownerHandle: roshetta.ownerHandle, createdAt: roshetta.createdAt }}
+          onOpenCredit={handle => openPage(ROUTES.PUBLIC_PROFILE(handle))}
           topLeft={topLeft}
           topRight={topRight}
         />

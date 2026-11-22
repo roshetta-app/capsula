@@ -16,7 +16,10 @@
  *                                  the Account row: { title, line }
  *   readOwner(raw)                 { isOwner, ownId } from what the database function returned
  *   readCredit(raw)                everything the shared pages read from the database answer:
- *                                  { ownerName, createdAt, isOwner, ownId }
+ *                                  { ownerName, ownerHandle, createdAt, isOwner, ownId }
+ *   readHandle(raw)                the owner's username if it has the right shape, else null (14.8)
+ *   creditLinkHandle({ ownerName, ownerHandle })
+ *                                  the username to open from "Created by", or null (needs a name too)
  *   findSavedCopy(items, code)     the saved copy that came from this link, or null
  *   sharedBarState({ kind, isOwner, ownId, savedId, savedCount, totalCount })
  *                                  what the bottom bar of a shared page shows:
@@ -75,11 +78,24 @@ export function readOwner(raw) {
   return { isOwner, ownId: isOwner ? raw.own_id : null };
 }
 
+// Step 14.8: the owner's username, sent only for an item that is on their profile. Anything that
+// does not look like a username (wrong shape, not text) counts as none, so no link is made from it.
+const HANDLE_SHAPE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+export function readHandle(raw) {
+  const h = raw && typeof raw.owner_handle === 'string' ? raw.owner_handle.trim() : '';
+  return h.length >= 3 && h.length <= 30 && HANDLE_SHAPE.test(h) ? h : null;
+}
+
+// The name opens the profile only when there is a name to show and a username to open.
+export function creditLinkHandle({ ownerName, ownerHandle } = {}) {
+  return cleanName(ownerName) && typeof ownerHandle === 'string' && ownerHandle ? ownerHandle : null;
+}
+
 export function readCredit(raw) {
   const r = raw && typeof raw === 'object' ? raw : {};
   const name = cleanName(r.owner_name);
   const created = typeof r.created_at === 'string' && dayText(r.created_at) !== '' ? r.created_at : null;
-  return { ownerName: name || null, createdAt: created, ...readOwner(r) };
+  return { ownerName: name || null, ownerHandle: readHandle(r), createdAt: created, ...readOwner(r) };
 }
 
 export function findSavedCopy(items, code) {

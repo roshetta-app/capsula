@@ -44,7 +44,7 @@ import HomeSyncLine, { LINE_H } from '../home/HomeSyncLine'
 import { SpecialtyIcon, useIsDark } from '../../utils/specialtyIcon'
 import { specialtyColors, specialtyHeaderText } from '../../utils/roshettaSpecialty'
 import { shortDateText } from '../../utils/roshettaShelfText'
-import { dayText } from '../../utils/shareCredit'
+import { dayText, creditLinkHandle } from '../../utils/shareCredit'
 import { ROSHETTA_DESCRIPTION_MAX } from '../../utils/roshettaRows'
 import { saveFailureMessage } from '../../utils/roshettaDetailsText'
 
@@ -52,7 +52,7 @@ const font = 'var(--font-body)'
 
 export default function RoshettaPadHeader({
   name, description = '', specialty = null, createdAt, updatedAt, credit = null,
-  topLeft, topRight, editable = false, onSaveDescription, onEditingChange, isPro = false,
+  topLeft, topRight, onOpenCredit, editable = false, onSaveDescription, onEditingChange, isPro = false,
   syncKind = '', syncText = '', syncActionLabel, onSyncAction,
 }) {
   const isDark = useIsDark()
@@ -67,6 +67,8 @@ export default function RoshettaPadHeader({
   const creditName = credit && typeof credit.ownerName === 'string' ? credit.ownerName.trim() : ''
   const creditDay = credit ? dayText(credit.createdAt) : ''
   const showCredit = !!(creditName || creditDay)
+  // 14.8: with a username the name opens that profile (onOpenCredit gets the username).
+  const creditHandle = onOpenCredit ? creditLinkHandle(credit || {}) : null
 
   const [syncActive, setSyncActive] = useState(false)   // a status message is showing
 
@@ -163,7 +165,10 @@ export default function RoshettaPadHeader({
                 : <CalendarDays size={12} strokeWidth={2} aria-hidden="true" style={{ flexShrink: 0, marginTop: 1 }} />}
               <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>
                 {creditName
-                  ? <>Created by{' '}<span dir="auto" style={{ fontWeight: 600, color: 'var(--color-text-secondary)' }}>{creditName}</span>{creditDay && ` \u00b7 ${creditDay}`}</>
+                  ? <>Created by{' '}{creditHandle
+                    ? <button type="button" dir="auto" onClick={() => onOpenCredit(creditHandle)}
+                        style={{ all: 'unset', cursor: 'pointer', fontWeight: 600, color: 'var(--color-text-secondary)', textDecoration: 'underline', textUnderlineOffset: 2 }}>{creditName}</button>
+                    : <span dir="auto" style={{ fontWeight: 600, color: 'var(--color-text-secondary)' }}>{creditName}</span>}{creditDay && ` \u00b7 ${creditDay}`}</>
                   : `Created ${creditDay}`}
               </span>
             </span>
