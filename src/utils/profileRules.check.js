@@ -148,17 +148,27 @@ test('30-day limits', () => {
   assert.equal(removedWaitDaysLeft({ handle: 'abc', public_removed_at: new Date(now).toISOString() }, now), 0)
 })
 
+test('all three physician values need a specialty; students and others do not', () => {
+  const base = { full_name: 'Sara', country: 'Egypt' }
+  for (const occupation of ['Specialist Physician', 'Junior Resident Physician', 'Senior Resident Physician']) {
+    assert.deepEqual(detailsMissing({ ...base, occupation }), ['specialty'])
+  }
+  for (const occupation of ['Medical Student', 'Pharmacist', 'Other']) {
+    assert.deepEqual(detailsMissing({ ...base, occupation }), [])
+  }
+})
+
 test('details complete: name, occupation, country (+ specialty for physicians); phone never required', () => {
   const base = { full_name: 'Sara Ahmed', occupation: 'pharmacist', country: 'EG' }
   assert.equal(detailsComplete(base), true)
   assert.deepEqual(detailsMissing({}), ['full_name', 'occupation', 'country'])
   assert.deepEqual(detailsMissing({ ...base, full_name: '  ' }), ['full_name'])
-  assert.deepEqual(detailsMissing({ ...base, occupation: 'physician' }), ['specialty'])
-  assert.equal(detailsComplete({ ...base, occupation: 'physician', specialty: 'Cardiology' }), true)
+  assert.deepEqual(detailsMissing({ ...base, occupation: 'Specialist Physician' }), ['specialty'])
+  assert.equal(detailsComplete({ ...base, occupation: 'Specialist Physician', specialty: 'Cardiology' }), true)
   assert.equal(detailsComplete({ ...base, phone_number: null, gender: null, governorate: null }), true)
   assert.deepEqual(detailsProgress({}), { done: 0, total: 3 })
   assert.deepEqual(detailsProgress(base), { done: 3, total: 3 })
-  assert.deepEqual(detailsProgress({ ...base, occupation: 'physician' }), { done: 3, total: 4 })
+  assert.deepEqual(detailsProgress({ ...base, occupation: 'Specialist Physician' }), { done: 3, total: 4 })
   assert.equal(detailsComplete(null), false)
   assert.equal(detailsComplete(undefined), false)
 })

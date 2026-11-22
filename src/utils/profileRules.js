@@ -29,7 +29,8 @@ const toLatinDigits = (s) => String(s ?? '').replace(/[٠-٩]/g, (c) => String(A
 const chars = (s) => Array.from(s).length // counts letters, not UTF-16 units
 
 // ---- flattening (same as profile_flatten in the database) ----
-const FLATTEN_DROP = /[\s.,'_­​-‏‪-‮⁠-⁤﻿ـً-ٰٟ-]/g
+// eslint-disable-next-line no-misleading-character-class -- the Arabic diacritic ranges are meant to be in this class
+const FLATTEN_DROP = /[\s.,'_\u00AD\u200B-\u200F\u202A-\u202E\u2060-\u2064\uFEFF\u0640\u064B-\u065F\u0670-]/g
 const FLATTEN_FROM = 'àáâãäåçèéêëìíîïñòóôõöùúûüýÿأإآٱىة10'
 const FLATTEN_TO = 'aaaaaaceeeeiiiinooooouuuuyyاااايهlo'
 const FLATTEN_MAP = new Map(Array.from(FLATTEN_FROM).map((c, i) => [c, Array.from(FLATTEN_TO)[i]]))
@@ -53,8 +54,10 @@ export function cleanHandle(raw) {
 }
 
 // ---- text rules (same order and codes as profile_text_issue) ----
-const NAME_CHARS = /^[A-Za-zÀ-ÖØ-öø-ÿء-ؿف-يً-ْ٠-٩ 0-9.,'-]+$/
-const BIO_CHARS = /^[A-Za-zÀ-ÖØ-öø-ÿء-ؿف-يً-ْ٠-٩،؛؟ 0-9.,'!?:;()&+/"-]+$/
+// eslint-disable-next-line no-misleading-character-class -- the Arabic diacritic ranges are meant to be in this class
+const NAME_CHARS = /^[A-Za-z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF\u0621-\u063F\u0641-\u064A\u064B-\u0652\u0660-\u0669 0-9.,'-]+$/
+// eslint-disable-next-line no-misleading-character-class -- the Arabic diacritic ranges are meant to be in this class
+const BIO_CHARS = /^[A-Za-z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF\u0621-\u063F\u0641-\u064A\u064B-\u0652\u0660-\u0669\u060C\u061B\u061F 0-9.,'!?:;()&+/"-]+$/
 const WEB_WORDS = /https?|www|:\/\//
 const WEB_DOMAIN = /[a-z0-9]\.(com|net|org|info|biz|io|me|co|app|link|ly|gl|xyz|eg|tv|cc|ws|to)([^a-z]|$)/
 
@@ -146,10 +149,10 @@ export function removedWaitDaysLeft(profile, now = Date.now()) {
 }
 
 // ---- the two states, worked out from filled-in data, never from a flag ----
-// CONFIRM against the wizard: which stored occupation value means a physician.
-export const PHYSICIAN_OCCUPATIONS = ['physician', 'doctor']
+// The three stored occupation values the wizard uses for physicians (ProfileWizard.jsx OCCUPATION_OPTIONS).
+export const PHYSICIAN_OCCUPATIONS = ['Specialist Physician', 'Junior Resident Physician', 'Senior Resident Physician']
 const filled = (v) => typeof v === 'string' && v.trim() !== ''
-export const isPhysician = (profile) => PHYSICIAN_OCCUPATIONS.includes(String(profile?.occupation ?? '').trim().toLowerCase())
+export const isPhysician = (profile) => PHYSICIAN_OCCUPATIONS.includes(String(profile?.occupation ?? '').trim())
 
 // Required: name, occupation, country (+ specialty for physicians). Phone, gender and governorate are never required.
 export function detailsMissing(profile) {
