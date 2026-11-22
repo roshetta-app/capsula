@@ -28,6 +28,10 @@ const ACTION_STYLES = {
   dismiss:       { bg: '#F3F4F6', color: '#374151', border: '#D1D5DB', label: 'Dismiss'       },
   appeal:        { bg: '#FEF9C3', color: '#854D0E', border: '#FDE047', label: 'Appeal'        },
   appeal_answer: { bg: '#DBEAFE', color: '#1E40AF', border: '#93C5FD', label: 'Appeal answer' },
+  // 14.9c-4b: turning a person's sharing off and on, and taking a username back (the database writes these itself)
+  sharing_off:   { bg: '#FEE2E2', color: '#991B1B', border: '#FCA5A5', label: 'Sharing off'   },
+  sharing_on:    { bg: '#D1FAE5', color: '#065F46', border: '#6EE7B7', label: 'Sharing restored' },
+  take_handle:   { bg: '#FEE2E2', color: '#991B1B', border: '#FCA5A5', label: 'Username taken back' },
 }
 
 const TABLE_LABELS = {
@@ -42,6 +46,8 @@ const TABLE_LABELS = {
   reports:          'Reports',
   blocked_words:    'Blocked words',
   profile_name_flags: 'Flagged profiles',
+  sharing_blocks:   'Sharing',
+  profiles:         'Profiles',
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

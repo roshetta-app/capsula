@@ -10,6 +10,9 @@
  * A Preview button on each card (step 14.9c-2) shows the reported thing's own words, read through the admin-only
  * database function admin_report_preview, so Hide and Dismiss are not decided from the name alone. The text is drawn
  * as plain text only.
+ * 14.9c-4b adds, on profile cards, the buttons Turn off sharing / Restore sharing / Take username back
+ * (components/admin/TakedownActions.jsx, rules in utils/takedownAdmin.js), a Sharing off tag, and below the cards the
+ * list of people whose sharing is turned off (SharingOffList), so Restore sharing is always reachable.
  */
 
 import { useEffect, useState } from 'react'
@@ -17,7 +20,11 @@ import { Link } from 'react-router-dom'
 import { RefreshCw, Flag, ExternalLink, Eye, EyeOff } from 'lucide-react'
 import AdminPageHeader from '../../components/admin/AdminPageHeader'
 import ConfirmModal from '../../components/admin/ConfirmModal'
+import TakedownActions from '../../components/admin/TakedownActions'
+import SharingOffList from '../../components/admin/SharingOffList'
 import { fetchReports, actOnReport, fetchPreview } from '../../utils/reportsAdminContent'
+import { fetchSharingOff } from '../../utils/takedownAdminContent'
+import { TAKEDOWN_WORDS } from '../../utils/takedownAdmin'
 import { rowView, confirmCopy, resultText, previewStatusText, REPORTS_WORDS, PREVIEW_WORDS } from '../../utils/reportsAdmin'
 
 const STATUS_STYLES = {
@@ -69,7 +76,7 @@ function PreviewBody({ preview }) {
   return preview.bio ? <div dir="auto" style={plainText}>{preview.bio}</div> : <div>{PREVIEW_WORDS.empty}</div>
 }
 
-function ReportCard({ row, busy, onAct }) {
+function ReportCard({ row, busy, onAct, sharingOff, onChanged }) {
   const v = rowView(row)
   const [pv, setPv] = useState({ open: false, status: 'idle', preview: null })
   async function togglePreview() {
@@ -91,9 +98,16 @@ function ReportCard({ row, busy, onAct }) {
           <div dir="auto" style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text-primary)', overflowWrap: 'anywhere' }}>{v.title}</div>
           <div dir="ltr" style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>{v.handleLine}</div>
         </div>
-        <span style={{ padding: '4px 10px', borderRadius: 'var(--radius-full)', fontSize: 12, fontWeight: 600, backgroundColor: status.bg, color: status.color }}>
-          {v.statusLabel}
-        </span>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'flex-end' }}>
+          {v.kind === 'profile' && sharingOff === true && (
+            <span style={{ padding: '4px 10px', borderRadius: 'var(--radius-full)', fontSize: 12, fontWeight: 600, backgroundColor: '#FEE2E2', color: '#991B1B' }}>
+              {TAKEDOWN_WORDS.tag}
+            </span>
+          )}
+          <span style={{ padding: '4px 10px', borderRadius: 'var(--radius-full)', fontSize: 12, fontWeight: 600, backgroundColor: status.bg, color: status.color }}>
+            {v.statusLabel}
+          </span>
+        </div>
       </div>
 
       {v.reasons.length > 0 && (
@@ -148,6 +162,16 @@ function ReportCard({ row, busy, onAct }) {
             {a.label}
           </button>
         ))}
+        {v.kind === 'profile' && (
+          <TakedownActions
+            profileId={row.targetId}
+            name={row.name}
+            handle={row.handle}
+            sharingOff={sharingOff}
+            disabled={busy}
+            onChanged={onChanged}
+          />
+        )}
         {v.profilePath && (
           <Link
             to={v.profilePath}
@@ -169,6 +193,7 @@ export default function ReportsManager() {
   const [pending, setPending] = useState(null)
   const [busyKey, setBusyKey] = useState(null)
   const [notice, setNotice] = useState('')
+  const [off, setOff] = useState({ status: 'loading', ids: [], people: [] })
 
   // Reading again: Refresh and a finished action bump this counter, which runs the effect below once more.
   const [reloadKey, setReloadKey] = useState(0)
@@ -184,6 +209,8 @@ export default function ReportsManager() {
       if (r.status === 'ok') setRows(r.rows)
       setStatus(r.status)
     })
+    // Who has sharing off is read on its own: a failed read never hides the reports.
+    fetchSharingOff().then((r) => { if (!cancelled) setOff(r) })
     return () => { cancelled = true }
   }, [reloadKey])
 
@@ -269,10 +296,14 @@ export default function ReportsManager() {
               row={row}
               busy={busyKey !== null}
               onAct={(action, r) => setPending({ action, row: r })}
+              sharingOff={off.status === 'ok' ? off.ids.includes(row.targetId) : null}
+              onChanged={reload}
             />
           ))}
         </div>
       )}
+
+      {status !== 'forbidden' && <SharingOffList off={off} onChanged={reload} />}
 
       <ConfirmModal
         isOpen={pending !== null}

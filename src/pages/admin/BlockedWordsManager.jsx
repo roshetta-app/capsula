@@ -7,6 +7,8 @@
  *
  * The rules and words live in utils/blockedWordsAdmin.js; the calls are utils/blockedWordsAdminContent.js.
  * Every name, username and word from the database is drawn as plain text, never as markup.
+ * 14.9c-4b adds, on each flagged profile, the buttons Turn off sharing / Restore sharing / Take username back
+ * (components/admin/TakedownActions.jsx, rules in utils/takedownAdmin.js) and a Sharing off tag.
  */
 
 import { useEffect, useState } from 'react'
@@ -14,8 +16,11 @@ import { Link } from 'react-router-dom'
 import { RefreshCw, Ban, ExternalLink } from 'lucide-react'
 import AdminPageHeader from '../../components/admin/AdminPageHeader'
 import ConfirmModal from '../../components/admin/ConfirmModal'
+import TakedownActions from '../../components/admin/TakedownActions'
 import { fetchBlockedWords, addWord, removeWord, clearFlags } from '../../utils/blockedWordsAdminContent'
 import { confirmCopy, resultText, BLOCKED_WORDS_WORDS as W, WORD_MAX } from '../../utils/blockedWordsAdmin'
+import { fetchSharingOff } from '../../utils/takedownAdminContent'
+import { TAKEDOWN_WORDS } from '../../utils/takedownAdmin'
 
 const buttonBase = {
   padding: 'var(--space-2) var(--space-3)', borderRadius: 'var(--radius-sm)', fontSize: 13, fontWeight: 600,
@@ -28,7 +33,7 @@ const card = {
 const plainText = { whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }
 const heading = { fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)', margin: 'var(--space-5) 0 var(--space-2)' }
 
-function FlagCard({ flag, busy, onClear }) {
+function FlagCard({ flag, busy, onClear, sharingOff, onChanged }) {
   return (
     <div style={card}>
       <div style={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
@@ -37,6 +42,11 @@ function FlagCard({ flag, busy, onClear }) {
         </span>
         {flag.handle && (
           <span dir="ltr" style={{ ...plainText, fontSize: 13, color: 'var(--color-text-secondary)' }}>@{flag.handle}</span>
+        )}
+        {sharingOff === true && (
+          <span style={{ padding: '3px 10px', borderRadius: 'var(--radius-full)', fontSize: 12, fontWeight: 600, backgroundColor: '#FEE2E2', color: '#991B1B' }}>
+            {TAKEDOWN_WORDS.tag}
+          </span>
         )}
       </div>
       {flag.words.length > 0 && (
@@ -63,6 +73,14 @@ function FlagCard({ flag, busy, onClear }) {
         >
           Clear flags
         </button>
+        <TakedownActions
+          profileId={flag.profileId}
+          name={flag.name}
+          handle={flag.handle}
+          sharingOff={sharingOff}
+          disabled={busy}
+          onChanged={onChanged}
+        />
         {flag.handle && (
           <Link
             to={`/u/${encodeURIComponent(flag.handle)}`}
@@ -86,6 +104,7 @@ export default function BlockedWordsManager() {
   const [pending, setPending] = useState(null)
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState('')
+  const [off, setOff] = useState({ status: 'loading', ids: [], people: [] })
 
   // Reading again: Refresh and a finished change bump this counter, which runs the effect below once more.
   const [reloadKey, setReloadKey] = useState(0)
@@ -101,6 +120,8 @@ export default function BlockedWordsManager() {
       if (r.status === 'ok') { setWords(r.words); setFlags(r.flags) }
       setStatus(r.status)
     })
+    // Who has sharing off is read on its own: a failed read never hides the flagged profiles.
+    fetchSharingOff().then((r) => { if (!cancelled) setOff(r) })
     return () => { cancelled = true }
   }, [reloadKey])
 
@@ -225,7 +246,14 @@ export default function BlockedWordsManager() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
               {flags.map(f => (
-                <FlagCard key={f.profileId} flag={f} busy={busy} onClear={(t) => setPending({ action: 'dismiss', target: t })} />
+                <FlagCard
+                  key={f.profileId}
+                  flag={f}
+                  busy={busy}
+                  onClear={(t) => setPending({ action: 'dismiss', target: t })}
+                  sharingOff={off.status === 'ok' ? off.ids.includes(f.profileId) : null}
+                  onChanged={reload}
+                />
               ))}
             </div>
           )}
