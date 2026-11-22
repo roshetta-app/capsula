@@ -11,6 +11,11 @@
  * (checked against the live reports table: the note stays after the report is closed and after the reporter
  * deletes the account; only the name is removed). No keeping time is stated because none is decided yet.
  *
+ * 2026-11-23 (Track H, step H5): the lines about anonymous unique view counts (checked against the live database:
+ * view_counts holds item, day and a number only; today's visitor codes are one-way hashes with a server secret, hold
+ * no account, and are cleared nightly; day numbers older than 90 days are added into one total per item; deleting a
+ * roshetta, a drug group or an account removes its counts). They replace the idea of "no visitor tracking".
+ *
  * Who runs Capsula and how to reach them are not known to the app. Fill in OPERATOR_NAME and
  * CONTACT_EMAIL below; while they are empty their lines are simply left out (nothing invented).
  */
@@ -78,6 +83,7 @@ export function termsSections(facts) {
       paragraphs: [
         'Everything is private unless you make it public. A public roshetta or drug group has a link and appears on your public profile with your name and username. Your profile also has its own link.',
         'Anyone with a link can view the item, save their own copy and change that copy. A copy belongs to whoever saved it, and changes they make do not change your original.',
+        'The person who made a public item can see an approximate count of how many visitors opened it, with repeat visits on the same day counted once. Capsula does not show who visited.',
         'Links you shared before public profiles existed keep working until you stop sharing them.',
         'Titles such as "Dr" are written by the person and are not checked by Capsula. You can use a nickname instead of your real name.',
         'When you make an item private, its link stops working for new visits at once. Someone who already opened it may still see what they loaded, and anyone who saved a copy keeps their copy.',
@@ -139,6 +145,7 @@ export function privacySections(facts) {
         'Notifications: a code that lets us send notifications to your device, with the type of device.',
         'Reports you send: which item or page, the reason and the day. The person who made the item never sees who reported. The people who run Capsula see how old the reporting accounts are, not who they are.',
         'Notes on page reports: when you report a problem on a Topic or drug page, the optional note (up to 300 letters) is kept with the report. Only the people who run Capsula see it. It is kept after the report is closed and after you delete your account, without your name.',
+        'View counts: for each public roshetta and drug group, how many visitors opened it each day, as a number only. The day by day numbers are held for 90 days and then added into one running total for that item. Only the person who made the item sees them. Your own visits while signed in are not counted.',
         'Crash records: the technical error and the app version. They are not linked to your account.',
         'Username checks: how many times you check whether a username is free, so that guessing can be stopped.',
       ],
@@ -149,12 +156,13 @@ export function privacySections(facts) {
         'Only what you make public: the items you choose, your name, your username, your bio and your avatar. Everything else stays private.',
         'The people who run Capsula can see your account details, including your phone number if you gave one.',
         'Opening a public link needs no account. We keep no list of who opened what. When someone looks up a username that does not exist, the lookup is counted under a scrambled code made from their address and the day, and this is cleared every night. It is used only to stop guessing.',
+        'We count visits without knowing who visited. After a public page has stayed open for a couple of seconds, one is added to its count for the day. To avoid counting the same visitor twice in a day, we keep a scrambled code made from the visitor\'s address, the item and the day, and a scrambled form of the address that limits how many items one address can add in a day. These codes cannot be turned back into the address, are not linked to any account, and are cleared every night. Nothing about the count is saved on the visitor\'s phone. The numbers are approximate: people on one shared network can count as one.',
       ],
     },
     {
       title: 'How we use it',
       paragraphs: [
-        'To run the app and keep your things in your account, to review reports, and to understand how the app is used.',
+        'To run the app and keep your things in your account, to review reports, to show owners how many visitors opened their public items, and to understand how the app is used.',
         'Your phone number is used to reach you about your plan. It is not used for offers unless you tick "Send me offers and deals", which is off until you choose it. We record the date you ticked it, and you can untick it at any time.',
       ],
     },
@@ -162,7 +170,7 @@ export function privacySections(facts) {
       title: 'Deleting your account',
       paragraphs: [
         'You can delete your account at any time from Edit profile. It is permanent.',
-        'Removed: your profile, roshettas and drug groups with their links, favourites, favourite classes, notes, search history, recent views and notification codes.',
+        'Removed: your profile, roshettas and drug groups with their links and view counts, favourites, favourite classes, notes, search history, recent views and notification codes.',
         'Stays: usage records, without your account attached (the device code and session code stay on them). Reports you sent, with any note you wrote, without your name. Your username, which stays reserved so nobody else can take it and old links never lead to someone else.',
         'If someone saved a copy of one of your public roshettas or drug groups, they keep their copy.',
       ],

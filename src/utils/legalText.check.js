@@ -87,6 +87,25 @@ test('the page-report lines say what the database really does with a report and 
     'after the report is closed', 'after you delete your account, without your name', 'with any note you wrote, without your name']) {
     assert.ok(p.includes(must), `Privacy: ${must}`);
   }
-  // No keeping time is decided yet, so the words must not promise one.
-  assert.doesNotMatch(t + p, /deleted after|removed after|kept for \d|within \d+ (days|months|years)/i);
+  // No keeping time is decided yet for report notes, so the lines about reports and notes must not promise one.
+  const reportLines = textOf(termsSections()).concat(textOf(privacySections())).filter((l) => /report|note/i.test(l)).join('\n');
+  assert.doesNotMatch(reportLines, /deleted after|removed after|kept for \d|held for \d|within \d+ (days|months|years)/i);
+});
+
+test('the view count lines say what the database really does and make no promise it does not keep (Track H, H5)', () => {
+  const t = textOf(termsSections()).join('\n');
+  for (const must of ['approximate count of how many visitors opened it', 'counted once', 'does not show who visited']) {
+    assert.ok(t.includes(must), `Terms: ${must}`);
+  }
+  const p = textOf(privacySections()).join('\n');
+  for (const must of [
+    'View counts:', 'as a number only', 'held for 90 days', 'one running total', 'Only the person who made the item sees them',
+    'Your own visits while signed in are not counted', 'We count visits without knowing who visited', 'couple of seconds',
+    'cannot be turned back into the address', 'not linked to any account', 'cleared every night',
+    'Nothing about the count is saved on the visitor', 'approximate', 'one shared network', 'with their links and view counts',
+  ]) assert.ok(p.includes(must), `Privacy: ${must}`);
+  // Counting is not hidden: the old idea of no visitor tracking at all would now be untrue.
+  assert.doesNotMatch(t + p, /no visitor tracking|never track|we do not track/i);
+  // A count is not a list: nothing says or implies the owner can see who looked.
+  assert.doesNotMatch(t + p, /who opened it|see who|who viewed|names of visitors/i);
 });
