@@ -82,6 +82,7 @@ import AccountScreen         from './pages/AccountScreen'
 import ProfileScreen         from './pages/ProfileScreen'
 import AccountEditScreen     from './pages/AccountEditScreen'
 import AccountFaqScreen      from './pages/AccountFaqScreen'
+import LegalScreen           from './pages/LegalScreen'
 import UnknownAddressScreen  from './pages/UnknownAddressScreen'
 
 // ─── Admin screens ────────────────────────────────────────────────────────────
@@ -153,6 +154,9 @@ export const ROUTES = {
   ACCOUNT_SETTINGS:  '/account/settings',
   ACCOUNT_EDIT:      '/account/edit',
   ACCOUNT_FAQ:       '/account/faq',
+  // 14.10 (2026-11-22): the Terms of Use and the Privacy Policy, opened from the Legal card in Settings.
+  ACCOUNT_TERMS:     '/account/terms',
+  ACCOUNT_PRIVACY:   '/account/privacy',
 
   // Admin
   ADMIN_LOGIN:            '/admin/login',
@@ -227,6 +231,8 @@ export function PublicRoutes() {
         <Route path="/account/settings"    element={<AccountScreen />} />
         <Route path="/account/edit"        element={<AccountEditScreen />} />
         <Route path="/account/faq"         element={<AccountFaqScreen />} />
+        <Route path="/account/terms"       element={<LegalScreen kind="terms" />} />
+        <Route path="/account/privacy"     element={<LegalScreen kind="privacy" />} />
 
         {/* Step 12.5: no dead ends. The four words below would otherwise be read as a drug with that
             name (/drugs/:slug), so they get their own routes: each is sent to the right list. Every

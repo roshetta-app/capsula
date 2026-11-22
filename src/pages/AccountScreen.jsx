@@ -577,14 +577,13 @@ export default function AccountScreen() {
     }
   }
 
-  // Contact Us, Report a Problem, Terms of Use, Privacy Policy — all stubs
-  // for now, no destinations decided yet. Deliberately no-ops rather than
-  // left unwired, so each row is real and tappable (matches the rest of
-  // the card) without pretending to go anywhere yet.
+  // Contact Us and Report a Problem — still stubs, no destinations decided yet. Deliberately no-ops
+  // rather than left unwired, so each row is real and tappable (matches the rest of the card)
+  // without pretending to go anywhere yet. Terms of Use and Privacy Policy open their pages (14.10).
   function handleContactUs() {}
   function handleReportProblem() {}
-  function handleTermsOfUse() {}
-  function handlePrivacyPolicy() {}
+  function handleTermsOfUse() { navigate(ROUTES.ACCOUNT_TERMS) }
+  function handlePrivacyPolicy() { navigate(ROUTES.ACCOUNT_PRIVACY) }
 
   // F10 Stage 2, Batch D, item 8g — the free-tier "Upgrade to Capsula PRO"
   // banner below was previously decorative (no onClick at all). This is the

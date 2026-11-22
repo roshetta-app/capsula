@@ -29,8 +29,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useBackClose } from '../../hooks/useBackClose'
+import { DELETE_ACCOUNT_WARNING } from '../../utils/legalText'
 
 const CONFIRM_WORD = 'DELETE'
+
+// 14.10: the warning lives in utils/legalText.js (checked against what deletion really does).
+// The confirm word inside it is drawn bold, as before.
+const WORD_AT = DELETE_ACCOUNT_WARNING.lastIndexOf(CONFIRM_WORD)
+const warningBefore = DELETE_ACCOUNT_WARNING.slice(0, WORD_AT)
+const warningAfter  = DELETE_ACCOUNT_WARNING.slice(WORD_AT + CONFIRM_WORD.length)
 
 export default function DeleteAccountSheet({ isOpen, onClose, onConfirm, busy = false }) {
   const overlayRef = useRef(null)
@@ -118,9 +125,7 @@ export default function DeleteAccountSheet({ isOpen, onClose, onConfirm, busy = 
           lineHeight: 1.55,
           color:      'var(--color-text-secondary)',
         }}>
-          This permanently deletes your profile, favourites, notes, and
-          history. This can't be undone. Type <strong>DELETE</strong> below
-          to confirm.
+          {warningBefore}<strong>{CONFIRM_WORD}</strong>{warningAfter}
         </p>
 
         <input

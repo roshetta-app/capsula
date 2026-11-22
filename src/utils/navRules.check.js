@@ -134,6 +134,8 @@ function legacyLabel(path) {
   if (/^\/roshetta\/[^/]+\/edit$/.test(path)) return 'Editor'
   if (path === '/account/edit') return 'Edit profile'
   if (path === '/account/faq') return 'FAQ'
+  if (path === '/account/terms') return 'Terms of Use'      // 14.10
+  if (path === '/account/privacy') return 'Privacy Policy'  // 14.10
   return null
 }
 
@@ -197,6 +199,17 @@ test('kinds, sign-in and shared pages', () => {
   assert.equal(laysBehind('/g/abc'), false)
   assert.equal(laysBehind('/drugs/x'), true)
   assert.equal(laysBehind('/nowhere'), false)
+})
+
+test('14.10: Terms of Use and Privacy Policy are pages under Settings, open to guests, with Settings behind them', () => {
+  for (const [path, name] of [['/account/terms', 'Terms of Use'], ['/account/privacy', 'Privacy Policy']]) {
+    assert.equal(kindOf(path), 'page', path)
+    assert.equal(needsSignIn(path), false, path)
+    assert.equal(parentPath(path), '/account/settings', path)
+    assert.equal(isMainScreen(path), false, path)
+    assert.equal(labelForPath(path), name, path)
+    assert.deepEqual(parentChain(path), [path, '/account/settings', '/account', '/'], path)
+  }
 })
 
 test('14.7a: Settings is a page under Profile (guests may open it), and Back from it goes to Profile', () => {

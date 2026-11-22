@@ -73,6 +73,9 @@ export const SCREENS = [
   { pattern: '/account/settings',          kind: 'page', parent: '/account',                 label: 'Settings',      signIn: false, laysBehind: true },
   { pattern: '/account/edit',              kind: 'edit', parent: '/account',                 label: 'Edit profile',           signIn: true,  laysBehind: true },
   { pattern: '/account/faq',               kind: 'page', parent: '/account/settings',        label: 'FAQ',           signIn: false, laysBehind: true },
+  // 14.10 (2026-11-22): the two legal pages are opened from Settings, like the FAQ.
+  { pattern: '/account/terms',             kind: 'page', parent: '/account/settings',        label: 'Terms of Use',  signIn: false, laysBehind: true },
+  { pattern: '/account/privacy',           kind: 'page', parent: '/account/settings',        label: 'Privacy Policy', signIn: false, laysBehind: true },
 ]
 
 // ─── Matching an address to its rule ──────────────────────────────────────────
