@@ -40,6 +40,8 @@ const TABLE_LABELS = {
   class_keywords:   'Class keywords',
   content_flags:    'Hidden items',
   reports:          'Reports',
+  blocked_words:    'Blocked words',
+  profile_name_flags: 'Flagged profiles',
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

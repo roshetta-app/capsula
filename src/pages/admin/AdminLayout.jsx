@@ -5,7 +5,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
   faHouse, faCapsules, faNotesMedical, faStethoscope, faTags,
   faChartBar, faBug, faBell, faClipboardList, faUsers, faRocket, faBullhorn, faRectangleList,
-  faMagnifyingGlass, faFlag,
+  faMagnifyingGlass, faFlag, faBan,
 } from '@fortawesome/free-solid-svg-icons'
 import { useAuth } from '../../hooks/useAuth'
 import useIsPhone from '../../hooks/useIsPhone'
@@ -67,6 +67,7 @@ const NAV_GROUPS = [
       { path: '/admin/users',         label: 'Users',         faIcon: faUsers },
       { path: '/admin/notifications', label: 'Notifications', faIcon: faBell },
       { path: '/admin/reports',       label: 'Reports',       faIcon: faFlag },
+      { path: '/admin/blocked-words', label: 'Blocked words', faIcon: faBan, indent: true },
     ],
   },
   {

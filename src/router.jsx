@@ -108,6 +108,7 @@ import ReleasesManager      from './pages/admin/ReleasesManager'
 import GatesManager         from './pages/admin/GatesManager'
 import HomeCardManager      from './pages/admin/HomeCardManager'
 import ReportsManager       from './pages/admin/ReportsManager'
+import BlockedWordsManager  from './pages/admin/BlockedWordsManager'
 import HomeScreen           from './pages/HomeScreen'
 
 // ─── Route path constants ─────────────────────────────────────────────────────
@@ -174,6 +175,7 @@ export const ROUTES = {
   ADMIN_MESSAGES:         '/admin/messages',
   ADMIN_HOME_CARD:        '/admin/home-card',
   ADMIN_REPORTS:          '/admin/reports',
+  ADMIN_BLOCKED_WORDS:    '/admin/blocked-words',
 }
 
 // ─── PublicRoutes — rendered inside the public provider branch in App.jsx ────
@@ -323,6 +325,9 @@ export function AdminRoutes() {
         />
         <Route path="/admin/reports"
           element={<ReportsManager />}
+        />
+        <Route path="/admin/blocked-words"
+          element={<BlockedWordsManager />}
         />
       </Route>
 
