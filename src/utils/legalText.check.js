@@ -76,3 +76,17 @@ test('the delete warning lists what goes and what stays, and still asks for DELE
     assert.ok(DELETE_ACCOUNT_WARNING.includes(must), `delete warning: ${must}`);
   }
 });
+
+test('the page-report lines say what the database really does with a report and its note (Track I, I6)', () => {
+  const t = textOf(termsSections()).join('\n');
+  for (const must of ['Topic or a drug page', 'never hides it', 'only reaches us', 'Do not put patient details']) {
+    assert.ok(t.includes(must), `Terms: ${must}`);
+  }
+  const p = textOf(privacySections()).join('\n');
+  for (const must of ['Notes on page reports', 'up to 300 letters', 'Only the people who run Capsula see it',
+    'after the report is closed', 'after you delete your account, without your name', 'with any note you wrote, without your name']) {
+    assert.ok(p.includes(must), `Privacy: ${must}`);
+  }
+  // No keeping time is decided yet, so the words must not promise one.
+  assert.doesNotMatch(t + p, /deleted after|removed after|kept for \d|within \d+ (days|months|years)/i);
+});

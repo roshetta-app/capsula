@@ -7,12 +7,15 @@
  * EVERY CLAIM BELOW WAS CHECKED AGAINST THE LIVE DATABASE AND THE APP ON 2026-11-22 (what is stored,
  * what deleting an account removes, what is public). When the app changes, this text changes with it:
  * the plan keeps the list of things to re-read (Track E1). It is NOT lawyer-reviewed yet (plan E2).
+ * 2026-11-23 (Track I, step I6): the lines about reports on Topic and drug pages and their optional note
+ * (checked against the live reports table: the note stays after the report is closed and after the reporter
+ * deletes the account; only the name is removed). No keeping time is stated because none is decided yet.
  *
  * Who runs Capsula and how to reach them are not known to the app. Fill in OPERATOR_NAME and
  * CONTACT_EMAIL below; while they are empty their lines are simply left out (nothing invented).
  */
 
-export const LEGAL_UPDATED = '2026-11-22'
+export const LEGAL_UPDATED = '2026-11-23'
 export const OPERATOR_NAME = ''
 export const CONTACT_EMAIL = ''
 
@@ -94,6 +97,7 @@ export function termsSections(facts) {
       title: 'Reports and removal',
       paragraphs: [
         'Anyone who is signed in can report a public roshetta, drug group or profile. The person who made it is never told who reported.',
+        'You can also report a problem on a Topic or a drug page: wrong information, something missing or something broken. You may add a short note in plain text. Do not put patient details or other personal information in it. A report about one of our own pages never hides it. It only reaches us, and we may not reply.',
         'A public roshetta or drug group is hidden automatically when enough different accounts report it. We can also hide any item or profile ourselves. A hidden item\'s link reads "Not available".',
         'If something of yours is hidden, your own page tells you and you can ask for one review. Our answer after that review is final.',
         'We may turn off public sharing for an account, or take a username back for good, without telling you first. Your account and your private things keep working.',
@@ -133,7 +137,8 @@ export function privacySections(facts) {
         'Your content: favourites, favourite classes, notes, roshettas, drug groups and their share links.',
         'Your activity: your drug search history and recently viewed items, and a usage record of what you open in the app, with a device code, a session code and the type of device.',
         'Notifications: a code that lets us send notifications to your device, with the type of device.',
-        'Reports you send: which item, the reason and the day. The person who made the item never sees who reported. The people who run Capsula see how old the reporting accounts are, not who they are.',
+        'Reports you send: which item or page, the reason and the day. The person who made the item never sees who reported. The people who run Capsula see how old the reporting accounts are, not who they are.',
+        'Notes on page reports: when you report a problem on a Topic or drug page, the optional note (up to 300 letters) is kept with the report. Only the people who run Capsula see it. It is kept after the report is closed and after you delete your account, without your name.',
         'Crash records: the technical error and the app version. They are not linked to your account.',
         'Username checks: how many times you check whether a username is free, so that guessing can be stopped.',
       ],
@@ -158,7 +163,7 @@ export function privacySections(facts) {
       paragraphs: [
         'You can delete your account at any time from Edit profile. It is permanent.',
         'Removed: your profile, roshettas and drug groups with their links, favourites, favourite classes, notes, search history, recent views and notification codes.',
-        'Stays: usage records, without your account attached (the device code and session code stay on them). Reports you sent, without your name. Your username, which stays reserved so nobody else can take it and old links never lead to someone else.',
+        'Stays: usage records, without your account attached (the device code and session code stay on them). Reports you sent, with any note you wrote, without your name. Your username, which stays reserved so nobody else can take it and old links never lead to someone else.',
         'If someone saved a copy of one of your public roshettas or drug groups, they keep their copy.',
       ],
     },
