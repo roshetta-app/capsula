@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  VIEW_WORDS, formatCount, parseViews, itemViewsLines, profileTiles, loadItemViews, loadProfileViews,
+  VIEW_WORDS, formatCount, parseViews, itemViewsLines, profileTiles, loadItemViews, loadProfileViews, savedLine,
 } from './ownerViews.js';
 
 const ID = '11111111-1111-1111-1111-111111111111';
@@ -59,7 +59,9 @@ test('the profile tiles: two tiles, and nothing when the numbers are not known',
 
 test('the words never name a visitor, promise a time or mention who looked', () => {
   const all = Object.values(VIEW_WORDS).join(' ').toLowerCase();
-  assert.ok(!/\b(who|visitor|visitors|people|viewed by)\b/.test(all));
+  assert.ok(!/\b(who|visitor|visitors|viewed by|names?)\b/.test(all));
+  // The one place people are counted: Saved by N people, a number and never a name.
+  assert.equal(VIEW_WORDS.savedMany, 'people');
   assert.ok(!/\b(within|hours|minutes|seconds)\b/.test(all));
   assert.ok(/approximate/.test(all));
 });
@@ -120,4 +122,37 @@ test('the new files never write to the phone (local storage, session storage, th
       .split('\n').filter(l => !/^\s*(\/\/|\*|\/\*)/.test(l)).join('\n');
     assert.ok(!/localStorage|sessionStorage|indexedDB|caches\.|\.setItem\(/.test(text), `${f} must not write to the phone`);
   }
+});
+
+test('Saved by N people (step H6): a count of copies only, shown when there is at least one, never a name', () => {
+  assert.equal(savedLine(0), null);
+  assert.equal(savedLine(undefined), null);
+  assert.equal(savedLine(null), null);
+  assert.equal(savedLine(-2), null);
+  assert.equal(savedLine('x'), null);
+  assert.equal(savedLine(1), 'Saved by 1 person');
+  assert.equal(savedLine(2), 'Saved by 2 people');
+  assert.equal(savedLine('1500'), 'Saved by 1,500 people');
+  // The answer keeps saved only when it is a real count; the old answer without it still parses exactly as before.
+  assert.deepEqual(parseViews({ status: 'ok', total: 8, last7: 3, saved: 2 }), { total: 8, last7: 3, saved: 2 });
+  assert.deepEqual(parseViews({ status: 'ok', total: 8, last7: 3, saved: 0 }), { total: 8, last7: 3, saved: 0 });
+  assert.deepEqual(parseViews({ status: 'ok', total: 8, last7: 3, saved: 'many' }), { total: 8, last7: 3 });
+  assert.deepEqual(parseViews({ status: 'ok', total: 8, last7: 3 }), { total: 8, last7: 3 });
+  // The box gets a third line only when someone saved a copy.
+  assert.equal(itemViewsLines({ total: 8, last7: 3, saved: 2 }).saved, 'Saved by 2 people');
+  assert.ok(!('saved' in itemViewsLines({ total: 8, last7: 3, saved: 0 })));
+  assert.ok(!('saved' in itemViewsLines({ total: 8, last7: 3 })));
+  // A link with copies but no counted views yet still says so.
+  const empty = itemViewsLines({ total: 0, last7: 0, saved: 1 });
+  assert.equal(empty.title, 'No views yet');
+  assert.equal(empty.saved, 'Saved by 1 person');
+  // The profile tiles do not carry it.
+  assert.equal(profileTiles({ total: 5, last7: 1, saved: 3 }).length, 2);
+});
+
+test('loadItemViews passes saved on; the profile total never has it', async () => {
+  const r = await loadItemViews('roshetta', ID, deps({ data: { status: 'ok', total: 8, last7: 3, saved: 4 }, error: null }));
+  assert.deepEqual(r, { status: 'ok', total: 8, last7: 3, saved: 4 });
+  const old = await loadItemViews('roshetta', ID, deps({ data: { status: 'ok', total: 8, last7: 3 }, error: null }));
+  assert.deepEqual(old, { status: 'ok', total: 8, last7: 3 });
 });

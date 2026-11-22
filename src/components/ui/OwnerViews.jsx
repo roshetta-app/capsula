@@ -2,7 +2,8 @@
  * src/components/ui/OwnerViews.jsx
  * 2026-11-23 (Track H, step H4): the owner's own view numbers, as drawn in H1.
  *   OwnerViewsBox    under the name on the person's roshetta page and drug group page: "N unique views" and
- *                    "N in the last 7 days · approximate", or "No views yet" on a new link.
+ *                    "N in the last 7 days · approximate", or "No views yet" on a new link; plus "Saved by N people"
+ *                    (H6) when someone has saved a copy.
  *   OwnerViewsTiles  on the Profile tab: two tiles (Unique views, Last 7 days) and "Approximate. Only you see
  *                    these numbers."
  * Both render nothing when the numbers are not known (offline, failed, no link): not knowing is not zero.
@@ -37,6 +38,9 @@ export function OwnerViewsBox({ views }) {
       <div style={{ minWidth: 0, flex: 1 }}>
         <div style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.3, color: 'var(--color-text-primary)' }}>{lines.title}</div>
         <div style={{ marginTop: 2, fontSize: 13, lineHeight: 1.4, color: 'var(--color-text-secondary)' }}>{lines.sub}</div>
+        {lines.saved && (
+          <div style={{ marginTop: 2, fontSize: 13, lineHeight: 1.4, fontWeight: 600, color: 'var(--color-text-secondary)' }}>{lines.saved}</div>
+        )}
       </div>
     </div>
   )

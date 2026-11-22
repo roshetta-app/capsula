@@ -9,6 +9,10 @@
  * Nothing in this file keeps anything on the phone. The numbers live in the page's memory only and are asked
  * again every time the page shows.
  *
+ * 2026-11-23 (Track H, step H6): an item's answer may also carry saved, the number of OTHER people who hold a
+ * copy made from the item's current link (Migration 9). Only a number: never who. An answer without it (the
+ * database not changed yet, or the profile total) simply shows no "Saved by" line.
+ *
  * The database facts this relies on (Migration 8, view_counts_h2):
  *   owner_item_views(p_kind, p_id)  { status: 'ok', total, last7 } for the caller's own roshetta or group;
  *                                   { status: 'not_found' } for anything else (stranger, unknown id, bad kind);
@@ -30,6 +34,8 @@ export const VIEW_WORDS = {
   noViewsLine: 'Views are counted when someone opens your link.',
   last7: 'in the last 7 days',
   approximate: 'approximate',
+  savedOne: 'Saved by 1 person',
+  savedMany: 'people',
   profileTotalLabel: 'Unique views',
   profileLast7Label: 'Last 7 days',
   profileNote: 'Approximate. Only you see these numbers.',
@@ -49,26 +55,44 @@ export function formatCount(n) {
   return String(whole).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
 }
 
-// The database answer as { total, last7 }, or null when it is not an ok answer with two real counts.
-// The last 7 days can never be more than the total, so a larger figure is cut down to it.
+// The database answer as { total, last7 } (plus saved when the answer has a real count of copies), or null when
+// it is not an ok answer with two real counts. The last 7 days can never be more than the total, so a larger
+// figure is cut down to it.
 export function parseViews(data) {
   if (!data || typeof data !== 'object' || data.status !== 'ok') return null
   const total = wholeCount(data.total)
   const last7 = wholeCount(data.last7)
   if (total === null || last7 === null) return null
-  return { total, last7: Math.min(last7, total) }
+  const out = { total, last7: Math.min(last7, total) }
+  const saved = wholeCount(data.saved)
+  if (saved !== null) out.saved = saved
+  return out
+}
+
+// "Saved by 3 people"; nothing when nobody has saved a copy or the number is not known.
+export function savedLine(saved) {
+  const n = wholeCount(saved)
+  if (n === null || n === 0) return null
+  return n === 1 ? VIEW_WORDS.savedOne : `Saved by ${formatCount(n)} ${VIEW_WORDS.savedMany}`
 }
 
 // What the item box says. A new link (no views at all) reads "No views yet" and one short line.
 export function itemViewsLines(views) {
   if (!views) return null
-  if (views.total === 0) return { empty: true, title: VIEW_WORDS.noViews, sub: VIEW_WORDS.noViewsLine }
-  const noun = views.total === 1 ? 'unique view' : 'unique views'
-  return {
-    empty: false,
-    title: `${formatCount(views.total)} ${noun}`,
-    sub: `${formatCount(views.last7)} ${VIEW_WORDS.last7} · ${VIEW_WORDS.approximate}`,
+  const saved = savedLine(views.saved)
+  let lines
+  if (views.total === 0) {
+    lines = { empty: true, title: VIEW_WORDS.noViews, sub: VIEW_WORDS.noViewsLine }
+  } else {
+    const noun = views.total === 1 ? 'unique view' : 'unique views'
+    lines = {
+      empty: false,
+      title: `${formatCount(views.total)} ${noun}`,
+      sub: `${formatCount(views.last7)} ${VIEW_WORDS.last7} · ${VIEW_WORDS.approximate}`,
+    }
   }
+  // A third line only when someone has saved a copy; the key is left out otherwise.
+  return saved ? { ...lines, saved } : lines
 }
 
 // The two tiles on the Profile tab.
