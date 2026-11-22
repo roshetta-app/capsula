@@ -59,6 +59,8 @@ import RoshettaPadHeader from '../components/roshettas/RoshettaPadHeader'
 import ShareRoshettaSheet from '../components/roshettas/ShareRoshettaSheet'
 import HiddenNotice from '../components/ui/HiddenNotice'
 import { useHiddenNotice } from '../hooks/useHiddenNotice'
+import { OwnerViewsBox } from '../components/ui/OwnerViews'
+import { useOwnerViews } from '../hooks/useOwnerViews'
 import RoshettaDetailsSheet from '../components/roshettas/RoshettaDetailsSheet'
 import PrescriptionSheetBlock from '../components/conditions/PrescriptionSheetBlock'
 import RoshettaPageSkeleton from '../components/roshettas/RoshettaPageSkeleton'
@@ -140,6 +142,8 @@ export default function RoshettaScreen() {
 
   // 14.9b-2: while a report has hidden this roshetta, its owner is told here and can ask for one review.
   const hidden = useHiddenNotice('roshetta', roshetta?.id)
+  // H4: the owner's unique view numbers, only while the roshetta has a live link and is not hidden (hidden items are not counted).
+  const ownerViews = useOwnerViews('roshetta', roshetta?.id, !!shareCode && !hidden.notice)
 
   // Learn once per roshetta whether it has a live link (online only; unknown counts as not shared).
   const roshettaId = roshetta?.id
@@ -382,6 +386,11 @@ export default function RoshettaScreen() {
           {hidden.notice && (
             <div style={{ marginBottom: 'var(--space-4)' }}>
               <HiddenNotice notice={hidden.notice} busy={hidden.busy} message={hidden.message} onAsk={hidden.ask} />
+            </div>
+          )}
+          {ownerViews && (
+            <div style={{ marginBottom: 'var(--space-4)' }}>
+              <OwnerViewsBox views={ownerViews} />
             </div>
           )}
           {isReadOnly && (

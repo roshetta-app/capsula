@@ -23,6 +23,8 @@ import { useAuth } from '../hooks/useAuth'
 import { usePublicProfile } from '../hooks/usePublicProfile'
 import { useHiddenNotice } from '../hooks/useHiddenNotice'
 import HiddenNotice from '../components/ui/HiddenNotice'
+import { OwnerViewsTiles } from '../components/ui/OwnerViews'
+import { useOwnerViews } from '../hooks/useOwnerViews'
 import PublicAvatar from '../components/ui/PublicAvatar'
 import PublicSetupSheet from '../components/ui/PublicSetupSheet'
 import AddToProfileSheet from '../components/ui/AddToProfileSheet'
@@ -147,6 +149,10 @@ export default function ProfileScreen() {
     fetchPublicProfile(handle).then((r) => { if (!cancelled) setPub(r) })
     return () => { cancelled = true }
   }, [signedIn, handle, authLoading, pubKey])
+
+  // H4: the person's total unique views over all their own items, asked only once the public profile shows
+  // (again every time the tab opens, never kept).
+  const ownerViews = useOwnerViews('profile', null, !!handle && pub.status === 'ok')
 
   // 14.7c-1: "Make private" from a card. Removing the share row ends the link at once and takes the
   // item off the profile; it throws on failure so the confirm sheet stays open and says so.
@@ -316,6 +322,7 @@ export default function ProfileScreen() {
               {PROFILE_WORDS.addToProfile}
             </button>
           </div>
+          <OwnerViewsTiles views={ownerViews} />
           <ProfileLists profile={pub.profile} own onAdd={openAdd} onMakePrivate={makePrivate} />
           <SafetyLine />
         </div>

@@ -87,6 +87,8 @@ import GroupEditorSheet from '../components/drugs/groups/GroupEditorSheet'
 import ShareGroupSheet from '../components/drugs/groups/ShareGroupSheet'
 import HiddenNotice from '../components/ui/HiddenNotice'
 import { useHiddenNotice } from '../hooks/useHiddenNotice'
+import { OwnerViewsBox } from '../components/ui/OwnerViews'
+import { useOwnerViews } from '../hooks/useOwnerViews'
 import GroupStateMessage from '../components/drugs/groups/GroupStateMessage'
 import GroupSyncStatus from '../components/drugs/groups/GroupSyncStatus'
 import FolderShell from '../components/drugs/groups/FolderShell'
@@ -180,6 +182,8 @@ export default function DrugGroupScreen() {
   const group = live ?? ((editorOpen || deleteOpen) ? snapshot : null)
   // 14.9b-2: while a report has hidden this group, its owner is told here and can ask for one review.
   const hidden = useHiddenNotice('group', group?.id)
+  // H4: the owner's unique view numbers, only while the group has a live link and is not hidden (hidden items are not counted).
+  const ownerViews = useOwnerViews('group', group?.id, !!shareCode && !hidden.notice)
 
   // Quick adds and removes are sent one after the other (step 12.4); 'ids' is the list as
   // the person's taps have left it.
@@ -499,6 +503,12 @@ export default function DrugGroupScreen() {
         {hidden.notice && (
           <div style={{ marginTop: 'var(--space-3)' }}>
             <HiddenNotice notice={hidden.notice} busy={hidden.busy} message={hidden.message} onAsk={hidden.ask} />
+          </div>
+        )}
+
+        {ownerViews && (
+          <div style={{ marginTop: 'var(--space-3)' }}>
+            <OwnerViewsBox views={ownerViews} />
           </div>
         )}
 
