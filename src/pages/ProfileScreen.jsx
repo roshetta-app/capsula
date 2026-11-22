@@ -64,7 +64,7 @@ function PillButton({ onClick, children }) {
       onClick={onClick}
       style={{
         padding: 'var(--space-2) var(--space-4)', borderRadius: 'var(--radius-full)', border: 'none',
-        backgroundColor: 'var(--color-accent)', color: '#fff', fontSize: 14, fontWeight: 600,
+        backgroundColor: 'var(--color-accent-solid)', color: '#fff', fontSize: 14, fontWeight: 600,
         fontFamily: 'var(--font-body)', cursor: 'pointer', WebkitTapHighlightColor: 'transparent',
       }}
     >
@@ -309,7 +309,7 @@ export default function ProfileScreen() {
               onClick={() => openAdd(null)}
               style={{
                 minHeight: 44, padding: '0 var(--space-4)', borderRadius: 'var(--radius-full)', border: 'none',
-                backgroundColor: 'var(--color-accent)', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer',
+                backgroundColor: 'var(--color-accent-solid)', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer',
                 fontFamily: 'var(--font-body)', WebkitTapHighlightColor: 'transparent',
               }}
             >

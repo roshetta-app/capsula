@@ -132,6 +132,7 @@ export function WizardDropdown({ value, onChange, options, placeholder = 'Select
               <input
                 ref={searchRef}
                 type="text"
+                dir="auto"
                 value={query}
                 onChange={e => setQuery(e.target.value)}
                 placeholder="Search…"
@@ -312,6 +313,7 @@ export function PhoneCodeSheet({ value, onSelect, onClose, isOpen }) {
             <input
               ref={searchRef}
               type="text"
+              dir="auto"
               value={query}
               onChange={e => setQuery(e.target.value)}
               placeholder="Search country or code…"
