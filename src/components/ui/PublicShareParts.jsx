@@ -82,13 +82,15 @@ function Line({ Icon, children }) {
  * Props:
  *   kind      'roshetta' | 'group'
  *   old       true for an old link (title and lines change; the link itself stays the same)
- *   canSetUp  true when a username exists; false shows "Set up your public profile first." instead of buttons
+ *   canSetUp  true when a username exists; false shows "Set up your public profile first." and, when onSetUp is
+ *             given (14.5b), a button that opens the setup sheet
  *   busy      true while saving
  *   refusal   a reason from the database (item_web, item_phone) to show under the lines, or null
  *   onConfirm () => void   Make public
+ *   onSetUp   () => void   opens the setup sheet (only used when canSetUp is false)
  *   onCancel  () => void   Not now
  */
-export function MakePublicPanel({ kind, old = false, canSetUp, busy = false, refusal = null, onConfirm, onCancel }) {
+export function MakePublicPanel({ kind, old = false, canSetUp, busy = false, refusal = null, onConfirm, onSetUp, onCancel }) {
   const noun = kind === 'group' ? 'group' : 'roshetta'
   const viewLine = kind === 'group'
     ? 'Anyone with the link can view this group: its name, description and drugs.'
@@ -130,9 +132,24 @@ export function MakePublicPanel({ kind, old = false, canSetUp, busy = false, ref
           {busy ? 'Making public\u2026' : 'Make public'}
         </button>
       ) : (
-        <p style={{ margin: 0, padding: '12px 14px', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-surface-muted)', fontSize: 15, fontWeight: 600, lineHeight: 1.4, color: 'var(--color-text-primary)', ...TEXT }}>
-          {SETUP_FIRST}
-        </p>
+        <>
+          <p style={{ margin: 0, padding: '12px 14px', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-surface-muted)', fontSize: 15, fontWeight: 600, lineHeight: 1.4, color: 'var(--color-text-primary)', ...TEXT }}>
+            {SETUP_FIRST}
+          </p>
+          {onSetUp && (
+            <button
+              type="button"
+              onClick={onSetUp}
+              style={{
+                width: '100%', minHeight: 48, marginTop: 'var(--space-3)', borderRadius: 'var(--radius-md)', border: 'none', cursor: 'pointer',
+                backgroundColor: 'var(--color-accent-solid)', color: '#fff', fontSize: 15, fontWeight: 600,
+                WebkitTapHighlightColor: 'transparent', outline: 'none', ...TEXT,
+              }}
+            >
+              Set up public profile
+            </button>
+          )}
+        </>
       )}
 
       <button

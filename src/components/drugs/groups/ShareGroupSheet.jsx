@@ -56,6 +56,7 @@ import ConfirmSheet from '../../ui/ConfirmSheet'
 import GroupStateMessage from './GroupStateMessage'
 import ShareNameRow from './ShareNameRow'
 import { VisibilityRow, OldLinkTag, MakePublicPanel } from '../../ui/PublicShareParts'
+import PublicSetupSheet from '../../ui/PublicSetupSheet'
 import { shareMode, canMakePublic, isItemRefusal, MAKE_PRIVATE_MESSAGE } from '../../../utils/publicShare'
 import { shimmer } from '../home/shimmer'
 import { useFavouritesContext } from '../../../context/FavouritesContext'
@@ -132,6 +133,8 @@ export default function ShareGroupSheet({ isOpen, onClose, group, onShareChange 
   const [attempt, setAttempt] = useState(0)
   const [busy, setBusy] = useState(false)
   const [stopOpen, setStopOpen] = useState(false)
+  // The setup sheet (14.5b): opened from "Set up public profile" when there is no username yet.
+  const [setupOpen, setSetupOpen] = useState(false)
   // nameInfo: null until known (or when it could not be read: then the switch is left out),
   // else { fullName, accountDefault }. showName: the switch for this group.
   const [nameInfo, setNameInfo] = useState(null)
@@ -141,7 +144,7 @@ export default function ShareGroupSheet({ isOpen, onClose, group, onShareChange 
   const [wasOpen, setWasOpen] = useState(false)
   if (isOpen !== wasOpen) {
     setWasOpen(isOpen)
-    if (isOpen) { setResult(null); setCopied(false); setAskOpen(false); setRefusal(null) }
+    if (isOpen) { setResult(null); setCopied(false); setAskOpen(false); setRefusal(null); setSetupOpen(false) }
   }
 
   const groupId = group?.id
@@ -173,6 +176,14 @@ export default function ShareGroupSheet({ isOpen, onClose, group, onShareChange 
   }
 
   // Make public: a new link already on the profile, or an old link moved onto it (same code).
+  // The setup sheet saved the public card (or it already existed): a username is there now, so
+  // carry on with Make public without another tap.
+  function handleSetupDone(card) {
+    setSetupOpen(false)
+    setNameInfo((n) => (n ? { ...n, fullName: card.name || n.fullName, hasHandle: true } : n))
+    handleMakePublic()
+  }
+
   async function handleMakePublic() {
     if (busy || !group) return
     setBusy(true)
@@ -260,6 +271,7 @@ export default function ShareGroupSheet({ isOpen, onClose, group, onShareChange 
             busy={busy}
             refusal={refusal}
             onConfirm={handleMakePublic}
+            onSetUp={() => setSetupOpen(true)}
             onCancel={() => { setAskOpen(false); setRefusal(null) }}
           />
         ) : (
@@ -278,6 +290,7 @@ export default function ShareGroupSheet({ isOpen, onClose, group, onShareChange 
         busy={busy}
         refusal={refusal}
         onConfirm={handleMakePublic}
+            onSetUp={() => setSetupOpen(true)}
         onCancel={() => { setAskOpen(false); setRefusal(null) }}
       />
     )
@@ -405,6 +418,8 @@ export default function ShareGroupSheet({ isOpen, onClose, group, onShareChange 
         </div>
         <div style={{ padding: '0 var(--space-4) var(--space-5)' }}>{body}</div>
       </SheetShell>
+
+      <PublicSetupSheet isOpen={setupOpen} onClose={() => setSetupOpen(false)} onDone={handleSetupDone} />
 
       <ConfirmSheet
         isOpen={stopOpen}
