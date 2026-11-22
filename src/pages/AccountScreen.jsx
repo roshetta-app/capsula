@@ -755,7 +755,7 @@ export default function AccountScreen() {
           </div>
 
           <button
-            onClick={() => navigate(ROUTES.ACCOUNT_EDIT)}
+            onClick={() => navigate(ROUTES.ACCOUNT_EDIT, { state: { group: 'details' } })}
             onPointerDown={() => setEditPressed(true)}
             onPointerUp={() => setEditPressed(false)}
             onPointerLeave={() => setEditPressed(false)}

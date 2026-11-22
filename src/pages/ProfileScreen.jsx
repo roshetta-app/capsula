@@ -30,6 +30,7 @@ import { fetchPublicProfile } from '../utils/publicProfile'
 import { PROFILE_WORDS } from '../utils/profileView'
 import { shimmer } from '../components/drugs/home/shimmer'
 import { ROUTES } from '../router'
+import { supabase } from '../lib/supabase'
 import {
   profileTabView, statusForFailure, heroLines, detailsPercent, TAB_WORDS,
 } from '../utils/profileTab'
@@ -143,6 +144,15 @@ export default function ProfileScreen() {
     return () => { cancelled = true }
   }, [signedIn, handle, authLoading, pubKey])
 
+  // 14.7c-1: "Make private" from a card. Removing the share row ends the link at once and takes the
+  // item off the profile; it throws on failure so the confirm sheet stays open and says so.
+  async function makePrivate(tabKey, item) {
+    const table = tabKey === 'groups' ? 'drug_group_shares' : 'roshetta_shares'
+    const { error } = await supabase.from(table).delete().eq('share_code', item.code)
+    if (error) throw error
+    reloadPub()
+  }
+
   function reloadPub() {
     setPub({ status: 'loading' })
     setPubKey((n) => n + 1)
@@ -219,7 +229,7 @@ export default function ProfileScreen() {
       {view === 'details' && (
         <button
           type="button"
-          onClick={() => navigate(ROUTES.ACCOUNT_EDIT, { state: { openWizard: true } })}
+          onClick={() => navigate(ROUTES.ACCOUNT_EDIT, { state: { group: 'details' } })}
           style={{
             ...CARD, width: '100%', display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
             textAlign: 'left', cursor: 'pointer', fontFamily: 'var(--font-body)',
@@ -275,6 +285,17 @@ export default function ProfileScreen() {
             <ShareProfileButton name={pub.profile.name} handle={pub.profile.handle} />
             <button
               type="button"
+              onClick={() => navigate(ROUTES.ACCOUNT_EDIT, { state: { group: 'public' } })}
+              style={{
+                minHeight: 44, padding: '0 var(--space-4)', borderRadius: 'var(--radius-full)', border: '1px solid var(--color-border)',
+                backgroundColor: 'var(--color-surface)', color: 'var(--color-text-primary)', fontSize: 14, fontWeight: 600, cursor: 'pointer',
+                fontFamily: 'var(--font-body)', WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              Edit profile
+            </button>
+            <button
+              type="button"
               onClick={() => openAdd(null)}
               style={{
                 minHeight: 44, padding: '0 var(--space-4)', borderRadius: 'var(--radius-full)', border: 'none',
@@ -285,7 +306,7 @@ export default function ProfileScreen() {
               {PROFILE_WORDS.addToProfile}
             </button>
           </div>
-          <ProfileLists profile={pub.profile} own onAdd={openAdd} />
+          <ProfileLists profile={pub.profile} own onAdd={openAdd} onMakePrivate={makePrivate} />
           <SafetyLine />
         </div>
       )}

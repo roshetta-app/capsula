@@ -1,514 +1,234 @@
 /**
  * src/pages/AccountEditScreen.jsx
- * Phase F13 Mini-stage 5 (Account redesign)
- * account-edit-view-mode (2026-08-22): added the read-only view + pencil-
- * to-edit shell (see below).
- * profile-wizard-redesign: the previous flat single-page edit form is
- * replaced by the shared ProfileWizard.jsx (2-step: personal, then
- * professional/location) — this file is now a thin wrapper: it fetches
- * the profile, renders read-only rows for every field in view mode, and
- * renders <ProfileWizard> pre-filled when editing. The wizard owns its
- * own fields/validation/conditional-logic/step navigation; this screen
- * only owns the fetch, the save call, and the view/edit shell around it.
+ * 2026-11-22 (public profile plan, step 14.7c-1): the ONE Edit screen. It replaces the read-only view +
+ * pencil + two-step wizard. Same screen from every entry point (Profile tab, Settings "Account details",
+ * the first sign-in), two groups:
  *
- * Rendered outside the shared Layout group (see router.jsx) — own
- * back-arrow header, no BottomNav, same convention as
- * ConditionDetailScreen/DrugDetailScreen.
+ *   Your details                       occupation (+ specialty), country, gender, phone (optional);
+ *                                      line: "Not shown on your public profile"
+ *   Shown on your public profile       name, username, avatar, bio, "Old addresses keep working"
+ *                                      (the name sits here: it is asked once and is also the public name)
  *
- * Reachable only from a signed-in AccountScreen row; if somehow reached
- * while signed out (e.g. a stale bookmark), redirects back to /account
- * rather than rendering a broken form with no user id to load against.
+ * Welcome mode (first sign-in only, while profile_setup_dismissed is still false): the name, occupation
+ * (+ specialty) and country only, with a Skip. Skip and finishing both land on the Profile tab.
+ * profile_setup_dismissed has one job: it stops the welcome from opening again.
  *
- * account-screen-redesign — after a successful save, also calls
- * AuthContext's refreshProfile() so the name shown on AccountScreen (now
- * read from shared Context, not its own fetch) updates immediately
- * instead of only after a full sign-out/sign-in.
- *
- * profile-wizard-redesign — the view mode + pencil shell survives, but is
- * skipped automatically the first time: if the loaded profile still has
- * profile_setup_dismissed = false (first-time signup, routed here by
- * ProfileSetupRedirect.jsx in place of the old modal), this screen opens
- * straight into the wizard instead of the view. Existing users who have
- * already completed setup keep the normal view-first, pencil-to-edit
- * flow. Completing the wizard from either path always writes
- * profile_setup_dismissed = true, same effect the old modal's Save had.
- *
- * account-edit-redesign (2026-08-22):
- *   - Wizard now renders full-width in edit mode — the bordered/padded
- *     card wrapper around <ProfileWizard> was dropped. The wizard fills
- *     the screen directly under the header (nav chrome, unchanged).
- *   - Read-only view redesigned: hero header (avatar + name + occupation)
- *     up top, then two grouped, icon-led sections below — Personal
- *     (gender, phone, email, country, governorate) and Professional
- *     (occupation, specialty/student type). Replaces the old flat
- *     undifferentiated ProfileValue stack. Tap target stays pencil-only
- *     (unchanged) — tapping the row body does not open the wizard.
- *   - Empty/conditional fields (Specialty, Student type, Governorate) no
- *     longer hide their row when not applicable — they always render,
- *     showing "Not set" like every other empty field.
- *   - Sticky header restyled to match AccountScreen.jsx's title bar:
- *     backgroundColor var(--color-bg), no border — was
- *     var(--color-surface) with a borderBottom.
- *   - Added a skeleton placeholder shown while profileLoading is true.
- *     Previously this state rendered nothing (blank gap under the
- *     header) until the fetch resolved.
- * account-header-tweaks (2026-08-23) — The mandatory first-time wizard
- *     view (editing && !canCancel — no saved profile to cancel back to)
- *     now shows a friendly "Tell us a bit more about yourself" title
- *     instead of "Manage Profile", and drops the back arrow entirely —
- *     nothing meaningful to navigate back to on a first-time signup, and
- *     the wizard's own Skip button already covers leaving this view.
- *     Existing users editing via the pencil icon see no change.
- * header-skip-country-tweaks (2026-08-23) — Reverses the account-edit-
- *     redesign (2026-08-22) call above for Governorate, Specialty, and
- *     Student type specifically: those three hide their row again when
- *     not applicable, instead of always showing an empty "Not set" row.
- *     Country and Occupation are unaffected and always render. (The
- *     "Other" occupation showing its typed-in specification instead of
- *     the literal word "Other" was already handled by occupationDisplay
- *     below — no change needed there.)
- * governorate-collection-removed (2026-08-23), same-day follow-up —
- *     Governorate is no longer collected or shown at all: removed from
- *     EMPTY_FIELDS, the loaded-profile mapping, and the read-only view
- *     (Country is now last in the Personal group). Country alone is kept.
- * manage-profile-reopens-wizard-fix (2026-08-23) — Fixed: the forced
- *     first-time wizard's footer Back button used to navigate away via
- *     `onBack` without ever persisting profileSetupDismissed, so opening
- *     Manage Profile again always forced the same wizard right back up,
- *     with no visible reason why. onBack is now undefined for that flow —
- *     Skip for now is the only step-1 exit, and it does persist the
- *     dismissal. Existing users (canCancel true) are unaffected.
- * unify-profile-avatar (2026-08-25) — ProfileHero's hand-built avatar
- *     circle (photo-with-initials-fallback, broken-image handling) is now
- *     the shared ProfileAvatar.jsx component, also used by
- *     AccountScreen.jsx and ProfileWizard.jsx, so the three screens can't
- *     drift out of sync with each other again. This screen's circle grows
- *     from 64px to the standard 72px, and its one-letter initials become
- *     two, matching the other two screens. ReadOnlySkeleton's placeholder
- *     circle is bumped to 72px too, so there's no layout jump when the
- *     real avatar loads in.
- * welcome-header-skip (2026-08-25) — First-time signup header: title text
- *     replaced with the app logo (the actual grab-attention welcome
- *     headline moved down into ProfileWizard's own body, above Personal
- *     info, where there's room for it — see that file). The "Skip for
- *     now" link also moved here, into the header's top-right corner
- *     (previously a small text link next to the Step 1/2 progress bar in
- *     the wizard body) — same handleSkip action as before, just
- *     relocated to where people expect a Skip option on a welcome
- *     screen, and where this header already had empty space for the
- *     first-time case. Existing users editing via the pencil icon are
- *     unaffected either way — this only changes the forced first-time path.
- *
- * offline-profile-account (2026-09-01) — this screen used to run its own
- * separate fetchOwnProfile() call, independent of (and without) the
- * offline-safe caching AuthContext.jsx already has for everything else in
- * the app. Offline, that call simply failed, was swallowed silently, and
- * left every field blank — including profileSetupDismissed, which then
- * forced this screen straight into the first-time wizard, making an
- * already-set-up person look brand new. This screen now reads its fields
- * from AuthContext's shared `profile` instead (same offline-safe data
- * AccountScreen already relies on) and no longer makes its own fetch at
- * all. It also now blocks editing outright while offline (pencil and
- * Delete Account both disabled with a short message) rather than letting
- * someone open the wizard, type changes, and have Save silently fail.
- *
- * Logo caching fix (this session) — the first-time-setup header's logo
- * <img> was hardcoded to '/logo.svg', missing the /capsula/ base path
- * every other logo reference in the app already applies. Switched to
- * `${import.meta.env.BASE_URL}logo.svg`, matching layout.jsx and
- * ConditionsScreen.jsx, so this request is now covered by sw.js's
- * existing cache-first rule for the app logo instead of hitting the
- * network on every visit to this screen.
+ * Two separate saves, details first (utils/editProfile.js, utils/profileData.js): a refusal of the public
+ * part leaves the details saved and says so under the field. Offline, the screen says so and saving waits
+ * for the connection (nothing is queued). The chosen avatar is shown here, never the sign-in photo.
+ * Delete account stays at the bottom (not in welcome). Remove public profile comes in 14.7c-2.
+ * The rules live in utils/editProfile.js; the old wizard file is retired in 14.7c-2.
  */
 
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { ArrowLeft, Pencil, X, User, Phone, Mail, MapPin, Stethoscope, HeartPulse, GraduationCap, Trash2, WifiOff } from 'lucide-react'
+import { ArrowLeft, Mail, Stethoscope, PenLine, HeartPulse, GraduationCap, MapPin, User, Phone, Trash2, WifiOff, ChevronDown, Contact } from 'lucide-react'
+import { validatePhoneNumberLength } from 'libphonenumber-js'
 import { useAuth } from '../hooks/useAuth'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
 import { useBackClose } from '../hooks/useBackClose'
 import { useToast } from '../context/ToastContext'
+import { usePublicProfile } from '../hooks/usePublicProfile'
 import { supabase } from '../lib/supabase'
-import { updateOwnProfile, deleteOwnAccount } from '../lib/queries'
+import { deleteOwnAccount } from '../lib/queries'
 import { ROUTES } from '../router'
-import ProfileWizard from '../components/ProfileWizard'
-import ProfileAvatar from '../components/ui/ProfileAvatar'
+import PublicAvatar from '../components/ui/PublicAvatar'
 import DeleteAccountSheet from '../components/ui/DeleteAccountSheet'
 import ConfirmSheet from '../components/ui/ConfirmSheet'
+import PublicSetupSheet from '../components/ui/PublicSetupSheet'
+import GroupStateMessage from '../components/drugs/groups/GroupStateMessage'
+import { shimmer } from '../components/drugs/home/shimmer'
+import PublicFieldsGroup from '../components/profile/PublicFieldsGroup'
+import { WizardField, WizardDropdown, PhoneCodeSheet, PillInput, wizardCardStyle, fieldIconStyle } from '../components/profile/FormParts'
+import {
+  GENDER_OPTIONS, OCCUPATION_OPTIONS, STUDENT_TYPE_OPTIONS, SPECIALTY_OPTIONS, COUNTRY_OPTIONS,
+  DIAL_TO_ISO2, formatPhoneDisplay,
+} from '../utils/profileOptions'
+import { handleChangeDaysLeft } from '../utils/profileRules'
+import {
+  valuesFromRow, applyChange, visibleFields, detailsProblems, detailsPayload, publicPayload, publicProblems,
+  fieldForPublicRefusal, hasChanges, hasHandle, mergeDetails, groupFromState, NOT_PUBLIC_LINE, PHONE_HELP,
+} from '../utils/editProfile'
 
-const EMPTY_FIELDS = {
-  fullName:              '',
-  gender:                '',
-  phoneCountryCode:      '',
-  phoneNumber:           '',
-  occupation:            '',
-  occupationOther:       '',
-  specialty:             '',
-  studentType:           '',
-  country:               '',
-  profileSetupDismissed: false,
-}
+const TEXT = { fontFamily: 'var(--font-body)' }
+const iconProps = { size: 14, strokeWidth: 1.8, color: 'var(--color-text-secondary)', style: fieldIconStyle }
+const OFFLINE_SAVE = "You're offline. Reconnect to save."
+const SECTION_TITLE = { margin: '0 0 var(--space-1)', fontSize: 18, fontWeight: 700, color: 'var(--color-text-primary)', ...TEXT }
+const SECTION_LINE = { margin: '0 0 var(--space-3)', fontSize: 13, lineHeight: 1.4, color: 'var(--color-text-secondary)', ...TEXT }
 
-const GENDER_LABELS = {
-  male:         'Male',
-  female:       'Female',
-  undisclosed:  'Prefer not to say',
-}
-
-function GroupLabel({ children }) {
+function EditSkeleton() {
   return (
-    <p style={{
-      fontSize:      11,
-      color:         'var(--color-text-tertiary)',
-      letterSpacing: '0.02em',
-      textTransform: 'uppercase',
-      margin:        '0 0 var(--space-2)',
-      padding:       '0 var(--space-1)',
-    }}>
-      {children}
-    </p>
-  )
-}
-
-function ReadOnlyRow({ icon, label, value, last }) {
-  return (
-    <div style={{
-      display:      'flex',
-      alignItems:   'center',
-      gap:          'var(--space-3)',
-      padding:      'var(--space-3) var(--space-1)',
-      borderBottom: last ? 'none' : '1px solid var(--color-border)',
-    }}>
-      <span style={{ display: 'flex', color: 'var(--color-text-secondary)', flexShrink: 0 }}>
-        {icon}
-      </span>
-      <span style={{
-        fontSize: 13,
-        color:    'var(--color-text-secondary)',
-        flex:     1,
-      }}>
-        {label}
-      </span>
-      <span style={{
-        fontSize: 13,
-        color:    value ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
-      }}>
-        {value || 'Not set'}
-      </span>
-    </div>
-  )
-}
-
-function ReadOnlyGroup({ children }) {
-  return (
-    <div style={{
-      backgroundColor: 'var(--color-surface)',
-      borderRadius:    'var(--radius-lg)',
-      border:          '1px solid var(--color-border)',
-      padding:         '0 var(--space-4)',
-      marginBottom:    'var(--space-5)',
-    }}>
-      {children}
-    </div>
-  )
-}
-
-function ProfileHero({ user, fullName, occupationLine }) {
-  return (
-    <div style={{
-      display:       'flex',
-      flexDirection: 'column',
-      alignItems:    'center',
-      textAlign:     'center',
-      marginBottom:  'var(--space-6)',
-    }}>
-      {/* unify-profile-avatar: shared ProfileAvatar component — see that
-          file for the photo/initials/broken-image-fallback logic, now
-          common to this screen, Account screen, and Profile Wizard.
-          marginBottom keeps this screen's original spacing to the
-          name/occupation text below it. */}
-      <ProfileAvatar user={user} fullName={fullName} style={{ marginBottom: 'var(--space-3)' }} />
-      <h2 style={{
-        margin:     0,
-        fontSize:   17,
-        fontWeight: 700,
-        color:      'var(--color-text-primary)',
-      }}>
-        {fullName || 'Not set'}
-      </h2>
-      {occupationLine && (
-        <p style={{
-          margin:    'var(--space-1) 0 0',
-          fontSize:  13,
-          color:     'var(--color-text-secondary)',
-        }}>
-          {occupationLine}
-        </p>
-      )}
-    </div>
-  )
-}
-
-function ReadOnlySkeleton() {
-  // Phase 12.1 (Back-Button & State-Audit merged plan) — was a local
-  // .capsula-skeleton class + capsulaSkeletonPulse keyframes defined
-  // right here; now uses the shared .shimmer class (src/styles/globals.css)
-  // that ConditionsScreen/AccountScreen already use, so this reads as the
-  // same animation system app-wide instead of a slightly different one.
-  return (
-    <div>
-      <div style={{
-        display:       'flex',
-        flexDirection: 'column',
-        alignItems:    'center',
-        marginBottom:  'var(--space-6)',
-      }}>
-        <div className="shimmer" style={{ width: 72, height: 72, borderRadius: 'var(--radius-full)', marginBottom: 'var(--space-3)' }} />
-        <div className="shimmer" style={{ width: 140, height: 16, marginBottom: 'var(--space-2)' }} />
-        <div className="shimmer" style={{ width: 100, height: 12 }} />
-      </div>
-
-      {[5, 2].map((rowCount, groupIdx) => (
-        <div key={groupIdx} style={{
-          backgroundColor: 'var(--color-surface)',
-          borderRadius:    'var(--radius-lg)',
-          border:          '1px solid var(--color-border)',
-          padding:         '0 var(--space-4)',
-          marginBottom:    'var(--space-5)',
-        }}>
-          {Array.from({ length: rowCount }).map((_, i) => (
-            <div key={i} style={{
-              display:      'flex',
-              alignItems:   'center',
-              gap:          'var(--space-3)',
-              padding:      'var(--space-3) var(--space-1)',
-              borderBottom: i === rowCount - 1 ? 'none' : '1px solid var(--color-border)',
-            }}>
-              <div className="shimmer" style={{ width: 17, height: 17, flexShrink: 0 }} />
-              <div className="shimmer" style={{ width: '40%', height: 12 }} />
-            </div>
-          ))}
-        </div>
-      ))}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: 'var(--space-2) 0' }}>
+      <div style={shimmer({ width: 72, height: 72, borderRadius: '50%', alignSelf: 'center' })} />
+      <div style={shimmer({ width: '100%', height: 48 })} />
+      <div style={shimmer({ width: '100%', height: 48 })} />
+      <div style={shimmer({ width: '100%', height: 48 })} />
     </div>
   )
 }
 
 export default function AccountEditScreen() {
   const { user, profile, loading, refreshProfile, signOut } = useAuth()
-  // offline-profile-account (2026-09-01) — used to gate editing/deleting
-  // outright while offline, and to explain why those actions are disabled.
+  const userId = user?.id ?? null
   const { isOnline } = useOnlineStatus()
   const isOffline = !isOnline
   const { toast } = useToast()
   const navigate = useNavigate()
   const location = useLocation()
-  // open-wizard-directly: AccountScreen's completeness nudge passes this
-  // flag via router state so tapping it always opens the wizard, even for
-  // someone who already dismissed setup once (e.g. via Skip) — previously
-  // the wizard only opened automatically when profileSetupDismissed was
-  // still false, so tapping the banner after a Skip landed on the
-  // read-only view instead of the wizard it promised.
-  const openWizard = location.state?.openWizard === true
+  const { loadProfile, savePublicCard, saveDetails } = usePublicProfile()
 
-  // offline-profile-account (2026-09-01) — `saved` is now derived directly
-  // from AuthContext's shared `profile` on every render instead of being
-  // its own separately-fetched state. That `profile` already carries every
-  // field this screen needs (see AuthContext.jsx) and already has the
-  // offline-safe cache fallback built in, so there is no longer a second,
-  // independent fetch here that can fail differently (or silently) than
-  // the rest of the app. While `profile` hasn't loaded yet, this reads as
-  // EMPTY_FIELDS, same blank starting point as before.
-  const saved = profile ? {
-    fullName:              profile.fullName ?? '',
-    gender:                profile.gender ?? '',
-    phoneCountryCode:      profile.phoneCountryCode ?? '',
-    phoneNumber:           profile.phoneNumber ?? '',
-    occupation:            profile.occupation ?? '',
-    occupationOther:       profile.occupationOther ?? '',
-    specialty:             profile.specialty ?? '',
-    studentType:           profile.studentType ?? '',
-    country:               profile.country ?? '',
-    profileSetupDismissed: profile.profileSetupDismissed ?? false,
-  } : EMPTY_FIELDS
+  // Welcome mode is decided once, when the sign-in has settled, from the same flag the first-run
+  // redirect reads. Saving or skipping flips the flag, which must not change the screen under the person.
+  const [welcome, setWelcome] = useState(null)
+  if (welcome === null && !loading && user) setWelcome(profile ? !profile.profileSetupDismissed : false)
+  const inWelcome = welcome === true
 
-  const [editing, setEditing] = useState(false)
-  // profile-danger-zone: sheet open state + a busy flag so the confirm
-  // button can show "Deleting…" and disable itself while the request is
-  // in flight, same convention as AccountScreen's sign-out confirm.
-  const [deleteSheetOpen, setDeleteSheetOpen] = useState(false)
-  const [deleting, setDeleting]               = useState(false)
-  // welcome-header-skip: header-level Skip link's busy state, guards
-  // against a double-tap firing handleSkip twice while it's in flight.
-  // Previously this lived inside ProfileWizard itself, alongside its own
-  // Skip for now link — moved here along with the link, see header below.
+  // status: 'loading' | 'ready' | 'offline' | 'error'
+  const [status, setStatus] = useState('loading')
+  const [row, setRow] = useState(null)
+  const [saved, setSaved] = useState(null)
+  const [values, setValues] = useState(null)
+  const [errors, setErrors] = useState({})
+  const [saving, setSaving] = useState(false)
   const [skipping, setSkipping] = useState(false)
+  const [attempt, setAttempt] = useState(0)
+  const [phoneSheetOpen, setPhoneSheetOpen] = useState(false)
+  const [setupOpen, setSetupOpen] = useState(false)
+  const [deleteSheetOpen, setDeleteSheetOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [unsavedOpen, setUnsavedOpen] = useState(false)
+  const pendingExitRef = useRef(null) // 'back' | 'skip'
+  const publicRef = useRef(null)
+  const group = groupFromState(location.state)
 
-  // Phase 8 (2026-09-10): canCancel/isFirstTimeSetup moved up from below
-  // the loading/user early-return guards — purely a reordering, same
-  // values, same dependencies (editing, saved.profileSetupDismissed),
-  // neither of which depends on loading/user. Needed here because
-  // useBackClose (a hook) can't be called after a conditional return.
-  const canCancel = editing && saved.profileSetupDismissed
-  const isFirstTimeSetup = editing && !canCancel
-
-  // Phase 8.1: during the forced first-time wizard there's no back arrow
-  // and no Cancel (X) — the header's Skip action (see handleSkipAction
-  // below) is the one intended way out. Without this, the device back
-  // button/gesture fell through to default routing instead, leaving the
-  // forced setup through an unintended path. Guard is only active while
-  // isFirstTimeSetup is true — normal editing (canCancel true) and the
-  // read-only view are both unaffected.
-  useBackClose(isFirstTimeSetup, () => attemptExit('skip'))
-
-  // Phase 12 (Back-Button & State-Audit merged plan) — mirrors the guard
-  // above, but for the normal pencil-icon edit flow (canCancel true): back
-  // closes the edit view the same way the X button does, instead of
-  // falling through to whatever the device's default back action would
-  // otherwise be. Both guards route through attemptExit (below) rather
-  // than calling their exit action directly, so an in-progress, unsaved
-  // change gets the same confirmation every exit path shares.
-  useBackClose(canCancel, () => attemptExit('cancel'))
-
-  // Phase 12 — tracks whether the open ProfileWizard has any unsaved
-  // changes (reported by its own onDirtyChange prop — see that file,
-  // since `values` itself lives entirely inside it) and gates every exit
-  // path (X button, the two back-close guards above, "I'll do it later")
-  // behind one shared confirmation instead of silently discarding
-  // whatever was typed.
-  const [isDirty, setIsDirty] = useState(false)
-  const [unsavedConfirmOpen, setUnsavedConfirmOpen] = useState(false)
-  const pendingExitRef = useRef(null) // 'cancel' | 'skip'
-
-  // Runs the actual exit action. For 'skip' this returns handleSkipAction's
-  // promise so ConfirmSheet's existing async support (Phase 3) can show
-  // "Working…" and a real connection-error message if it fails offline,
-  // instead of closing optimistically — same pattern Phase 11 already uses
-  // for FavouritesScreen's removal confirm.
-  function runExit(action) {
-    if (action === 'skip') return handleSkipAction()
-    handleCancelEdit()
-  }
-
-  function attemptExit(action) {
-    if (isDirty) {
-      pendingExitRef.current = action
-      setUnsavedConfirmOpen(true)
-      return
-    }
-    runExit(action)
-  }
-
-  function handleConfirmDiscard() {
-    return runExit(pendingExitRef.current)
-  }
-
-  // offline-profile-account (2026-09-01) — decides once per signed-in
-  // user whether to auto-open the wizard (first-time signup, or the
-  // completeness nudge asking for it), same once-per-user guard pattern
-  // ProfileSetupRedirect.jsx already uses. Previously this lived inside
-  // the old local-fetch effect and ran once the fetch resolved; now that
-  // `saved` comes from shared, already-loading `profile`, this just waits
-  // on that same `loading` flag instead.
-  const initialEditCheckRef = useRef(null)
-
+  // Signed out (a stale bookmark): nothing to edit.
   useEffect(() => {
-    if (!user || loading) return
-    if (initialEditCheckRef.current === user.id) return
-    initialEditCheckRef.current = user.id
-    if (!saved.profileSetupDismissed || openWizard) setEditing(true)
-  }, [user, loading, saved.profileSetupDismissed, openWizard])
+    if (!loading && !user) navigate(ROUTES.ACCOUNT, { replace: true })
+  }, [loading, user, navigate])
 
-  function handleStartEdit() {
-    // offline-profile-account (2026-09-01): the Edit button itself is
-    // disabled while offline (see the header button below) — this guard
-    // is just defensive in case handleStartEdit is ever reached another
-    // way, so editing can never open without a connection to save to.
-    if (isOffline) return
-    setEditing(true)
+  // The row is read from the server every time the screen opens (the details and the public card together).
+  useEffect(() => {
+    if (!userId) return
+    let cancelled = false
+    ;(async () => {
+      const r = await loadProfile()
+      if (cancelled) return
+      if (!r.ok) { setStatus(r.kind === 'retry' ? 'offline' : 'error'); return }
+      const v = valuesFromRow(r.profile)
+      setRow(r.profile)
+      setSaved(v)
+      setValues(v)
+      setErrors({})
+      setStatus('ready')
+    })()
+    return () => { cancelled = true }
+  }, [userId, attempt, loadProfile])
+
+  // Opened at the group that was asked for.
+  useEffect(() => {
+    if (status === 'ready' && group === 'public') publicRef.current?.scrollIntoView({ block: 'start' })
+  }, [status, group])
+
+  function retry() { setStatus('loading'); setAttempt((a) => a + 1) }
+
+  const ready = status === 'ready' && values && saved
+  const isDirty = ready ? hasChanges(values, saved) : false
+  const show = ready ? visibleFields(values, { welcome: inWelcome }) : null
+  const handleDaysLeft = row ? handleChangeDaysLeft(row) : 0
+  const liveProblems = ready ? publicProblems(values, saved, { savedRow: row }) : {}
+
+  function change(field, value) {
+    setValues((v) => applyChange(v, field, value))
+    const key = field === 'fullName' ? 'name' : field === 'avatarCode' ? 'avatar' : field === 'phoneNumber' || field === 'phoneCountryCode' ? 'phone' : field
+    setErrors((e) => {
+      if (!e[key] && !e.general) return e
+      const next = { ...e }
+      delete next[key]
+      delete next.general
+      return next
+    })
   }
 
-  // Only offered once setup has already been completed at least once —
-  // for the forced first-time wizard there's no saved view to cancel
-  // back to, so the header doesn't show an X in that case (see canCancel).
-  function handleCancelEdit() {
-    setEditing(false)
-  }
-
-  // profile-nudge-system: lets a first-time signup bail out of the
-  // wizard without finishing it. Persists profile_setup_dismissed alone
-  // — deliberately skips the wizard's own step1Valid/step2Valid checks,
-  // since the whole point is to let someone leave without having filled
-  // anything in. AccountScreen's own persistent nudge (driven by the
-  // actual field values, independent of this flag) picks up from here
-  // for anyone who still has required fields missing.
-  async function handleSkip() {
-    // offline-profile-account (2026-09-01): this writes to the server, so
-    // it can't succeed offline — tell the person plainly instead of
-    // attempting it and failing silently. No dedicated error UI slot for
-    // this header-level action (unlike Save below), so a toast is the
-    // clearest way to surface it here.
-    if (isOffline) {
-      toast.error("You're offline — reconnect to continue.")
-      return
-    }
-    await updateOwnProfile(supabase, user.id, { profileSetupDismissed: true })
-    await refreshProfile()
-    navigate(ROUTES.ACCOUNT)
-  }
-
-  // Phase 8.1: shared guarded wrapper around handleSkip, used by both the
-  // header button's onClick (below) and useBackClose above — same
-  // busy/double-fire guard either way, so pressing back mid-request
-  // behaves identically to tapping the button mid-request rather than
-  // firing handleSkip a second time.
-  async function handleSkipAction() {
+  // ── Leaving ────────────────────────────────────────────────────────────────
+  async function finishSkip() {
     if (skipping) return
+    if (isOffline) { toast.error("You're offline. Reconnect to continue."); return }
     setSkipping(true)
     try {
-      await handleSkip()
+      const res = await saveDetails({ profile_setup_dismissed: true }, { hasHandle: hasHandle(saved ?? {}) })
+      if (!res.ok) { toast.error(res.message ?? 'Could not skip. Try again.'); return }
+      await refreshProfile()
+      navigate(ROUTES.ACCOUNT)
     } finally {
-      // handleSkip navigates away on success, so this mostly only matters
-      // if it throws — keeps the button from getting stuck disabled/busy
-      // on a failed attempt.
       setSkipping(false)
     }
   }
 
-  async function handleWizardComplete(values) {
-    // offline-profile-account (2026-09-01): covers going offline after
-    // the wizard was already opened while online — Save is otherwise
-    // still reachable in that case. Throwing here surfaces through
-    // ProfileWizard's own existing saving/error state (it already awaits
-    // onComplete and shows err.message), so no new error UI is needed.
-    if (isOffline) {
-      throw new Error("You're offline — reconnect to save changes.")
-    }
-    await updateOwnProfile(supabase, user.id, {
-      ...values,
-      profileSetupDismissed: true,
-    })
-    await refreshProfile()
-    setEditing(false)
-    toast.success('Profile saved')
+  function runExit(action) {
+    if (action === 'skip') return finishSkip()
+    // Edit stays behind the Profile tab (Back rules, 14.7a).
+    navigate(ROUTES.ACCOUNT)
+    return undefined
   }
 
-  // profile-danger-zone: permanently deletes the account (server-side —
-  // see delete-account/index.ts for what it removes) then reuses
-  // AuthContext's own signOut(), which already clears local notes/
-  // recently-viewed storage, rather than duplicating that cleanup here.
-  // The account no longer exists at this point regardless of outcome, so
-  // there's nothing meaningful left to cancel back to on success — this
-  // always ends at the signed-out /account screen.
-  async function handleDeleteAccount() {
-    // offline-profile-account (2026-09-01): the Delete Account button is
-    // disabled while offline (see the Danger Zone section below) — this
-    // guard is just defensive, so a delete attempt can never fire without
-    // a connection.
-    if (isOffline) {
-      toast.error("You're offline — reconnect to delete your account.")
-      return
+  function attemptExit(action) {
+    if (isDirty) { pendingExitRef.current = action; setUnsavedOpen(true); return }
+    if (action === 'back') { navigate(-1); return }
+    runExit(action)
+  }
+
+  // Welcome: back means Skip (as before). Otherwise back only needs a guard while something is unsaved.
+  useBackClose(inWelcome, () => attemptExit('skip'))
+  useBackClose(!inWelcome && isDirty, () => attemptExit('back'))
+
+  // ── Saving ─────────────────────────────────────────────────────────────────
+  async function handleSave() {
+    if (saving || !ready) return
+    if (isOffline) { setErrors({ general: OFFLINE_SAVE }); return }
+    const dProblems = detailsProblems(values, { welcome: inWelcome })
+    const pProblems = publicProblems(values, saved, { savedRow: row })
+    const first = {
+      ...(dProblems.fullName ? { name: dProblems.fullName } : {}),
+      ...(dProblems.occupation ? { occupation: dProblems.occupation } : {}),
+      ...(dProblems.occupationOther ? { occupationOther: dProblems.occupationOther } : {}),
+      ...(dProblems.specialty ? { specialty: dProblems.specialty } : {}),
+      ...(dProblems.country ? { country: dProblems.country } : {}),
+      ...(dProblems.phone ? { phone: dProblems.phone } : {}),
+      ...pProblems,
     }
+    if (Object.keys(first).length > 0) { setErrors(first); return }
+
+    setSaving(true)
+    setErrors({})
+    try {
+      const d = await saveDetails(detailsPayload(values, { welcome: inWelcome }), { hasHandle: hasHandle(saved) })
+      if (!d.ok) { setErrors({ general: d.message }); return }
+
+      const payload = publicPayload(values, saved, { savedRow: row })
+      if (payload) {
+        const p = await savePublicCard(payload, values.fullName)
+        if (!p.ok || p.waiting) {
+          // The details are saved; the public part was not. Say where, keep what was typed.
+          setSaved((s) => mergeDetails(s, values))
+          const where = p.ok ? 'general' : fieldForPublicRefusal(p)
+          const message = p.ok ? 'No connection. Your public changes were not saved. Try again.' : p.message
+          setErrors({ [where]: message })
+          refreshProfile()
+          return
+        }
+      }
+
+      await refreshProfile()
+      setSaved(values)
+      toast.success('Profile saved')
+      navigate(ROUTES.ACCOUNT)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleDeleteAccount() {
+    if (isOffline) { toast.error("You're offline. Reconnect to delete your account."); return }
     setDeleting(true)
     const { error } = await deleteOwnAccount(supabase)
     if (error) {
@@ -522,343 +242,266 @@ export default function AccountEditScreen() {
     navigate(ROUTES.ACCOUNT, { replace: true })
   }
 
-  // Wait for the initial session check to resolve before deciding whether
-  // to redirect. useAuth() starts with user=null until its session check
-  // finishes (loading stays true until then) — checking !user alone here
-  // fired this redirect on the brief null tick every single mount, even
-  // for an already-signed-in user, sending them straight back to /account
-  // before the real session ever had a chance to load (bug fix, 2026-08-21).
-  //
-  // Phase 12.1 (Back-Button & State-Audit merged plan) — this used to be a
-  // separate `if (loading) return null` above this check, which blanked
-  // the whole screen (header included) while loading, and meant
-  // ReadOnlySkeleton below could never actually render — by the time
-  // execution reached it, loading was already guaranteed false. Folded
-  // into one check: the redirect-race protection is unchanged (still only
-  // fires once loading has resolved), but the header/main now render
-  // during the loading tick too, so `loading ? <ReadOnlySkeleton /> : ...`
-  // further down actually shows the skeleton instead of a blank screen.
-  // Signed out (stale bookmark, deep link, etc.) — nothing to edit.
-  if (!loading && !user) {
-    navigate(ROUTES.ACCOUNT, { replace: true })
-    return null
-  }
-
-  // account-header-tweaks (2026-08-23): the mandatory first-time wizard
-  // (no saved profile to cancel back to — same condition canCancel above
-  // already keys off) gets its own friendly title instead of the normal
-  // "Manage Profile" header, and drops the back arrow since there's
-  // nothing meaningful to go back to on a first-time signup — the header's
-  // own Skip button (see welcome-header-skip below) is already the escape
-  // hatch for this view. (canCancel/isFirstTimeSetup themselves are
-  // computed further up now — see Phase 8 note above.)
-
-  const genderLabel = GENDER_LABELS[saved.gender] || ''
-  const phoneLabel = saved.phoneNumber ? `${saved.phoneCountryCode} ${saved.phoneNumber}` : ''
-  const isPhysician = saved.occupation === 'Specialist Physician' || saved.occupation === 'Junior Resident Physician' || saved.occupation === 'Senior Resident Physician'
-  const isStudent = saved.occupation === 'Medical Student'
-  // Same display rules as ProfileWizard's OCCUPATION_OPTIONS: "Medical
-  // Student" shows as "Student", and "Other" shows the person's own typed
-  // text instead of the literal word "Other".
-  const occupationDisplay = saved.occupation === 'Other'
-    ? (saved.occupationOther || 'Other')
-    : isStudent
-      ? 'Student'
-      : saved.occupation
-  const occupationLine = isPhysician && saved.specialty
-    ? `${occupationDisplay} \u00b7 ${saved.specialty}`
-    : occupationDisplay || ''
+  const busy = saving || skipping
+  const logo = `${import.meta.env.BASE_URL}logo.svg`
 
   return (
     <div>
       <header style={{
-        position:        'sticky',
-        top:             0,
-        zIndex:          50,
-        backgroundColor: 'var(--color-bg)',
-        padding:         'var(--space-5) var(--page-gutter, var(--space-4)) var(--space-3)',
-        display:         'flex',
-        alignItems:      'center',
-        justifyContent:  'space-between',
-        gap:             'var(--space-3)',
+        position: 'sticky', top: 0, zIndex: 50, backgroundColor: 'var(--color-bg)',
+        padding: 'var(--space-5) var(--page-gutter, var(--space-4)) var(--space-3)',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-          {!isFirstTimeSetup && (
+          {!inWelcome && (
             <button
-              onClick={() => navigate(-1)}
+              type="button"
+              onClick={() => attemptExit('back')}
               aria-label="Back"
-              style={{
-                border:          'none',
-                background:      'none',
-                padding:         'var(--space-1)',
-                display:         'flex',
-                alignItems:      'center',
-                cursor:          'pointer',
-                color:           'var(--color-text-primary)',
-              }}
+              style={{ border: 'none', background: 'none', padding: 'var(--space-1)', display: 'flex', alignItems: 'center', cursor: 'pointer', color: 'var(--color-text-primary)' }}
             >
               <ArrowLeft size={22} />
             </button>
           )}
-          {isFirstTimeSetup ? (
-            // welcome-header-logo: app logo in place of a plain "Welcome"
-            // text label — public/logo.svg, served from the app's public
-            // folder root, same as favicon/icons already are. Sized to sit
-            // comfortably in this same slim header bar; nudge the height if
-            // it looks off once you see it on device.
-            //
-            // Logo caching fix (this session): was hardcoded '/logo.svg',
-            // missing the site's /capsula/ base path that every other logo
-            // reference (layout.jsx, ConditionsScreen.jsx) already applies
-            // via import.meta.env.BASE_URL. That meant this one request
-            // never matched the service worker's PUBLIC_ROOT_CACHE_FIRST
-            // rule for '/capsula/logo.svg' — it fell straight through
-            // sw.js's fetch handler uncached, refetching from the network
-            // on every single visit to this first-time-setup header,
-            // instead of being served from cache like the app's other logo
-            // usages already are.
-            <img src={`${import.meta.env.BASE_URL}logo.svg`} alt="Capsula" style={{ height: 24, width: 'auto' }} />
+          {inWelcome ? (
+            <img src={logo} alt="Capsula" style={{ height: 24, width: 'auto' }} />
           ) : (
-            <h1 style={{
-              margin:     0,
-              fontSize:   17,
-              fontWeight: 700,
-              color:      'var(--color-text-primary)',
-            }}>
-              Manage Profile
-            </h1>
+            <h1 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--color-text-primary)' }}>Edit profile</h1>
           )}
         </div>
 
-        {!loading && (
-          canCancel ? (
-            <button
-              onClick={() => attemptExit('cancel')}
-              aria-label="Cancel editing"
-              style={{
-                border:     'none',
-                background: 'none',
-                padding:    'var(--space-1)',
-                display:    'flex',
-                alignItems: 'center',
-                cursor:     'pointer',
-                color:      'var(--color-text-secondary)',
-                flexShrink: 0,
-              }}
-            >
-              <X size={20} strokeWidth={1.8} />
-            </button>
-          ) : isFirstTimeSetup ? (
-            // welcome-header-skip: moved here from inside the wizard body
-            // (was a quiet text link next to the Step 1/2 progress bar,
-            // easy to miss under the avatar/name field above it) — the
-            // top-right corner of a welcome screen is the spot people
-            // already expect a Skip option, and it was sitting empty here
-            // for this exact case (no back arrow, no Edit/Cancel button).
-            //
-            // Phase 8.2 (2026-09-10): renamed "Skip" → "I'll do it later"
-            // and restyled from a plain underlined text link to a bordered
-            // pill, so it reads as a deliberate choice rather than
-            // something easy to tap by accident or overlook entirely.
-            // onClick now goes through the shared handleSkipAction (also
-            // used by Phase 8.1's back-button guard above) instead of its
-            // own inline copy of the same guard logic.
-            // Phase 12: now routed through attemptExit, same as the X
-            // button and both back-close guards, so an unsaved change
-            // gets the same confirmation here too.
-            <button
-              onClick={() => attemptExit('skip')}
-              disabled={skipping}
-              aria-label="I'll do it later"
-              style={{
-                border:                  '1px solid var(--color-border)',
-                borderRadius:            'var(--radius-full)',
-                background:              'var(--color-surface)',
-                padding:                 '6px 12px',
-                fontSize:                13,
-                fontWeight:              600,
-                fontFamily:              'var(--font-body)',
-                color:                   'var(--color-text-secondary)',
-                cursor:                  skipping ? 'default' : 'pointer',
-                opacity:                 skipping ? 0.6 : 1,
-                flexShrink:              0,
-                WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              {skipping ? 'Skipping…' : "I'll do it later"}
-            </button>
-          ) : (!editing && (
-            // offline-profile-account (2026-09-01): disabled outright
-            // while offline rather than letting someone open the wizard
-            // and have Save fail — see the notice under the profile
-            // header below for the explanation shown alongside this.
-            <button
-              onClick={handleStartEdit}
-              disabled={isOffline}
-              aria-label="Edit profile"
-              style={{
-                display:                 'flex',
-                alignItems:              'center',
-                gap:                     6,
-                border:                  'none',
-                backgroundColor:         isOffline ? 'var(--color-border)' : 'var(--color-accent-light)',
-                borderRadius:            999,
-                padding:                 'var(--space-1) var(--space-3)',
-                cursor:                  isOffline ? 'not-allowed' : 'pointer',
-                color:                   isOffline ? 'var(--color-text-tertiary)' : 'var(--color-accent)',
-                fontSize:                13,
-                fontWeight:              600,
-                fontFamily:              'var(--font-body)',
-                flexShrink:              0,
-                WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              <Pencil size={15} strokeWidth={1.8} />
-              Edit
-            </button>
-          ))
+        {inWelcome && !loading && (
+          <button
+            type="button"
+            onClick={() => attemptExit('skip')}
+            disabled={skipping}
+            aria-label="I'll do it later"
+            style={{
+              border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', background: 'var(--color-surface)',
+              padding: '6px 12px', fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-body)', color: 'var(--color-text-secondary)',
+              cursor: skipping ? 'default' : 'pointer', opacity: skipping ? 0.6 : 1, flexShrink: 0, WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            {skipping ? 'Skipping…' : "I'll do it later"}
+          </button>
         )}
       </header>
 
-      <main style={{
-        maxWidth: 680,
-        margin:   '0 auto',
-        padding:  'var(--space-6) var(--page-gutter, var(--space-4)) calc(var(--space-12) + 24px)',
-      }}>
-        {loading ? (
-          <ReadOnlySkeleton />
-        ) : editing ? (
-          <ProfileWizard
-            initialValues={saved}
-            user={user}
-            onComplete={handleWizardComplete}
-            // manage-profile-reopens-wizard-fix (2026-08-23): onBack used to
-            // fall back to `() => navigate(ROUTES.ACCOUNT)` for the forced
-            // first-time flow, which let someone leave step 1 via the
-            // footer Back button without ever persisting
-            // profileSetupDismissed — so the next time they opened Manage
-            // Profile, this screen forced them straight back into the same
-            // wizard, with no visible reason why. The header's own Skip
-            // button already persists the dismissal and is meant to be the
-            // only step-1 exit for this flow — passing undefined here hides the footer Back button on step 1 entirely, same
-            // as the header's own back arrow already being dropped for
-            // this case. Step 2 -> step 1 navigation inside the wizard is
-            // unaffected either way. Existing users editing via the pencil
-            // icon (canCancel true) are unaffected.
-            // Phase 12: routed through attemptExit rather than
-            // handleCancelEdit directly — this footer Back button is the
-            // same exit action as the header's X button (both end the
-            // canCancel edit session), so it gets the same unsaved-changes
-            // confirmation instead of a silent, unwarned discard.
-            onBack={canCancel ? () => attemptExit('cancel') : undefined}
-            // welcome-header-skip: Skip itself moved to the header button
-            // above — the wizard just needs to know whether this is the
-            // first-time welcome flow, to show its big welcome headline
-            // (see ProfileWizard.jsx). Same canCancel condition as before,
-            // just renamed for clarity now that it's not tied to Skip.
-            isWelcome={!canCancel}
-            // Phase 12: reports whether the form has unsaved changes, so
-            // every exit path above can decide whether to confirm first.
-            onDirtyChange={setIsDirty}
-          />
-        ) : (
-          <div>
-            <ProfileHero
-              user={user}
-              fullName={saved.fullName}
-              occupationLine={occupationLine}
-            />
+      <main style={{ maxWidth: 680, margin: '0 auto', padding: 'var(--space-4) var(--page-gutter, var(--space-4)) calc(var(--space-12) + 24px)' }}>
+        {(loading || status === 'loading') && <EditSkeleton />}
 
-            {/* offline-profile-account (2026-09-01): explains why Edit and
-                Delete Account are both disabled below — shown only in the
-                read-only view (editing is already blocked from opening at
-                all while offline, so there's nothing to explain there). */}
-            {isOffline && (
-              <div style={{
-                display:         'flex',
-                alignItems:      'center',
-                gap:             'var(--space-2)',
-                backgroundColor: 'var(--color-bg)',
-                border:          '1px solid var(--color-border)',
-                borderRadius:    'var(--radius-lg)',
-                padding:         'var(--space-3) var(--space-4)',
-                marginBottom:    'var(--space-5)',
-                fontSize:        13,
-                lineHeight:      1.5,
-                color:           'var(--color-text-secondary)',
-              }}>
-                <WifiOff size={16} strokeWidth={1.8} style={{ flexShrink: 0 }} />
-                <span>You're offline. Editing your profile and deleting your account are only available when you're back online.</span>
+        {!loading && status === 'offline' && (
+          <GroupStateMessage title="No connection" body="Connect to edit your profile." actionLabel="Try again" onAction={retry} />
+        )}
+        {!loading && status === 'error' && (
+          <GroupStateMessage title="Couldn't open your profile" actionLabel="Try again" onAction={retry} />
+        )}
+
+        {!loading && ready && (
+          <div style={{ fontFamily: 'var(--font-body)' }}>
+            {inWelcome && (
+              <div style={{ fontSize: 26, fontWeight: 800, lineHeight: 1.2, color: 'var(--color-text-primary)', margin: '0 0 var(--space-5)' }}>
+                Welcome to Capsula<br />Let's set up your profile
               </div>
             )}
 
-            <GroupLabel>Personal</GroupLabel>
-            <ReadOnlyGroup>
-              <ReadOnlyRow icon={<User size={17} strokeWidth={1.8} />}     label="Gender"      value={genderLabel} />
-              <ReadOnlyRow icon={<Phone size={17} strokeWidth={1.8} />}    label="Phone"       value={phoneLabel} />
-              <ReadOnlyRow icon={<Mail size={17} strokeWidth={1.8} />}     label="Email"       value={user.email} />
-              {/* governorate-collection-removed (2026-08-23): Governorate
-                  row removed entirely — it's no longer collected at all,
-                  Country is now the only location field. Country is last
-                  in this group as a result. */}
-              <ReadOnlyRow icon={<MapPin size={17} strokeWidth={1.8} />}   label="Country"     value={saved.country} last />
-            </ReadOnlyGroup>
+            {!inWelcome && (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-5)' }}>
+                <PublicAvatar code={values.avatarCode} name={values.fullName} size={72} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)', color: 'var(--color-text-secondary)' }}>
+                  <Mail size={15} strokeWidth={1.8} />
+                  <span style={{ fontSize: 15 }}>{user?.email ?? ''}</span>
+                </div>
+              </div>
+            )}
 
-            <GroupLabel>Professional</GroupLabel>
-            <ReadOnlyGroup>
-              {/* header-skip-country-tweaks (2026-08-23): same reversal as
-                  Governorate above, for Specialty/Student type — each only
-                  renders when the occupation actually calls for it (a
-                  pharmacist, dentist, etc. gets neither row, rather than an
-                  empty "Not set" Specialty row every non-physician saw
-                  before). Occupation itself is unaffected and always shows. */}
-              <ReadOnlyRow icon={<Stethoscope size={17} strokeWidth={1.8} />} label="Occupation" value={occupationDisplay} last={!isStudent && !isPhysician} />
-              {isStudent && (
-                <ReadOnlyRow icon={<GraduationCap size={17} strokeWidth={1.8} />} label="Student type" value={saved.studentType} last />
-              )}
-              {isPhysician && (
-                <ReadOnlyRow icon={<HeartPulse size={17} strokeWidth={1.8} />} label="Specialty" value={saved.specialty} last />
-              )}
-            </ReadOnlyGroup>
+            {isOffline && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 'var(--space-2)', backgroundColor: 'var(--color-bg)', border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-lg)', padding: 'var(--space-3) var(--space-4)', marginBottom: 'var(--space-5)', fontSize: 13, lineHeight: 1.5, color: 'var(--color-text-secondary)',
+              }}>
+                <WifiOff size={16} strokeWidth={1.8} style={{ flexShrink: 0 }} />
+                <span>You're offline. Saving and deleting your account need a connection.</span>
+              </div>
+            )}
 
-            {/* profile-danger-zone (2026-08-23): read-only-view only —
-                not shown while the wizard is open, keeps this separate
-                from data entry. Own red-toned styling (not ReadOnlyGroup)
-                since this is the one destructive action on the screen and
-                should read as visually distinct, not just another row. */}
-            <GroupLabel>Danger Zone</GroupLabel>
-            <div style={{
-              backgroundColor: 'var(--color-surface)',
-              borderRadius:    'var(--radius-lg)',
-              border:          '1px solid var(--color-danger)',
-              overflow:        'hidden',
-            }}>
-              <button
-                onClick={() => { if (!isOffline) setDeleteSheetOpen(true) }}
-                disabled={isOffline}
-                style={{
-                  width:                   '100%',
-                  display:                 'flex',
-                  alignItems:              'center',
-                  gap:                     'var(--space-3)',
-                  padding:                 'var(--space-3) var(--space-4)',
-                  border:                  'none',
-                  backgroundColor:         'transparent',
-                  fontFamily:              'var(--font-body)',
-                  textAlign:               'left',
-                  cursor:                  isOffline ? 'not-allowed' : 'pointer',
-                  color:                   isOffline ? 'var(--color-text-tertiary)' : 'var(--color-danger)',
-                  opacity:                 isOffline ? 0.6 : 1,
-                  WebkitTapHighlightColor: 'transparent',
-                }}
+            {/* Welcome asks the name once, first; later it sits in the public group. */}
+            {inWelcome && (
+              <div style={{ marginBottom: 'var(--space-5)' }}>
+                <h2 style={SECTION_TITLE}>Your name</h2>
+                <div style={wizardCardStyle}>
+                  <WizardField label="Name" icon={<Contact {...iconProps} />} error={errors.name} last>
+                    <PillInput
+                      type="text"
+                      value={values.fullName}
+                      onChange={(e) => change('fullName', e.target.value)}
+                      dir="auto"
+                      autoComplete="off"
+                      error={Boolean(errors.name)}
+                      placeholder="Your name"
+                    />
+                    <p style={{ margin: '6px 0 0', fontSize: 12, lineHeight: 1.4, color: 'var(--color-text-secondary)', ...TEXT }}>
+                      Shown on your public profile if you make one. A nickname is fine.
+                    </p>
+                  </WizardField>
+                </div>
+              </div>
+            )}
+
+            <h2 style={SECTION_TITLE}>Your details</h2>
+            <p style={SECTION_LINE}>{NOT_PUBLIC_LINE}</p>
+            <div style={wizardCardStyle}>
+              <WizardField
+                label="Occupation"
+                icon={<Stethoscope {...iconProps} />}
+                error={errors.occupation}
               >
-                <Trash2 size={17} strokeWidth={1.8} style={{ flexShrink: 0 }} />
-                <span style={{ fontSize: 14, fontWeight: 600 }}>Delete Account</span>
-              </button>
+                <WizardDropdown value={values.occupation} onChange={(v) => change('occupation', v)} options={OCCUPATION_OPTIONS} error={Boolean(errors.occupation)} />
+              </WizardField>
+
+              {show.occupationOther && (
+                <WizardField label="Please specify" icon={<PenLine {...iconProps} />} error={errors.occupationOther}>
+                  <PillInput
+                    type="text"
+                    value={values.occupationOther}
+                    onChange={(e) => change('occupationOther', e.target.value)}
+                    placeholder="e.g. Physiotherapist"
+                    error={Boolean(errors.occupationOther)}
+                  />
+                </WizardField>
+              )}
+
+              {show.specialty && (
+                <WizardField label="Specialty" icon={<HeartPulse {...iconProps} />} error={errors.specialty}>
+                  <WizardDropdown value={values.specialty} onChange={(v) => change('specialty', v)} options={SPECIALTY_OPTIONS} error={Boolean(errors.specialty)} />
+                </WizardField>
+              )}
+
+              {show.studentType && (
+                <WizardField label="Student type" icon={<GraduationCap {...iconProps} />}>
+                  <WizardDropdown value={values.studentType} onChange={(v) => change('studentType', v)} options={STUDENT_TYPE_OPTIONS} />
+                </WizardField>
+              )}
+
+              <WizardField label="Country" icon={<MapPin {...iconProps} />} error={errors.country} last={!show.gender && !show.phone}>
+                <WizardDropdown value={values.country} onChange={(v) => change('country', v)} options={COUNTRY_OPTIONS} error={Boolean(errors.country)} />
+              </WizardField>
+
+              {show.gender && (
+                <WizardField label="Gender (optional)" icon={<User {...iconProps} />}>
+                  <WizardDropdown value={values.gender} onChange={(v) => change('gender', v)} options={GENDER_OPTIONS} />
+                </WizardField>
+              )}
+
+              {show.phone && (
+                <WizardField label="Phone (optional)" icon={<Phone {...iconProps} />} error={errors.phone} last>
+                  <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                    <button
+                      type="button"
+                      onClick={() => setPhoneSheetOpen(true)}
+                      aria-label="Phone country code"
+                      style={{
+                        flex: '0 0 30%', minHeight: 48, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, cursor: 'pointer',
+                        padding: 'var(--space-3) var(--space-4)', borderRadius: 'var(--radius-md)', border: '1px solid transparent',
+                        backgroundColor: 'var(--color-surface-muted)', fontSize: 15, fontFamily: 'var(--font-body)',
+                        color: values.phoneCountryCode ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
+                      }}
+                    >
+                      {values.phoneCountryCode || 'Code'}
+                      <ChevronDown size={14} strokeWidth={1.8} color="var(--color-text-secondary)" />
+                    </button>
+                    <PillInput
+                      type="tel"
+                      inputMode="numeric"
+                      value={formatPhoneDisplay(values.phoneCountryCode, values.phoneNumber)}
+                      onChange={(e) => {
+                        const digits = e.target.value.replace(/[^\d]/g, '')
+                        // Stop at the longest number that country allows (its own rule, not a fixed length).
+                        const iso2 = DIAL_TO_ISO2[values.phoneCountryCode]
+                        if (iso2 && digits.length > values.phoneNumber.length && validatePhoneNumberLength(digits, iso2) === 'TOO_LONG') return
+                        change('phoneNumber', digits)
+                      }}
+                      placeholder="Phone number"
+                      error={Boolean(errors.phone)}
+                      style={{ flex: 1 }}
+                    />
+                  </div>
+                  <p style={{ margin: '6px 0 0', fontSize: 12, lineHeight: 1.4, color: 'var(--color-text-secondary)', ...TEXT }}>{PHONE_HELP}</p>
+                </WizardField>
+              )}
             </div>
+
+            {show.publicGroup && (
+              <div ref={publicRef} style={{ marginTop: 'var(--space-6)', scrollMarginTop: 80 }}>
+                <h2 style={SECTION_TITLE}>Shown on your public profile</h2>
+                <p style={SECTION_LINE}>This is what people see when you make a roshetta or drug group public.</p>
+                <PublicFieldsGroup
+                  values={values}
+                  onChange={change}
+                  errors={{ ...liveProblems, ...errors }}
+                  handleDaysLeft={handleDaysLeft}
+                  disabled={busy}
+                  onSetUp={() => setSetupOpen(true)}
+                  setUpBlockedLine={isDirty ? 'Save your changes first.' : isOffline ? 'Connect to set up your public profile.' : null}
+                />
+              </div>
+            )}
+
+            {errors.general && !show.publicGroup && (
+              <div role="alert" style={{ marginTop: 'var(--space-4)', fontSize: 13, color: 'var(--color-danger)', ...TEXT }}>{errors.general}</div>
+            )}
+
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving || skipping || (!inWelcome && !isDirty) || isOffline}
+              style={{
+                width: '100%', minHeight: 48, marginTop: 'var(--space-6)', borderRadius: 999, border: 'none', fontSize: 15, fontWeight: 600, fontFamily: 'var(--font-body)',
+                cursor: saving || (!inWelcome && !isDirty) || isOffline ? 'not-allowed' : 'pointer',
+                backgroundColor: saving || (!inWelcome && !isDirty) || isOffline ? 'var(--color-border)' : 'var(--color-accent-solid)',
+                color: saving || (!inWelcome && !isDirty) || isOffline ? 'var(--color-text-tertiary)' : '#fff',
+              }}
+            >
+              {saving ? 'Saving…' : inWelcome ? 'Save and continue' : 'Save'}
+            </button>
+
+            {!inWelcome && (
+              <div style={{ marginTop: 'var(--space-8)' }}>
+                <h2 style={{ ...SECTION_TITLE, fontSize: 15 }}>Danger zone</h2>
+                <div style={{ backgroundColor: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-danger)', overflow: 'hidden' }}>
+                  <button
+                    type="button"
+                    onClick={() => { if (!isOffline) setDeleteSheetOpen(true) }}
+                    disabled={isOffline}
+                    style={{
+                      width: '100%', display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-3) var(--space-4)', border: 'none',
+                      backgroundColor: 'transparent', fontFamily: 'var(--font-body)', textAlign: 'left', cursor: isOffline ? 'not-allowed' : 'pointer',
+                      color: isOffline ? 'var(--color-text-tertiary)' : 'var(--color-danger)', opacity: isOffline ? 0.6 : 1, WebkitTapHighlightColor: 'transparent',
+                    }}
+                  >
+                    <Trash2 size={17} strokeWidth={1.8} style={{ flexShrink: 0 }} />
+                    <span style={{ fontSize: 14, fontWeight: 600 }}>Delete Account</span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </main>
+
+      <PhoneCodeSheet
+        isOpen={phoneSheetOpen}
+        value={values?.phoneCountryCode ?? ''}
+        onSelect={(code) => change('phoneCountryCode', code)}
+        onClose={() => setPhoneSheetOpen(false)}
+      />
+
+      <PublicSetupSheet
+        isOpen={setupOpen}
+        onClose={() => setSetupOpen(false)}
+        onDone={() => { setSetupOpen(false); retry() }}
+        actionLabel="Save"
+      />
 
       <DeleteAccountSheet
         isOpen={deleteSheetOpen}
@@ -867,17 +510,10 @@ export default function AccountEditScreen() {
         busy={deleting}
       />
 
-      {/* Phase 12 (Back-Button & State-Audit merged plan) — shown whenever
-          X, either back-close guard, or "I'll do it later" is triggered
-          while the open wizard has unsaved changes (see attemptExit
-          above). Confirming runs the originally-requested exit action;
-          for the "skip" path that's async, so onConfirm returns its
-          promise and lets this sheet's own busy/failure state (Phase 3)
-          handle a genuine offline failure instead of closing early. */}
       <ConfirmSheet
-        isOpen={unsavedConfirmOpen}
-        onClose={() => setUnsavedConfirmOpen(false)}
-        onConfirm={handleConfirmDiscard}
+        isOpen={unsavedOpen}
+        onClose={() => setUnsavedOpen(false)}
+        onConfirm={() => runExit(pendingExitRef.current)}
         title="Unsaved changes"
         message="You have unsaved changes. Are you sure you want to leave without saving?"
         confirmLabel="Discard"

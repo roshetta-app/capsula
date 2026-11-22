@@ -16,7 +16,9 @@
 
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Share2, ChevronRight, ChevronLeft } from 'lucide-react'
+import { Share2, ChevronRight, ChevronLeft, MoreVertical } from 'lucide-react'
+import ConfirmSheet from '../ui/ConfirmSheet'
+import { MAKE_PRIVATE_MESSAGE } from '../../utils/publicShare'
 import PublicAvatar from '../ui/PublicAvatar'
 import { ROUTES } from '../../router'
 import { shareProfile } from '../../utils/shareProfileLink'
@@ -101,13 +103,14 @@ function Card({ item, tabKey, onOpen }) {
 }
 
 // own: the person looking at their own list (empty lines differ). onAdd: optional, draws Add to profile.
-export function ProfileLists({ profile, own = false, onAdd }) {
+export function ProfileLists({ profile, own = false, onAdd, onMakePrivate }) {
   const navigate = useNavigate()
   // The chosen tab lives only while the page is open (plain state, never stored).
   const [tab, setTab] = useState(() => defaultTab(profile))
   const tabs = tabsFor(profile)
   const section = tab === 'groups' ? profile.groups : profile.roshettas
   const cap = capLine(section)
+  const [pending, setPending] = useState(null)
 
   return (
     <div>
@@ -157,18 +160,40 @@ export function ProfileLists({ profile, own = false, onAdd }) {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
           {section.items.map((item) => (
-            <Card
-              key={item.code}
-              item={item}
-              tabKey={tab}
-              onOpen={() => navigate(tab === 'groups' ? ROUTES.SHARED_GROUP(item.code) : ROUTES.SHARED_ROSHETTA(item.code))}
-            />
+            <div key={item.code} style={{ display: 'flex', alignItems: 'stretch', gap: 4 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <Card
+                  item={item}
+                  tabKey={tab}
+                  onOpen={() => navigate(tab === 'groups' ? ROUTES.SHARED_GROUP(item.code) : ROUTES.SHARED_ROSHETTA(item.code))}
+                />
+              </div>
+              {own && onMakePrivate && (
+                <button
+                  type="button"
+                  aria-label="Make private"
+                  onClick={() => setPending(item)}
+                  style={{ flexShrink: 0, width: 44, border: 'none', background: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-secondary)', WebkitTapHighlightColor: 'transparent' }}
+                >
+                  <MoreVertical size={20} strokeWidth={1.8} />
+                </button>
+              )}
+            </div>
           ))}
           {cap && (
             <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--color-text-tertiary)', padding: 'var(--space-2) 0', ...BODY }}>{cap}</div>
           )}
         </div>
       )}
+      <ConfirmSheet
+        isOpen={pending !== null}
+        onClose={() => setPending(null)}
+        onConfirm={() => onMakePrivate(tab, pending)}
+        title="Make private?"
+        message={MAKE_PRIVATE_MESSAGE}
+        confirmLabel="Make private"
+        destructive
+      />
     </div>
   )
 }

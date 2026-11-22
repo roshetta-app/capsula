@@ -65,6 +65,9 @@ import { ROUTES } from '../router'
 // signed-in user's profile-setup redirect hasn't been decided yet — same
 // fixed/inset/zIndex/background shape as AppGate.jsx's AppGateBlock, just
 // with no content, since there's nothing to show yet.
+// 14.7c-1: someone opening a shared roshetta, group or profile link is not pulled into the welcome first.
+const isSharedLinkPath = (p) => /^\/(r|g|u)\//.test(p)
+
 function ProfileCheckPlaceholder() {
   return (
     <div style={{
@@ -101,7 +104,7 @@ export default function ProfileSetupRedirect({ children }) {
     if (loading) return
     if (checkedUserId === user.id) return
 
-    if (!profile?.profileSetupDismissed && location.pathname !== ROUTES.ACCOUNT_EDIT) {
+    if (!profile?.profileSetupDismissed && location.pathname !== ROUTES.ACCOUNT_EDIT && !isSharedLinkPath(location.pathname)) {
       navigate(ROUTES.ACCOUNT_EDIT)
     }
     setCheckedUserId(user.id)

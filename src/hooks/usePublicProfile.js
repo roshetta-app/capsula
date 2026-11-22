@@ -11,6 +11,10 @@
  *                            saves through save_public_profile; with no connection the change
  *                            waits on the phone ({ ok: true, waiting: true })
  *
+ *   saveDetails (updates, { hasHandle }) => Promise<{ ok: true, saved } | { ok: false, kind, code, message }>
+ *                            (14.7c-1) the private details path (the 14 allowed columns only); it does not wait for
+ *                            the connection: the Edit screen says so and the person taps Save again
+ *
  *   loadSharedIds ()        => Promise<{ ok: true, roshettas: Set, groups: Set } | { ok: false, kind, message }>
  *                            (14.5c) the ids of the person's roshettas and groups that already have a share
  *                            row (a link), for the Add to profile picker; the rest are private
@@ -24,7 +28,7 @@ import { useCallback, useMemo } from 'react'
 import { useAuth } from './useAuth'
 import { supabase } from '../lib/supabase'
 import {
-  fetchProfile, savePublicCardOrWait, applyWaiting, hasWaiting, localProfileStore,
+  fetchProfile, savePublicCardOrWait, applyWaiting, hasWaiting, localProfileStore, saveDetails as sendDetails,
 } from '../utils/profileData'
 import { readSharedIds } from '../utils/addToProfile'
 
@@ -69,6 +73,11 @@ export function usePublicProfile() {
     return res
   }, [userId, store])
 
+  const saveDetails = useCallback(async (updates, { hasHandle = false } = {}) => {
+    if (!userId) return { ok: false, kind: 'retry', code: 'not_signed_in', message: 'Sign in first.' }
+    return sendDetails(supabase, userId, updates, { hasHandle, limit: withLimit })
+  }, [userId])
+
   const loadSharedIds = useCallback(async () => {
     if (!userId) return { ok: false, kind: 'retry', code: 'not_signed_in', message: 'Sign in first.' }
     const [r, g] = await Promise.all([
@@ -80,5 +89,5 @@ export function usePublicProfile() {
     return { ok: false, kind: offline ? 'retry' : 'error', message: offline ? 'No connection.' : 'Something went wrong. Try again.' }
   }, [userId])
 
-  return { signedIn: Boolean(userId), loadProfile, savePublicCard, loadSharedIds }
+  return { signedIn: Boolean(userId), loadProfile, savePublicCard, saveDetails, loadSharedIds }
 }
