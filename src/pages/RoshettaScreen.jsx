@@ -57,6 +57,8 @@ import Icon from '../components/ui/Icon'
 import GroupStateMessage from '../components/drugs/groups/GroupStateMessage'
 import RoshettaPadHeader from '../components/roshettas/RoshettaPadHeader'
 import ShareRoshettaSheet from '../components/roshettas/ShareRoshettaSheet'
+import HiddenNotice from '../components/ui/HiddenNotice'
+import { useHiddenNotice } from '../hooks/useHiddenNotice'
 import RoshettaDetailsSheet from '../components/roshettas/RoshettaDetailsSheet'
 import PrescriptionSheetBlock from '../components/conditions/PrescriptionSheetBlock'
 import RoshettaPageSkeleton from '../components/roshettas/RoshettaPageSkeleton'
@@ -135,6 +137,9 @@ export default function RoshettaScreen() {
     syncText = statusText('refresh')
     syncAction = { label: 'Try again', run: reloadRoshettas }
   }
+
+  // 14.9b-2: while a report has hidden this roshetta, its owner is told here and can ask for one review.
+  const hidden = useHiddenNotice('roshetta', roshetta?.id)
 
   // Learn once per roshetta whether it has a live link (online only; unknown counts as not shared).
   const roshettaId = roshetta?.id
@@ -374,6 +379,11 @@ export default function RoshettaScreen() {
 
         {/* The sheet itself: no card, the topic sheet's side margins and spacing. */}
         <div style={{ padding: 'var(--space-5) calc(var(--space-6) - var(--page-gutter, 16px)) 0' }}>
+          {hidden.notice && (
+            <div style={{ marginBottom: 'var(--space-4)' }}>
+              <HiddenNotice notice={hidden.notice} busy={hidden.busy} message={hidden.message} onAsk={hidden.ask} />
+            </div>
+          )}
           {isReadOnly && (
             <div style={{ marginBottom: 'var(--space-4)' }}>
               <GroupStateMessage variant="banner" tone="warning" title={READ_ONLY_MESSAGE} />

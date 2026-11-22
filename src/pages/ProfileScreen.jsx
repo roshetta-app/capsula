@@ -21,6 +21,8 @@ import { useNavigate } from 'react-router-dom'
 import { Settings, ChevronRight, UserCircle, WifiOff, AlertCircle } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { usePublicProfile } from '../hooks/usePublicProfile'
+import { useHiddenNotice } from '../hooks/useHiddenNotice'
+import HiddenNotice from '../components/ui/HiddenNotice'
 import PublicAvatar from '../components/ui/PublicAvatar'
 import PublicSetupSheet from '../components/ui/PublicSetupSheet'
 import AddToProfileSheet from '../components/ui/AddToProfileSheet'
@@ -109,6 +111,8 @@ export default function ProfileScreen() {
   const [profile, setProfile] = useState(null)
   const [setupOpen, setSetupOpen] = useState(false)
   const signedIn = !!user
+  // 14.9b-2: while a report has hidden the person's public profile, the tab tells them and offers one review.
+  const hidden = useHiddenNotice('profile', user?.id)
 
   // Reading again: Try again and a finished setup bump this counter, which runs the effect below once more.
   const [reloadKey, setReloadKey] = useState(0)
@@ -259,6 +263,12 @@ export default function ProfileScreen() {
             <div style={{ marginTop: 2, fontSize: 13, lineHeight: 1.45, color: 'var(--color-text-secondary)' }}>{TAB_WORDS.publicLine}</div>
           </div>
           <PillButton onClick={() => setSetupOpen(true)}>Set up</PillButton>
+        </div>
+      )}
+
+      {showHero && hidden.notice && (
+        <div style={{ marginBottom: 'var(--space-3)' }}>
+          <HiddenNotice notice={hidden.notice} busy={hidden.busy} message={hidden.message} onAsk={hidden.ask} />
         </div>
       )}
 

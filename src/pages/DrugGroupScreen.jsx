@@ -85,6 +85,8 @@ import ConfirmSheet from '../components/ui/ConfirmSheet'
 import Snackbar from '../components/ui/Snackbar'
 import GroupEditorSheet from '../components/drugs/groups/GroupEditorSheet'
 import ShareGroupSheet from '../components/drugs/groups/ShareGroupSheet'
+import HiddenNotice from '../components/ui/HiddenNotice'
+import { useHiddenNotice } from '../hooks/useHiddenNotice'
 import GroupStateMessage from '../components/drugs/groups/GroupStateMessage'
 import GroupSyncStatus from '../components/drugs/groups/GroupSyncStatus'
 import FolderShell from '../components/drugs/groups/FolderShell'
@@ -176,6 +178,8 @@ export default function DrugGroupScreen() {
   const [snapshot, setSnapshot] = useState(null)
   if (live && live !== snapshot) setSnapshot(live)
   const group = live ?? ((editorOpen || deleteOpen) ? snapshot : null)
+  // 14.9b-2: while a report has hidden this group, its owner is told here and can ask for one review.
+  const hidden = useHiddenNotice('group', group?.id)
 
   // Quick adds and removes are sent one after the other (step 12.4); 'ids' is the list as
   // the person's taps have left it.
@@ -491,6 +495,12 @@ export default function DrugGroupScreen() {
         </FolderShell>
 
         <GroupSyncStatus marginTop="var(--space-3)" />
+
+        {hidden.notice && (
+          <div style={{ marginTop: 'var(--space-3)' }}>
+            <HiddenNotice notice={hidden.notice} busy={hidden.busy} message={hidden.message} onAsk={hidden.ask} />
+          </div>
+        )}
 
         {isReadOnly && (
           <div style={{ marginTop: 'var(--space-3)' }}>
