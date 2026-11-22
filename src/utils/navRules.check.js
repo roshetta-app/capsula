@@ -77,6 +77,9 @@ test('stacks of the screens that matter', () => {
   assert.deepEqual(parentChain('/drugs/generic/paracetamol'), ['/drugs/generic/paracetamol', '/drugs', '/'])
   assert.deepEqual(parentChain('/conditions/gout'), ['/conditions/gout', '/conditions', '/'])
   assert.deepEqual(parentChain('/account/edit'), ['/account/edit', '/account', '/'])
+  // 14.7a: Settings sits behind Profile, and the FAQ behind Settings
+  assert.deepEqual(parentChain('/account/settings'), ['/account/settings', '/account', '/'])
+  assert.deepEqual(parentChain('/account/faq'), ['/account/faq', '/account/settings', '/account', '/'])
   assert.deepEqual(parentChain('/g/abc'), ['/g/abc', '/'])
   assert.deepEqual(parentChain('/'), ['/'])
   for (const p of ['/conditions', '/drugs', '/favourites', '/account']) assert.deepEqual(parentChain(p), [p, '/'], p)
@@ -87,7 +90,8 @@ test('stacks of the screens that matter', () => {
 // Step 12.3: the 12 screens that used to name their own parent (useDeepLinkParent) now call it
 // with nothing, and the parent comes from the table. Each of them must be a rule that lays
 // screens behind it, and nothing may use the old "first screen" flag any more.
-test('the 12 screens ask the rulebook for their parent, with no argument', () => {
+// 14.7a: Settings (the old Account screen, /account/settings) is the 13th.
+test('the 13 screens ask the rulebook for their parent, with no argument', () => {
   let found = 0
   for (const { path, file } of publicRoutes()) {
     if (!file) continue
@@ -99,7 +103,7 @@ test('the 12 screens ask the rulebook for their parent, with no argument', () =>
     assert.equal(call[1].trim(), '', `${file}: still names its own parent`)
     assert.equal(SCREENS.find((s) => s.pattern === path).laysBehind, true, path)
   }
-  assert.equal(found, 12)
+  assert.equal(found, 13)
 })
 
 // Frozen copy of the label function as it was before 12.2 (homePaths.js), so we can prove the
@@ -121,7 +125,8 @@ function legacyLabel(path) {
   if (path.startsWith('/drugs/')) return 'Drug'
   if (path.startsWith('/conditions/')) return 'Topic'
   if (path === '/favourites') return 'Favourites'
-  if (path === '/account') return 'Account'
+  if (path === '/account') return 'Profile'
+  if (path === '/account/settings') return 'Settings'
   // Step 12.8 named the five screens that had no name before.
   if (/^\/roshetta\/[^/]+$/.test(path)) return 'Roshetta'
   if (/^\/roshetta\/[^/]+\/add$/.test(path)) return 'Add drugs'
@@ -189,6 +194,17 @@ test('kinds, sign-in and shared pages', () => {
   assert.equal(laysBehind('/g/abc'), false)
   assert.equal(laysBehind('/drugs/x'), true)
   assert.equal(laysBehind('/nowhere'), false)
+})
+
+test('14.7a: Settings is a page under Profile (guests may open it), and Back from it goes to Profile', () => {
+  assert.equal(kindOf('/account/settings'), 'page')
+  assert.equal(needsSignIn('/account/settings'), false)
+  assert.equal(parentPath('/account/settings'), '/account')
+  assert.equal(parentPath('/account/faq'), '/account/settings')
+  assert.equal(parentPath('/account/edit'), '/account')
+  assert.equal(isMainScreen('/account/settings'), false)
+  assert.equal(labelForPath('/account'), 'Profile')
+  assert.equal(labelForPath('/account/settings'), 'Settings')
 })
 
 test('fillPattern puts values in, and says null when one is missing', () => {

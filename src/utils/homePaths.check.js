@@ -24,7 +24,7 @@ test('second tap scrolls only on the exact top screen', () => {
 
 test('top screens are the four tabs and Account, nothing underneath them', () => {
   for (const p of ['/', '/conditions', '/drugs', '/favourites', '/account']) assert.equal(isTopScreen(p), true, p)
-  for (const p of ['/conditions/x', '/drugs/motinorm', '/roshettas', '/account/edit', '/admin']) assert.equal(isTopScreen(p), false, p)
+  for (const p of ['/conditions/x', '/drugs/motinorm', '/roshettas', '/account/edit', '/account/settings', '/admin']) assert.equal(isTopScreen(p), false, p)
 })
 
 test('Back: from every other top screen to Home, from Home exit, nothing on other screens', () => {
@@ -49,7 +49,7 @@ test('names: "/" says Home, "/conditions" says Topics, the rest as before', () =
   assert.equal(labelForPath('/drugs/generic/x'), 'Generic')
   assert.equal(labelForPath('/drugs/motinorm'), 'Drug')
   assert.equal(labelForPath('/favourites'), 'Favourites')
-  assert.equal(labelForPath('/account'), 'Account')
+  assert.equal(labelForPath('/account'), 'Profile')
   assert.equal(labelForPath('/nowhere'), null)
   assert.equal(labelForPath(undefined), null)
 })

@@ -136,6 +136,11 @@
  * reloading the page after going back inside the class sheet on the Drugs
  * screen. Everything else about Back is unchanged.
  *
+ * 14.7a (2026-11-22, public profile plan): the fifth slot is now called Profile (it opens the Profile tab,
+ *             same address /account). Only the word on the bar and its screen-reader name changed; the
+ *             icon, the dot for a signed-in person and every Back rule are as before. The old Account
+ *             screen is now Settings, opened from Profile (/account/settings, no bottom bar).
+ *
  * Changes from previous version:
  *  - Tab 1: Conditions — BookOpen (Lucide), unified with FavouritesScreen's
  *           own Conditions tab icon
@@ -450,7 +455,7 @@ export default function BottomNav() {
             onPointerDown={() => setPressedPath('account')}
             onPointerUp={() => setPressedPath(null)}
             onPointerLeave={() => setPressedPath(null)}
-            aria-label="Account"
+            aria-label="Profile"
             aria-current={accountActive ? 'page' : undefined}
             style={{
               flex:                    '1 1 0',
@@ -498,7 +503,7 @@ export default function BottomNav() {
               fontWeight:    accountActive ? 600 : 500,
               letterSpacing: '0.01em',
             }}>
-              Account
+              Profile
             </span>
           </button>
         </div>

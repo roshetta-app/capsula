@@ -10,6 +10,9 @@
  *             the same shared Layout group as Conditions/Drugs/Favourites
  *             so BottomNav stays visible and Layout's mount-once behavior
  *             (NotificationsBanner state, etc.) is unaffected.
+ * 14.7a (2026-11-22): the Account tab is now the Profile tab (/account shows ProfileScreen). The old
+ *             Account screen is Settings at /account/settings, outside the shared Layout like /account/edit
+ *             and /account/faq (own Back to Profile, no bottom bar).
  * Phase F13 Mini-stage 5 (Account redesign) — Added /account/edit and
  *             /account/faq. Both placed OUTSIDE the shared Layout group,
  *             next to /conditions/:slug and /drugs/:slug — same reasoning
@@ -75,6 +78,7 @@ import DrugDetailScreen      from './pages/DrugDetailScreen'
 import GenericDetailScreen   from './pages/GenericDetailScreen'
 import FavouritesScreen      from './pages/FavouritesScreen'
 import AccountScreen         from './pages/AccountScreen'
+import ProfileScreen         from './pages/ProfileScreen'
 import AccountEditScreen     from './pages/AccountEditScreen'
 import AccountFaqScreen      from './pages/AccountFaqScreen'
 import UnknownAddressScreen  from './pages/UnknownAddressScreen'
@@ -141,6 +145,7 @@ export const ROUTES = {
   GENERIC_DETAIL:    (slug) => `/drugs/generic/${slug}`,
   FAVOURITES:        '/favourites',
   ACCOUNT:           '/account',
+  ACCOUNT_SETTINGS:  '/account/settings',
   ACCOUNT_EDIT:      '/account/edit',
   ACCOUNT_FAQ:       '/account/faq',
 
@@ -195,7 +200,7 @@ export function PublicRoutes() {
         <Route path="/roshetta/:id/add"               element={<RoshettaAddDrugScreen />} />
         <Route path="/roshetta/:id/edit"              element={<RoshettaEditorScreen />} />
         <Route path="/favourites"          element={<FavouritesScreen />} />
-        <Route path="/account"             element={<AccountScreen />} />
+        <Route path="/account"             element={<ProfileScreen />} />
       </Route>
 
       {/* Detail screens render their own header/scroll setup and stay
@@ -211,6 +216,7 @@ export function PublicRoutes() {
         <Route path="/drugs/generic/:slug"           element={<GenericDetailScreen />} />
         <Route path="/g/:code"                       element={<SharedGroupScreen />} />
         <Route path="/r/:code"                       element={<SharedRoshettaScreen />} />
+        <Route path="/account/settings"    element={<AccountScreen />} />
         <Route path="/account/edit"        element={<AccountEditScreen />} />
         <Route path="/account/faq"         element={<AccountFaqScreen />} />
 

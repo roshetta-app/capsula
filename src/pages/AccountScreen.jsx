@@ -1,6 +1,12 @@
 /**
  * src/pages/AccountScreen.jsx
  * Phase F13 Mini-stage 1 — Account page rebuild
+ * 14.7a (2026-11-22, public profile plan): this screen is now SETTINGS, opened from the Profile tab at
+ *             /account/settings (outside the shared Layout, with its own Back to Profile and no bottom
+ *             bar). Removed here: the Finish-setting-up-your-profile bar (it moved to the Profile tab,
+ *             which shows one card at a time) and the account-wide Show-my-name row (new shares always
+ *             show the name; old links keep their own switch in their share sheet). The sign-in photo
+ *             may stay on this screen (plan 14.7a). The Manage Profile button now reads Account details.
  * Phase F13 Mini-stage 5 — Redesigned signed-in view from a flat form
  *             layout into a profile header + tappable settings-list
  *             layout. The inline 5-field profile form has moved to
@@ -185,17 +191,16 @@
  * version the shared component adopted as the standard.
  */
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  User, UserX, LogOut, ChevronRight, Bell, HelpCircle, Info, UserCog, Mail,
-  Sun, Moon, Monitor, MessageCircle, Flag, FileText, ShieldCheck, AlertCircle,
+  User, LogOut, ChevronRight, Bell, HelpCircle, Info, UserCog, Mail,
+  Sun, Moon, Monitor, MessageCircle, Flag, FileText, ShieldCheck,
 } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
+import { useBackLabel } from '../hooks/useBackLabel'
+import { useDeepLinkParent } from '../hooks/useDeepLinkParent'
 import { useFavouritesContext } from '../context/FavouritesContext'
-import NameSwitch from '../components/drugs/groups/NameSwitch'
-import { accountSwitchText } from '../utils/shareCredit'
-import { isDrugGroupsOn } from '../constants/features'
 import { signOutGroupNote } from '../utils/groupSignOutNote'
 import { useDarkMode } from '../hooks/useDarkMode'
 import { usePushSubscriptionContext } from '../context/PushSubscriptionContext'
@@ -392,144 +397,6 @@ function ThemeRow({ theme, onChange, last }) {
 // shared links" (words from shareCredit.js) because it covers shared roshettas too (step 13.5).
 // Only for a signed-in person, only while groups are on, and it leaves itself out until the
 // profile has been read.
-function ShareNameRow() {
-  const { getShareNameInfo, setAccountShareName } = useFavouritesContext()
-  const { toast } = useToast()
-  const [info, setInfo] = useState(null)
-  useEffect(() => {
-    let cancelled = false
-    getShareNameInfo().then(r => {
-      if (!cancelled && r.ok) setInfo({ fullName: r.fullName, on: r.accountDefault })
-    })
-    return () => { cancelled = true }
-  }, [getShareNameInfo])
-  if (!info) return null
-
-  const hasName = !!info.fullName
-  const on = hasName && info.on
-  const Icon = on ? User : UserX
-  const words = accountSwitchText({ hasName, on })
-
-  async function handleChange(next) {
-    setInfo(i => ({ ...i, on: next }))
-    const r = await setAccountShareName(next)
-    if (r.ok) return
-    setInfo(i => ({ ...i, on: !next }))
-    toast.error(r.reason === 'offline' ? "You're offline. Reconnect to change this." : "Couldn't save that. Try again.")
-  }
-
-  return (
-    <div style={{
-      width: '100%', display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
-      padding: 'var(--space-3)', paddingRight: 'var(--space-2)', borderBottom: '1px solid var(--color-border)',
-    }}>
-      <div style={{
-        width: 32, height: 32, borderRadius: 'var(--radius-full)', backgroundColor: 'var(--color-accent-light)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: 'var(--color-accent)',
-      }}>
-        <Icon size={17} strokeWidth={1.8} />
-      </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-text-primary)' }}>
-          {words.title}
-        </div>
-        <div style={{ marginTop: 2, fontSize: 12, lineHeight: 1.4, color: 'var(--color-text-secondary)' }}>
-          {words.line}
-        </div>
-      </div>
-      <NameSwitch checked={on} onChange={handleChange} disabled={!hasName} label={words.title} />
-    </div>
-  )
-}
-
-// profile-nudge-system: same physician-occupation check AccountEditScreen.jsx
-// already uses to decide whether Specialty applies to this person — kept in
-// sync with that file rather than imported, since it's a two-value string
-// comparison, not worth its own shared util for this.
-function isPhysicianOccupation(occupation) {
-  return occupation === 'Specialist Physician' || occupation === 'Resident Physician'
-}
-
-// profile-nudge-banner-redesign: counts how many required fields are
-// filled in, out of how many apply to this person. Email is counted as
-// always-filled (base 1 of 5, or 1 of 6 for a physician) — every signed-in
-// user has one by definition (Google sign-in), so treating it as real
-// progress means the bar is never fully empty, even on a totally blank
-// profile. The other 4 (name, phone, occupation, country) are counted
-// normally, plus specialty for physicians only.
-function getProfileCompleteness(data) {
-  let total = 5     // email (always) + name + phone + occupation + country
-  let completed = 1 // email always counts
-  if (data?.fullName?.trim())   completed++
-  if (data?.phoneNumber?.trim()) completed++
-  if (data?.occupation?.trim()) completed++
-  if (data?.country?.trim())    completed++
-  if (isPhysicianOccupation(data?.occupation)) {
-    total += 1
-    if (data?.specialty?.trim()) completed++
-  }
-  return { completed, total }
-}
-
-// profile-nudge-banner-redesign: persistent, non-dismissible reminder
-// shown near the top of the signed-in view whenever completed < total. No
-// dismiss/close control by design (independent of wizard-skip state, it
-// should stay until the fields are actually filled) — tapping it is the
-// only way to act on it, same press-feedback convention as the Edit
-// Profile pill above it. Option B from the redesign discussion: title +
-// a slim progress bar only, no fraction/percentage text underneath.
-function ProfileNudgeCard({ completed, total, onClick }) {
-  const [pressed, setPressed] = useState(false)
-  const percent = total > 0 ? Math.round((completed / total) * 100) : 0
-  return (
-    <button
-      onClick={onClick}
-      onPointerDown={() => setPressed(true)}
-      onPointerUp={() => setPressed(false)}
-      onPointerLeave={() => setPressed(false)}
-      style={{
-        width:                   '100%',
-        display:                 'flex',
-        alignItems:              'center',
-        gap:                     'var(--space-3)',
-        padding:                 'var(--space-3) var(--space-4)',
-        borderRadius:            'var(--radius-lg)',
-        border:                  '1px solid var(--color-accent)',
-        backgroundColor:         'color-mix(in srgb, var(--color-accent) 10%, transparent)',
-        textAlign:               'left',
-        cursor:                  'pointer',
-        marginBottom:            'var(--space-3)',
-        transform:               pressed ? 'scale(0.98)' : 'scale(1)',
-        transition:              'transform var(--motion-fast) var(--ease-settle)',
-        WebkitTapHighlightColor: 'transparent',
-      }}
-    >
-      <AlertCircle size={20} strokeWidth={1.8} color="var(--color-accent)" style={{ flexShrink: 0 }} />
-      <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 6 }}>
-          Finish setting up your profile
-        </div>
-        <div style={{
-          width:           '100%',
-          height:          6,
-          borderRadius:    'var(--radius-full)',
-          backgroundColor: 'var(--color-border)',
-          overflow:        'hidden',
-        }}>
-          <div style={{
-            width:           `${percent}%`,
-            height:          '100%',
-            borderRadius:    'var(--radius-full)',
-            backgroundColor: 'var(--color-accent)',
-            transition:      'width var(--motion-fast) var(--ease-settle)',
-          }} />
-        </div>
-      </div>
-      <ChevronRight size={18} color="var(--color-accent)" style={{ flexShrink: 0 }} />
-    </button>
-  )
-}
-
 function SectionLabel({ children }) {
   return (
     <div style={{
@@ -633,6 +500,25 @@ function AccountSkeleton() {
   )
 }
 
+// 14.7a: this screen now lives outside the shared Layout (like Edit and FAQ), so it carries the same
+// page frame Layout gives the tabs: the side gutter the sticky bar below breaks out of, the colours,
+// and room at the bottom (there is no bottom bar here).
+function SettingsPage({ children }) {
+  return (
+    <div style={{
+      minHeight:       'var(--viewport-height, 100dvh)',
+      backgroundColor: 'var(--color-bg)',
+      fontFamily:      'var(--font-body)',
+      color:           'var(--color-text-primary)',
+      '--page-gutter': 'var(--space-4)',
+    }}>
+      <main style={{ maxWidth: 680, margin: '0 auto', padding: '0 var(--page-gutter) calc(var(--space-12) + 24px)' }}>
+        {children}
+      </main>
+    </div>
+  )
+}
+
 export default function AccountScreen() {
   const { user, profile, loading, signInWithGoogle, signOut } = useAuth()
   const { theme, setTheme } = useDarkMode()
@@ -640,6 +526,8 @@ export default function AccountScreen() {
   const { isOnline } = useOnlineStatus()
   const { toast } = useToast()
   const navigate = useNavigate()
+  useDeepLinkParent()
+  const backLabel = useBackLabel() || 'Profile'
   // Step 17.6c: group changes not yet sent are mentioned in the sign-out question.
   const { waitingCount = 0, failedCount = 0 } = useFavouritesContext()
   const groupNote = signOutGroupNote({ waitingCount, failedCount })
@@ -653,15 +541,6 @@ export default function AccountScreen() {
   const [aboutOpen, setAboutOpen]                 = useState(false)
   const [signOutConfirmOpen, setSignOutConfirmOpen] = useState(false)
   const [proSheetOpen, setProSheetOpen]           = useState(false)
-
-  // profile-nudge-instant-load: completeness is now computed directly from
-  // AuthContext's `profile`, which already carries phone/occupation/
-  // country/specialty as of the fix in AuthContext.jsx — no separate fetch,
-  // no wait. `profile` is null until AuthContext's own load finishes, at
-  // which point `loading` (checked below) has already gone false, so by
-  // the time this ever renders, completeness is already known — this is
-  // what removes the beat-long delay before the banner used to appear.
-  const completeness = user ? getProfileCompleteness(profile) : null
 
   async function handleGoogleSignIn() {
     if (busy) return
@@ -728,13 +607,13 @@ export default function AccountScreen() {
   // AccountSkeleton — same shimmer() convention every other screen's
   // loading state already uses.
   if (loading) {
-    return <AccountSkeleton />
+    return <SettingsPage><AccountSkeleton /></SettingsPage>
   }
 
   const fullName = profile?.fullName
 
   return (
-    <div>
+    <SettingsPage>
       {/* account-screen-visual-refresh: sticky, full-bleed title bar —
           breaks out of Layout's <main> side padding (--page-gutter each
           side) via negative margins, same visual weight as
@@ -766,33 +645,29 @@ export default function AccountScreen() {
             alignItems: 'center',
             gap:        'var(--space-3)',
           }}>
-            {/* header-skip-country-tweaks (2026-08-23): leading icon
-                restored — same accent-tinted badge-circle treatment
-                MenuRow already uses for its own icons below (32px circle,
-                var(--color-accent-light) fill, icon in var(--color-accent)),
-                not a new pattern. Title bumped 15px -> 17px to match, same
-                size AccountEditScreen/AccountFaqScreen already use for
-                their own sticky headers. */}
-            <div style={{
-              width:           32,
-              height:          32,
-              borderRadius:    'var(--radius-full)',
-              backgroundColor: 'var(--color-accent-light)',
-              display:         'flex',
-              alignItems:      'center',
-              justifyContent:  'center',
-              flexShrink:      0,
-              color:           'var(--color-accent)',
-            }}>
-              <UserCog size={18} strokeWidth={1.8} />
-            </div>
+            {/* 14.7a (2026-11-22): this screen is now Settings, a page opened from the Profile tab.
+                The leading badge icon became a Back button (same look as the Back on My roshettas)
+                and the title reads Settings. */}
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              aria-label={`Back to ${backLabel}`}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', cursor: 'pointer',
+                color: 'var(--color-accent-text)', fontSize: 14, fontWeight: 500, fontFamily: 'var(--font-body)',
+                padding: '4px 0', WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              <ChevronRight size={16} strokeWidth={2} style={{ transform: 'rotate(180deg)' }} aria-hidden="true" />
+              {backLabel}
+            </button>
             <h1 style={{
               margin:     0,
               fontSize:   17,
               fontWeight: 700,
               color:      'var(--color-text-primary)',
             }}>
-              Account &amp; Settings
+              Settings
             </h1>
           </div>
 
@@ -903,7 +778,7 @@ export default function AccountScreen() {
             }}
           >
             <UserCog size={14} strokeWidth={1.8} />
-            Manage Profile
+            Account details
           </button>
         </div>
       )}
@@ -1004,21 +879,6 @@ export default function AccountScreen() {
         </div>
       )}
 
-      {/* profile-nudge-system: signed-in only, independent of whether the
-          wizard was ever formally completed — driven purely by whether
-          the required fields are actually filled in.
-          open-wizard-directly: passes an explicit flag so tapping this
-          always opens the wizard, even for someone who already dismissed
-          setup once (e.g. via Skip) — AccountEditScreen only opened the
-          wizard automatically for a never-dismissed profile before. */}
-      {user && completeness && completeness.completed < completeness.total && (
-        <ProfileNudgeCard
-          completed={completeness.completed}
-          total={completeness.total}
-          onClick={() => navigate(ROUTES.ACCOUNT_EDIT, { state: { openWizard: true } })}
-        />
-      )}
-
       {/* account-upgrade-card-guest-visibility: renders regardless of
           sign-in state (previously nested inside the profile-header block
           above, signed-in only). For a guest, profile is null, so this
@@ -1117,7 +977,6 @@ export default function AccountScreen() {
           theme={theme}
           onChange={setTheme}
         />
-        {user && isDrugGroupsOn() && <ShareNameRow />}
         <MenuRow
           icon={<Bell size={17} strokeWidth={1.8} />}
           label="Notifications"
@@ -1214,6 +1073,6 @@ export default function AccountScreen() {
         isOpen={proSheetOpen}
         onClose={() => setProSheetOpen(false)}
       />
-    </div>
+    </SettingsPage>
   )
 }

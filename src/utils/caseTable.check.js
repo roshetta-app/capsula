@@ -336,7 +336,7 @@ test('K25: signed out on a signed-in-only screen goes Home by replacing it, with
 })
 
 test('K32: every screen the app knows has a name for its title and Back label', () => {
-  for (const url of ['/', '/conditions', '/drugs', '/favourites', '/account', '/drugs/browse/groups', '/roshetta/7', '/roshetta/7/edit', '/account/faq', '/g/abc', '/r/abc']) {
+  for (const url of ['/', '/conditions', '/drugs', '/favourites', '/account', '/drugs/browse/groups', '/roshetta/7', '/roshetta/7/edit', '/account/faq', '/account/settings', '/g/abc', '/r/abc']) {
     assert.ok(labelForPath(url), url)
     assert.ok(matchScreen(url), url)
   }

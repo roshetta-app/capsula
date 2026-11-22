@@ -37,7 +37,7 @@ export const SCREENS = [
   { pattern: '/conditions',                kind: 'main', parent: '/',                        label: 'Topics',       signIn: false, laysBehind: true },
   { pattern: '/drugs',                     kind: 'main', parent: '/',                        label: 'Drugs',        signIn: false, laysBehind: true },
   { pattern: '/favourites',                kind: 'main', parent: '/',                        label: 'Favourites',   signIn: false, laysBehind: true },
-  { pattern: '/account',                   kind: 'main', parent: '/',                        label: 'Account',      signIn: false, laysBehind: true },
+  { pattern: '/account',                   kind: 'main', parent: '/',                        label: 'Profile',      signIn: false, laysBehind: true },
 
   // ── Topics side
   { pattern: '/conditions/:slug',          kind: 'page', parent: '/conditions',              label: 'Topic',        signIn: false, laysBehind: true },
@@ -66,8 +66,11 @@ export const SCREENS = [
 
   // ── Account pages. Today no screen places Account behind them on a link arrival; the rule
   // says it should (plan rule 3), and step 12.3 is where that gets built.
+  // 14.7a (2026-11-22): the Account tab is now the Profile tab. What used to be the Account screen is
+  // Settings, a page opened from Profile; the FAQ is opened from Settings, so Settings is behind it.
+  { pattern: '/account/settings',          kind: 'page', parent: '/account',                 label: 'Settings',      signIn: false, laysBehind: true },
   { pattern: '/account/edit',              kind: 'edit', parent: '/account',                 label: 'Edit profile',           signIn: true,  laysBehind: true },
-  { pattern: '/account/faq',               kind: 'page', parent: '/account',                 label: 'FAQ',           signIn: false, laysBehind: true },
+  { pattern: '/account/faq',               kind: 'page', parent: '/account/settings',        label: 'FAQ',           signIn: false, laysBehind: true },
 ]
 
 // ─── Matching an address to its rule ──────────────────────────────────────────
