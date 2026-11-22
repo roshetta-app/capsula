@@ -15,7 +15,7 @@
 
 import {
   cleanName, cleanBio, cleanHandle, messageForCode, isAvatarCode,
-  PHYSICIAN_OCCUPATIONS, handleChangeDaysLeft,
+  PHYSICIAN_OCCUPATIONS, handleChangeDaysLeft, removedWaitDaysLeft,
 } from './profileRules.js'
 import { previewPublic } from './profileData.js'
 import { COUNTRIES, DIAL_TO_ISO2, isPhoneInvalid } from './profileOptions.js'
@@ -180,4 +180,21 @@ export function mergeDetails(saved, values) {
 export function groupFromState(state) {
   const g = state?.group
   return g === 'details' || g === 'public' ? g : null
+}
+
+// Remove public profile (14.7c-2). The wording is the plan's (P18); the work is the database's
+// remove_public_profile: every on-profile link stops, items stay private, name, bio, avatar and
+// username are cleared, usernames die for good, and a new profile waits 30 days.
+export const REMOVE_PUBLIC = {
+  action: 'Remove public profile',
+  title: 'Remove public profile?',
+  message: 'Your profile and its links stop working. Your items stay private. You can set up a new profile in 30 days.',
+  confirm: 'Remove',
+  done: 'Public profile removed',
+}
+
+// After a removal the Set up button waits; this is the line under it (null = no wait).
+export function setUpWaitLine(row, now = Date.now()) {
+  const d = removedWaitDaysLeft(row, now)
+  return d > 0 ? `You can set up a new profile in ${d === 1 ? '1 day' : `${d} days`}.` : null
 }

@@ -28,7 +28,7 @@ import { useCallback, useMemo } from 'react'
 import { useAuth } from './useAuth'
 import { supabase } from '../lib/supabase'
 import {
-  fetchProfile, savePublicCardOrWait, applyWaiting, hasWaiting, localProfileStore, saveDetails as sendDetails,
+  fetchProfile, savePublicCardOrWait, applyWaiting, hasWaiting, localProfileStore, saveDetails as sendDetails, removePublicCard,
 } from '../utils/profileData'
 import { readSharedIds } from '../utils/addToProfile'
 
@@ -78,6 +78,13 @@ export function usePublicProfile() {
     return sendDetails(supabase, userId, updates, { hasHandle, limit: withLimit })
   }, [userId])
 
+  // 14.7c-2: Remove public profile. The database ends every on-profile link, clears name, bio, avatar and
+  // username (the usernames die for good) and starts the 30-day wait. Not queued: the person must be online.
+  const removePublicProfile = useCallback(async () => {
+    if (!userId) return { ok: false, kind: 'retry', code: 'not_signed_in', message: 'Sign in first.' }
+    return removePublicCard(supabase, { limit: withLimit })
+  }, [userId])
+
   const loadSharedIds = useCallback(async () => {
     if (!userId) return { ok: false, kind: 'retry', code: 'not_signed_in', message: 'Sign in first.' }
     const [r, g] = await Promise.all([
@@ -89,5 +96,5 @@ export function usePublicProfile() {
     return { ok: false, kind: offline ? 'retry' : 'error', message: offline ? 'No connection.' : 'Something went wrong. Try again.' }
   }, [userId])
 
-  return { signedIn: Boolean(userId), loadProfile, savePublicCard, saveDetails, loadSharedIds }
+  return { signedIn: Boolean(userId), loadProfile, savePublicCard, saveDetails, removePublicProfile, loadSharedIds }
 }

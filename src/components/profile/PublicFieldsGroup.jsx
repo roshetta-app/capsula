@@ -14,7 +14,8 @@
 
 import { Contact, AtSign, AlignLeft, AlertCircle } from 'lucide-react'
 import PublicAvatar from '../ui/PublicAvatar'
-import { WizardField, PillInput, wizardCardStyle, fieldIconStyle } from './FormParts'
+import { WizardField, PillInput } from './FormParts'
+import { wizardCardStyle, fieldIconStyle } from './formStyles'
 import { AVATAR_CODES } from '../../utils/profileRules'
 import { NAME_HELP, HANDLE_HELP, BIO_HELP, BIO_MAX, NAME_MAX, HANDLE_MAX } from '../../utils/publicSetup'
 import { FORWARDING_LABEL, FORWARDING_HELP, hasHandle } from '../../utils/editProfile'

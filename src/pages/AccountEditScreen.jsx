@@ -16,13 +16,14 @@
  * Two separate saves, details first (utils/editProfile.js, utils/profileData.js): a refusal of the public
  * part leaves the details saved and says so under the field. Offline, the screen says so and saving waits
  * for the connection (nothing is queued). The chosen avatar is shown here, never the sign-in photo.
- * Delete account stays at the bottom (not in welcome). Remove public profile comes in 14.7c-2.
+ * Delete account and Remove public profile (14.7c-2, only with a username) sit in the danger zone at the
+ * bottom, not in welcome. Removal: confirm sheet, then the database's remove_public_profile.
  * The rules live in utils/editProfile.js; the old wizard file is retired in 14.7c-2.
  */
 
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { ArrowLeft, Mail, Stethoscope, PenLine, HeartPulse, GraduationCap, MapPin, User, Phone, Trash2, WifiOff, ChevronDown, Contact } from 'lucide-react'
+import { ArrowLeft, Mail, Stethoscope, PenLine, HeartPulse, GraduationCap, MapPin, User, Phone, Trash2, UserX, WifiOff, ChevronDown, Contact } from 'lucide-react'
 import { validatePhoneNumberLength } from 'libphonenumber-js'
 import { useAuth } from '../hooks/useAuth'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
@@ -39,7 +40,8 @@ import PublicSetupSheet from '../components/ui/PublicSetupSheet'
 import GroupStateMessage from '../components/drugs/groups/GroupStateMessage'
 import { shimmer } from '../components/drugs/home/shimmer'
 import PublicFieldsGroup from '../components/profile/PublicFieldsGroup'
-import { WizardField, WizardDropdown, PhoneCodeSheet, PillInput, wizardCardStyle, fieldIconStyle } from '../components/profile/FormParts'
+import { WizardField, WizardDropdown, PhoneCodeSheet, PillInput } from '../components/profile/FormParts'
+import { wizardCardStyle, fieldIconStyle } from '../components/profile/formStyles'
 import {
   GENDER_OPTIONS, OCCUPATION_OPTIONS, STUDENT_TYPE_OPTIONS, SPECIALTY_OPTIONS, COUNTRY_OPTIONS,
   DIAL_TO_ISO2, formatPhoneDisplay,
@@ -48,6 +50,7 @@ import { handleChangeDaysLeft } from '../utils/profileRules'
 import {
   valuesFromRow, applyChange, visibleFields, detailsProblems, detailsPayload, publicPayload, publicProblems,
   fieldForPublicRefusal, hasChanges, hasHandle, mergeDetails, groupFromState, NOT_PUBLIC_LINE, PHONE_HELP,
+  REMOVE_PUBLIC, setUpWaitLine,
 } from '../utils/editProfile'
 
 const TEXT = { fontFamily: 'var(--font-body)' }
@@ -75,7 +78,7 @@ export default function AccountEditScreen() {
   const { toast } = useToast()
   const navigate = useNavigate()
   const location = useLocation()
-  const { loadProfile, savePublicCard, saveDetails } = usePublicProfile()
+  const { loadProfile, savePublicCard, saveDetails, removePublicProfile } = usePublicProfile()
 
   // Welcome mode is decided once, when the sign-in has settled, from the same flag the first-run
   // redirect reads. Saving or skipping flips the flag, which must not change the screen under the person.
@@ -97,6 +100,7 @@ export default function AccountEditScreen() {
   const [deleteSheetOpen, setDeleteSheetOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [unsavedOpen, setUnsavedOpen] = useState(false)
+  const [removeOpen, setRemoveOpen] = useState(false)
   const pendingExitRef = useRef(null) // 'back' | 'skip'
   const publicRef = useRef(null)
   const group = groupFromState(location.state)
@@ -225,6 +229,17 @@ export default function AccountEditScreen() {
     } finally {
       setSaving(false)
     }
+  }
+
+  // Throws on failure so the confirm sheet stays open and says so; on success the screen reads the
+  // (now empty) public card again and shows the not-set-up state.
+  async function handleRemovePublic() {
+    if (isOffline) throw new Error('offline')
+    const res = await removePublicProfile()
+    if (!res.ok) throw new Error(res.message ?? 'remove failed')
+    toast.success(REMOVE_PUBLIC.done)
+    refreshProfile()
+    retry()
   }
 
   async function handleDeleteAccount() {
@@ -442,7 +457,7 @@ export default function AccountEditScreen() {
                   handleDaysLeft={handleDaysLeft}
                   disabled={busy}
                   onSetUp={() => setSetupOpen(true)}
-                  setUpBlockedLine={isDirty ? 'Save your changes first.' : isOffline ? 'Connect to set up your public profile.' : null}
+                  setUpBlockedLine={isDirty ? 'Save your changes first.' : isOffline ? 'Connect to set up your public profile.' : setUpWaitLine(row)}
                 />
               </div>
             )}
@@ -469,6 +484,22 @@ export default function AccountEditScreen() {
               <div style={{ marginTop: 'var(--space-8)' }}>
                 <h2 style={{ ...SECTION_TITLE, fontSize: 15 }}>Danger zone</h2>
                 <div style={{ backgroundColor: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-danger)', overflow: 'hidden' }}>
+                  {hasHandle(saved) && (
+                    <button
+                      type="button"
+                      onClick={() => { if (!isOffline) setRemoveOpen(true) }}
+                      disabled={isOffline}
+                      style={{
+                        width: '100%', display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-3) var(--space-4)', border: 'none',
+                        borderBottom: '1px solid var(--color-border)', backgroundColor: 'transparent', fontFamily: 'var(--font-body)', textAlign: 'left',
+                        cursor: isOffline ? 'not-allowed' : 'pointer', color: isOffline ? 'var(--color-text-tertiary)' : 'var(--color-danger)',
+                        opacity: isOffline ? 0.6 : 1, WebkitTapHighlightColor: 'transparent',
+                      }}
+                    >
+                      <UserX size={17} strokeWidth={1.8} style={{ flexShrink: 0 }} />
+                      <span style={{ fontSize: 14, fontWeight: 600 }}>{REMOVE_PUBLIC.action}</span>
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => { if (!isOffline) setDeleteSheetOpen(true) }}
@@ -508,6 +539,16 @@ export default function AccountEditScreen() {
         onClose={() => setDeleteSheetOpen(false)}
         onConfirm={handleDeleteAccount}
         busy={deleting}
+      />
+
+      <ConfirmSheet
+        isOpen={removeOpen}
+        onClose={() => setRemoveOpen(false)}
+        onConfirm={handleRemovePublic}
+        title={REMOVE_PUBLIC.title}
+        message={REMOVE_PUBLIC.message}
+        confirmLabel={REMOVE_PUBLIC.confirm}
+        destructive
       />
 
       <ConfirmSheet

@@ -159,3 +159,18 @@ test('details counted as saved after a public refusal: name only when it went wi
   const noHandle = valuesFromRow({ ...row, handle: null })
   assert.equal(mergeDetails(noHandle, { ...noHandle, fullName: 'New' }).fullName, 'New')
 })
+
+test('Remove public profile uses the plan wording exactly', async () => {
+  const { REMOVE_PUBLIC } = await import('./editProfile.js')
+  assert.equal(REMOVE_PUBLIC.message, 'Your profile and its links stop working. Your items stay private. You can set up a new profile in 30 days.')
+  assert.equal(REMOVE_PUBLIC.title, 'Remove public profile?')
+})
+
+test('after a removal the Set up button shows the wait; no wait, no line', async () => {
+  const { setUpWaitLine } = await import('./editProfile.js')
+  const now = Date.parse('2026-11-22T12:00:00Z')
+  assert.equal(setUpWaitLine({ public_removed_at: null }, now), null)
+  assert.equal(setUpWaitLine({ public_removed_at: '2026-11-10T12:00:00Z' }, now), 'You can set up a new profile in 18 days.')
+  assert.equal(setUpWaitLine({ public_removed_at: '2026-10-01T12:00:00Z' }, now), null)
+  assert.equal(setUpWaitLine({ public_removed_at: '2026-10-24T12:00:00Z' }, now), 'You can set up a new profile in 1 day.')
+})
