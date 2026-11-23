@@ -195,7 +195,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   User, LogOut, ChevronRight, Bell, HelpCircle, Info, UserCog, Mail,
-  Sun, Moon, Monitor, MessageCircle, Flag, FileText, ShieldCheck,
+  Sun, Moon, Monitor, MessageCircle, Flag, FileText, ShieldCheck, LayoutDashboard,
 } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { useBackLabel } from '../hooks/useBackLabel'
@@ -984,6 +984,29 @@ export default function AccountScreen() {
           last
         />
       </div>
+
+      {/* 2026-11-23: the admin pages (/admin) had no way in from the app: the
+          native app has no address bar. Admin accounts get one row here. Same
+          rule as AuthGuard (profile.role is 'admin'); everyone else sees nothing. */}
+      {profile?.role === 'admin' && (
+        <>
+          <SectionLabel>Admin</SectionLabel>
+          <div style={{
+            backgroundColor: 'var(--color-surface)',
+            borderRadius:    'var(--radius-lg)',
+            border:          '1px solid var(--color-border)',
+            overflow:        'hidden',
+            marginBottom:    'var(--space-3)',
+          }}>
+            <MenuRow
+              icon={<LayoutDashboard size={17} strokeWidth={1.8} />}
+              label="Admin pages"
+              onClick={() => navigate(ROUTES.ADMIN)}
+              last
+            />
+          </div>
+        </>
+      )}
 
       {/* account-screen-visual-refresh: reordered FAQ, Contact Us, Report
           a Problem, About Capsula. Report a Problem is new (stub). */}
