@@ -141,3 +141,14 @@ test('the star lines say what the database really does: a public number, a priva
   assert.doesNotMatch(t + p, /anonymous|no one can see who starred|nobody can see who starred/i);
 });
 
+
+test('the Telegram alert line says what the doorbell really sends and nothing more (Track F, F1c)', () => {
+  const p = textOf(privacySections()).join('\n');
+  for (const must of [
+    'Alerts to our team:', 'Telegram, a messaging service', 'the people who run Capsula',
+    'the kind of page or item, the reason, how many reports and a link to the review screen',
+    'It holds no names, notes or account details',
+  ]) assert.ok(p.includes(must), `Privacy: ${must}`);
+  // The message carries no personal detail, so the text never says it does.
+  assert.doesNotMatch(p, /telegram[^.]*(your name|your note|your email)/i);
+});
