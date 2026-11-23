@@ -28,6 +28,12 @@
  * a request to the Edge Function" error. Mirrors send-notification's
  * existing corsHeaders + OPTIONS handling exactly. pg_cron's own calls are
  * unaffected by this change — CORS is a browser-only mechanism.
+ *
+ * Step 1b (2026-11-24) — notifications to ONE person. notification_log has a
+ * new nullable column target_user_id. When it is set, the row is sent only to
+ * the push_tokens of that person; when it is empty, to every phone as before.
+ * Rows with a target are created by the database function notify_user, which
+ * makes them due at once (no 30 minute review window).
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -171,11 +177,17 @@ async function sendToToken(
 async function deliverOne(
   adminClient: ReturnType<typeof createClient>,
   accessToken: string,
-  logRow: { id: string; type: string; title: string; message: string; image_url: string | null; deep_link_path: string | null },
+  logRow: { id: string; type: string; title: string; message: string; image_url: string | null; deep_link_path: string | null; target_user_id: string | null },
 ) {
-  const { data: tokens, error: dbErr } = await adminClient
+  // Step 1b (2026-11-24): a row with target_user_id goes ONLY to that person's phones;
+  // an empty target_user_id still means everyone, exactly as before.
+  let tokenQuery = adminClient
     .from('push_tokens')
     .select('id, token')
+  if (logRow.target_user_id) {
+    tokenQuery = tokenQuery.eq('user_id', logRow.target_user_id)
+  }
+  const { data: tokens, error: dbErr } = await tokenQuery
 
   if (dbErr) throw dbErr
 
@@ -233,7 +245,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: dueRows, error: dueErr } = await adminClient
       .from('notification_log')
-      .select('id, type, title, message, image_url, deep_link_path')
+      .select('id, type, title, message, image_url, deep_link_path, target_user_id')
       .eq('status', 'pending')
       .lte('scheduled_send_at', new Date().toISOString())
 
@@ -247,7 +259,7 @@ Deno.serve(async (req: Request) => {
 
     for (const row of dueRows) {
       try {
-        await deliverOne(adminClient, accessToken, row as { id: string; type: string; title: string; message: string; image_url: string | null; deep_link_path: string | null })
+        await deliverOne(adminClient, accessToken, row as { id: string; type: string; title: string; message: string; image_url: string | null; deep_link_path: string | null; target_user_id: string | null })
       } catch (err) {
         console.error(`deliver-notification: failed to deliver ${row.id}:`, err)
       }
