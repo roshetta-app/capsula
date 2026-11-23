@@ -16,6 +16,10 @@
  * no account, and are cleared nightly; day numbers older than 90 days are added into one total per item; deleting a
  * roshetta, a drug group or an account removes its counts). They replace the idea of "no visitor tracking".
  *
+ * 2026-11-23 (Track H, step H7c): the lines about stars (checked against Migration 10 and its test: a star is kept as
+ * account + item + time, one per person, never readable by the app, removed on un-star, account deletion and item deletion,
+ * hidden while the item is private and back when it is public again, the count is public).
+ *
  * 2026-11-23 (Track H, step H6c): the lines about the saved-copy count (checked against the live database and Migration 9:
  * a copy stores the code of the link it came from; one copy per person per link; the owner gets a number only through
  * owner_item_views, never a name or id; a deleted copy or account stops counting).
@@ -89,6 +93,7 @@ export function termsSections(facts) {
         'Anyone with a link can view the item, save their own copy and change that copy. A copy belongs to whoever saved it, and changes they make do not change your original.',
         'The person who made a public item can see an approximate count of how many visitors opened it, with repeat visits on the same day counted once. Capsula does not show who visited.',
         'The person who made a public item can also see how many other people saved a copy from its link. Capsula does not show who saved it.',
+        'A signed-in person can star a public item they did not make. The number of stars is public: anyone who opens the link sees it. Capsula does not show who starred.',
         'Links you shared before public profiles existed keep working until you stop sharing them.',
         'Titles such as "Dr" are written by the person and are not checked by Capsula. You can use a nickname instead of your real name.',
         'When you make an item private, its link stops working for new visits at once. Someone who already opened it may still see what they loaded, and anyone who saved a copy keeps their copy.',
@@ -152,6 +157,7 @@ export function privacySections(facts) {
         'Notes on page reports: when you report a problem on a Topic or drug page, the optional note (up to 300 letters) is kept with the report. Only the people who run Capsula see it. It is kept after the report is closed and after you delete your account, without your name.',
         'View counts: for each public roshetta and drug group, how many visitors opened it each day, as a number only. The day by day numbers are held for 90 days and then added into one running total for that item. Only the person who made the item sees them. Your own visits while signed in are not counted.',
         'Saved copies: a copy you save remembers which link it came from, so the same link cannot be saved twice by you. The person who made the original sees only how many other people hold a copy, never who. If you delete your copy or your account, you are no longer counted.',
+        'Stars: when you star a public roshetta or drug group, Capsula keeps your account, the item and the time, so one account can star an item only once and your star can be taken back. Only the people who run Capsula can see this record; the app never shows who starred, and everyone sees only the number. Taking back your star, deleting your account or deleting the item removes the star. If the item is made private, its stars are not shown, and they show again if it becomes public again.',
         'Crash records: the technical error and the app version. They are not linked to your account.',
         'Username checks: how many times you check whether a username is free, so that guessing can be stopped.',
       ],
@@ -160,6 +166,7 @@ export function privacySections(facts) {
       title: 'What is public',
       paragraphs: [
         'Only what you make public: the items you choose, your name, your username, your bio and your avatar. Everything else stays private.',
+        'The number of stars on a public item is public. Who starred it is not shown in the app.',
         'The people who run Capsula can see your account details, including your phone number if you gave one.',
         'Opening a public link needs no account. We keep no list of who opened what. When someone looks up a username that does not exist, the lookup is counted under a scrambled code made from their address and the day, and this is cleared every night. It is used only to stop guessing.',
         'We count visits without knowing who visited. After a public page has stayed open for a couple of seconds, one is added to its count for the day. To avoid counting the same visitor twice in a day, we keep a scrambled code made from the visitor\'s address, the item and the day, and a scrambled form of the address that limits how many items one address can add in a day. These codes cannot be turned back into the address, are not linked to any account, and are cleared every night. Nothing about the count is saved on the visitor\'s phone. The numbers are approximate: people on one shared network can count as one.',
@@ -168,7 +175,7 @@ export function privacySections(facts) {
     {
       title: 'How we use it',
       paragraphs: [
-        'To run the app and keep your things in your account, to review reports, to show owners how many visitors opened their public items and how many people saved a copy, and to understand how the app is used.',
+        'To run the app and keep your things in your account, to review reports, to show owners how many visitors opened their public items, how many people saved a copy and how many starred it, and to understand how the app is used.',
         'Your phone number is used to reach you about your plan. It is not used for offers unless you tick "Send me offers and deals", which is off until you choose it. We record the date you ticked it, and you can untick it at any time.',
       ],
     },
@@ -176,7 +183,7 @@ export function privacySections(facts) {
       title: 'Deleting your account',
       paragraphs: [
         'You can delete your account at any time from Edit profile. It is permanent.',
-        'Removed: your profile, roshettas and drug groups with their links and view counts, favourites, favourite classes, notes, search history, recent views and notification codes.',
+        'Removed: your profile, roshettas and drug groups with their links, view counts and stars, the stars you gave, favourites, favourite classes, notes, search history, recent views and notification codes.',
         'Stays: usage records, without your account attached (the device code and session code stay on them). Reports you sent, with any note you wrote, without your name. Your username, which stays reserved so nobody else can take it and old links never lead to someone else.',
         'If someone saved a copy of one of your public roshettas or drug groups, they keep their copy.',
       ],

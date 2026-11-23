@@ -102,7 +102,7 @@ test('the view count lines say what the database really does and make no promise
     'View counts:', 'as a number only', 'held for 90 days', 'one running total', 'Only the person who made the item sees them',
     'Your own visits while signed in are not counted', 'We count visits without knowing who visited', 'couple of seconds',
     'cannot be turned back into the address', 'not linked to any account', 'cleared every night',
-    'Nothing about the count is saved on the visitor', 'approximate', 'one shared network', 'with their links and view counts',
+    'Nothing about the count is saved on the visitor', 'approximate', 'one shared network', 'with their links, view counts and stars',
   ]) assert.ok(p.includes(must), `Privacy: ${must}`);
   // Counting is not hidden: the old idea of no visitor tracking at all would now be untrue.
   assert.doesNotMatch(t + p, /no visitor tracking|never track|we do not track/i);
@@ -123,3 +123,21 @@ test('the saved-copy lines say what the database really does and show owners a n
   // A number is not a list: nothing says or implies the owner can learn who saved a copy.
   assert.doesNotMatch(t + p, /see who saved|who saved a copy of your|names of people who saved/i);
 });
+
+test('the star lines say what the database really does: a public number, a private record, and what removes it (Track H, H7c)', () => {
+  const t = textOf(termsSections()).join('\n');
+  for (const must of ['can star a public item they did not make', 'The number of stars is public', 'does not show who starred']) {
+    assert.ok(t.includes(must), `Terms: ${must}`);
+  }
+  const p = textOf(privacySections()).join('\n');
+  for (const must of [
+    'Stars:', 'keeps your account, the item and the time', 'only once', 'the app never shows who starred',
+    'everyone sees only the number', 'Taking back your star, deleting your account or deleting the item removes the star',
+    'its stars are not shown', 'show again if it becomes public again',
+    'The number of stars on a public item is public', 'how many starred it', 'view counts and stars, the stars you gave',
+  ]) assert.ok(p.includes(must), `Privacy: ${must}`);
+  // Honest about who can see the record, and never promises that nobody can.
+  assert.ok(p.includes('Only the people who run Capsula can see this record'));
+  assert.doesNotMatch(t + p, /anonymous|no one can see who starred|nobody can see who starred/i);
+});
+
