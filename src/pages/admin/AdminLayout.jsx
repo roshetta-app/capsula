@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
-import { LogOut, Menu } from 'lucide-react'
+import { LogOut, Menu, Home } from 'lucide-react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
   faHouse, faCapsules, faNotesMedical, faStethoscope, faTags,
@@ -157,6 +157,13 @@ export default function AdminLayout() {
     requestLeave(() => navigate(path))
   }
 
+  // 2026-11-23: one tap back to the public app (Home). Goes through the same
+  // Leave / Stay question as the menu items, so unsaved changes are never lost silently.
+  function goToApp() {
+    setMenuOpen(false)
+    requestLeave(() => navigate('/'))
+  }
+
   function handleSignOut() {
     setMenuOpen(false)
     requestLeave(async () => {
@@ -193,6 +200,15 @@ export default function AdminLayout() {
             <Menu size={22} />
           </button>
           <div className="cms-topbar-title">{editorTitle || currentPageLabel(location.pathname)}</div>
+          <button
+            type="button"
+            className="cms-topbar-btn"
+            style={{ marginLeft: 0 }}
+            onClick={goToApp}
+            aria-label="Back to the app"
+          >
+            <Home size={20} />
+          </button>
         </header>
       )}
       {isPhone && menuOpen && (
@@ -322,11 +338,36 @@ export default function AdminLayout() {
           ))}
         </nav>
 
-        {/* Sign out */}
+        {/* Back to the app + Sign out */}
         <div style={{
           padding: 'var(--space-3)',
           borderTop: '1px solid var(--color-border)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 'var(--space-2)',
         }}>
+          <button
+            onClick={goToApp}
+            aria-label="Back to the app"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--space-2)',
+              padding: 'var(--space-2) var(--space-3)',
+              borderRadius: 'var(--radius-sm)',
+              border: '1px solid var(--color-border)',
+              backgroundColor: 'transparent',
+              color: 'var(--color-text-secondary)',
+              fontSize: 13,
+              fontWeight: 500,
+              fontFamily: 'var(--font-body)',
+              cursor: 'pointer',
+              width: '100%',
+            }}
+          >
+            <Home size={15} />
+            Back to the app
+          </button>
           <button
             onClick={handleSignOut}
             aria-label="Sign out"
