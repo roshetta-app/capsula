@@ -1545,7 +1545,7 @@ export async function fetchPendingNotifications() {
 export async function fetchSentNotifications({ limit = 100 } = {}) {
   const { data, error } = await supabase
     .from('notification_log')
-    .select('id, type, title, message, sent_count, failed_count, click_count, sent_at')
+    .select('id, type, title, message, sent_count, failed_count, click_count, sent_at, target_user_id')
     .eq('status', 'sent')
     .order('sent_at', { ascending: false })
     .limit(limit)

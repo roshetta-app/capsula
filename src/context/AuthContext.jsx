@@ -128,7 +128,7 @@ import {
 } from '../utils/signInReturn'
 import { useToast } from './ToastContext'
 import { writeCachedAuthSnapshot, clearCachedAuthSnapshot, getCachedAuthSnapshot } from '../utils/authSnapshot'
-import { setCurrentUserId } from '../analytics/deviceSession'
+import { setCurrentUserId, getDeviceId } from '../analytics/deviceSession'
 import { prefetchAllNotes, useNotesPrefetchResume } from '../hooks/useNotesPrefetch'
 import { openSheetStepCount } from '../hooks/useBackClose'
 
@@ -977,6 +977,16 @@ export function AuthProvider({ children }) {
   // place clearCachedAuthSnapshot() is called from — see loadProfile's
   // header comment above for why it was removed from there.
   async function signOut() {
+    // Step 1b follow-up (2026-11-24): free this phone from the account BEFORE the
+    // sign-out (the database only lets a signed-in person change their own phone
+    // row), so a personal notice never shows on a phone where that person has
+    // signed out. The phone still gets notices meant for everyone. Best effort:
+    // a failure here never blocks the sign-out.
+    try {
+      await supabase.from('push_tokens').update({ user_id: null }).eq('device_id', getDeviceId())
+    } catch {
+      // ignore
+    }
     const { error } = await supabase.auth.signOut()
     if (error && isNetworkTimingError(error)) return { error }
 

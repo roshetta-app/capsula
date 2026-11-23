@@ -1252,6 +1252,17 @@ export default function NotificationsPanel() {
                         fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)',
                         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                       }}>
+                        {entry.target_user_id && (
+                          <span style={{
+                            fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
+                            letterSpacing: '0.05em', marginRight: 6, padding: '1px 6px',
+                            borderRadius: 'var(--radius-full)',
+                            border: '1px solid var(--color-border-subtle)',
+                            color: 'var(--color-text-tertiary)',
+                          }}>
+                            One person
+                          </span>
+                        )}
                         {entry.title}
                       </div>
                       <div style={{
