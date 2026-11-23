@@ -13,9 +13,12 @@
  * reports, and a link to the CMS Reports screen. Never a name, a note, a
  * reporter or any personal detail (the queue does not hold them).
  *
- * Secret (Edge Function secret, dashboard only): NTFY_TOPIC, a long random
+ * Secrets (Edge Function secrets, dashboard only): NTFY_TOPIC, a long random
  * topic name that works like a password (whoever knows it can read the alerts,
- * which hold nothing personal). Nothing is read from the request: anyone who calls this
+ * which hold nothing personal); and NTFY_TOKEN, an access token of a free ntfy.sh
+ * account. Without the token ntfy counts the send against Supabase's SHARED outgoing
+ * address, whose free daily quota was already used up ("daily message quota reached",
+ * 2026-11-23); with it the quota is the account's own. Nothing is read from the request: anyone who calls this
  * function can only cause rows already in the queue to be sent to the owner's
  * own topic; they cannot choose the text or the topic.
  *
@@ -32,6 +35,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 const SUPABASE_URL              = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const NTFY_TOPIC                = Deno.env.get('NTFY_TOPIC') ?? ''
+const NTFY_TOKEN                = Deno.env.get('NTFY_TOKEN') ?? ''
 
 const CMS_REPORTS_URL = 'https://roshetta-app.github.io/capsula/admin/reports'
 const MAX_MESSAGES_PER_HOUR = 20
@@ -138,12 +142,16 @@ Deno.serve(async () => {
         Priority: msg.urgent ? '5' : '3',
         Tags: msg.urgent ? 'rotating_light' : 'bell',
         Click: CMS_REPORTS_URL,
+        ...(NTFY_TOKEN ? { Authorization: `Bearer ${NTFY_TOKEN}` } : {}),
       },
       body: msg.body,
     })
     if (!res.ok) {
       await release()
-      console.error('doorbell send failed, status', res.status)
+      // ntfy's refusal text holds no topic and no secret, so it is safe to log (first 200 letters).
+      let why = ''
+      try { why = (await res.text()).slice(0, 200) } catch (_e) { /* ignore */ }
+      console.error('doorbell send failed, status', res.status, why)
       return json({ ok: false, error: 'send_failed', status: res.status }, 502)
     }
     return json({ ok: true, sent: claimed.length })
