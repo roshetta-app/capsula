@@ -1,19 +1,23 @@
 /**
  * supabase/functions/telegram-doorbell/index.ts
- * Track F, step F1b (2026-11-23) — the Telegram doorbell.
+ * Track F, step F1b (2026-11-23) — the report doorbell.
+ * Changed the same night from Telegram to ntfy (Telegram refused every request with
+ * "Too Many Requests", even from a new bot). The function and job keep the name
+ * `telegram-doorbell` so nothing else had to be renamed.
  *
  * Called every minute by the pg_cron job `telegram-doorbell`, only when the
  * table `doorbell_queue` has an unsent row (filled by the trigger on `reports`).
- * Sends ONE short message to the owner's Telegram chat, then marks the rows sent.
+ * Sends ONE short alert to the owner's phone through ntfy (https://ntfy.sh), then marks the rows sent.
  *
  * What the message holds: the kind of page or item, the reason, how many
  * reports, and a link to the CMS Reports screen. Never a name, a note, a
  * reporter or any personal detail (the queue does not hold them).
  *
- * Secrets (Edge Function secrets, dashboard only): TELEGRAM_BOT_TOKEN,
- * TELEGRAM_CHAT_ID. Nothing is read from the request: anyone who calls this
+ * Secret (Edge Function secret, dashboard only): NTFY_TOPIC, a long random
+ * topic name that works like a password (whoever knows it can read the alerts,
+ * which hold nothing personal). Nothing is read from the request: anyone who calls this
  * function can only cause rows already in the queue to be sent to the owner's
- * own chat; they cannot choose the text or the chat.
+ * own topic; they cannot choose the text or the topic.
  *
  * Limits: at most 20 messages an hour (rows over the limit wait and go out in
  * a later, grouped message; nothing is lost). A failed send puts the rows
@@ -27,8 +31,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const SUPABASE_URL              = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-const BOT_TOKEN                 = Deno.env.get('TELEGRAM_BOT_TOKEN') ?? ''
-const CHAT_ID                   = Deno.env.get('TELEGRAM_CHAT_ID') ?? ''
+const NTFY_TOPIC                = Deno.env.get('NTFY_TOPIC') ?? ''
 
 const CMS_REPORTS_URL = 'https://roshetta-app.github.io/capsula/admin/reports'
 const MAX_MESSAGES_PER_HOUR = 20
@@ -63,7 +66,7 @@ function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 }
 
-function buildMessage(rows: Row[]): string {
+function buildMessage(rows: Row[]): { title: string; body: string; urgent: boolean } {
   // one line per page or item (same kind + same target), with a count
   const groups = new Map<string, { kind: string; urgent: boolean; reasons: Map<string, number>; count: number }>()
   for (const r of rows) {
@@ -82,14 +85,18 @@ function buildMessage(rows: Row[]): string {
       .join(', ')
     const word = KIND_WORDS[g.kind] ?? 'Report'
     const count = g.count > 1 ? ` (${g.count} reports)` : ''
-    return `${g.urgent ? '\u{1F534} URGENT ' : ''}${word}: ${reasons}${count}`
+    return `${g.urgent ? 'URGENT ' : ''}${word}: ${reasons}${count}`
   })
   if (list.length > shown.length) lines.push(`and ${list.length - shown.length} more`)
-  return `Capsula: new report${rows.length > 1 ? 's' : ''}\n\n${lines.join('\n')}\n\n${CMS_REPORTS_URL}`
+  return {
+    title: `Capsula: new report${rows.length > 1 ? 's' : ''}`,
+    body: `${lines.join('\n')}\n\n${CMS_REPORTS_URL}`,
+    urgent: list.some((g) => g.urgent),
+  }
 }
 
 Deno.serve(async () => {
-  if (!BOT_TOKEN || !CHAT_ID) return json({ ok: false, error: 'not_configured' }, 500)
+  if (NTFY_TOPIC.length < 16) return json({ ok: false, error: 'not_configured' }, 500)
 
   const db = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } })
 
@@ -122,25 +129,27 @@ Deno.serve(async () => {
   }
 
   try {
-    const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+    const msg = buildMessage(claimed as Row[])
+    // The address holds the topic name (the password), so it is never logged.
+    const res = await fetch(`https://ntfy.sh/${encodeURIComponent(NTFY_TOPIC)}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: CHAT_ID,
-        text: buildMessage(claimed as Row[]),
-        disable_web_page_preview: true,
-      }),
+      headers: {
+        Title: msg.title,
+        Priority: msg.urgent ? '5' : '3',
+        Tags: msg.urgent ? 'rotating_light' : 'bell',
+        Click: CMS_REPORTS_URL,
+      },
+      body: msg.body,
     })
     if (!res.ok) {
       await release()
-      // log the status only, never the address (it holds the token)
-      console.error('telegram send failed, status', res.status)
+      console.error('doorbell send failed, status', res.status)
       return json({ ok: false, error: 'send_failed', status: res.status }, 502)
     }
     return json({ ok: true, sent: claimed.length })
   } catch (_e) {
     await release()
-    console.error('telegram send failed (network)')
+    console.error('doorbell send failed (network)')
     return json({ ok: false, error: 'send_failed' }, 502)
   }
 })
