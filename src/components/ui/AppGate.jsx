@@ -10,7 +10,7 @@
  * below rather than inventing a new one. See OfflineBlock and the
  * mount/unmount effect in AppGate() for details.
  *
- * 2026-09-01 (offline-block-forgiveness fix, plan §4.4 addendum) — the
+ * 2026-09-01 (offline-block-forgiveness fix, SUPERSEDED 2026-11-23, see below) — the
  * block used to engage the instant the shared isOnline signal went
  * false, which meant a slow-but-working connection (weak signal, brief
  * hiccup) that the shared check had confirmed "down" still locked a free
@@ -32,6 +32,16 @@
  * interface" offline shows the block immediately, same as before the
  * grace period ever existed; only the ambiguous "device says connected
  * but can't reach the server" case gets the wait.
+ *
+ * 2026-11-23 (softer offline block, decision O1, plan §4.4 addendum
+ * revised) — the block now appears ONLY when the device has no network
+ * at all (hasNetworkInterface false: wifi and data off). The ambiguous
+ * case — device says connected but the server check fails, i.e. weak
+ * signal — never blocks any more: the app keeps working from the saved
+ * library and updates when the signal returns. That removes the
+ * BLOCK_GRACE_MS wait and its timer entirely. isOnline itself is still
+ * untouched, so the Pro toast and everything else read the same signal
+ * as before. The block still clears the instant the interface returns.
  *
  * Reads the current gate from AppGateContext and renders one of two
  * surfaces, chosen by gate.dismissible:
@@ -100,14 +110,6 @@ import { useDrugContext } from '../../context/DrugContext'
 import { useConditionContext } from '../../context/ConditionContext'
 import { logUsageEvent } from '../../analytics/usageEvents'
 import { useBackClose } from '../../hooks/useBackClose'
-
-// How long the offline block waits, once eligible, before it's actually
-// allowed to appear (2026-09-01 offline-block-forgiveness fix, plan §4.4
-// addendum) — gives a slow-but-recovering connection a further window to
-// come back before a free user is locked out, on top of (not instead of)
-// the shared reachability check's own confirmation in OnlineStatusContext.
-// Cancels immediately, no grace, the moment the connection recovers.
-const BLOCK_GRACE_MS = 6000
 
 // Type-based color + icon, plan §10.6. Force Update and (hard) Maintenance
 // lean into the serious tones since they're the two that can block
@@ -564,60 +566,20 @@ export default function AppGate() {
   // already loaded into Drug/ConditionContext — no explicit refresh()
   // needed for this to clear itself the instant a real connection
   // returns (§4.4), since it's just recalculated on the next render.
-  const { isOnline, hasNetworkInterface } = useOnlineStatus()
+  const { hasNetworkInterface } = useOnlineStatus()
   const isPro = useIsPro()
   const { drugs, loading: drugsLoading } = useDrugContext()
   const { conditions, loading: conditionsLoading } = useConditionContext()
   const hasCachedLibrary = !drugsLoading && drugs.length > 0 && !conditionsLoading && conditions.length > 0
 
-  // Everything that would make the block eligible to show, before the
-  // grace period below is applied.
-  const rawOfflineCandidate = hasCachedLibrary && !isOnline && !isPro
-
-  // 2026-09-01 (offline-block-forgiveness fix, plan §4.4 addendum): the
-  // shared isOnline signal (OnlineStatusContext) already requires two
-  // failed reachability checks before it flips false, which protects
-  // every consumer — this block, the Pro toast, everything — from a
-  // single blip. But the block specifically has real consequences (it
-  // stops a free user from using the app at all), while the toast is
-  // just a message, so the block alone gets one further layer of
-  // forgiveness on top of that shared signal: it waits BLOCK_GRACE_MS
-  // after becoming eligible before it's actually allowed to appear,
-  // and cancels immediately (no grace) if the connection recovers
-  // before that window is up. This does NOT touch isOnline itself —
-  // the toast and everything else keep reading the same signal exactly
-  // as responsively as before; only the block's own decision to show
-  // gets this extra patience.
-  //
-  // 2026-09-01 (hard-vs-ambiguous fix): that grace period is ONLY for the
-  // ambiguous case — device claims connected but the reachability check
-  // can't get through, which could be a real drop or could just be a
-  // slow moment. A device with no network interface at all
-  // (hasNetworkInterface false — wifi/data actually off) is not
-  // ambiguous at all, so it gets none of that grace: the block shows
-  // immediately, same as it always did before the grace period existed.
-  const [offlineBlockActive, setOfflineBlockActive] = useState(false)
-
-  useEffect(() => {
-    if (!rawOfflineCandidate) {
-      // Not eligible (back online, went Pro, or lost cached library) —
-      // clear instantly, same "recovery is never delayed" rule the
-      // shared signal itself already follows.
-      setOfflineBlockActive(false)
-      return
-    }
-
-    if (!hasNetworkInterface) {
-      // Hard offline — nothing ambiguous to wait out.
-      setOfflineBlockActive(true)
-      return
-    }
-
-    // Device claims connected but can't actually reach the server —
-    // give it a chance to recover before locking the person out.
-    const timer = setTimeout(() => setOfflineBlockActive(true), BLOCK_GRACE_MS)
-    return () => clearTimeout(timer)
-  }, [rawOfflineCandidate, hasNetworkInterface])
+  // 2026-11-23 (softer offline block, decision O1): the block shows only
+  // for a TRUE no-network moment — a free account, a library already
+  // cached, and no network interface at all (wifi and data off).
+  // "Connected but the server can't be reached" (weak signal, slow
+  // hospital wifi) never blocks: the saved library keeps working and
+  // refreshes when the signal returns. Computed live on every render,
+  // so it clears the instant the interface comes back — no timer needed.
+  const offlineBlockActive = hasCachedLibrary && !hasNetworkInterface && !isPro
 
   // Fade mount/unmount for the offline block, mirroring AppGateSheet's
   // shouldRender/animateIn pattern above rather than a plain conditional
