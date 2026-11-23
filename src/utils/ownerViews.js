@@ -13,6 +13,9 @@
  * copy made from the item's current link (Migration 9). Only a number: never who. An answer without it (the
  * database not changed yet, or the profile total) simply shows no "Saved by" line.
  *
+ * 2026-11-23 (Track H, step H7): an item's answer may also carry stars (Migration 10), how many people starred it.
+ * Only a number; an answer without it shows no stars line.
+ *
  * The database facts this relies on (Migration 8, view_counts_h2):
  *   owner_item_views(p_kind, p_id)  { status: 'ok', total, last7 } for the caller's own roshetta or group;
  *                                   { status: 'not_found' } for anything else (stranger, unknown id, bad kind);
@@ -66,7 +69,17 @@ export function parseViews(data) {
   const out = { total, last7: Math.min(last7, total) }
   const saved = wholeCount(data.saved)
   if (saved !== null) out.saved = saved
+  // Track H, step H7: how many people starred the item (a number; never who). Absent when not known.
+  const stars = wholeCount(data.stars)
+  if (stars !== null) out.stars = stars
   return out
+}
+
+// "13 stars" / "1 star"; nothing when nobody has starred or the number is not known.
+export function starsLine(stars) {
+  const n = wholeCount(stars)
+  if (n === null || n === 0) return null
+  return n === 1 ? '1 star' : `${formatCount(n)} stars`
 }
 
 // "Saved by 3 people"; nothing when nobody has saved a copy or the number is not known.
@@ -80,6 +93,7 @@ export function savedLine(saved) {
 export function itemViewsLines(views) {
   if (!views) return null
   const saved = savedLine(views.saved)
+  const stars = starsLine(views.stars)
   let lines
   if (views.total === 0) {
     lines = { empty: true, title: VIEW_WORDS.noViews, sub: VIEW_WORDS.noViewsLine }
@@ -92,7 +106,7 @@ export function itemViewsLines(views) {
     }
   }
   // A third line only when someone has saved a copy; the key is left out otherwise.
-  return saved ? { ...lines, saved } : lines
+  return { ...lines, ...(saved ? { saved } : {}), ...(stars ? { stars } : {}) }
 }
 
 // The two tiles on the Profile tab.

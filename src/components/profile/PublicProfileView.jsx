@@ -20,6 +20,7 @@ import { Share2, ChevronRight, ChevronLeft, MoreVertical } from 'lucide-react'
 import ConfirmSheet from '../ui/ConfirmSheet'
 import { MAKE_PRIVATE_MESSAGE } from '../../utils/publicShare'
 import PublicAvatar from '../ui/PublicAvatar'
+import { StarCount } from '../ui/StarButton'
 import { ROUTES } from '../../router'
 import { shareProfile } from '../../utils/shareProfileLink'
 import {
@@ -95,7 +96,10 @@ function Card({ item, tabKey, onOpen }) {
       )}
       <span style={{ flex: 1, minWidth: 0 }}>
         <span dir="auto" style={{ display: 'block', fontSize: 15, fontWeight: 600, color: 'var(--color-text-primary)', overflowWrap: 'anywhere' }}>{item.name}</span>
-        <span style={{ display: 'block', marginTop: 2, fontSize: 12, color: 'var(--color-text-secondary)' }}>{itemLine(item)}</span>
+        <span style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: 10, marginTop: 2, fontSize: 12, color: 'var(--color-text-secondary)' }}>
+          <span>{itemLine(item)}</span>
+          <StarCount stars={item.stars} size={13} />
+        </span>
       </span>
       <Arrow size={18} color="var(--color-text-tertiary)" style={{ flexShrink: 0 }} aria-hidden="true" />
     </button>

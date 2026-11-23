@@ -29,6 +29,7 @@
 import { ROSHETTA_ROW_TYPES } from './roshettaRows.js'
 import { withTimeLimit } from './roshettaLoad.js'
 import { specialtyFromShared } from './roshettaSpecialty.js'
+import { readStars } from './itemStars.js'
 import { readCredit } from './shareCredit.js'
 
 // The database refuses codes shorter than this; no need to ask it.
@@ -55,6 +56,7 @@ export function mapSharedRoshetta(data) {
     specialtyId,
     specialty: specialtyFromShared(sp),
     ...readCredit(data),   // ownerName, createdAt, isOwner, ownId
+    ...readStars(data),    // stars, starred (Track H, step H7)
   }
 }
 

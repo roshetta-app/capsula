@@ -92,6 +92,8 @@ import { useCategories } from '../hooks/useCategories'
 import { useAuth } from '../hooks/useAuth'
 import { useTapGuard } from '../hooks/useTapGuard'
 import ReportSheet, { ReportLink } from '../components/ui/ReportSheet'
+import { useItemStar } from '../hooks/useItemStar'
+import { StarButton, StarCount, StarNotice } from '../components/ui/StarButton'
 import { useViewCount } from '../hooks/useViewCount'
 import { useOpenDrug } from '../hooks/useOpenDrug'
 import useScrollToTopOnOpen from '../hooks/useScrollToTopOnOpen'
@@ -272,6 +274,13 @@ function SharedGroupBody({ code }) {
 
   // The page shows an answer asked before the person signed in: the Save bar waits a moment.
   const answerIsStale = result.status === 'ok' && !!user && result.forUser !== user.id
+  // Star button (Track H, step H7): shown only when the page's answer carries a star count.
+  const star = useItemStar('group', code, {
+    stars: result.status === 'ok' ? (result.group.stars ?? null) : null,
+    starred: result.status === 'ok' && result.group.starred === true,
+    ready: result.status === 'ok' && !!user && !answerIsStale,
+    isOwner: result.status === 'ok' && result.group.isOwner === true,
+  })
   const bar = sharedBarState({
     kind: 'group',
     isOwner: result.status === 'ok' && result.group.isOwner,
@@ -446,11 +455,13 @@ function SharedGroupBody({ code }) {
           backgroundColor: 'var(--color-surface)', boxShadow: '0 -6px 18px rgba(0,0,0,0.06)',
           fontFamily: 'var(--font-body)',
         }}>
+          <StarNotice notice={star.notice} />
           {showOwnerBar ? (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)' }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
                 <FolderOpen size={18} strokeWidth={1.8} color="var(--color-text-secondary)" aria-hidden="true" style={{ flexShrink: 0 }} />
                 <span style={{ fontSize: 14, lineHeight: 1.4, color: 'var(--color-text-primary)' }}>{bar.text}</span>
+                <span style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}><StarCount stars={result.group.stars} /></span>
               </span>
               <button
                 onClick={() => openPage(ROUTES.DRUGS_GROUP(bar.targetId))}
@@ -466,6 +477,7 @@ function SharedGroupBody({ code }) {
             </div>
           ) : saveState.phase !== 'saved' && bar.mode === 'saved' ? (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)' }}>
+              <StarButton star={star} />
               <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
                 <Check size={18} strokeWidth={2.6} color="var(--color-success)" aria-hidden="true" style={{ flexShrink: 0 }} />
                 <span role="status" style={{ fontSize: 14, lineHeight: 1.4, color: 'var(--color-text-primary)' }}>{bar.text}</span>
@@ -484,6 +496,7 @@ function SharedGroupBody({ code }) {
             </div>
           ) : saveState.phase === 'saved' ? (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)' }}>
+              <StarButton star={star} />
               <span style={{ display: 'flex', alignItems: 'flex-start', gap: 8, minWidth: 0 }}>
                 <Check size={18} strokeWidth={2.6} color="var(--color-success)" aria-hidden="true" style={{ flexShrink: 0, marginTop: 1 }} />
                 <span role="status" style={{ fontSize: 14, lineHeight: 1.4, color: 'var(--color-text-primary)' }}>
@@ -509,11 +522,13 @@ function SharedGroupBody({ code }) {
                   <GroupStateMessage variant="banner" tone="warning" title={notice} />
                 </div>
               )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+              <StarButton star={star} />
               <button
                 onClick={handleSaveTap}
                 disabled={saveBusy}
                 style={{
-                  display: 'block', width: '100%', minHeight: 48, border: 'none', padding: '0 16px',
+                  flex: 1, minWidth: 0, minHeight: 48, border: 'none', padding: '0 16px',
                   borderRadius: 999, backgroundColor: 'var(--color-accent-solid)', color: '#fff',
                   fontSize: 15, fontWeight: 600, fontFamily: 'var(--font-body)',
                   cursor: saveBusy ? 'default' : 'pointer', opacity: saveBusy ? 0.6 : 1,
@@ -522,6 +537,7 @@ function SharedGroupBody({ code }) {
               >
                 {saveState.phase === 'saving' ? 'Saving…' : 'Save to my groups'}
               </button>
+              </div>
             </>
           )}
         </div>

@@ -27,6 +27,7 @@
 
 import { supabase } from '../lib/supabase'
 import { readCredit } from './shareCredit'
+import { readStars } from './itemStars'
 
 // The database refuses codes shorter than this; no need to ask it.
 const MIN_CODE_LENGTH = 32
@@ -102,6 +103,7 @@ export async function fetchSharedGroup(code) {
       description: data.description ?? '',
       color: data.color,
       ...readCredit(data),   // ownerName, createdAt, isOwner, ownId
+      ...readStars(data),    // stars, starred (Track H, step H7)
       drugs,
     },
   }

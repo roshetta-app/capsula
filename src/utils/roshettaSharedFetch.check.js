@@ -21,7 +21,7 @@ async function run(code, { reply = { data: { name: 'Chest pain', description: 'd
 
 test('a good code: name, description and rows come back, asked through get_shared_roshetta with the code as given', async () => {
   const { result, asked } = await run(CODE);
-  assert.deepEqual(result, { status: 'ok', roshetta: { name: 'Chest pain', description: 'd', rows: [drug, text], specialtyId: null, specialty: null, ownerName: null, ownerHandle: null, createdAt: null, isOwner: false, ownId: null } });
+  assert.deepEqual(result, { status: 'ok', roshetta: { name: 'Chest pain', description: 'd', rows: [drug, text], specialtyId: null, specialty: null, ownerName: null, ownerHandle: null, createdAt: null, isOwner: false, ownId: null, stars: null, starred: false } });
   assert.deepEqual(asked, [['get_shared_roshetta', { p_code: CODE }]]);
 });
 
@@ -66,7 +66,7 @@ test('only drug and text rows are kept; anything else (a free_text row would be 
 });
 
 test('rows that are not a list become an empty list; only the listed things are passed on, never a user id', () => {
-  assert.deepEqual(mapSharedRoshetta({ name: 'N', description: 'd', rows: 'x', owner: 'u1', user_id: 'u1', owner_id: 'u1' }), { name: 'N', description: 'd', rows: [], specialtyId: null, specialty: null, ownerName: null, ownerHandle: null, createdAt: null, isOwner: false, ownId: null });
+  assert.deepEqual(mapSharedRoshetta({ name: 'N', description: 'd', rows: 'x', owner: 'u1', user_id: 'u1', owner_id: 'u1' }), { name: 'N', description: 'd', rows: [], specialtyId: null, specialty: null, ownerName: null, ownerHandle: null, createdAt: null, isOwner: false, ownId: null, stars: null, starred: false });
 });
 
 // Phase I step 10.8: the specialty comes through for the header, and its id for Save a copy.
@@ -76,7 +76,7 @@ test('a shared roshetta with a specialty: the id and the picker-shaped specialty
   const m = mapSharedRoshetta({ name: 'N', description: '', rows: [], specialty: CARDIO });
   assert.equal(m.specialtyId, 's1');
   assert.deepEqual(m.specialty, { id: 's1', name: 'Cardiology', iconType: 'lucide', iconValue: 'HeartPulse', colorToken: 'rose' });
-  assert.deepEqual(Object.keys(m).sort(), ['createdAt', 'description', 'isOwner', 'name', 'ownId', 'ownerHandle', 'ownerName', 'rows', 'specialty', 'specialtyId']);
+  assert.deepEqual(Object.keys(m).sort(), ['createdAt', 'description', 'isOwner', 'name', 'ownId', 'ownerHandle', 'ownerName', 'rows', 'specialty', 'specialtyId', 'starred', 'stars']);
 });
 
 test('no specialty, or anything that is not a proper one, gives none (the default blue) and no id to copy', () => {

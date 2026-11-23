@@ -32,7 +32,7 @@ export function useOwnerViews(kind, id, enabled = true) {
     const request = kind === 'profile' ? fetchProfileViews() : fetchItemViews(kind, id)
     request.then((r) => {
       if (cancelled) return
-      setAnswer({ key, views: r.status === 'ok' ? { total: r.total, last7: r.last7, ...(r.saved === undefined ? {} : { saved: r.saved }) } : null })
+      setAnswer({ key, views: r.status === 'ok' ? { total: r.total, last7: r.last7, ...(r.saved === undefined ? {} : { saved: r.saved }), ...(r.stars === undefined ? {} : { stars: r.stars }) } : null })
     })
     return () => { cancelled = true }
   }, [authLoading, userId, enabled, isOnline, kind, id, key, needsId])

@@ -10,7 +10,7 @@
  * The words and the rules live in utils/ownerViews.js; the data comes from hooks/useOwnerViews.js.
  */
 
-import { Eye } from 'lucide-react'
+import { Eye, Star } from 'lucide-react'
 import { itemViewsLines, profileTiles, VIEW_WORDS } from '../../utils/ownerViews'
 
 const TEXT = { fontFamily: 'var(--font-body)' }
@@ -40,6 +40,12 @@ export function OwnerViewsBox({ views }) {
         <div style={{ marginTop: 2, fontSize: 13, lineHeight: 1.4, color: 'var(--color-text-secondary)' }}>{lines.sub}</div>
         {lines.saved && (
           <div style={{ marginTop: 2, fontSize: 13, lineHeight: 1.4, fontWeight: 600, color: 'var(--color-text-secondary)' }}>{lines.saved}</div>
+        )}
+        {lines.stars && (
+          <div style={{ marginTop: 2, display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, lineHeight: 1.4, fontWeight: 600, color: 'var(--color-text-secondary)' }}>
+            <Star size={14} strokeWidth={1.8} aria-hidden="true" style={{ flexShrink: 0 }} />
+            <span>{lines.stars}</span>
+          </div>
         )}
       </div>
     </div>

@@ -31,8 +31,8 @@ test('a good answer is mapped: only what the page shows, items without a code dr
   assert.equal(p.name, 'Sara Ahmed');
   assert.equal(p.avatarCode, 'heart-rose');
   assert.equal(p.roshettas.total, 53);
-  assert.deepEqual(p.roshettas.items, [{ name: 'Chest pain', drugCount: 2, createdAt: '2026-11-01T10:00:00Z', code: CODE }]);
-  assert.deepEqual(p.groups.items, [{ name: 'Antibiotics', drugCount: 4, createdAt: '2026-10-01T10:00:00Z', code: CODE, color: 'blue' }]);
+  assert.deepEqual(p.roshettas.items, [{ name: 'Chest pain', drugCount: 2, createdAt: '2026-11-01T10:00:00Z', code: CODE, stars: null }]);
+  assert.deepEqual(p.groups.items, [{ name: 'Antibiotics', drugCount: 4, createdAt: '2026-10-01T10:00:00Z', code: CODE, stars: null, color: 'blue' }]);
   assert.equal(JSON.stringify(p).includes('secret'), false);
   assert.equal(JSON.stringify(p).includes('user_id'), false);
 });

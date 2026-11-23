@@ -29,6 +29,7 @@
  */
 
 import { withTimeLimit } from './roshettaLoad.js'
+import { wholeStars } from './itemStars.js'
 
 const clean = (v) => (typeof v === 'string' ? v : '')
 const count = (v) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Math.floor(Number(v)) : 0)
@@ -41,6 +42,7 @@ function mapItems(list, withColor) {
       drugCount: count(i.drug_count),
       createdAt: typeof i.created_at === 'string' ? i.created_at : null,
       code: i.share_code,
+      stars: wholeStars(i.stars),   // Track H, step H7: how many people starred it; null when the answer has none
       ...(withColor ? { color: typeof i.color === 'string' ? i.color : null } : {}),
     }))
 }
