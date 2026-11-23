@@ -1,12 +1,15 @@
 /**
  * src/components/home/HomeTopBar.jsx
  * Phase H, step 9.3 — the top bar of Home: the CAPSULA wordmark on the left, the notification bell and
- * the dark mode button on the right, drawn the same as the Topics screen's own bar (which keeps its own).
+ * the dark mode button on the right (plus an Admin pages button for admin accounts only), drawn the same as the Topics screen's own bar (which keeps its own).
  */
 import { useState } from 'react'
-import { Bell, Sun, Moon, Monitor } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Bell, Sun, Moon, Monitor, LayoutDashboard } from 'lucide-react'
 import NotificationSheet from '../ui/NotificationSheet'
 import { useDarkMode } from '../../hooks/useDarkMode'
+import { useAuth } from '../../hooks/useAuth'
+import { ROUTES } from '../../router'
 
 const THEME_CYCLE = ['light', 'dark', 'system']
 const THEME_LABELS = {
@@ -26,6 +29,11 @@ const roundButton = {
 export default function HomeTopBar() {
   const { theme, setTheme } = useDarkMode()
   const [notifOpen, setNotifOpen] = useState(false)
+  const navigate = useNavigate()
+  const { profile } = useAuth()
+  // 2026-11-23: the app has no address bar, so admin accounts get a button here that opens /admin.
+  // Same rule as AuthGuard (profile.role is 'admin'); everyone else sees nothing.
+  const isAdmin = profile?.role === 'admin'
   const ThemeIcon = THEME_ICONS[theme] ?? Sun
 
   return (
@@ -37,6 +45,11 @@ export default function HomeTopBar() {
         style={{ display: 'block', height: 30, width: 'auto' }}
       />
       <span style={{ flex: 1 }} />
+      {isAdmin && (
+        <button onClick={() => navigate(ROUTES.ADMIN)} aria-label="Admin pages" style={roundButton}>
+          <LayoutDashboard size={16} />
+        </button>
+      )}
       <button onClick={() => setNotifOpen(true)} aria-label="Notifications" style={roundButton}>
         <Bell size={16} />
       </button>
