@@ -1,26 +1,26 @@
 /**
  * supabase/functions/telegram-doorbell/index.ts
- * Track F, step F1b (2026-11-23) — the report doorbell.
- * Changed the same night from Telegram to ntfy (Telegram refused every request with
- * "Too Many Requests", even from a new bot). The function and job keep the name
- * `telegram-doorbell` so nothing else had to be renamed.
+ * Track F, step F1b (2026-11-23) - the report doorbell.
+ * The alert channel changed twice the same night: Telegram refused every request with
+ * "Too Many Requests", then ntfy refused with "daily message quota reached" (both limit
+ * by the sending address, and Supabase's address is shared with many other projects).
+ * Email through Resend is limited per account, so it is not affected. The function and
+ * job keep the name `telegram-doorbell` so nothing else had to be renamed.
  *
  * Called every minute by the pg_cron job `telegram-doorbell`, only when the
  * table `doorbell_queue` has an unsent row (filled by the trigger on `reports`).
- * Sends ONE short alert to the owner's phone through ntfy (https://ntfy.sh), then marks the rows sent.
+ * Sends ONE short alert email to the owner through Resend (https://resend.com), then marks the rows sent.
  *
  * What the message holds: the kind of page or item, the reason, how many
  * reports, and a link to the CMS Reports screen. Never a name, a note, a
  * reporter or any personal detail (the queue does not hold them).
  *
- * Secrets (Edge Function secrets, dashboard only): NTFY_TOPIC, a long random
- * topic name that works like a password (whoever knows it can read the alerts,
- * which hold nothing personal); and NTFY_TOKEN, an access token of a free ntfy.sh
- * account. Without the token ntfy counts the send against Supabase's SHARED outgoing
- * address, whose free daily quota was already used up ("daily message quota reached",
- * 2026-11-23); with it the quota is the account's own. Nothing is read from the request: anyone who calls this
- * function can only cause rows already in the queue to be sent to the owner's
- * own topic; they cannot choose the text or the topic.
+ * Secrets (Edge Function secrets, dashboard only): RESEND_API_KEY, the API key of a
+ * free Resend account; and ALERT_EMAIL, the address that gets the alerts (on the free
+ * plan with the shared sender it must be the email the Resend account was made with).
+ * Nothing is read from the request: anyone who calls this function can only cause
+ * rows already in the queue to be sent to the owner's own address; they cannot choose
+ * the text or the address.
  *
  * Limits: at most 20 messages an hour (rows over the limit wait and go out in
  * a later, grouped message; nothing is lost). A failed send puts the rows
@@ -34,8 +34,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const SUPABASE_URL              = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-const NTFY_TOPIC                = Deno.env.get('NTFY_TOPIC') ?? ''
-const NTFY_TOKEN                = Deno.env.get('NTFY_TOKEN') ?? ''
+const RESEND_API_KEY            = (Deno.env.get('RESEND_API_KEY') ?? '').trim()
+const ALERT_EMAIL               = (Deno.env.get('ALERT_EMAIL') ?? '').trim()
 
 const CMS_REPORTS_URL = 'https://roshetta-app.github.io/capsula/admin/reports'
 const MAX_MESSAGES_PER_HOUR = 20
@@ -100,7 +100,7 @@ function buildMessage(rows: Row[]): { title: string; body: string; urgent: boole
 }
 
 Deno.serve(async () => {
-  if (NTFY_TOPIC.length < 16) return json({ ok: false, error: 'not_configured' }, 500)
+  if (RESEND_API_KEY.length < 10 || !ALERT_EMAIL.includes('@')) return json({ ok: false, error: 'not_configured' }, 500)
 
   const db = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } })
 
@@ -134,21 +134,19 @@ Deno.serve(async () => {
 
   try {
     const msg = buildMessage(claimed as Row[])
-    // The address holds the topic name (the password), so it is never logged.
-    const res = await fetch(`https://ntfy.sh/${encodeURIComponent(NTFY_TOPIC)}`, {
+    const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
-      headers: {
-        Title: msg.title,
-        Priority: msg.urgent ? '5' : '3',
-        Tags: msg.urgent ? 'rotating_light' : 'bell',
-        Click: CMS_REPORTS_URL,
-        ...(NTFY_TOKEN ? { Authorization: `Bearer ${NTFY_TOKEN}` } : {}),
-      },
-      body: msg.body,
+      headers: { Authorization: `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from: 'Capsula alerts <onboarding@resend.dev>',
+        to: [ALERT_EMAIL],
+        subject: (msg.urgent ? 'URGENT - ' : '') + msg.title,
+        text: msg.body,
+      }),
     })
     if (!res.ok) {
       await release()
-      // ntfy's refusal text holds no topic and no secret, so it is safe to log (first 200 letters).
+      // Resend's refusal text holds no key and no address, so it is safe to log (first 200 letters).
       let why = ''
       try { why = (await res.text()).slice(0, 200) } catch (_e) { /* ignore */ }
       console.error('doorbell send failed, status', res.status, why)
