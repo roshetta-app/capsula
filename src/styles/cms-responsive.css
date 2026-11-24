@@ -355,7 +355,7 @@ html.cms-surface .cms-only-phone {
      .cms-fill-phone    a block takes the whole first line of a wrapping row.
      .cms-wrap-any      long words (emails, links) break instead of pushing wide.
      .cms-table-cards   a real <table> becomes one card per row on phone.
-                        Cell order: name, email, role, tier, status, joined.
+                        Cell order: name (email under it), plan, ends, items, last seen, request.
      .cms-notif-sched   scheduled notification row: countdown, type and the three
                         buttons on line 1, title and message on line 2.
      .cms-notif-hist    sent notification row: time, type and expand button on
@@ -394,16 +394,11 @@ html.cms-surface .cms-only-phone {
     min-width: 0;
   }
   html.cms-surface .cms-table-cards td:nth-child(1) { order: 1; flex: 1 1 0; }
-  html.cms-surface .cms-table-cards td:nth-child(5) { order: 2; }
-  html.cms-surface .cms-table-cards td:nth-child(2) {
-    order: 3;
-    flex: 1 1 100%;
-    font-size: 12px;
-    overflow-wrap: anywhere;
-  }
+  html.cms-surface .cms-table-cards td:nth-child(6) { order: 2; }
+  html.cms-surface .cms-table-cards td:nth-child(2) { order: 3; }
   html.cms-surface .cms-table-cards td:nth-child(3) { order: 4; }
   html.cms-surface .cms-table-cards td:nth-child(4) { order: 5; }
-  html.cms-surface .cms-table-cards td:nth-child(6) { order: 6; margin-left: auto; }
+  html.cms-surface .cms-table-cards td:nth-child(5) { order: 6; margin-left: auto; }
 
   html.cms-surface .cms-notif-sched {
     grid-template-columns: auto minmax(0, 1fr) auto auto auto !important;

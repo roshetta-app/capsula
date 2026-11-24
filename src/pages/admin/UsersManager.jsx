@@ -24,8 +24,14 @@
  *  - No drag-reorder, no active/inactive toggle, no add/delete —
  *    accounts are created by Google sign-in, not from this screen, and
  *    there is no "order" concept for a user list.
- *  - No search/filter bar (10 real accounts today, per the F11 Stage 1
- *    audit) — matching D33's original scope, unchanged by this redesign.
+ *  - Track K step K5d (2026-11-24): the table now shows Name (with the email
+ *    under it), Plan, Ends, Items (roshettas made), Last seen and Request,
+ *    with filter chips (All, Pro, Trial, Ending soon, Waiting request), a
+ *    search box (name or email) and paging (50 per page). All the rules and
+ *    words live in src/utils/usersAdmin.js (checked on their own); the data
+ *    comes from the admin-users 'list' answer (K5b). Role, tier and ban still
+ *    live in the detail window, unchanged. Everything is filtered on this
+ *    screen, which is fine at launch size (decision 1 of K5).
  *  - Tap a row to open a detail modal for role/tier/ban, instead of an
  *    inline toggle — role and ban are consequential enough to want an
  *    explicit save step, and ban specifically goes through ConfirmModal
@@ -34,8 +40,8 @@
  *    this screen only records the value, no billing logic reads it yet.
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { ShieldCheck, Ban, CircleUserRound, Users as UsersIcon } from 'lucide-react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { ShieldCheck, Ban, CircleUserRound, Users as UsersIcon, Search } from 'lucide-react'
 import { useToast }   from '../../context/ToastContext'
 import Modal          from '../../components/admin/Modal'
 import ConfirmModal   from '../../components/admin/ConfirmModal'
@@ -47,6 +53,10 @@ import {
   banUser,
   unbanUser,
 } from '../../lib/adminQueries'
+import {
+  FILTERS, filterUsers, filterCounts, pageOf, planName, endsText, itemsText,
+  lastSeenText, requestCell,
+} from '../../utils/usersAdmin'
 
 // ─── Formatting helpers ─────────────────────────────────────────────────────
 
@@ -271,6 +281,10 @@ export default function UsersManager() {
 
   const [rows, setRows]       = useState([])
   const [loading, setLoading] = useState(true)
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [filter, setFilter]   = useState('all')
+  const [search, setSearch]   = useState('')
+  const [page, setPage]       = useState(1)
 
   const [detailOpen, setDetailOpen]     = useState(false)
   const [detailTarget, setDetailTarget] = useState(null)
@@ -280,9 +294,10 @@ export default function UsersManager() {
 
   const load = useCallback(async () => {
     setLoading(true)
+    setLoadFailed(false)
     const { data, error } = await fetchAllUsers()
     setLoading(false)
-    if (error) { toastRef.current.error('Failed to load users'); return }
+    if (error) { setLoadFailed(true); toastRef.current.error('Failed to load users'); return }
     setRows(data ?? [])
   }, [])
 
@@ -310,6 +325,13 @@ export default function UsersManager() {
     load()
   }
 
+  // One clock for the whole screen draw, so every row agrees on "today".
+  const now = useMemo(() => new Date(), [rows])  // eslint-disable-line react-hooks/exhaustive-deps
+  const counts   = useMemo(() => filterCounts(rows, now), [rows, now])
+  const filtered = useMemo(() => filterUsers(rows, { filter, search }, now), [rows, filter, search, now])
+  const view     = pageOf(filtered, page)
+  const searching = search.trim() !== '' || filter !== 'all'
+
   const totalUsers  = rows.length
   const totalAdmins = rows.filter(u => u.role === 'admin').length
   const totalBanned = rows.filter(isBanned).length
@@ -334,73 +356,148 @@ export default function UsersManager() {
         </div>
       )}
 
-      {/* Table */}
-      {!loading && (
+      {/* Could not load: say so plainly and offer a retry (never a blank table that looks like "no users") */}
+      {!loading && loadFailed && (
         <div style={{
-          border: '1px solid var(--color-border)',
-          borderRadius: 'var(--radius-lg)',
-          overflow: 'hidden',
-          backgroundColor: 'var(--color-surface)',
+          textAlign: 'center', padding: 32, borderRadius: 'var(--radius-lg)',
+          border: '1px solid var(--color-border)', backgroundColor: 'var(--color-surface)',
+          color: 'var(--color-text-secondary)',
         }}>
-          <table className="cms-table-cards" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-            <thead>
-              <tr style={{ backgroundColor: 'var(--color-surface-muted)' }}>
-                <th style={thStyle}>Name</th>
-                <th style={thStyle}>Email</th>
-                <th style={thStyle}>Role</th>
-                <th style={thStyle}>Tier</th>
-                <th style={thStyle}>Status</th>
-                <th style={thStyle}>Joined</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map(user => {
-                const banned = isBanned(user)
+          <div style={{ marginBottom: 12 }}>The users could not be loaded.</div>
+          <button onClick={load} style={btnPrimary}>Try again</button>
+        </div>
+      )}
+
+      {!loading && !loadFailed && (
+        <>
+          {/* Search and filter chips */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 'var(--space-4)' }}>
+            <div style={{ position: 'relative' }}>
+              <Search size={14} color="var(--color-text-tertiary)" style={{ position: 'absolute', left: 10, top: 11 }} />
+              <input
+                type="search"
+                value={search}
+                onChange={e => { setSearch(e.target.value); setPage(1) }}
+                placeholder="Search by name or email…"
+                aria-label="Search users by name or email"
+                style={{ ...inputStyle, paddingLeft: 30 }}
+              />
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {FILTERS.map(f => {
+                const active = filter === f.key
                 return (
-                  <tr
-                    key={user.id}
-                    onClick={() => openDetail(user)}
+                  <button
+                    key={f.key}
+                    onClick={() => { setFilter(f.key); setPage(1) }}
+                    aria-pressed={active}
                     style={{
-                      cursor: 'pointer',
-                      borderTop: '1px solid var(--color-border)',
-                      opacity: banned ? 0.65 : 1,
+                      padding: '6px 12px',
+                      borderRadius: 'var(--radius-full)',
+                      border: `1px solid ${active ? 'var(--color-accent)' : 'var(--color-border)'}`,
+                      backgroundColor: active ? 'var(--color-accent-light)' : 'transparent',
+                      color: active ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+                      fontSize: 12, fontWeight: 600, fontFamily: 'var(--font-body)', cursor: 'pointer',
                     }}
                   >
-                    <td style={tdStyle}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <CircleUserRound size={16} color="var(--color-text-secondary)" />
-                        {user.full_name || '—'}
-                      </div>
-                    </td>
-                    <td style={{ ...tdStyle, color: 'var(--color-text-secondary)' }}>
-                      {user.email ?? user.id}
-                    </td>
-                    <td style={tdStyle}>
-                      {user.role === 'admin'
-                        ? <span style={{ ...badgeStyle, color: 'var(--color-accent)', borderColor: 'var(--color-accent)' }}>
-                            <ShieldCheck size={11} /> Admin
-                          </span>
-                        : <span style={badgeStyle}>User</span>
-                      }
-                    </td>
-                    <td style={tdStyle}>{user.tier === 'paid' ? 'Paid' : 'Free'}</td>
-                    <td style={tdStyle}>
-                      {banned
-                        ? <span style={{ ...badgeStyle, color: 'var(--color-error, #ef4444)', borderColor: 'var(--color-error, #ef4444)' }}>
-                            <Ban size={11} /> Banned
-                          </span>
-                        : <span style={badgeStyle}>Active</span>
-                      }
-                    </td>
-                    <td style={{ ...tdStyle, color: 'var(--color-text-tertiary)' }}>
-                      {formatDate(user.created_at)}
-                    </td>
-                  </tr>
+                    {f.label} · {counts[f.key]}
+                  </button>
                 )
               })}
-            </tbody>
-          </table>
-        </div>
+            </div>
+          </div>
+
+          {/* Nothing to show: no users at all, or nothing matches the chip and search */}
+          {view.total === 0 && (
+            <div style={{
+              textAlign: 'center', padding: 32, borderRadius: 'var(--radius-lg)',
+              border: '1px solid var(--color-border)', backgroundColor: 'var(--color-surface)',
+              color: 'var(--color-text-secondary)',
+            }}>
+              {searching ? (
+                <>
+                  <div style={{ marginBottom: 12 }}>No one matches.</div>
+                  <button onClick={() => { setFilter('all'); setSearch(''); setPage(1) }} style={btnSecondary}>Clear search and filter</button>
+                </>
+              ) : 'There are no users yet.'}
+            </div>
+          )}
+
+          {/* Table */}
+          {view.total > 0 && (
+            <div style={{
+              border: '1px solid var(--color-border)',
+              borderRadius: 'var(--radius-lg)',
+              overflow: 'hidden',
+              backgroundColor: 'var(--color-surface)',
+            }}>
+              <table className="cms-table-cards" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <thead>
+                  <tr style={{ backgroundColor: 'var(--color-surface-muted)' }}>
+                    <th style={thStyle}>Name</th>
+                    <th style={thStyle}>Plan</th>
+                    <th style={thStyle}>Ends</th>
+                    <th style={thStyle}>Items</th>
+                    <th style={thStyle}>Last seen</th>
+                    <th style={thStyle}>Request</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {view.rows.map(user => {
+                    const banned = isBanned(user)
+                    const req = requestCell(user, now)
+                    const ends = endsText(user, now)
+                    return (
+                      <tr
+                        key={user.id}
+                        onClick={() => openDetail(user)}
+                        style={{
+                          cursor: 'pointer',
+                          borderTop: '1px solid var(--color-border)',
+                          opacity: banned ? 0.65 : 1,
+                        }}
+                      >
+                        <td style={tdStyle}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                            <CircleUserRound size={16} color="var(--color-text-secondary)" />
+                            <span>{user.full_name || '—'}</span>
+                            {user.role === 'admin' && (
+                              <span style={{ ...badgeStyle, color: 'var(--color-accent)', borderColor: 'var(--color-accent)' }}>
+                                <ShieldCheck size={11} /> Admin
+                              </span>
+                            )}
+                            {banned && (
+                              <span style={{ ...badgeStyle, color: 'var(--color-error, #ef4444)', borderColor: 'var(--color-error, #ef4444)' }}>
+                                <Ban size={11} /> Banned
+                              </span>
+                            )}
+                          </div>
+                          <div className="cms-wrap-any" style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2 }}>
+                            {user.email ?? user.id}
+                          </div>
+                        </td>
+                        <td style={tdStyle}>{planName(user, now)}</td>
+                        <td style={{ ...tdStyle, color: ends ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)' }}>{ends || '—'}</td>
+                        <td style={tdStyle}>{itemsText(user)}</td>
+                        <td style={{ ...tdStyle, color: 'var(--color-text-tertiary)' }}>{lastSeenText(user, now)}</td>
+                        <td style={{ ...tdStyle, ...requestToneStyle[req.tone] }}>{req.text}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Paging: shown only when there is more than one page */}
+          {view.pages > 1 && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginTop: 'var(--space-4)', fontSize: 13, color: 'var(--color-text-secondary)' }}>
+              <button onClick={() => setPage(view.page - 1)} disabled={view.page <= 1} style={btnSecondary}>Previous</button>
+              <span>Page {view.page} of {view.pages} · {view.total} people</span>
+              <button onClick={() => setPage(view.page + 1)} disabled={view.page >= view.pages} style={btnSecondary}>Next</button>
+            </div>
+          )}
+        </>
       )}
 
       <UserModal
@@ -497,6 +594,15 @@ const badgeStyle = {
   fontWeight:      500,
   color:           'var(--color-text-secondary)',
   flexShrink:      0,
+}
+
+// How the Request cell is coloured: late (12 hours) amber, overdue (24 hours) red, ending soon amber.
+const requestToneStyle = {
+  none:    { color: 'var(--color-text-tertiary)' },
+  ok:      { color: 'var(--color-text-primary)', fontWeight: 600 },
+  late:    { color: 'var(--color-warning, #d97706)', fontWeight: 600 },
+  overdue: { color: 'var(--color-error, #ef4444)', fontWeight: 600 },
+  ending:  { color: 'var(--color-warning, #d97706)' },
 }
 
 const thStyle = {
