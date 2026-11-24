@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faUsers, faCapsules, faNotesMedical, faFlag, faTriangleExclamation } from '@fortawesome/free-solid-svg-icons'
+import { faUsers, faCapsules, faNotesMedical, faFlag, faTriangleExclamation, faCreditCard } from '@fortawesome/free-solid-svg-icons'
 import { supabase } from '../../lib/supabase'
 import { fetchAllUsers } from '../../lib/adminQueries'
 import { fetchReportCount } from '../../utils/reportsAdminContent'
 import { fetchPageProblemCount } from '../../utils/pageProblemsAdminContent'
+import { waitTone } from '../../utils/proRequestsAdmin'
 import AdminPageHeader from '../../components/admin/AdminPageHeader'
 import DawaaGateCard from '../../components/admin/DawaaGateCard'
 
@@ -38,11 +39,19 @@ export default function AdminSummary() {
   const [reports, setReports]   = useState({ status: 'loading', count: 0 })
   // I5: pages with open problem reports; asked on its own for the same reason.
   const [pageProblems, setPageProblems] = useState({ status: 'loading', count: 0 })
+  // Stage 3 step 4: Pro payment requests waiting, and how many of them are past 12 hours; asked on its own too.
+  const [proWaiting, setProWaiting] = useState({ status: 'loading', count: 0, late: 0 })
 
   useEffect(() => {
     let cancelled = false
     fetchReportCount().then((r) => { if (!cancelled) setReports({ status: r.status, count: r.count ?? 0 }) })
     fetchPageProblemCount().then((r) => { if (!cancelled) setPageProblems({ status: r.status, count: r.count ?? 0 }) })
+    supabase.rpc('admin_pro_requests', { p_status: 'waiting', p_limit: 200 }).then(({ data, error }) => {
+      if (cancelled) return
+      if (error) { setProWaiting({ status: 'error', count: 0, late: 0 }); return }
+      const rows = data ?? []
+      setProWaiting({ status: 'ok', count: rows.length, late: rows.filter(r => waitTone(r.status, r.hours_waiting) !== 'ok').length })
+    })
     return () => { cancelled = true }
   }, [])
 
@@ -191,6 +200,31 @@ export default function AdminSummary() {
             </div>
             <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', marginTop: 2 }}>
               Page problems
+            </div>
+          </div>
+        </Link>
+        <Link
+          to="/admin/pro-requests"
+          style={{
+            display: 'flex', alignItems: 'center', gap: 'var(--space-4)', padding: 'var(--space-4)',
+            backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)',
+            borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-card)', textDecoration: 'none',
+          }}
+        >
+          <div style={{
+            width: 48, height: 48, borderRadius: 'var(--radius-md)', flexShrink: 0,
+            backgroundColor: proWaiting.late > 0 ? '#FEE2E2' : 'var(--color-accent-light)',
+            color: proWaiting.late > 0 ? '#991B1B' : 'var(--color-accent)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <FontAwesomeIcon icon={faCreditCard} style={{ width: 20, height: 20 }} />
+          </div>
+          <div>
+            <div style={{ fontSize: 24, fontWeight: 700, fontFamily: 'var(--font-body)', color: 'var(--color-text-primary)', lineHeight: 1.2 }}>
+              {proWaiting.status === 'ok' ? proWaiting.count : '—'}
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', marginTop: 2 }}>
+              Pro requests waiting{proWaiting.late > 0 ? ` (${proWaiting.late} over 12 hours)` : ''}
             </div>
           </div>
         </Link>

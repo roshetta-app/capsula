@@ -38,6 +38,7 @@ const RESEND_API_KEY            = (Deno.env.get('RESEND_API_KEY') ?? '').trim()
 const ALERT_EMAIL               = (Deno.env.get('ALERT_EMAIL') ?? '').trim()
 
 const CMS_REPORTS_URL = 'https://roshetta-app.github.io/capsula/admin/reports'
+const CMS_PRO_URL = 'https://roshetta-app.github.io/capsula/admin/pro-requests'
 const MAX_MESSAGES_PER_HOUR = 20
 const MAX_ROWS_PER_RUN = 200
 const MAX_LINES = 15
@@ -49,6 +50,7 @@ const KIND_WORDS: Record<string, string> = {
   topic: 'Topic page',
   brand: 'Brand page',
   generic: 'Generic page',
+  pro_request: 'Pro payment request',
 }
 
 const REASON_WORDS: Record<string, string> = {
@@ -62,6 +64,8 @@ const REASON_WORDS: Record<string, string> = {
   missing: 'something missing',
   typo: 'typing or wording',
   broken: 'something broken',
+  new: 'waiting for your approval',
+  late12: 'still waiting after 12 hours (we promised 24)',
 }
 
 type Row = { id: number; target_id: string; kind: string; reason: string; urgent: boolean }
@@ -71,6 +75,8 @@ function json(body: unknown, status = 200) {
 }
 
 function buildMessage(rows: Row[]): { title: string; body: string; urgent: boolean } {
+  const hasReports = rows.some((r) => r.kind !== 'pro_request')
+  const hasPro = rows.some((r) => r.kind === 'pro_request')
   // one line per page or item (same kind + same target), with a count
   const groups = new Map<string, { kind: string; urgent: boolean; reasons: Map<string, number>; count: number }>()
   for (const r of rows) {
@@ -93,8 +99,10 @@ function buildMessage(rows: Row[]): { title: string; body: string; urgent: boole
   })
   if (list.length > shown.length) lines.push(`and ${list.length - shown.length} more`)
   return {
-    title: `Capsula: new report${rows.length > 1 ? 's' : ''}`,
-    body: `${lines.join('\n')}\n\n${CMS_REPORTS_URL}`,
+    title: hasPro && !hasReports
+      ? `Capsula: Pro request${rows.length > 1 ? 's' : ''}`
+      : `Capsula: new report${rows.length > 1 ? 's' : ''}`,
+    body: `${lines.join('\n')}\n\n${[hasReports ? CMS_REPORTS_URL : '', hasPro ? CMS_PRO_URL : ''].filter(Boolean).join('\n')}`,
     urgent: list.some((g) => g.urgent),
   }
 }
