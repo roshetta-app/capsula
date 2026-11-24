@@ -169,7 +169,8 @@ import AlphabetSectionDivider  from '../components/conditions/AlphabetSectionDiv
 import ConditionsEmptyState    from '../components/conditions/ConditionsEmptyState'
 import SpecialtiesBottomSheet  from '../components/conditions/SpecialtiesBottomSheet'
 import SpecialtySelector       from '../components/conditions/SpecialtySelector'
-import NotificationSheet       from '../components/ui/NotificationSheet'
+import BellSheets              from '../components/ui/BellSheets'
+import { useUnreadNotices }    from '../hooks/useNotices'
 import { useConditionContext }  from '../context/ConditionContext'
 import { useFavouritesContext } from '../context/FavouritesContext'
 import { useDarkMode }         from '../hooks/useDarkMode'
@@ -380,6 +381,7 @@ function DarkModeToggle({ theme, onCycleTheme }) {
 // The tagline under it is gone (the Drugs header has none).
 
 function BrandRow({ theme, onCycleTheme, onOpenNotifications }) {
+  const unreadNotices = useUnreadNotices()
   return (
     <div style={{ paddingBottom: 'var(--space-3)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', minHeight: 44 }}>
@@ -394,8 +396,9 @@ function BrandRow({ theme, onCycleTheme, onOpenNotifications }) {
         {/* Notification bell: opens the persistent status sheet */}
         <button
           onClick={onOpenNotifications}
-          aria-label="Notifications"
+          aria-label={unreadNotices > 0 ? 'Notifications, you have unread notices' : 'Notifications'}
           style={{
+            position:                'relative',
             width:                   36,
             height:                  36,
             borderRadius:            'var(--radius-full)',
@@ -413,6 +416,13 @@ function BrandRow({ theme, onCycleTheme, onOpenNotifications }) {
           }}
         >
           <Bell size={16} />
+          {unreadNotices > 0 && (
+            <span style={{
+              position: 'absolute', top: 5, right: 6, width: 9, height: 9,
+              borderRadius: '50%', backgroundColor: 'var(--color-danger)',
+              border: '1.5px solid var(--color-surface)',
+            }} />
+          )}
         </button>
 
         {/* Dark mode toggle */}
@@ -1072,7 +1082,7 @@ export default function ConditionsScreen() {
       <BackToTopButton visible={showBackToTop} onClick={handleBackToTop} />
 
       {/* Notification status sheet — portals to body, placement here doesn't matter */}
-      <NotificationSheet
+      <BellSheets
         isOpen={notifSheetOpen}
         onClose={() => setNotifSheetOpen(false)}
       />

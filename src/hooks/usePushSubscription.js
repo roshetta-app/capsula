@@ -703,5 +703,7 @@ export function usePushSubscription() {
   return {
     supported, permission, subscribed, loading, error, checking, isOnline,
     subscribeToPush, unsubscribeFromPush,
+    // Step 1c: lets the notices list open a notice's link the same way a tapped push does.
+    openUrl: openFromOutside,
   }
 }

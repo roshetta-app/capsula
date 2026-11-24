@@ -6,7 +6,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Bell, Sun, Moon, Monitor, LayoutDashboard } from 'lucide-react'
-import NotificationSheet from '../ui/NotificationSheet'
+import BellSheets from '../ui/BellSheets'
+import { useUnreadNotices } from '../../hooks/useNotices'
 import { useDarkMode } from '../../hooks/useDarkMode'
 import { useAuth } from '../../hooks/useAuth'
 import { ROUTES } from '../../router'
@@ -31,6 +32,7 @@ export default function HomeTopBar() {
   const [notifOpen, setNotifOpen] = useState(false)
   const navigate = useNavigate()
   const { profile } = useAuth()
+  const unreadNotices = useUnreadNotices()
   // 2026-11-23: the app has no address bar, so admin accounts get a button here that opens /admin.
   // Same rule as AuthGuard (profile.role is 'admin'); everyone else sees nothing.
   const isAdmin = profile?.role === 'admin'
@@ -50,8 +52,19 @@ export default function HomeTopBar() {
           <LayoutDashboard size={16} />
         </button>
       )}
-      <button onClick={() => setNotifOpen(true)} aria-label="Notifications" style={roundButton}>
+      <button
+        onClick={() => setNotifOpen(true)}
+        aria-label={unreadNotices > 0 ? 'Notifications, you have unread notices' : 'Notifications'}
+        style={{ ...roundButton, position: 'relative' }}
+      >
         <Bell size={16} />
+        {unreadNotices > 0 && (
+          <span style={{
+            position: 'absolute', top: 5, right: 6, width: 9, height: 9,
+            borderRadius: '50%', backgroundColor: 'var(--color-danger)',
+            border: '1.5px solid var(--color-surface)',
+          }} />
+        )}
       </button>
       <button
         onClick={() => setTheme(THEME_CYCLE[(THEME_CYCLE.indexOf(theme) + 1) % THEME_CYCLE.length])}
@@ -60,7 +73,7 @@ export default function HomeTopBar() {
       >
         <ThemeIcon size={16} />
       </button>
-      <NotificationSheet isOpen={notifOpen} onClose={() => setNotifOpen(false)} />
+      <BellSheets isOpen={notifOpen} onClose={() => setNotifOpen(false)} />
     </div>
   )
 }
