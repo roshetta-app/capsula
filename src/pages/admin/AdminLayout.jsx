@@ -5,7 +5,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
   faHouse, faCapsules, faNotesMedical, faStethoscope, faTags,
   faChartBar, faBug, faBell, faClipboardList, faUsers, faRocket, faBullhorn, faRectangleList,
-  faMagnifyingGlass, faFlag, faBan, faCreditCard, faSliders,
+  faMagnifyingGlass, faFlag, faBan, faCreditCard, faSliders, faCoins,
 } from '@fortawesome/free-solid-svg-icons'
 import { useAuth } from '../../hooks/useAuth'
 import useIsPhone from '../../hooks/useIsPhone'
@@ -84,6 +84,7 @@ const NAV_GROUPS = [
   {
     // Analytics + logs
     items: [
+      { path: '/admin/business',   label: 'Business',   faIcon: faCoins },
       { path: '/admin/analytics',  label: 'Analytics',  faIcon: faChartBar },
       { path: '/admin/crash-logs', label: 'Crash Logs', faIcon: faBug },
       { path: '/admin/audit-log',  label: 'Audit Log',  faIcon: faClipboardList },

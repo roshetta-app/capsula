@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faUsers, faCapsules, faNotesMedical, faFlag, faTriangleExclamation, faCreditCard } from '@fortawesome/free-solid-svg-icons'
+import { faUsers, faCapsules, faNotesMedical, faFlag, faTriangleExclamation, faCreditCard, faCoins } from '@fortawesome/free-solid-svg-icons'
 import { supabase } from '../../lib/supabase'
 import { fetchAllUsers } from '../../lib/adminQueries'
 import { fetchReportCount } from '../../utils/reportsAdminContent'
@@ -225,6 +225,30 @@ export default function AdminSummary() {
             </div>
             <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', marginTop: 2 }}>
               Pro requests waiting{proWaiting.late > 0 ? ` (${proWaiting.late} over 12 hours)` : ''}
+            </div>
+          </div>
+        </Link>
+        <Link
+          to="/admin/business"
+          style={{
+            display: 'flex', alignItems: 'center', gap: 'var(--space-4)', padding: 'var(--space-4)',
+            backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)',
+            borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-card)', textDecoration: 'none',
+          }}
+        >
+          <div style={{
+            width: 48, height: 48, borderRadius: 'var(--radius-md)', flexShrink: 0,
+            backgroundColor: 'var(--color-accent-light)', color: 'var(--color-accent)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <FontAwesomeIcon icon={faCoins} style={{ width: 20, height: 20 }} />
+          </div>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-body)', color: 'var(--color-text-primary)', lineHeight: 1.2 }}>
+              Business numbers
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', marginTop: 2 }}>
+              Sign-ups, Pro, income, what needs you
             </div>
           </div>
         </Link>
