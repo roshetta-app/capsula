@@ -27,9 +27,10 @@ import { useBackLabel } from '../hooks/useBackLabel'
 import { useDeepLinkParent } from '../hooks/useDeepLinkParent'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
 import {
-  PLAN_ORDER, PLAN_MONTHS, PLAN_LABEL, DEFAULT_PLAN, RECEIPT_REQUIRED, PAY_TO, PROMISE_TEXT, REJECT_REASON_TEXT,
-  fetchPlanPrices, fetchMyProReference, fetchMyProRequests, createProRequest, uploadAndAttachReceipt, cancelProRequest,
+  PLAN_ORDER, PLAN_MONTHS, PLAN_LABEL, DEFAULT_PLAN, RECEIPT_REQUIRED, PROMISE_TEXT, REJECT_REASON_TEXT,
+  fetchPlanPrices, fetchProSettings, fetchMyProReference, fetchMyProRequests, createProRequest, uploadAndAttachReceipt, cancelProRequest,
 } from '../lib/proQueries'
+import { payState } from '../utils/proSettingsAdmin'
 
 const font = 'var(--font-body)'
 
@@ -56,10 +57,6 @@ const softButton = {
   backgroundColor: 'var(--color-surface)', color: 'var(--color-accent-text)', border: '1px solid var(--color-chip-line)',
   fontFamily: font, fontSize: 14, fontWeight: 600, outline: 'none', WebkitTapHighlightColor: 'transparent',
 }
-
-// Dev server only: show the placeholders so the flow can be tried. The live app needs real payment details.
-const PAY_TO_READY = Boolean(PAY_TO.name && PAY_TO.number)
-const PAY_TO_SHOWN = PAY_TO_READY || import.meta.env.DEV
 
 function fmtDate(iso) {
   if (!iso) return ''
@@ -118,8 +115,8 @@ export default function UpgradeScreen() {
 
   const load = useCallback(async () => {
     try {
-      const [prices, requests, reference] = await Promise.all([fetchPlanPrices(), fetchMyProRequests(), fetchMyProReference()])
-      setData({ prices, requests, reference })
+      const [prices, requests, reference, settings] = await Promise.all([fetchPlanPrices(), fetchMyProRequests(), fetchMyProReference(), fetchProSettings()])
+      setData({ prices, requests, reference, settings })
       setFailed(false)
     } catch {
       setFailed(true)
@@ -199,6 +196,7 @@ export default function UpgradeScreen() {
         plan={plan}
         amount={price?.amount_egp ?? 0}
         reference={data.reference}
+        settings={data.settings}
         userId={userId}
         onDone={async () => { setView('plans'); await load() }}
         onAlreadyWaiting={async () => { setView('plans'); await load() }}
@@ -318,7 +316,8 @@ function PlansView({ prices, plan, onPlan, renewing, onContinue }) {
   )
 }
 
-function PayView({ plan, amount, reference, userId, onDone, onAlreadyWaiting }) {
+function PayView({ plan, amount, reference, settings, userId, onDone, onAlreadyWaiting }) {
+  const payReady = payState(settings) === 'ready'
   const [sender, setSender] = useState('')
   const [file, setFile] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -329,7 +328,7 @@ function PayView({ plan, amount, reference, userId, onDone, onAlreadyWaiting }) 
   const digits = sender.replace(/[^0-9٠-٩۰-۹]/g, '')
   const senderOk = digits.length >= 4 && digits.length <= 15
   const receiptOk = !RECEIPT_REQUIRED || Boolean(file)
-  const canSubmit = senderOk && receiptOk && Boolean(reference) && PAY_TO_SHOWN && !busy
+  const canSubmit = senderOk && receiptOk && Boolean(reference) && payReady && !busy
 
   async function copyCode() {
     try {
@@ -374,9 +373,11 @@ function PayView({ plan, amount, reference, userId, onDone, onAlreadyWaiting }) 
       <div style={{ ...cardStyle, marginBottom: 'var(--space-2)' }}>
         <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 4 }}>1. Send {amount} EGP</div>
         <div style={{ fontSize: 14, color: 'var(--color-text-secondary)' }}>
-          {PAY_TO_SHOWN
-            ? `By ${PAY_TO.name || '[WALLET OR INSTAPAY NAME]'} to ${PAY_TO.number || '[YOUR NUMBER]'}`
-            : 'Payment details are coming soon. Please check back later.'}
+          {payReady
+            ? `By ${settings.wallet_name} to ${settings.wallet_number}`
+            : payState(settings) === 'paused'
+              ? 'Payments are paused for now. Please check back later.'
+              : 'Payment details are coming soon. Please check back later.'}
         </div>
       </div>
 

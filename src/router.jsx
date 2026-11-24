@@ -84,6 +84,7 @@ import ProfileScreen         from './pages/ProfileScreen'
 import AccountEditScreen     from './pages/AccountEditScreen'
 import UpgradeScreen         from './pages/UpgradeScreen'
 import ProRequestsManager    from './pages/admin/ProRequestsManager'
+import ProSettingsManager    from './pages/admin/ProSettingsManager'
 import AccountFaqScreen      from './pages/AccountFaqScreen'
 import LegalScreen           from './pages/LegalScreen'
 import UnknownAddressScreen  from './pages/UnknownAddressScreen'
@@ -187,6 +188,7 @@ export const ROUTES = {
   ADMIN_HOME_CARD:        '/admin/home-card',
   ADMIN_REPORTS:          '/admin/reports',
   ADMIN_PRO_REQUESTS:     '/admin/pro-requests',
+  ADMIN_PRO_SETTINGS:     '/admin/pro-settings',
   ADMIN_BLOCKED_WORDS:    '/admin/blocked-words',
 }
 
@@ -344,6 +346,9 @@ export function AdminRoutes() {
         />
         <Route path="/admin/pro-requests"
           element={<ProRequestsManager />}
+        />
+        <Route path="/admin/pro-settings"
+          element={<ProSettingsManager />}
         />
         <Route path="/admin/blocked-words"
           element={<BlockedWordsManager />}

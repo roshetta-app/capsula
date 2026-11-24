@@ -24,11 +24,6 @@ export const DEFAULT_PLAN = 'yearly'
 // The drawing shows it as step 4. The database accepts a request without one, so this is one switch.
 export const RECEIPT_REQUIRED = true
 
-// Where the person sends the money. NOT FILLED IN ON PURPOSE (owner, 2026-11-24: no wallet or number for now).
-// Fill both in when decision 26 is settled. While either is empty the live app shows "payment details are coming"
-// and the I paid button stays off; the dev server shows the placeholders so the flow can be tried.
-export const PAY_TO = { name: '', number: '' }
-
 // The fixed promise (decision 29). One place, so the wording can change without touching the screens.
 export const PROMISE_TEXT = 'Pro turns on within 24 hours of your request, once we see your payment.'
 
@@ -40,6 +35,14 @@ export const REJECT_REASON_TEXT = {
   unclear_receipt: 'The receipt photo was not clear.',
   duplicate: 'This receipt was already used.',
   other: null,
+}
+
+// Where the person sends the money, and whether payments are open, are set in the CMS (Pro settings, Migration 19).
+export async function fetchProSettings() {
+  // A failure here must not break the whole page: no settings simply means "payment details are coming soon".
+  const { data, error } = await supabase.from('pro_settings').select('wallet_name, wallet_number, payments_open').maybeSingle()
+  if (error) return null
+  return data ?? null
 }
 
 export async function fetchPlanPrices() {
