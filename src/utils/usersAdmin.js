@@ -350,3 +350,125 @@ export function addDaysDoneText(days, newEnd) {
   const n = Number(days)
   return `${n} day${n === 1 ? '' : 's'} added. Pro now ends ${dateText(newEnd)}.`
 }
+
+// ─── Set plan and start trial (K7) ───────────────────────────────────────────
+// An admin gives a person a plan (admin_set_pro) or starts their one free trial (admin_start_trial).
+// The database functions decide; these rules give plain words first and predict the new end date the
+// same way the database does, so the question shown before the change tells the truth.
+
+export const SET_PLAN_OPTIONS = [
+  { key: 'monthly',    label: 'Pro monthly' },
+  { key: 'six_months', label: 'Pro 6 months' },
+  { key: 'yearly',     label: 'Pro yearly' },
+  { key: 'lifetime',   label: 'Lifetime' },
+]
+export const TRIAL_DAYS = 7
+
+const PLAN_MONTHS = { monthly: 1, six_months: 6, yearly: 12 }
+
+// Calendar months added the way the database does it: same day of the month, or the last day of a
+// shorter month (31 Jan + 1 month = 28 Feb); the time of day is kept.
+function addMonths(date, months) {
+  const d = new Date(date.getTime())
+  const day = d.getUTCDate()
+  d.setUTCDate(1)
+  d.setUTCMonth(d.getUTCMonth() + months)
+  const lastDay = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate()
+  d.setUTCDate(Math.min(day, lastDay))
+  return d
+}
+
+/** Whether a plan can be set for this person, and if not, why in plain words. */
+export function canSetPlan(user, now = new Date()) {
+  if (!user) return { allowed: false, why: 'This person could not be found.' }
+  if (planKey(user, now) === 'lifetime') {
+    return { allowed: false, why: 'This person is already Lifetime. A Lifetime plan cannot be changed from here.' }
+  }
+  return { allowed: true, why: '' }
+}
+
+/** Checks the plan chosen and the reason (required, trimmed, at most 500 characters). */
+export function validateSetPlan(plan, reason) {
+  if (!SET_PLAN_OPTIONS.some(o => o.key === plan)) return { ok: false, error: 'Choose a plan.' }
+  const why = String(reason ?? '').trim()
+  if (!why) return { ok: false, error: 'Write a reason. It is kept in the history.' }
+  if (why.length > REASON_MAX) return { ok: false, error: `The reason is too long (at most ${REASON_MAX} characters).` }
+  return { ok: true, plan, reason: why }
+}
+
+/** Whether the person has a running paid plan or trial: the new time is then added after its end. */
+function isRunning(user, now) {
+  const end = toDate(user?.pro_end)
+  return Boolean(user && user.tier === 'paid' && end && end.getTime() > now.getTime())
+}
+
+/** The end date the database will give, or null for Lifetime (and for a plan that is not known). */
+export function setPlanNewEnd(user, plan, now = new Date()) {
+  const months = PLAN_MONTHS[plan]
+  if (!months) return null
+  const base = isRunning(user, now) ? toDate(user.pro_end) : now
+  return addMonths(base, months)
+}
+
+/** The question shown before the plan is set: says whether it starts today or is added after the current end. */
+export function setPlanConfirmText(user, plan, now = new Date()) {
+  const option = SET_PLAN_OPTIONS.find(o => o.key === plan)
+  if (!option) return ''
+  const running = isRunning(user, now)
+  if (plan === 'lifetime') {
+    const replaced = running && planKey(user, now) !== 'lifetime'
+      ? ` The current plan (${planName(user, now)}, ends ${dateText(user.pro_end)}) is replaced.`
+      : ''
+    return `Make this person Lifetime? It has no end date and cannot be changed to another plan from here afterwards.${replaced}`
+  }
+  const newEnd = setPlanNewEnd(user, plan, now)
+  if (running) {
+    return `Give ${option.label}? The current plan (${planName(user, now)}) ends ${dateText(user.pro_end)}. The new plan is added after it, so this person will be on ${option.label} until ${dateText(newEnd)}.`
+  }
+  return `Give ${option.label} starting today? It will end ${dateText(newEnd)}.`
+}
+
+/** Plain words for what admin_set_pro can answer. */
+export function setPlanErrorText(message) {
+  const m = String(message ?? '')
+  if (m.includes('forbidden')) return 'Only an admin account can set a plan.'
+  if (m.includes('bad_plan')) return 'Choose one of the listed plans.'
+  if (m.includes('no_such_user')) return 'This person no longer exists.'
+  if (m.includes('already_lifetime')) return 'This person is already Lifetime, so the plan cannot be changed. Nothing was changed.'
+  return 'Could not set the plan. Nothing was changed. Try again.'
+}
+
+/** The success line. newEnd is empty for Lifetime. */
+export function setPlanDoneText(plan, newEnd) {
+  const option = SET_PLAN_OPTIONS.find(o => o.key === plan)
+  const label = option ? option.label : 'Plan'
+  if (plan === 'lifetime' || !newEnd) return `${label} set. It has no end date.`
+  return `${label} set. It now ends ${dateText(newEnd)}.`
+}
+
+/** Whether the one free trial can be started for this person, and if not, why. */
+export function canStartTrial(user) {
+  if (!user) return { allowed: false, why: 'This person could not be found.' }
+  if (user.trial_started_at) return { allowed: false, why: 'This person already used their free trial.' }
+  if (user.tier === 'paid') return { allowed: false, why: 'This person is already on Pro, so a trial cannot be started.' }
+  return { allowed: true, why: '' }
+}
+
+export function startTrialConfirmText(now = new Date()) {
+  const end = new Date(now.getTime() + TRIAL_DAYS * DAY_MS)
+  return `Start a ${TRIAL_DAYS}-day free trial now? It will end ${dateText(end)}.`
+}
+
+/** Plain words for what admin_start_trial can answer. */
+export function startTrialErrorText(message) {
+  const m = String(message ?? '')
+  if (m.includes('forbidden')) return 'Only an admin account can start a trial.'
+  if (m.includes('no_such_user')) return 'This person no longer exists.'
+  if (m.includes('trial_already_used')) return 'This person already used their free trial. Nothing was changed.'
+  if (m.includes('already_pro')) return 'This person is already on Pro, so a trial cannot be started. Nothing was changed.'
+  return 'Could not start the trial. Nothing was changed. Try again.'
+}
+
+export function startTrialDoneText(newEnd) {
+  return `Trial started. It ends ${dateText(newEnd)}.`
+}

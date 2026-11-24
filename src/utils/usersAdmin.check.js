@@ -5,6 +5,8 @@ import {
   filterCounts, pageOf, requestCell, lastSeenText, itemsText, trialText, historyLine, requestStatusText,
   requestTitle, requestLine, referenceText, limitHitsText, DETAIL_LOAD_ERROR,
   ADD_DAYS_MAX, canAddDays, validateAddDays, addDaysConfirmText, addDaysErrorText, addDaysDoneText,
+  SET_PLAN_OPTIONS, canSetPlan, validateSetPlan, setPlanNewEnd, setPlanConfirmText, setPlanErrorText, setPlanDoneText,
+  canStartTrial, startTrialConfirmText, startTrialErrorText, startTrialDoneText,
 } from './usersAdmin.js'
 
 const NOW = new Date('2026-11-24T12:00:00Z')
@@ -219,4 +221,96 @@ test('each answer of the database function has plain words, and anything else sa
   assert.match(addDaysErrorText(undefined), /Nothing was changed/)
   assert.equal(addDaysDoneText(7, '2026-12-11T12:00:00Z'), '7 days added. Pro now ends 11 Dec 2026.')
   assert.equal(addDaysDoneText(1, '2026-12-11T12:00:00Z'), '1 day added. Pro now ends 11 Dec 2026.')
+})
+
+// ─── K7: set plan and start trial ───
+
+test('the four plans can be set; the choice and the reason are both required', () => {
+  assert.deepEqual(SET_PLAN_OPTIONS.map(o => o.key), ['monthly', 'six_months', 'yearly', 'lifetime'])
+  assert.deepEqual(validateSetPlan('yearly', ' gift '), { ok: true, plan: 'yearly', reason: 'gift' })
+  for (const bad of ['', 'trial', 'weekly', null, undefined]) assert.equal(validateSetPlan(bad, 'x').ok, false, `plan ${bad}`)
+  assert.match(validateSetPlan('', 'x').error, /Choose a plan/)
+  assert.match(validateSetPlan('yearly', '').error, /reason/)
+  assert.match(validateSetPlan('yearly', '   ').error, /reason/)
+  assert.equal(validateSetPlan('yearly', 'a'.repeat(500)).ok, true)
+  assert.equal(validateSetPlan('yearly', 'a'.repeat(501)).ok, false)
+})
+
+test('a Lifetime person cannot be changed; everyone else can be given a plan', () => {
+  assert.equal(canSetPlan(paid('lifetime', null), NOW).allowed, false)
+  assert.match(canSetPlan(paid('lifetime', null), NOW).why, /already Lifetime/)
+  assert.equal(canSetPlan(person(), NOW).allowed, true)
+  assert.equal(canSetPlan(paid('monthly', 10), NOW).allowed, true)
+  assert.equal(canSetPlan(paid('trial', 3), NOW).allowed, true)
+  assert.equal(canSetPlan(person({ tier: 'paid' }), NOW).allowed, true)
+  assert.equal(canSetPlan(null, NOW).allowed, false)
+})
+
+test('new end date: from today when nothing runs, after the current end when a plan or trial runs', () => {
+  assert.equal(setPlanNewEnd(person(), 'yearly', NOW).toISOString(), '2027-11-24T12:00:00.000Z')
+  assert.equal(setPlanNewEnd(person(), 'monthly', NOW).toISOString(), '2026-12-24T12:00:00.000Z')
+  assert.equal(setPlanNewEnd(person(), 'six_months', NOW).toISOString(), '2027-05-24T12:00:00.000Z')
+  const running = { ...paid('monthly', 20), pro_end: '2026-12-14T12:00:00Z' }
+  assert.equal(setPlanNewEnd(running, 'yearly', NOW).toISOString(), '2027-12-14T12:00:00.000Z')
+  const trial = { ...paid('trial', 2), pro_end: '2026-11-26T12:00:00Z' }
+  assert.equal(setPlanNewEnd(trial, 'monthly', NOW).toISOString(), '2026-12-26T12:00:00.000Z')
+  // an ended plan, a free tier with an old date and a hand-set tier all start today
+  assert.equal(setPlanNewEnd(paid('monthly', -5), 'monthly', NOW).toISOString(), '2026-12-24T12:00:00.000Z')
+  assert.equal(setPlanNewEnd(person({ tier: 'free', pro_plan: 'yearly', pro_end: inDays(100) }), 'monthly', NOW).toISOString(), '2026-12-24T12:00:00.000Z')
+  assert.equal(setPlanNewEnd(person({ tier: 'paid' }), 'monthly', NOW).toISOString(), '2026-12-24T12:00:00.000Z')
+  assert.equal(setPlanNewEnd(person(), 'lifetime', NOW), null)
+})
+
+test('months are added like the database: a short month ends on its last day, the time of day is kept', () => {
+  const jan31 = new Date('2027-01-31T08:30:00Z')
+  assert.equal(setPlanNewEnd(person(), 'monthly', jan31).toISOString(), '2027-02-28T08:30:00.000Z')
+  const leap = new Date('2027-08-31T08:30:00Z')
+  assert.equal(setPlanNewEnd(person(), 'six_months', leap).toISOString(), '2028-02-29T08:30:00.000Z')
+  const feb29 = new Date('2028-02-29T10:00:00Z')
+  assert.equal(setPlanNewEnd(person(), 'yearly', feb29).toISOString(), '2029-02-28T10:00:00.000Z')
+})
+
+test('the plan question says starting today or added after the current end, and what Lifetime means', () => {
+  assert.equal(setPlanConfirmText(person(), 'yearly', NOW), 'Give Pro yearly starting today? It will end 24 Nov 2027.')
+  const running = { ...paid('monthly', 20), pro_end: '2026-12-14T12:00:00Z' }
+  assert.equal(
+    setPlanConfirmText(running, 'yearly', NOW),
+    'Give Pro yearly? The current plan (Pro monthly) ends 14 Dec 2026. The new plan is added after it, so this person will be on Pro yearly until 14 Dec 2027.',
+  )
+  assert.match(setPlanConfirmText(paid('trial', 3), 'monthly', NOW), /current plan \(Trial\)/)
+  assert.match(setPlanConfirmText(person(), 'lifetime', NOW), /no end date and cannot be changed/)
+  assert.doesNotMatch(setPlanConfirmText(person(), 'lifetime', NOW), /replaced/)
+  assert.match(setPlanConfirmText(running, 'lifetime', NOW), /Pro monthly, ends 14 Dec 2026\) is replaced/)
+  assert.equal(setPlanConfirmText(person(), 'weekly', NOW), '')
+})
+
+test('each answer of admin_set_pro has plain words; success lines name the plan and the end', () => {
+  assert.match(setPlanErrorText('forbidden'), /admin/)
+  assert.match(setPlanErrorText('bad_plan'), /listed plans/)
+  assert.match(setPlanErrorText('no_such_user'), /no longer exists/)
+  assert.match(setPlanErrorText('already_lifetime'), /already Lifetime/)
+  assert.match(setPlanErrorText('odd'), /Nothing was changed/)
+  assert.match(setPlanErrorText(undefined), /Nothing was changed/)
+  assert.equal(setPlanDoneText('yearly', '2027-11-24T12:00:00Z'), 'Pro yearly set. It now ends 24 Nov 2027.')
+  assert.equal(setPlanDoneText('lifetime', null), 'Lifetime set. It has no end date.')
+})
+
+test('the trial can start only for a Free person who never had one', () => {
+  assert.equal(canStartTrial(person()).allowed, true)
+  assert.equal(canStartTrial(person({ trial_started_at: '2026-10-01T00:00:00Z' })).allowed, false)
+  assert.match(canStartTrial(person({ trial_started_at: '2026-10-01T00:00:00Z' })).why, /already used/)
+  assert.equal(canStartTrial(paid('monthly', 10)).allowed, false)
+  assert.match(canStartTrial(paid('monthly', 10)).why, /already on Pro/)
+  assert.equal(canStartTrial(person({ tier: 'paid' })).allowed, false)
+  assert.equal(canStartTrial(null).allowed, false)
+})
+
+test('the trial question and answers are in plain words', () => {
+  assert.equal(startTrialConfirmText(NOW), 'Start a 7-day free trial now? It will end 1 Dec 2026.')
+  assert.match(startTrialErrorText('forbidden'), /admin/)
+  assert.match(startTrialErrorText('no_such_user'), /no longer exists/)
+  assert.match(startTrialErrorText('trial_already_used'), /already used/)
+  assert.match(startTrialErrorText('already_pro'), /already on Pro/)
+  assert.match(startTrialErrorText('odd'), /Nothing was changed/)
+  assert.equal(startTrialDoneText('2026-12-01T12:00:00Z'), 'Trial started. It ends 1 Dec 2026.')
 })

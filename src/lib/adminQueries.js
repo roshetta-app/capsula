@@ -1748,6 +1748,42 @@ export async function addProDays(userId, days, reason, email = null) {
 }
 
 /**
+ * Give a person a plan (monthly, six_months, yearly or lifetime). Goes straight to the database
+ * function admin_set_pro with the admin's own login: it checks the admin, adds the new time after a
+ * running plan (or starts today), refuses to change a Lifetime person, and writes the Pro history
+ * line itself. The Audit Log line is written here after it succeeded.
+ * @param {string} userId
+ * @param {string} plan — 'monthly' | 'six_months' | 'yearly' | 'lifetime'
+ * @param {string} reason — required by the screen, trimmed there
+ * @param {string|null} email — for the audit log entry only
+ * @returns {Promise<{ data: { newEnd: string|null }|null, error: object|null }>}
+ */
+export async function setProPlan(userId, plan, reason, email = null) {
+  const { data, error } = await supabase.rpc('admin_set_pro', {
+    p_user: userId, p_plan: plan, p_reason: reason,
+  })
+  if (error) return { data: null, error }
+  await logAudit('update', 'profiles', userId, email, { pro_plan: plan, reason, pro_end: data })
+  return { data: { newEnd: data }, error: null }
+}
+
+/**
+ * Start the person's one free 7-day trial (only for a Free person who never had one). Goes straight
+ * to admin_start_trial with the admin's own login, which writes the Pro history line itself.
+ * @param {string} userId
+ * @param {string|null} email — for the audit log entry only
+ * @returns {Promise<{ data: { newEnd: string }|null, error: object|null }>}
+ */
+export async function startProTrial(userId, email = null) {
+  const { data, error } = await supabase.rpc('admin_start_trial', {
+    p_user: userId, p_reason: 'started by an admin',
+  })
+  if (error) return { data: null, error }
+  await logAudit('update', 'profiles', userId, email, { pro_plan: 'trial', pro_end: data, reason: 'trial started by an admin' })
+  return { data: { newEnd: data }, error: null }
+}
+
+/**
  * Set a user's role ('admin' | 'user').
  * @param {string} userId
  * @param {string} role

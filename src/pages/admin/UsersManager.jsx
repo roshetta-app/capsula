@@ -63,6 +63,8 @@ import {
   fetchAllUsers,
   fetchUserDetail,
   addProDays,
+  setProPlan,
+  startProTrial,
   updateUserRole,
   updateUserTier,
   banUser,
@@ -73,6 +75,8 @@ import {
   lastSeenText, requestCell, planName as planNameOf, trialText, historyLine, requestLine,
   referenceText, limitHitsText, DETAIL_LOAD_ERROR,
   ADD_DAYS_MAX, canAddDays, validateAddDays, addDaysConfirmText, addDaysErrorText, addDaysDoneText,
+  SET_PLAN_OPTIONS, canSetPlan, validateSetPlan, setPlanConfirmText, setPlanErrorText, setPlanDoneText,
+  canStartTrial, startTrialConfirmText, startTrialErrorText, startTrialDoneText,
 } from '../../utils/usersAdmin'
 
 // ─── Formatting helpers ─────────────────────────────────────────────────────
@@ -393,6 +397,128 @@ function AddDays({ user, onAdded }) {
   )
 }
 
+// ─── Plan: set a plan, start the trial (K7) ─────────────────────────────────
+
+function SetPlan({ user, onChanged }) {
+  const { toast } = useToast()
+  const [plan, setPlan]       = useState('')
+  const [reason, setReason]   = useState('')
+  const [asking, setAsking]   = useState(null)   // null, 'plan' or 'trial': which "are you sure" line is shown
+  const [problem, setProblem] = useState('')
+  const [busy, setBusy]       = useState(false)
+
+  const can   = canSetPlan(user)
+  const trial = canStartTrial(user)
+
+  if (!can.allowed) {
+    return (
+      <div>
+        <SectionTitle>Plan</SectionTitle>
+        <div style={mutedLine}>{can.why}</div>
+      </div>
+    )
+  }
+
+  function reset() { setAsking(null); setProblem('') }
+
+  function askPlan() {
+    const check = validateSetPlan(plan, reason)
+    if (!check.ok) { setProblem(check.error); return }
+    setProblem('')
+    setAsking('plan')
+  }
+
+  async function doSetPlan() {
+    const check = validateSetPlan(plan, reason)
+    if (!check.ok) { setProblem(check.error); setAsking(null); return }
+    setBusy(true)
+    const { data, error } = await setProPlan(user.id, check.plan, check.reason, user.email)
+    setBusy(false)
+    setAsking(null)
+    if (error) { setProblem(setPlanErrorText(error.message)); return }
+    toast.success(setPlanDoneText(check.plan, data.newEnd))
+    setPlan('')
+    setReason('')
+    setProblem('')
+    onChanged(user.id)
+  }
+
+  async function doStartTrial() {
+    setBusy(true)
+    const { data, error } = await startProTrial(user.id, user.email)
+    setBusy(false)
+    setAsking(null)
+    if (error) { setProblem(startTrialErrorText(error.message)); return }
+    toast.success(startTrialDoneText(data.newEnd))
+    setProblem('')
+    onChanged(user.id)
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <SectionTitle>Plan</SectionTitle>
+      <div style={mutedLine}>Give this person a plan without a payment request. If a plan is running, the new one is added after it. It is written in the Pro history and the Audit Log.</div>
+      <select
+        value={plan}
+        onChange={e => { setPlan(e.target.value); reset() }}
+        aria-label="Plan to give"
+        disabled={busy}
+        style={inputStyle}
+      >
+        <option value="">Choose a plan…</option>
+        {SET_PLAN_OPTIONS.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
+      </select>
+      <input
+        value={reason}
+        onChange={e => { setReason(e.target.value); reset() }}
+        placeholder="Reason (required)"
+        aria-label="Reason for setting the plan"
+        maxLength={500}
+        disabled={busy}
+        style={inputStyle}
+      />
+
+      {problem && <div role="alert" style={{ fontSize: 13, color: 'var(--color-error, #ef4444)' }}>{problem}</div>}
+
+      {asking !== 'plan' && (
+        <div>
+          <button onClick={askPlan} disabled={busy} style={btnSecondary}>Set plan</button>
+        </div>
+      )}
+
+      {asking === 'plan' && (
+        <div style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--color-border)', fontSize: 13, color: 'var(--color-text-primary)' }}>
+          <div style={{ marginBottom: 8 }}>{setPlanConfirmText(user, plan)}</div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={reset} disabled={busy} style={btnSecondary}>Cancel</button>
+            <button onClick={doSetPlan} disabled={busy} style={btnPrimary}>{busy ? 'Setting…' : 'Yes, set the plan'}</button>
+          </div>
+        </div>
+      )}
+
+      {trial.allowed && (
+        <div style={{ marginTop: 4, paddingTop: 10, borderTop: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={mutedLine}>This person never used the free trial. You can start it for them instead.</div>
+          {asking !== 'trial' && (
+            <div>
+              <button onClick={() => { setProblem(''); setAsking('trial') }} disabled={busy} style={btnSecondary}>Start 7-day trial</button>
+            </div>
+          )}
+          {asking === 'trial' && (
+            <div style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--color-border)', fontSize: 13, color: 'var(--color-text-primary)' }}>
+              <div style={{ marginBottom: 8 }}>{startTrialConfirmText()}</div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={reset} disabled={busy} style={btnSecondary}>Cancel</button>
+                <button onClick={doStartTrial} disabled={busy} style={btnPrimary}>{busy ? 'Starting…' : 'Yes, start the trial'}</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── UserModal — the person window ──────────────────────────────────────────
 
 function UserModal({ open, user, onClose, onSaved, onAdded, onRequestBanConfirm }) {
@@ -515,6 +641,14 @@ function UserModal({ open, user, onClose, onSaved, onAdded, onRequestBanConfirm 
             key={user.id}
             user={user}
             onAdded={id => { setDetailTry(n => n + 1); onAdded(id) }}
+          />
+        </div>
+
+        <div style={sectionCard}>
+          <SetPlan
+            key={user.id}
+            user={user}
+            onChanged={id => { setDetailTry(n => n + 1); onAdded(id) }}
           />
         </div>
 
