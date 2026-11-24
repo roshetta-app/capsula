@@ -1728,6 +1728,26 @@ export async function fetchUserDetail(userId) {
 }
 
 /**
+ * Add days to a running Pro plan or trial (the late-approval fix). Goes straight to the database
+ * function admin_add_days with the admin's own login: it checks the admin, allows 1 to 366 days,
+ * refuses lifetime and plans that are not running, and writes the Pro history line itself.
+ * The Audit Log line is written here after it succeeded.
+ * @param {string} userId
+ * @param {number} days
+ * @param {string} reason — required by the screen, trimmed there
+ * @param {string|null} email — for the audit log entry only
+ * @returns {Promise<{ data: { newEnd: string }|null, error: object|null }>}
+ */
+export async function addProDays(userId, days, reason, email = null) {
+  const { data, error } = await supabase.rpc('admin_add_days', {
+    p_user: userId, p_days: days, p_reason: reason,
+  })
+  if (error) return { data: null, error }
+  await logAudit('update', 'profiles', userId, email, { pro_days_added: days, reason, pro_end: data })
+  return { data: { newEnd: data }, error: null }
+}
+
+/**
  * Set a user's role ('admin' | 'user').
  * @param {string} userId
  * @param {string} role

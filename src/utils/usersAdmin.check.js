@@ -4,6 +4,7 @@ import {
   PAGE_SIZE, FILTERS, planKey, planName, endsText, daysLeft, matchesFilter, matchesSearch, filterUsers,
   filterCounts, pageOf, requestCell, lastSeenText, itemsText, trialText, historyLine, requestStatusText,
   requestTitle, requestLine, referenceText, limitHitsText, DETAIL_LOAD_ERROR,
+  ADD_DAYS_MAX, canAddDays, validateAddDays, addDaysConfirmText, addDaysErrorText, addDaysDoneText,
 } from './usersAdmin.js'
 
 const NOW = new Date('2026-11-24T12:00:00Z')
@@ -171,4 +172,51 @@ test('reference code, limit hits and the load-error line', () => {
   assert.equal(limitHitsText(1), '1 time')
   assert.equal(limitHitsText(7), '7 times')
   assert.match(DETAIL_LOAD_ERROR, /role, tier or ban/)
+})
+
+test('Add days is allowed only on a running Pro or trial, with a plain reason otherwise', () => {
+  assert.deepEqual(canAddDays(paid('monthly', 5), NOW), { allowed: true, why: '' })
+  assert.equal(canAddDays(paid('trial', 1), NOW).allowed, true)
+  assert.match(canAddDays(paid('lifetime', null), NOW).why, /no end date/)
+  assert.equal(canAddDays(paid('lifetime', null), NOW).allowed, false)
+  assert.match(canAddDays(person(), NOW).why, /running/)
+  assert.equal(canAddDays(paid('monthly', -1), NOW).allowed, false)
+  assert.equal(canAddDays(person({ tier: 'paid' }), NOW).allowed, false)
+  assert.equal(canAddDays(null, NOW).allowed, false)
+})
+
+test('days must be a whole number from 1 to 366 and a reason is required (trimmed, at most 500)', () => {
+  assert.equal(ADD_DAYS_MAX, 366)
+  assert.deepEqual(validateAddDays('7', ' late approval '), { ok: true, days: 7, reason: 'late approval' })
+  assert.deepEqual(validateAddDays(366, 'x'), { ok: true, days: 366, reason: 'x' })
+  assert.deepEqual(validateAddDays(1, 'x'), { ok: true, days: 1, reason: 'x' })
+  for (const bad of ['', '  ', '0', '-3', '367', '1.5', 'abc', null, undefined, '1e2']) {
+    assert.equal(validateAddDays(bad, 'x').ok, false, `days ${bad}`)
+  }
+  assert.match(validateAddDays('7', '').error, /reason/)
+  assert.match(validateAddDays('7', '   ').error, /reason/)
+  assert.match(validateAddDays('7', undefined).error, /reason/)
+  assert.equal(validateAddDays('7', 'a'.repeat(500)).ok, true)
+  assert.equal(validateAddDays('7', 'a'.repeat(501)).ok, false)
+  assert.match(validateAddDays('0', 'x').error, /1 to 366/)
+})
+
+test('the confirm question names days, plan, old end and new end', () => {
+  const u = { ...paid('yearly', 10), pro_end: '2026-12-04T12:00:00Z' }
+  assert.equal(addDaysConfirmText(u, 7, NOW), 'Add 7 days to Pro yearly? It now ends 4 Dec 2026 and will end 11 Dec 2026.')
+  assert.match(addDaysConfirmText(u, 1, NOW), /^Add 1 day to /)
+  assert.equal(addDaysConfirmText(person(), 7, NOW), '')
+  assert.equal(addDaysConfirmText(u, 'x', NOW), '')
+})
+
+test('each answer of the database function has plain words, and anything else says nothing was changed', () => {
+  assert.match(addDaysErrorText('forbidden'), /admin/)
+  assert.match(addDaysErrorText('bad_days'), /1 to 366/)
+  assert.match(addDaysErrorText('no_such_user'), /no longer exists/)
+  assert.match(addDaysErrorText('lifetime_has_no_end'), /Lifetime/)
+  assert.match(addDaysErrorText('not_running'), /Nothing was added/)
+  assert.match(addDaysErrorText('some odd failure'), /Nothing was changed/)
+  assert.match(addDaysErrorText(undefined), /Nothing was changed/)
+  assert.equal(addDaysDoneText(7, '2026-12-11T12:00:00Z'), '7 days added. Pro now ends 11 Dec 2026.')
+  assert.equal(addDaysDoneText(1, '2026-12-11T12:00:00Z'), '1 day added. Pro now ends 11 Dec 2026.')
 })

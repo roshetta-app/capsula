@@ -38,6 +38,12 @@
  *    made, their requests (with a link to the Pro requests screen when one is
  *    waiting) and their Pro history, each line with who and when. If that call
  *    fails the window still opens and role, tier and ban still work.
+ *  - Track K step K5f (2026-11-24): an Add days section in the same window (the
+ *    late-approval fix, decision 29). A reason is required, 1 to 366 days per
+ *    action, asked once before it is done; it goes through the database function
+ *    admin_add_days (which writes the Pro history) and the app writes the Audit
+ *    Log line. Lifetime and plans that are not running get a plain message
+ *    instead of a button. After it, the end date and the history refresh.
  *  - Tap a row to open a detail modal for role/tier/ban, instead of an
  *    inline toggle — role and ban are consequential enough to want an
  *    explicit save step, and ban specifically goes through ConfirmModal
@@ -56,6 +62,7 @@ import AdminPageHeader from '../../components/admin/AdminPageHeader'
 import {
   fetchAllUsers,
   fetchUserDetail,
+  addProDays,
   updateUserRole,
   updateUserTier,
   banUser,
@@ -65,6 +72,7 @@ import {
   FILTERS, filterUsers, filterCounts, pageOf, planName, endsText, itemsText,
   lastSeenText, requestCell, planName as planNameOf, trialText, historyLine, requestLine,
   referenceText, limitHitsText, DETAIL_LOAD_ERROR,
+  ADD_DAYS_MAX, canAddDays, validateAddDays, addDaysConfirmText, addDaysErrorText, addDaysDoneText,
 } from '../../utils/usersAdmin'
 
 // ─── Formatting helpers ─────────────────────────────────────────────────────
@@ -200,9 +208,97 @@ function ProDetail({ user, state, detail, onRetry }) {
 const mutedLine = { fontSize: 12, color: 'var(--color-text-tertiary)' }
 const listRow  = { padding: '6px 0', borderTop: '1px solid var(--color-border)', fontSize: 13, color: 'var(--color-text-primary)' }
 
+// ─── Add days (K5f) ──────────────────────────────────────────────────────────
+
+function AddDays({ user, onAdded }) {
+  const { toast } = useToast()
+  const [days, setDays]       = useState('')
+  const [reason, setReason]   = useState('')
+  const [asking, setAsking]   = useState(false)   // true while the "are you sure" line is shown
+  const [problem, setProblem] = useState('')
+  const [busy, setBusy]       = useState(false)
+
+  const can = canAddDays(user)
+  if (!can.allowed) {
+    return (
+      <div>
+        <SectionTitle>Add days</SectionTitle>
+        <div style={mutedLine}>{can.why}</div>
+      </div>
+    )
+  }
+
+  function ask() {
+    const check = validateAddDays(days, reason)
+    if (!check.ok) { setProblem(check.error); return }
+    setProblem('')
+    setAsking(true)
+  }
+
+  async function doAdd() {
+    const check = validateAddDays(days, reason)
+    if (!check.ok) { setProblem(check.error); setAsking(false); return }
+    setBusy(true)
+    const { data, error } = await addProDays(user.id, check.days, check.reason, user.email)
+    setBusy(false)
+    setAsking(false)
+    if (error) { setProblem(addDaysErrorText(error.message)); return }
+    toast.success(addDaysDoneText(check.days, data.newEnd))
+    setDays('')
+    setReason('')
+    setProblem('')
+    onAdded(user.id)
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <SectionTitle>Add days</SectionTitle>
+      <div style={mutedLine}>For a late approval or a goodwill extension. 1 to {ADD_DAYS_MAX} days each time. It is written in the Pro history and the Audit Log.</div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <input
+          type="number" inputMode="numeric" min={1} max={ADD_DAYS_MAX} step={1}
+          value={days}
+          onChange={e => { setDays(e.target.value); setAsking(false); setProblem('') }}
+          placeholder="Days"
+          aria-label="Days to add"
+          disabled={busy}
+          style={{ ...inputStyle, width: 90, flexShrink: 0 }}
+        />
+        <input
+          value={reason}
+          onChange={e => { setReason(e.target.value); setAsking(false); setProblem('') }}
+          placeholder="Reason (required)"
+          aria-label="Reason for adding days"
+          maxLength={500}
+          disabled={busy}
+          style={inputStyle}
+        />
+      </div>
+
+      {problem && <div role="alert" style={{ fontSize: 13, color: 'var(--color-error, #ef4444)' }}>{problem}</div>}
+
+      {!asking && (
+        <div>
+          <button onClick={ask} disabled={busy} style={btnSecondary}>Add days</button>
+        </div>
+      )}
+
+      {asking && (
+        <div style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--color-border)', fontSize: 13, color: 'var(--color-text-primary)' }}>
+          <div style={{ marginBottom: 8 }}>{addDaysConfirmText(user, validateAddDays(days, reason).days ?? days)}</div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={() => setAsking(false)} disabled={busy} style={btnSecondary}>Cancel</button>
+            <button onClick={doAdd} disabled={busy} style={btnPrimary}>{busy ? 'Adding…' : 'Yes, add the days'}</button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── UserModal — role / tier / ban detail view ──────────────────────────────
 
-function UserModal({ open, user, onClose, onSaved, onRequestBanConfirm }) {
+function UserModal({ open, user, onClose, onSaved, onAdded, onRequestBanConfirm }) {
   const { toast } = useToast()
   const [role, setRole] = useState('user')
   const [tier, setTier] = useState('free')
@@ -321,6 +417,12 @@ function UserModal({ open, user, onClose, onSaved, onRequestBanConfirm }) {
           state={detailState}
           detail={detail}
           onRetry={() => setDetailTry(n => n + 1)}
+        />
+
+        <AddDays
+          key={user.id}
+          user={user}
+          onAdded={id => { setDetailTry(n => n + 1); onAdded(id) }}
         />
 
         <label style={labelStyle}>
@@ -444,6 +546,16 @@ export default function UsersManager() {
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  // After days were added: reload the list and point the open window at the fresh row, so the
+  // end date it shows is the new one. The window itself reloads its history.
+  async function refreshAfterAdd(userId) {
+    const { data, error } = await fetchAllUsers()
+    if (error || !data) return
+    setRows(data)
+    const fresh = data.find(u => u.id === userId)
+    if (fresh) setDetailTarget(fresh)
+  }
 
   function openDetail(user) {
     setDetailTarget(user)
@@ -647,6 +759,7 @@ export default function UsersManager() {
         user={detailTarget}
         onClose={() => { setDetailOpen(false); setDetailTarget(null) }}
         onSaved={load}
+        onAdded={refreshAfterAdd}
         onRequestBanConfirm={requestBanConfirm}
       />
 

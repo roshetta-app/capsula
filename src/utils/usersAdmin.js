@@ -293,3 +293,60 @@ export function limitHitsText(n) {
 
 /** Shown when the person view cannot be loaded; the role, tier and ban controls still work. */
 export const DETAIL_LOAD_ERROR = 'The Pro details could not be loaded. You can still change role, tier or ban below.'
+
+// ─── Add days (K5f) ──────────────────────────────────────────────────────────
+// The late-approval fix of decision 29: an admin adds days to a Pro or trial that is still running.
+// The database function admin_add_days enforces the same limits; these rules give plain words first.
+
+export const ADD_DAYS_MIN = 1
+export const ADD_DAYS_MAX = 366
+export const REASON_MAX = 500
+
+/** Whether Add days can be used for this person right now, and if not, why in plain words. */
+export function canAddDays(user, now = new Date()) {
+  const key = planKey(user, now)
+  if (key === 'lifetime') return { allowed: false, why: 'Lifetime Pro has no end date, so there is nothing to add to.' }
+  if (key === 'free' || key === 'by_hand') {
+    return { allowed: false, why: 'Add days works only while a Pro plan or a trial is running. Approve a request first.' }
+  }
+  return { allowed: true, why: '' }
+}
+
+/** Checks what the admin typed. days may be a string from the box; the reason is required. */
+export function validateAddDays(days, reason) {
+  const text = String(days ?? '').trim()
+  const n = Number(text)
+  if (!/^\d+$/.test(text) || !Number.isInteger(n) || n < ADD_DAYS_MIN || n > ADD_DAYS_MAX) {
+    return { ok: false, error: `Type a whole number of days from ${ADD_DAYS_MIN} to ${ADD_DAYS_MAX}.` }
+  }
+  const why = String(reason ?? '').trim()
+  if (!why) return { ok: false, error: 'Write a reason. It is kept in the history.' }
+  if (why.length > REASON_MAX) return { ok: false, error: `The reason is too long (at most ${REASON_MAX} characters).` }
+  return { ok: true, days: n, reason: why }
+}
+
+/** The question shown before the days are added: names the days, the plan, and the old and new end date. */
+export function addDaysConfirmText(user, days, now = new Date()) {
+  const end = toDate(user?.pro_end)
+  const n = Number(days)
+  if (!end || !Number.isFinite(n)) return ''
+  const next = new Date(end.getTime() + n * DAY_MS)
+  return `Add ${n} day${n === 1 ? '' : 's'} to ${planName(user, now)}? It now ends ${dateText(end)} and will end ${dateText(next)}.`
+}
+
+/** Plain words for what the database function can answer. */
+export function addDaysErrorText(message) {
+  const m = String(message ?? '')
+  if (m.includes('forbidden')) return 'Only an admin account can add days.'
+  if (m.includes('bad_days')) return `Days must be a whole number from ${ADD_DAYS_MIN} to ${ADD_DAYS_MAX}.`
+  if (m.includes('no_such_user')) return 'This person no longer exists.'
+  if (m.includes('lifetime_has_no_end')) return 'Lifetime Pro has no end date, so there is nothing to add to.'
+  if (m.includes('not_running')) return 'This person has no running Pro or trial any more (it may have just ended). Nothing was added.'
+  return 'Could not add the days. Nothing was changed. Try again.'
+}
+
+/** The success line. */
+export function addDaysDoneText(days, newEnd) {
+  const n = Number(days)
+  return `${n} day${n === 1 ? '' : 's'} added. Pro now ends ${dateText(newEnd)}.`
+}
