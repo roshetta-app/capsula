@@ -1713,6 +1713,21 @@ export async function fetchAllUsers() {
 }
 
 /**
+ * One person's Pro details for the Users detail window (read only): their payment code, Pro history
+ * (newest first, with who did each thing), requests (never the receipt file, only whether one exists),
+ * how many times they hit a limit and how many roshettas they made. Admin only (the function refuses
+ * anyone else).
+ * @param {string} userId
+ */
+export async function fetchUserDetail(userId) {
+  const { data, error } = await supabase.functions.invoke('admin-users', {
+    body: { action: 'detail', userId },
+  })
+  if (error) return { data: null, error }
+  return { data: data ?? null, error: null }
+}
+
+/**
  * Set a user's role ('admin' | 'user').
  * @param {string} userId
  * @param {string} role

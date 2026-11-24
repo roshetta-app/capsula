@@ -259,3 +259,37 @@ export function requestStatusText(request) {
     default: return ''
   }
 }
+
+/** "Pro yearly · 299 EGP" for a request line in the person view. */
+export function requestTitle(request) {
+  const plan = PLAN_NAMES[request?.plan] ?? 'Pro'
+  const amount = Number(request?.amount_egp)
+  return Number.isFinite(amount) ? `${plan} \u00b7 ${amount} EGP` : plan
+}
+
+/** One request in the person view, in plain words: { title, status, when, receipt, code, by }. */
+export function requestLine(request) {
+  return {
+    title: requestTitle(request),
+    status: requestStatusText(request),
+    when: dateText(request?.created_at),
+    receipt: request?.has_receipt ? 'Receipt attached' : request?.status === 'waiting' ? 'No receipt yet' : '',
+    code: request?.reference_code || '',
+    by: request?.decided_by_name || '',
+  }
+}
+
+/** The payment code, or a plain line when the person has never opened the Upgrade page. */
+export function referenceText(code) {
+  return code ? code : 'Not made yet (they have not opened Upgrade)'
+}
+
+/** How many times the person hit a free limit (roshetta or group), in words. */
+export function limitHitsText(n) {
+  const v = Number(n)
+  if (!Number.isFinite(v) || v <= 0) return 'Never'
+  return v === 1 ? '1 time' : `${v} times`
+}
+
+/** Shown when the person view cannot be loaded; the role, tier and ban controls still work. */
+export const DETAIL_LOAD_ERROR = 'The Pro details could not be loaded. You can still change role, tier or ban below.'

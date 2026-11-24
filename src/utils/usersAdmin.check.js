@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import {
   PAGE_SIZE, FILTERS, planKey, planName, endsText, daysLeft, matchesFilter, matchesSearch, filterUsers,
   filterCounts, pageOf, requestCell, lastSeenText, itemsText, trialText, historyLine, requestStatusText,
+  requestTitle, requestLine, referenceText, limitHitsText, DETAIL_LOAD_ERROR,
 } from './usersAdmin.js'
 
 const NOW = new Date('2026-11-24T12:00:00Z')
@@ -149,4 +150,25 @@ test('request status words', () => {
   assert.equal(requestStatusText({ status: 'rejected', reject_reason: 'duplicate' }), 'Not confirmed. Reason: receipt already used')
   assert.equal(requestStatusText({ status: 'cancelled' }), 'Cancelled by the person')
   assert.equal(requestStatusText({}), '')
+})
+
+test('a request line reads in plain words with plan, amount, status, date, receipt, code and who decided', () => {
+  const r = { plan: 'yearly', amount_egp: 299, status: 'approved', created_at: '2026-11-20T10:00:00Z', has_receipt: true, reference_code: 'CAP-7K4Q', decided_by_name: 'Owner' }
+  assert.deepEqual(requestLine(r), { title: 'Pro yearly \u00b7 299 EGP', status: 'Approved', when: '20 Nov 2026', receipt: 'Receipt attached', code: 'CAP-7K4Q', by: 'Owner' })
+  assert.equal(requestLine({ plan: 'monthly', amount_egp: 49, status: 'waiting', has_receipt: false }).receipt, 'No receipt yet')
+  assert.equal(requestLine({ plan: 'monthly', amount_egp: 49, status: 'rejected', reject_reason: 'wrong_amount', has_receipt: false }).receipt, '')
+  assert.equal(requestLine({ plan: 'monthly', amount_egp: 49, status: 'rejected', reject_reason: 'wrong_amount' }).status, 'Not confirmed. Reason: wrong amount')
+  assert.equal(requestTitle({}), 'Pro')
+  assert.equal(requestTitle({ plan: 'six_months', amount_egp: 199 }), 'Pro 6 months \u00b7 199 EGP')
+  assert.deepEqual(requestLine(null), { title: 'Pro', status: '', when: '', receipt: '', code: '', by: '' })
+})
+
+test('reference code, limit hits and the load-error line', () => {
+  assert.equal(referenceText('CAP-7K4Q'), 'CAP-7K4Q')
+  assert.match(referenceText(null), /Not made yet/)
+  assert.equal(limitHitsText(0), 'Never')
+  assert.equal(limitHitsText(undefined), 'Never')
+  assert.equal(limitHitsText(1), '1 time')
+  assert.equal(limitHitsText(7), '7 times')
+  assert.match(DETAIL_LOAD_ERROR, /role, tier or ban/)
 })

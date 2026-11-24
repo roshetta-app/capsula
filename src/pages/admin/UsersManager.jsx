@@ -32,6 +32,12 @@
  *    comes from the admin-users 'list' answer (K5b). Role, tier and ban still
  *    live in the detail window, unchanged. Everything is filtered on this
  *    screen, which is fine at launch size (decision 1 of K5).
+ *  - Track K step K5e (2026-11-24): the detail window also shows the person's
+ *    Pro side, read from the admin-users 'detail' action when it opens: plan and
+ *    end date, payment code, trial used or not, times they hit a limit, roshettas
+ *    made, their requests (with a link to the Pro requests screen when one is
+ *    waiting) and their Pro history, each line with who and when. If that call
+ *    fails the window still opens and role, tier and ban still work.
  *  - Tap a row to open a detail modal for role/tier/ban, instead of an
  *    inline toggle — role and ban are consequential enough to want an
  *    explicit save step, and ban specifically goes through ConfirmModal
@@ -42,12 +48,14 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { ShieldCheck, Ban, CircleUserRound, Users as UsersIcon, Search } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { useToast }   from '../../context/ToastContext'
 import Modal          from '../../components/admin/Modal'
 import ConfirmModal   from '../../components/admin/ConfirmModal'
 import AdminPageHeader from '../../components/admin/AdminPageHeader'
 import {
   fetchAllUsers,
+  fetchUserDetail,
   updateUserRole,
   updateUserTier,
   banUser,
@@ -55,7 +63,8 @@ import {
 } from '../../lib/adminQueries'
 import {
   FILTERS, filterUsers, filterCounts, pageOf, planName, endsText, itemsText,
-  lastSeenText, requestCell,
+  lastSeenText, requestCell, planName as planNameOf, trialText, historyLine, requestLine,
+  referenceText, limitHitsText, DETAIL_LOAD_ERROR,
 } from '../../utils/usersAdmin'
 
 // ─── Formatting helpers ─────────────────────────────────────────────────────
@@ -84,6 +93,113 @@ function formatPhone(user) {
     : user.phone_number
 }
 
+// ─── Person's Pro side (K5e) — read only ────────────────────────────────────
+
+function Fact({ label, value }) {
+  return (
+    <div>
+      <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{label}</div>
+      <div style={{ fontSize: 13, color: 'var(--color-text-primary)', fontWeight: 500 }}>{value}</div>
+    </div>
+  )
+}
+
+function SectionTitle({ children }) {
+  return (
+    <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.03em', color: 'var(--color-text-tertiary)', marginBottom: 6 }}>
+      {children}
+    </div>
+  )
+}
+
+function ProDetail({ user, state, detail, onRetry }) {
+  const now = new Date()
+  const ends = endsText(user, now)
+
+  if (state === 'error') {
+    return (
+      <div style={{ padding: '10px 12px', borderRadius: 8, backgroundColor: 'var(--color-surface-muted)', fontSize: 13, color: 'var(--color-text-secondary)' }}>
+        <div style={{ marginBottom: 8 }}>{DETAIL_LOAD_ERROR}</div>
+        <button onClick={onRetry} style={btnSecondary}>Try again</button>
+      </div>
+    )
+  }
+
+  const loading = state !== 'ready'
+  const dash = '…'
+  const history  = detail?.history ?? []
+  const requests = detail?.requests ?? []
+  const waiting  = requests.find(r => r.status === 'waiting')
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div className="cms-cols cms-wrap-any" style={{
+        '--cols-phone': 'minmax(0, 1fr) minmax(0, 1fr)',
+        display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px',
+        padding: '10px 12px', borderRadius: 8, backgroundColor: 'var(--color-surface-muted)',
+      }}>
+        <Fact label="Plan" value={planNameOf(user, now)} />
+        <Fact label="Ends" value={ends || '—'} />
+        <Fact label="Payment code" value={loading ? dash : referenceText(detail?.reference_code)} />
+        <Fact label="Free trial" value={trialText(user)} />
+        <Fact label="Hit a free limit" value={loading ? dash : limitHitsText(detail?.limit_hits)} />
+        <Fact label="Roshettas made" value={loading ? dash : String(detail?.items_made ?? 0)} />
+      </div>
+
+      {waiting && (
+        <div style={{
+          padding: '10px 12px', borderRadius: 8, fontSize: 13,
+          border: '1px solid var(--color-warning, #d97706)', color: 'var(--color-text-primary)',
+        }}>
+          <div style={{ fontWeight: 600, marginBottom: 4 }}>A request is waiting: {requestLine(waiting).title}</div>
+          <Link to="/admin/pro-requests" style={{ color: 'var(--color-accent)', fontWeight: 600 }}>
+            Open Pro requests to approve or reject
+          </Link>
+        </div>
+      )}
+
+      <div>
+        <SectionTitle>Requests</SectionTitle>
+        {loading
+          ? <div style={mutedLine}>Loading…</div>
+          : requests.length === 0
+            ? <div style={mutedLine}>No requests.</div>
+            : requests.map(r => {
+                const line = requestLine(r)
+                return (
+                  <div key={r.id} style={listRow}>
+                    <div style={{ fontWeight: 600 }}>{line.title}</div>
+                    <div style={mutedLine}>
+                      {[line.status, line.when, line.receipt, line.code, line.by && `by ${line.by}`].filter(Boolean).join(' · ')}
+                    </div>
+                  </div>
+                )
+              })}
+      </div>
+
+      <div>
+        <SectionTitle>Pro history</SectionTitle>
+        {loading
+          ? <div style={mutedLine}>Loading…</div>
+          : history.length === 0
+            ? <div style={mutedLine}>Nothing yet.</div>
+            : history.map(h => {
+                const line = historyLine(h)
+                return (
+                  <div key={h.id} style={listRow}>
+                    <div>{line.text}</div>
+                    <div style={mutedLine}>{[line.when, line.by && `by ${line.by}`].filter(Boolean).join(' · ')}</div>
+                  </div>
+                )
+              })}
+      </div>
+    </div>
+  )
+}
+
+const mutedLine = { fontSize: 12, color: 'var(--color-text-tertiary)' }
+const listRow  = { padding: '6px 0', borderTop: '1px solid var(--color-border)', fontSize: 13, color: 'var(--color-text-primary)' }
+
 // ─── UserModal — role / tier / ban detail view ──────────────────────────────
 
 function UserModal({ open, user, onClose, onSaved, onRequestBanConfirm }) {
@@ -91,13 +207,32 @@ function UserModal({ open, user, onClose, onSaved, onRequestBanConfirm }) {
   const [role, setRole] = useState('user')
   const [tier, setTier] = useState('free')
   const [busy, setBusy] = useState(false)
-
+  const [detailTry, setDetailTry] = useState(0)
+  const [detailResult, setDetailResult] = useState({ key: null, data: null, failed: false })
   useEffect(() => {
     if (open && user) {
       setRole(user.role ?? 'user')
       setTier(user.tier ?? 'free')
     }
   }, [open, user])
+
+  // Pro details of this one person, kept with the key (person and attempt) they were asked for, so
+  // an answer for someone else, or from before a retry, is never shown: it simply counts as loading.
+  // A failure never blocks the role, tier and ban controls.
+  const userId = user?.id
+  const detailKey = `${userId}:${detailTry}`
+  useEffect(() => {
+    if (!open || !userId) return undefined
+    let current = true
+    fetchUserDetail(userId).then(({ data, error }) => {
+      if (!current) return
+      setDetailResult({ key: detailKey, data: error ? null : data, failed: Boolean(error || !data) })
+    })
+    return () => { current = false }
+  }, [open, userId, detailKey])
+  const fresh = detailResult.key === detailKey
+  const detail = fresh ? detailResult.data : null
+  const detailState = !fresh ? 'loading' : detailResult.failed ? 'error' : 'ready'
 
   if (!user) return null
 
@@ -180,6 +315,13 @@ function UserModal({ open, user, onClose, onSaved, onRequestBanConfirm }) {
             ))}
           </div>
         )}
+
+        <ProDetail
+          user={user}
+          state={detailState}
+          detail={detail}
+          onRetry={() => setDetailTry(n => n + 1)}
+        />
 
         <label style={labelStyle}>
           Role

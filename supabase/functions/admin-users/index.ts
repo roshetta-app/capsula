@@ -43,6 +43,7 @@
  * left out — UI-state fields with nothing for an admin to act on, not
  * account information.
  *
+ * K5e: 'detail' also returns reference_code (the person's payment code, read only).
  * Track K step K5b — 'list' also returns each person's plan (pro_plan), Pro end
  * date (pro_end), trial start, last seen, items made (roshettas) and their
  * waiting Pro request (with hours waiting). 'detail' is new and read only.
@@ -236,6 +237,12 @@ Deno.serve(async (req: Request) => {
         .limit(200)
       if (historyErr) throw historyErr
 
+      // The person's own payment code (decision 26). Read only: it is created when they first open
+      // the Upgrade page, so a person who never did has none and this stays empty.
+      const { data: refRow, error: refErr } = await adminClient
+        .from('pro_references').select('code').eq('user_id', userId).maybeSingle()
+      if (refErr) throw refErr
+
       // Receipt files are never returned here: only whether one is attached and not yet deleted.
       const { data: requests, error: requestsErr } = await adminClient
         .from('pro_requests')
@@ -283,6 +290,7 @@ Deno.serve(async (req: Request) => {
 
       return jsonResponse({
         profile,
+        reference_code: (refRow as { code?: string } | null)?.code ?? null,
         limit_hits: limitHits ?? 0,
         items_made: itemsMade ?? 0,
         history: historyRows.map(h => ({
