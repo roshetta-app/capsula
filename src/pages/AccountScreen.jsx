@@ -212,6 +212,7 @@ import ConfirmSheet from '../components/ui/ConfirmSheet'
 import ProfileAvatar from '../components/ui/ProfileAvatar'
 import { ROUTES } from '../router'
 import { logUsageEvent } from '../analytics/usageEvents'
+import { proStatusLabel } from '../utils/proStatusLabel'
 
 // Google "G" mark — local to this file, used only on the Continue with
 // Google button so the CTA reads as a real Google sign-in rather than a
@@ -889,8 +890,17 @@ export default function AccountScreen() {
             'pro', but the real database value (and every other check in
             the app, e.g. useIsPro.js) uses 'paid'. This tag could never
             show for a real Pro account before this fix. */}
-        {profile?.tier === 'paid' ? (
-          <div style={{
+        {profile?.tier === 'paid' ? (() => {
+          // 2026-11-24 (Stage 3 step 6): a trial or timed Pro person sees the days left or the end date,
+          // and the card opens the Upgrade page (paying early adds time). Lifetime stays plain.
+          const status = proStatusLabel(profile)
+          return (
+          <div
+            onClick={status.tappable ? handleUpgradeClick : undefined}
+            role={status.tappable ? 'button' : undefined}
+            tabIndex={status.tappable ? 0 : undefined}
+            onKeyDown={status.tappable ? (e => { if (e.key === 'Enter' || e.key === ' ') handleUpgradeClick() }) : undefined}
+            style={{
             display:         'flex',
             alignItems:      'center',
             justifyContent:  'center',
@@ -898,6 +908,8 @@ export default function AccountScreen() {
             padding:         'var(--space-2) var(--space-4)',
             backgroundColor: 'var(--color-bg)',
             borderRadius:    'var(--radius-sm)',
+            cursor:          status.tappable ? 'pointer' : 'default',
+            WebkitTapHighlightColor: 'transparent',
           }}>
             <span style={{
               display:       'inline-block',
@@ -911,9 +923,11 @@ export default function AccountScreen() {
             }}>
               PRO
             </span>
-            <span style={{ fontSize: 14, color: 'var(--color-text-secondary)' }}>plan</span>
+            <span style={{ fontSize: 14, color: 'var(--color-text-secondary)' }}>{status.text}</span>
+            {status.tappable && <ChevronRight size={16} color="var(--color-text-secondary)" style={{ flexShrink: 0 }} />}
           </div>
-        ) : (
+          )
+        })() : (
           <div
             onClick={handleUpgradeClick}
             role="button"
