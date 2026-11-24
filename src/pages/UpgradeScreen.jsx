@@ -31,6 +31,7 @@ import {
   fetchPlanPrices, fetchProSettings, fetchMyProReference, fetchMyProRequests, createProRequest, uploadAndAttachReceipt, cancelProRequest,
 } from '../lib/proQueries'
 import { payState } from '../utils/proSettingsAdmin'
+import { logUsageEvent } from '../analytics/usageEvents'
 
 const font = 'var(--font-body)'
 
@@ -127,6 +128,15 @@ export default function UpgradeScreen() {
     if (!userId) return
     load()
   }, [userId, load])
+
+  // Track K (K3b): one 'upgrade_screen_view' per visit, only for a signed-in person once the page has loaded
+  // (guests see the sign-in card and are not counted). No name, number or amount is sent.
+  const viewLoggedRef = useRef(false)
+  useEffect(() => {
+    if (!userId || !data || viewLoggedRef.current) return
+    viewLoggedRef.current = true
+    logUsageEvent('upgrade_screen_view')
+  }, [userId, data])
 
   function retry() {
     setFailed(false)
@@ -232,7 +242,7 @@ export default function UpgradeScreen() {
           plan={plan}
           onPlan={setPlan}
           renewing={isPaid || hasEnded}
-          onContinue={() => setView('pay')}
+          onContinue={() => { logUsageEvent('upgrade_request_start', null, plan); setView('pay') }}
         />
       </>
     )

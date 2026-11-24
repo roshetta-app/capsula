@@ -43,6 +43,13 @@
  *   group_limit_hit            — a group limit was reached; entity_name is
  *                                 one of free_groups, free_drugs,
  *                                 pro_groups, pro_drugs
+ *   pro_feature_click          — the Upgrade banner in Settings was tapped (entity_name is the banner text)
+ *   upgrade_screen_view        — a signed-in person opened the Upgrade page and it loaded (Track K, K3b;
+ *                                 once per visit, nothing else sent)
+ *   upgrade_request_start      — the person tapped Continue on a plan to open the I paid steps (entity_name is
+ *                                 monthly, six_months or yearly; no amount, number or receipt)
+ *   trial_start                — allowed by the database but NOT sent by the app: the trial starts in the
+ *                                 database at sign-up, and the numbers read profiles.trial_started_at instead
  *   (Drug groups, step 9.5: group events never carry a group name or
  *   description. The database list usage_events_event_type_check has them.)
  *
@@ -62,7 +69,7 @@ import { getDeviceId, getSessionId, getPlatform, getCurrentUserId } from './devi
 /**
  * Log a usage event to Supabase.
  *
- * @param {'condition_view'|'drug_view'|'condition_search'|'drug_search'|'drug_search_near_miss'|'drug_search_filter_masked'|'group_create'|'group_drug_add'|'group_share_create'|'shared_group_open'|'shared_group_save'|'group_limit_hit'|'roshetta_create'|'roshetta_share_create'|'shared_roshetta_open'|'shared_roshetta_save'|'roshetta_limit_hit'} eventType
+ * @param {'condition_view'|'drug_view'|'condition_search'|'drug_search'|'drug_search_near_miss'|'drug_search_filter_masked'|'group_create'|'group_drug_add'|'group_share_create'|'shared_group_open'|'shared_group_save'|'group_limit_hit'|'roshetta_create'|'roshetta_share_create'|'shared_roshetta_open'|'shared_roshetta_save'|'roshetta_limit_hit'|'pro_feature_click'|'upgrade_screen_view'|'upgrade_request_start'|'trial_start'} eventType
  * @param {string|null} entityId   — UUID of the entity, or null for search events
  * @param {string|null} entityName — Name snapshot at time of event
  * @param {'brand'|'generic'|null} [mode] — Brand/Generic mode, for drug-search
