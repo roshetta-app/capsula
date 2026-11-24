@@ -53,7 +53,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { ShieldCheck, Ban, CircleUserRound, Users as UsersIcon, Search } from 'lucide-react'
+import { ShieldCheck, Ban, Search, ChevronRight, ChevronDown } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useToast }   from '../../context/ToastContext'
 import Modal          from '../../components/admin/Modal'
@@ -69,7 +69,7 @@ import {
   unbanUser,
 } from '../../lib/adminQueries'
 import {
-  FILTERS, filterUsers, filterCounts, pageOf, planName, endsText, itemsText,
+  FILTERS, planKey, filterUsers, filterCounts, pageOf, planName, endsText, itemsText,
   lastSeenText, requestCell, planName as planNameOf, trialText, historyLine, requestLine,
   referenceText, limitHitsText, DETAIL_LOAD_ERROR,
   ADD_DAYS_MAX, canAddDays, validateAddDays, addDaysConfirmText, addDaysErrorText, addDaysDoneText,
@@ -105,9 +105,9 @@ function formatPhone(user) {
 
 function Fact({ label, value }) {
   return (
-    <div>
+    <div style={{ minWidth: 0 }}>
       <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{label}</div>
-      <div style={{ fontSize: 13, color: 'var(--color-text-primary)', fontWeight: 500 }}>{value}</div>
+      <div style={{ fontSize: 13, color: 'var(--color-text-primary)', fontWeight: 500, overflowWrap: 'anywhere' }}>{value}</div>
     </div>
   )
 }
@@ -120,44 +120,113 @@ function SectionTitle({ children }) {
   )
 }
 
-function ProDetail({ user, state, detail, onRetry }) {
+// ─── Look and feel: pills, avatar, cards (2026-11-24 redesign of the list and the window) ──────────
+
+const TONE_COLOR = {
+  success: 'var(--color-success, #059669)',
+  accent:  'var(--color-accent)',
+  warning: 'var(--color-warning, #d97706)',
+  error:   'var(--color-error, #ef4444)',
+  muted:   'var(--color-text-secondary)',
+}
+
+function Pill({ tone = 'muted', icon: Icon, children }) {
+  const c = TONE_COLOR[tone] ?? TONE_COLOR.muted
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 4,
+      padding: '3px 9px', borderRadius: 'var(--radius-full)',
+      border: `1px solid color-mix(in srgb, ${c} 40%, transparent)`,
+      backgroundColor: `color-mix(in srgb, ${c} 12%, transparent)`,
+      color: c, fontSize: 11, fontWeight: 600, lineHeight: 1.3, whiteSpace: 'nowrap', flexShrink: 0,
+    }}>
+      {Icon && <Icon size={11} />}{children}
+    </span>
+  )
+}
+
+function planTone(user, now) {
+  const key = planKey(user, now)
+  if (key === 'free') return 'muted'
+  if (key === 'trial') return 'accent'
+  return 'success'
+}
+
+const REQUEST_TONE = { ok: 'accent', late: 'warning', overdue: 'error', ending: 'warning' }
+
+function Avatar({ user, size = 40 }) {
+  const letter = (user.full_name || user.email || '?').trim().charAt(0).toUpperCase() || '?'
+  return (
+    <div aria-hidden="true" style={{
+      width: size, height: size, borderRadius: '50%', flexShrink: 0,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      backgroundColor: 'color-mix(in srgb, var(--color-accent) 14%, transparent)',
+      color: 'var(--color-accent)', fontSize: Math.round(size * 0.42), fontWeight: 700,
+    }}>
+      {letter}
+    </div>
+  )
+}
+
+// Plan, end date and request state as small coloured pills. Extra pills (Admin, Banned) go in as children.
+function StatusPills({ user, now, children }) {
+  const req  = requestCell(user, now)
+  const ends = endsText(user, now)
+  const ending = req.tone === 'ending'
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+      <Pill tone={planTone(user, now)}>{planName(user, now)}</Pill>
+      {ending
+        ? <Pill tone="warning">{req.text}{ends ? ` · ${ends}` : ''}</Pill>
+        : ends && <Pill tone="muted">{ends === 'No end' ? 'No end date' : `Ends ${ends}`}</Pill>}
+      {req.tone !== 'none' && !ending && <Pill tone={REQUEST_TONE[req.tone] ?? 'muted'}>{req.text}</Pill>}
+      {children}
+    </div>
+  )
+}
+
+const sectionCard = {
+  padding: '12px 14px', borderRadius: 'var(--radius-md)',
+  border: '1px solid var(--color-border)', backgroundColor: 'var(--color-surface)',
+}
+
+const factsGrid = {
+  '--cols-phone': 'minmax(0, 1fr) minmax(0, 1fr)',
+  display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 16px',
+}
+
+// A section the admin can fold away: a native details element, so it works with no extra code.
+function Collapsible({ title, count, defaultOpen = false, children }) {
+  return (
+    <details open={defaultOpen} style={sectionCard}>
+      <summary style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>
+        <span>{title}{count !== undefined && count !== null ? <span style={{ color: 'var(--color-text-tertiary)', fontWeight: 500 }}> · {count}</span> : null}</span>
+        <ChevronDown size={16} color="var(--color-text-tertiary)" />
+      </summary>
+      <div style={{ marginTop: 10 }}>{children}</div>
+    </details>
+  )
+}
+
+// ─── Person's Pro side (K5e) — read only ────────────────────────────────────
+
+// Waiting-request alert and the Pro facts. The facts that come from the list (plan, ends, trial) always show;
+// the ones that need the detail call show dots while loading and a dash if it failed.
+function ProFacts({ user, state, detail, onRetry }) {
   const now = new Date()
   const ends = endsText(user, now)
-
-  if (state === 'error') {
-    return (
-      <div style={{ padding: '10px 12px', borderRadius: 8, backgroundColor: 'var(--color-surface-muted)', fontSize: 13, color: 'var(--color-text-secondary)' }}>
-        <div style={{ marginBottom: 8 }}>{DETAIL_LOAD_ERROR}</div>
-        <button onClick={onRetry} style={btnSecondary}>Try again</button>
-      </div>
-    )
-  }
-
   const loading = state !== 'ready'
-  const dash = '…'
-  const history  = detail?.history ?? []
-  const requests = detail?.requests ?? []
-  const waiting  = requests.find(r => r.status === 'waiting')
+  const dash = state === 'error' ? '—' : '…'
+  const waiting = (detail?.requests ?? []).find(r => r.status === 'waiting')
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <div className="cms-cols cms-wrap-any" style={{
-        '--cols-phone': 'minmax(0, 1fr) minmax(0, 1fr)',
-        display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px',
-        padding: '10px 12px', borderRadius: 8, backgroundColor: 'var(--color-surface-muted)',
-      }}>
-        <Fact label="Plan" value={planNameOf(user, now)} />
-        <Fact label="Ends" value={ends || '—'} />
-        <Fact label="Payment code" value={loading ? dash : referenceText(detail?.reference_code)} />
-        <Fact label="Free trial" value={trialText(user)} />
-        <Fact label="Hit a free limit" value={loading ? dash : limitHitsText(detail?.limit_hits)} />
-        <Fact label="Roshettas made" value={loading ? dash : String(detail?.items_made ?? 0)} />
-      </div>
-
+    <>
       {waiting && (
         <div style={{
-          padding: '10px 12px', borderRadius: 8, fontSize: 13,
-          border: '1px solid var(--color-warning, #d97706)', color: 'var(--color-text-primary)',
+          padding: '10px 12px', borderRadius: 'var(--radius-md)', fontSize: 13,
+          border: '1px solid var(--color-warning, #d97706)',
+          backgroundColor: 'color-mix(in srgb, var(--color-warning, #d97706) 10%, transparent)',
+          color: 'var(--color-text-primary)',
         }}>
           <div style={{ fontWeight: 600, marginBottom: 4 }}>A request is waiting: {requestLine(waiting).title}</div>
           <Link to="/admin/pro-requests" style={{ color: 'var(--color-accent)', fontWeight: 600 }}>
@@ -166,16 +235,45 @@ function ProDetail({ user, state, detail, onRetry }) {
         </div>
       )}
 
-      <div>
-        <SectionTitle>Requests</SectionTitle>
+      <div style={sectionCard}>
+        <SectionTitle>Pro</SectionTitle>
+        <div className="cms-cols cms-wrap-any" style={factsGrid}>
+          <Fact label="Plan" value={planNameOf(user, now)} />
+          <Fact label="Ends" value={ends || '—'} />
+          <Fact label="Payment code" value={loading ? dash : referenceText(detail?.reference_code)} />
+          <Fact label="Free trial" value={trialText(user)} />
+          <Fact label="Hit a free limit" value={loading ? dash : limitHitsText(detail?.limit_hits)} />
+          <Fact label="Roshettas made" value={loading ? dash : String(detail?.items_made ?? 0)} />
+        </div>
+        {state === 'error' && (
+          <div style={{ marginTop: 12, fontSize: 13, color: 'var(--color-text-secondary)' }}>
+            <div style={{ marginBottom: 8 }}>{DETAIL_LOAD_ERROR}</div>
+            <button onClick={onRetry} style={btnSecondary}>Try again</button>
+          </div>
+        )}
+      </div>
+    </>
+  )
+}
+
+// Requests and Pro history, each folded away until opened.
+function ProLists({ state, detail }) {
+  const loading  = state === 'loading'
+  const history  = detail?.history ?? []
+  const requests = detail?.requests ?? []
+  if (state === 'error') return null
+
+  return (
+    <>
+      <Collapsible title="Requests" count={loading ? null : requests.length}>
         {loading
           ? <div style={mutedLine}>Loading…</div>
           : requests.length === 0
             ? <div style={mutedLine}>No requests.</div>
-            : requests.map(r => {
+            : requests.map((r, i) => {
                 const line = requestLine(r)
                 return (
-                  <div key={r.id} style={listRow}>
+                  <div key={r.id} style={{ ...listRow, borderTop: i === 0 ? 'none' : listRow.borderTop }}>
                     <div style={{ fontWeight: 600 }}>{line.title}</div>
                     <div style={mutedLine}>
                       {[line.status, line.when, line.receipt, line.code, line.by && `by ${line.by}`].filter(Boolean).join(' · ')}
@@ -183,25 +281,24 @@ function ProDetail({ user, state, detail, onRetry }) {
                   </div>
                 )
               })}
-      </div>
+      </Collapsible>
 
-      <div>
-        <SectionTitle>Pro history</SectionTitle>
+      <Collapsible title="Pro history" count={loading ? null : history.length}>
         {loading
           ? <div style={mutedLine}>Loading…</div>
           : history.length === 0
             ? <div style={mutedLine}>Nothing yet.</div>
-            : history.map(h => {
+            : history.map((h, i) => {
                 const line = historyLine(h)
                 return (
-                  <div key={h.id} style={listRow}>
+                  <div key={h.id} style={{ ...listRow, borderTop: i === 0 ? 'none' : listRow.borderTop }}>
                     <div>{line.text}</div>
                     <div style={mutedLine}>{[line.when, line.by && `by ${line.by}`].filter(Boolean).join(' · ')}</div>
                   </div>
                 )
               })}
-      </div>
-    </div>
+      </Collapsible>
+    </>
   )
 }
 
@@ -296,7 +393,7 @@ function AddDays({ user, onAdded }) {
   )
 }
 
-// ─── UserModal — role / tier / ban detail view ──────────────────────────────
+// ─── UserModal — the person window ──────────────────────────────────────────
 
 function UserModal({ open, user, onClose, onSaved, onAdded, onRequestBanConfirm }) {
   const { toast } = useToast()
@@ -333,6 +430,8 @@ function UserModal({ open, user, onClose, onSaved, onAdded, onRequestBanConfirm 
   if (!user) return null
 
   const banned = isBanned(user)
+  const now = new Date()
+  const dirty = role !== user.role || tier !== user.tier
 
   // View-only profile fields (D7) — only render the ones the account
   // actually has a value for, so accounts filled out before a given
@@ -386,89 +485,108 @@ function UserModal({ open, user, onClose, onSaved, onAdded, onRequestBanConfirm 
 
   return (
     <Modal isOpen={open} title={user.full_name || user.email || 'User'} onClose={onClose}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
-        <div style={{ display: 'flex', gap: 16, fontSize: 12, color: 'var(--color-text-tertiary)' }}>
-          <div>Joined {formatDate(user.created_at)}</div>
-          <div>Last sign-in {formatDate(user.last_sign_in_at)}</div>
+        {/* Who: avatar, email, dates, then plan / end / request / admin / banned as pills */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <Avatar user={user} size={48} />
+          <div className="cms-wrap-any" style={{ minWidth: 0, flex: 1 }}>
+            <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>{user.email ?? user.id}</div>
+            <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginTop: 2 }}>
+              Joined {formatDate(user.created_at)} · Last sign-in {formatDate(user.last_sign_in_at)}
+            </div>
+          </div>
         </div>
 
-        {profileFields.length > 0 && (
-          <div className="cms-cols cms-wrap-any" style={{
-            '--cols-phone': 'minmax(0, 1fr) minmax(0, 1fr)',
-            display:      'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap:          '8px 16px',
-            padding:      '10px 12px',
-            borderRadius: 8,
-            backgroundColor: 'var(--color-surface-muted)',
-          }}>
-            {profileFields.map(([label, value]) => (
-              <div key={label}>
-                <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{label}</div>
-                <div style={{ fontSize: 13, color: 'var(--color-text-primary)', fontWeight: 500 }}>{value}</div>
-              </div>
-            ))}
-          </div>
-        )}
+        <StatusPills user={user} now={now}>
+          {user.role === 'admin' && <Pill tone="accent" icon={ShieldCheck}>Admin</Pill>}
+          {banned && <Pill tone="error" icon={Ban}>Banned</Pill>}
+        </StatusPills>
 
-        <ProDetail
+        <ProFacts
           user={user}
           state={detailState}
           detail={detail}
           onRetry={() => setDetailTry(n => n + 1)}
         />
 
-        <AddDays
-          key={user.id}
-          user={user}
-          onAdded={id => { setDetailTry(n => n + 1); onAdded(id) }}
-        />
+        <div style={sectionCard}>
+          <AddDays
+            key={user.id}
+            user={user}
+            onAdded={id => { setDetailTry(n => n + 1); onAdded(id) }}
+          />
+        </div>
 
-        <label style={labelStyle}>
-          Role
-          <select value={role} onChange={e => setRole(e.target.value)} style={inputStyle}>
-            <option value="user">User</option>
-            <option value="admin">Admin</option>
-          </select>
-        </label>
+        <ProLists state={detailState} detail={detail} />
 
-        <label style={labelStyle}>
-          Tier
-          <select value={tier} onChange={e => setTier(e.target.value)} style={inputStyle}>
-            <option value="free">Free</option>
-            <option value="paid">Paid</option>
-          </select>
-        </label>
-
-        {banned && (
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            padding: '10px 12px', borderRadius: 8,
-            backgroundColor: 'var(--color-error, #ef4444)1a',
-            border: '1px solid var(--color-error, #ef4444)',
-            fontSize: 13, color: 'var(--color-error, #ef4444)',
-          }}>
-            <Ban size={14} />
-            This account is currently banned.
-          </div>
+        {profileFields.length > 0 && (
+          <Collapsible title="Profile" defaultOpen>
+            <div className="cms-cols cms-wrap-any" style={factsGrid}>
+              {profileFields.map(([label, value]) => <Fact key={label} label={label} value={value} />)}
+            </div>
+          </Collapsible>
         )}
 
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between', paddingTop: 8 }}>
+        {/* Account controls: role and tier side by side */}
+        <div style={sectionCard}>
+          <SectionTitle>Account</SectionTitle>
+          <div className="cms-cols" style={{ ...factsGrid, gap: 12 }}>
+            <label style={labelStyle}>
+              Role
+              <select value={role} onChange={e => setRole(e.target.value)} style={inputStyle}>
+                <option value="user">User</option>
+                <option value="admin">Admin</option>
+              </select>
+            </label>
+            <label style={labelStyle}>
+              Tier
+              <select value={tier} onChange={e => setTier(e.target.value)} style={inputStyle}>
+                <option value="free">Free</option>
+                <option value="paid">Paid</option>
+              </select>
+            </label>
+          </div>
+          <div style={{ ...mutedLine, marginTop: 8 }}>
+            Changing the tier by hand does not set a plan or dates. To give Pro, approve a request.
+          </div>
+        </div>
+
+        {/* Ban lives apart, at the bottom, so it is never tapped by accident */}
+        <div style={{ ...sectionCard, borderColor: 'color-mix(in srgb, var(--color-error, #ef4444) 40%, transparent)' }}>
+          {banned && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, fontSize: 13, color: 'var(--color-error, #ef4444)' }}>
+              <Ban size={14} />
+              This account is currently banned.
+            </div>
+          )}
           <button
             onClick={() => banned ? handleUnban() : onRequestBanConfirm(user)}
             disabled={busy}
-            style={banned ? btnSecondary : btnDanger}
+            style={{ ...btnSecondary, width: '100%', ...(banned ? {} : { color: 'var(--color-error, #ef4444)', borderColor: 'var(--color-error, #ef4444)' }) }}
           >
-            {banned ? 'Unban' : 'Ban user'}
+            {banned ? 'Unban this user' : 'Ban this user'}
           </button>
+          {!banned && <div style={{ ...mutedLine, marginTop: 8 }}>Signs them out and blocks sign-in until unbanned.</div>}
+        </div>
 
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={onClose} disabled={busy} style={btnSecondary}>Cancel</button>
-            <button onClick={handleSave} disabled={busy} style={btnPrimary}>
-              {busy ? 'Saving…' : 'Save'}
-            </button>
-          </div>
+        {/* Footer stays in view while the window scrolls; Save is on only when something changed */}
+        <div style={{
+          position: 'sticky', bottom: 0,
+          margin: '0 calc(-1 * var(--space-5)) calc(-1 * var(--space-5))',
+          padding: '12px var(--space-5)',
+          backgroundColor: 'var(--color-surface)',
+          borderTop: '1px solid var(--color-border)',
+          display: 'flex', gap: 8, justifyContent: 'flex-end',
+        }}>
+          <button onClick={onClose} disabled={busy} style={btnSecondary}>Cancel</button>
+          <button
+            onClick={handleSave}
+            disabled={busy || !dirty}
+            style={{ ...btnPrimary, ...((busy || !dirty) ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
+          >
+            {busy ? 'Saving…' : 'Save'}
+          </button>
         </div>
 
       </div>
@@ -476,37 +594,23 @@ function UserModal({ open, user, onClose, onSaved, onAdded, onRequestBanConfirm 
   )
 }
 
-// ─── Stat cards ─────────────────────────────────────────────────────────────
+// ─── Stat tiles (small, three in a row, also on a phone) ───────────────────
 
-function StatCard({ label, value, faIconAsLucide: Icon }) {
+function StatCard({ label, value }) {
   return (
     <div style={{
-      display:         'flex',
-      alignItems:      'center',
-      gap:             'var(--space-3)',
-      padding:         'var(--space-4)',
+      padding:         '10px 12px',
       backgroundColor: 'var(--color-surface)',
       border:          '1px solid var(--color-border)',
       borderRadius:    'var(--radius-lg)',
-      boxShadow:       'var(--shadow-card)',
+      textAlign:       'center',
+      minWidth:        0,
     }}>
-      <div style={{
-        width: 40, height: 40,
-        borderRadius: 'var(--radius-md)',
-        backgroundColor: 'var(--color-accent-light)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        flexShrink: 0,
-        color: 'var(--color-accent)',
-      }}>
-        <Icon size={18} />
+      <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-text-primary)', lineHeight: 1.2 }}>
+        {value}
       </div>
-      <div>
-        <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text-primary)', lineHeight: 1.2 }}>
-          {value}
-        </div>
-        <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginTop: 2 }}>
-          {label}
-        </div>
+      <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 2 }}>
+        {label}
       </div>
     </div>
   )
@@ -592,16 +696,11 @@ export default function UsersManager() {
 
   return (
     <AdminPageHeader title="Users">
-      {/* Stat cards */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-        gap: 'var(--space-4)',
-        marginBottom: 'var(--space-5)',
-      }}>
-        <StatCard label="Total Users" value={loading ? '—' : totalUsers} faIconAsLucide={UsersIcon} />
-        <StatCard label="Admins"      value={loading ? '—' : totalAdmins} faIconAsLucide={ShieldCheck} />
-        <StatCard label="Banned"      value={loading ? '—' : totalBanned} faIconAsLucide={Ban} />
+      {/* Stat tiles */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10, marginBottom: 'var(--space-4)' }}>
+        <StatCard label="Total Users" value={loading ? '—' : totalUsers} />
+        <StatCard label="Admins"      value={loading ? '—' : totalAdmins} />
+        <StatCard label="Banned"      value={loading ? '—' : totalBanned} />
       </div>
 
       {loading && (
@@ -637,7 +736,7 @@ export default function UsersManager() {
                 style={{ ...inputStyle, paddingLeft: 30 }}
               />
             </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 2 }}>
               {FILTERS.map(f => {
                 const active = filter === f.key
                 return (
@@ -652,6 +751,7 @@ export default function UsersManager() {
                       backgroundColor: active ? 'var(--color-accent-light)' : 'transparent',
                       color: active ? 'var(--color-accent)' : 'var(--color-text-secondary)',
                       fontSize: 12, fontWeight: 600, fontFamily: 'var(--font-body)', cursor: 'pointer',
+                      flexShrink: 0, whiteSpace: 'nowrap',
                     }}
                   >
                     {f.label} · {counts[f.key]}
@@ -677,69 +777,58 @@ export default function UsersManager() {
             </div>
           )}
 
-          {/* Table */}
+          {/* People: one card each (same on phone and computer) */}
           {view.total > 0 && (
             <div style={{
-              border: '1px solid var(--color-border)',
-              borderRadius: 'var(--radius-lg)',
-              overflow: 'hidden',
-              backgroundColor: 'var(--color-surface)',
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 320px), 1fr))',
+              gap: 10,
             }}>
-              <table className="cms-table-cards" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                <thead>
-                  <tr style={{ backgroundColor: 'var(--color-surface-muted)' }}>
-                    <th style={thStyle}>Name</th>
-                    <th style={thStyle}>Plan</th>
-                    <th style={thStyle}>Ends</th>
-                    <th style={thStyle}>Items</th>
-                    <th style={thStyle}>Last seen</th>
-                    <th style={thStyle}>Request</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {view.rows.map(user => {
-                    const banned = isBanned(user)
-                    const req = requestCell(user, now)
-                    const ends = endsText(user, now)
-                    return (
-                      <tr
-                        key={user.id}
-                        onClick={() => openDetail(user)}
-                        style={{
-                          cursor: 'pointer',
-                          borderTop: '1px solid var(--color-border)',
-                          opacity: banned ? 0.65 : 1,
-                        }}
-                      >
-                        <td style={tdStyle}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                            <CircleUserRound size={16} color="var(--color-text-secondary)" />
-                            <span>{user.full_name || '—'}</span>
-                            {user.role === 'admin' && (
-                              <span style={{ ...badgeStyle, color: 'var(--color-accent)', borderColor: 'var(--color-accent)' }}>
-                                <ShieldCheck size={11} /> Admin
-                              </span>
-                            )}
-                            {banned && (
-                              <span style={{ ...badgeStyle, color: 'var(--color-error, #ef4444)', borderColor: 'var(--color-error, #ef4444)' }}>
-                                <Ban size={11} /> Banned
-                              </span>
-                            )}
-                          </div>
-                          <div className="cms-wrap-any" style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2 }}>
+              {view.rows.map(user => {
+                const banned = isBanned(user)
+                const n = itemsText(user)
+                return (
+                  <div
+                    key={user.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => openDetail(user)}
+                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetail(user) } }}
+                    style={{
+                      display: 'flex', flexDirection: 'column', gap: 8,
+                      padding: '12px 14px', cursor: 'pointer',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: 'var(--radius-lg)',
+                      backgroundColor: 'var(--color-surface)',
+                      opacity: banned ? 0.65 : 1,
+                      minWidth: 0,
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <Avatar user={user} size={36} />
+                      <div className="cms-wrap-any" style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                            {user.full_name || user.email || '—'}
+                          </span>
+                          {user.role === 'admin' && <Pill tone="accent" icon={ShieldCheck}>Admin</Pill>}
+                          {banned && <Pill tone="error" icon={Ban}>Banned</Pill>}
+                        </div>
+                        {user.full_name && (
+                          <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 1 }}>
                             {user.email ?? user.id}
                           </div>
-                        </td>
-                        <td style={tdStyle}>{planName(user, now)}</td>
-                        <td style={{ ...tdStyle, color: ends ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)' }}>{ends || '—'}</td>
-                        <td style={tdStyle}>{itemsText(user)}</td>
-                        <td style={{ ...tdStyle, color: 'var(--color-text-tertiary)' }}>{lastSeenText(user, now)}</td>
-                        <td style={{ ...tdStyle, ...requestToneStyle[req.tone] }}>{req.text}</td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+                        )}
+                      </div>
+                      <ChevronRight size={16} color="var(--color-text-tertiary)" />
+                    </div>
+                    <StatusPills user={user} now={now} />
+                    <div style={mutedLine}>
+                      {n} {n === '1' ? 'roshetta' : 'roshettas'} · Seen {lastSeenText(user, now).toLowerCase()}
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           )}
 
@@ -802,18 +891,6 @@ const btnSecondary = {
   cursor:          'pointer',
 }
 
-const btnDanger = {
-  padding:         '8px 14px',
-  borderRadius:    'var(--radius-sm)',
-  border:          'none',
-  backgroundColor: 'var(--color-error, #ef4444)',
-  color:           '#fff',
-  fontSize:        13,
-  fontWeight:      600,
-  fontFamily:      'var(--font-body)',
-  cursor:          'pointer',
-}
-
 const labelStyle = {
   display:       'flex',
   flexDirection: 'column',
@@ -835,42 +912,4 @@ const inputStyle = {
   outline:         'none',
   width:           '100%',
   boxSizing:       'border-box',
-}
-
-const badgeStyle = {
-  display:         'inline-flex',
-  alignItems:      'center',
-  gap:             4,
-  padding:         '2px 8px',
-  borderRadius:    'var(--radius-full)',
-  border:          '1px solid var(--color-border)',
-  backgroundColor: 'var(--color-surface-muted)',
-  fontSize:        11,
-  fontWeight:      500,
-  color:           'var(--color-text-secondary)',
-  flexShrink:      0,
-}
-
-// How the Request cell is coloured: late (12 hours) amber, overdue (24 hours) red, ending soon amber.
-const requestToneStyle = {
-  none:    { color: 'var(--color-text-tertiary)' },
-  ok:      { color: 'var(--color-text-primary)', fontWeight: 600 },
-  late:    { color: 'var(--color-warning, #d97706)', fontWeight: 600 },
-  overdue: { color: 'var(--color-error, #ef4444)', fontWeight: 600 },
-  ending:  { color: 'var(--color-warning, #d97706)' },
-}
-
-const thStyle = {
-  textAlign:    'left',
-  padding:      '10px 12px',
-  fontSize:     11,
-  fontWeight:   600,
-  textTransform: 'uppercase',
-  letterSpacing: '0.03em',
-  color:        'var(--color-text-tertiary)',
-}
-
-const tdStyle = {
-  padding: '10px 12px',
-  color:   'var(--color-text-primary)',
 }
