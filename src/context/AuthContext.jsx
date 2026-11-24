@@ -391,7 +391,7 @@ export function AuthProvider({ children }) {
 
     const { data, error } = await supabase
       .from('profiles')
-      .select('role, tier, full_name, theme_preference, phone_number, occupation, country, specialty, profile_setup_dismissed, gender, phone_country_code, occupation_other, student_type')
+      .select('role, tier, full_name, theme_preference, phone_number, occupation, country, specialty, profile_setup_dismissed, gender, phone_country_code, occupation_other, student_type, pro_plan, pro_end')
       .eq('id', currentUser.id)
       .single()
 

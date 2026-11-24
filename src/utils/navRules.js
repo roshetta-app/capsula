@@ -75,6 +75,8 @@ export const SCREENS = [
   // Settings, a page opened from Profile; the FAQ is opened from Settings, so Settings is behind it.
   { pattern: '/account/settings',          kind: 'page', parent: '/account',                 label: 'Settings',      signIn: false, laysBehind: true },
   { pattern: '/account/edit',              kind: 'edit', parent: '/account',                 label: 'Edit profile',           signIn: true,  laysBehind: true },
+  // 2026-11-24 (Stage 3 step 3): Capsula PRO, opened from the Upgrade card in Settings. Signed-in only (Pro belongs to an account).
+  { pattern: '/account/upgrade',           kind: 'page', parent: '/account/settings',        label: 'Upgrade',       signIn: true,  laysBehind: true },
   { pattern: '/account/faq',               kind: 'page', parent: '/account/settings',        label: 'FAQ',           signIn: false, laysBehind: true },
   // 14.10 (2026-11-22): the two legal pages are opened from Settings, like the FAQ.
   { pattern: '/account/terms',             kind: 'page', parent: '/account/settings',        label: 'Terms of Use',  signIn: false, laysBehind: true },

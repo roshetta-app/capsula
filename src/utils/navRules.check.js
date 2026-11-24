@@ -82,6 +82,8 @@ test('stacks of the screens that matter', () => {
   assert.deepEqual(parentChain('/account/faq'), ['/account/faq', '/account/settings', '/account', '/'])
   // step 1c: the Notifications page sits behind Home
   assert.deepEqual(parentChain('/notifications'), ['/notifications', '/'])
+  // Stage 3 step 3: the Upgrade page sits behind Settings, then Profile, then Home
+  assert.deepEqual(parentChain('/account/upgrade'), ['/account/upgrade', '/account/settings', '/account', '/'])
   assert.deepEqual(parentChain('/g/abc'), ['/g/abc', '/'])
   assert.deepEqual(parentChain('/'), ['/'])
   for (const p of ['/conditions', '/drugs', '/favourites', '/account']) assert.deepEqual(parentChain(p), [p, '/'], p)
@@ -94,7 +96,8 @@ test('stacks of the screens that matter', () => {
 // screens behind it, and nothing may use the old "first screen" flag any more.
 // 14.7a: Settings (the old Account screen, /account/settings) is the 13th.
 // 2026-11-24 (step 1c): the Notifications page (/notifications) is the 14th.
-test('the 14 screens ask the rulebook for their parent, with no argument', () => {
+// 2026-11-24 (Stage 3 step 3): the Upgrade page (/account/upgrade) is the 15th.
+test('the 15 screens ask the rulebook for their parent, with no argument', () => {
   let found = 0
   for (const { path, file } of publicRoutes()) {
     if (!file) continue
@@ -106,7 +109,7 @@ test('the 14 screens ask the rulebook for their parent, with no argument', () =>
     assert.equal(call[1].trim(), '', `${file}: still names its own parent`)
     assert.equal(SCREENS.find((s) => s.pattern === path).laysBehind, true, path)
   }
-  assert.equal(found, 14)
+  assert.equal(found, 15)
 })
 
 // Frozen copy of the label function as it was before 12.2 (homePaths.js), so we can prove the
@@ -140,6 +143,7 @@ function legacyLabel(path) {
   if (path === '/account/terms') return 'Terms of Use'      // 14.10
   if (path === '/account/privacy') return 'Privacy Policy'  // 14.10
   if (path === '/notifications') return 'Notifications'      // step 1c
+  if (path === '/account/upgrade') return 'Upgrade'          // Stage 3 step 3
   return null
 }
 
@@ -190,7 +194,7 @@ test('kinds, sign-in and shared pages', () => {
   // signed-in only: groups, roshettas, notifications, account edit; open to guests: everything else
   const signIn = SCREENS.filter((s) => s.signIn).map((s) => s.pattern).sort()
   assert.deepEqual(signIn, [
-    '/account/edit', '/drugs/group/:groupId', '/drugs/group/:groupId/add', '/notifications', '/roshetta/:id',
+    '/account/edit', '/account/upgrade', '/drugs/group/:groupId', '/drugs/group/:groupId/add', '/notifications', '/roshetta/:id',
     '/roshetta/:id/add', '/roshetta/:id/edit', '/roshettas',
   ])
   assert.equal(needsSignIn('/roshetta/9'), true)

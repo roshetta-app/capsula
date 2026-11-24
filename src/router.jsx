@@ -82,6 +82,7 @@ import FavouritesScreen      from './pages/FavouritesScreen'
 import AccountScreen         from './pages/AccountScreen'
 import ProfileScreen         from './pages/ProfileScreen'
 import AccountEditScreen     from './pages/AccountEditScreen'
+import UpgradeScreen         from './pages/UpgradeScreen'
 import AccountFaqScreen      from './pages/AccountFaqScreen'
 import LegalScreen           from './pages/LegalScreen'
 import UnknownAddressScreen  from './pages/UnknownAddressScreen'
@@ -156,6 +157,8 @@ export const ROUTES = {
   ACCOUNT:           '/account',
   ACCOUNT_SETTINGS:  '/account/settings',
   ACCOUNT_EDIT:      '/account/edit',
+  // 2026-11-24 (Stage 3 step 3): Capsula PRO plans, the I paid steps and the request status.
+  ACCOUNT_UPGRADE:   '/account/upgrade',
   ACCOUNT_FAQ:       '/account/faq',
   // 14.10 (2026-11-22): the Terms of Use and the Privacy Policy, opened from the Legal card in Settings.
   ACCOUNT_TERMS:     '/account/terms',
@@ -234,6 +237,7 @@ export function PublicRoutes() {
         <Route path="/u/:handle"                     element={<PublicProfileScreen />} />
         <Route path="/account/settings"    element={<AccountScreen />} />
         <Route path="/account/edit"        element={<AccountEditScreen />} />
+        <Route path="/account/upgrade"     element={<UpgradeScreen />} />
         <Route path="/account/faq"         element={<AccountFaqScreen />} />
         <Route path="/account/terms"       element={<LegalScreen kind="terms" />} />
         <Route path="/account/privacy"     element={<LegalScreen kind="privacy" />} />

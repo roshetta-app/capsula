@@ -209,7 +209,6 @@ import { useToast } from '../context/ToastContext'
 import NotificationSheet from '../components/ui/NotificationSheet'
 import InfoSheet from '../components/ui/InfoSheet'
 import ConfirmSheet from '../components/ui/ConfirmSheet'
-import ProComingSoonSheet from '../components/ui/ProComingSoonSheet'
 import ProfileAvatar from '../components/ui/ProfileAvatar'
 import { ROUTES } from '../router'
 import { logUsageEvent } from '../analytics/usageEvents'
@@ -540,7 +539,6 @@ export default function AccountScreen() {
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [aboutOpen, setAboutOpen]                 = useState(false)
   const [signOutConfirmOpen, setSignOutConfirmOpen] = useState(false)
-  const [proSheetOpen, setProSheetOpen]           = useState(false)
 
   async function handleGoogleSignIn() {
     if (busy) return
@@ -593,7 +591,7 @@ export default function AccountScreen() {
   // see roadmap Section 5, still blocked on an undecided business question.
   function handleUpgradeClick() {
     logUsageEvent('pro_feature_click', null, 'Upgrade to Capsula PRO banner')
-    setProSheetOpen(true)
+    navigate(ROUTES.ACCOUNT_UPGRADE)
   }
 
   // Same convention AccountEditScreen.jsx uses — wait for AuthContext's
@@ -1089,11 +1087,6 @@ export default function AccountScreen() {
         message={groupNote ? `You can sign back in with Google anytime. ${groupNote}` : 'You can sign back in with Google anytime.'}
         confirmLabel={busy ? 'Signing out…' : 'Sign out'}
         destructive
-      />
-
-      <ProComingSoonSheet
-        isOpen={proSheetOpen}
-        onClose={() => setProSheetOpen(false)}
       />
     </SettingsPage>
   )
