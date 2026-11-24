@@ -73,6 +73,7 @@ import SharedRoshettaScreen  from './pages/SharedRoshettaScreen'
 import PublicProfileScreen   from './pages/PublicProfileScreen'
 import RoshettaScreen        from './pages/RoshettaScreen'
 import RoshettasListScreen   from './pages/RoshettasListScreen'
+import NotificationsScreen    from './pages/NotificationsScreen'
 import RoshettaAddDrugScreen from './pages/RoshettaAddDrugScreen'
 import RoshettaEditorScreen from './pages/RoshettaEditorScreen'
 import DrugDetailScreen      from './pages/DrugDetailScreen'
@@ -141,6 +142,8 @@ export const ROUTES = {
   PUBLIC_PROFILE:        (handle) => `/u/${encodeURIComponent(handle)}`,
   // 2026-11-14 (Roshetta plan, step 8.2): all of a person's roshettas, with search and sort.
   ROSHETTAS:             '/roshettas',
+  // 2026-11-24 (step 1c): the Notifications page, opened from the bell.
+  NOTIFICATIONS:         '/notifications',
   // 2026-11-14 (Roshetta plan, step 4.2a): a person's own roshetta page.
   ROSHETTA:              (id) => `/roshetta/${id}`,
   // 2026-11-14 (Roshetta plan, step 5.2a): the Add drug screen of a roshetta.
@@ -207,6 +210,7 @@ export function PublicRoutes() {
         <Route path="/drugs/group/:groupId"           element={<DrugGroupScreen />} />
         <Route path="/drugs/group/:groupId/add"       element={<AddDrugsToGroupScreen />} />
         <Route path="/roshettas"                      element={<RoshettasListScreen />} />
+        <Route path="/notifications"                  element={<NotificationsScreen />} />
         <Route path="/roshetta/:id"                   element={<RoshettaScreen />} />
         <Route path="/roshetta/:id/add"               element={<RoshettaAddDrugScreen />} />
         <Route path="/roshetta/:id/edit"              element={<RoshettaEditorScreen />} />

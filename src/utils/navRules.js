@@ -60,6 +60,9 @@ export const SCREENS = [
   { pattern: '/roshetta/:id/add',          kind: 'edit', parent: '/roshetta/:id',            label: 'Add drugs',           signIn: true,  laysBehind: true },
   { pattern: '/roshetta/:id/edit',         kind: 'edit', parent: '/roshetta/:id',            label: 'Editor',           signIn: true,  laysBehind: true },
 
+  // ── Notifications (opened from the bell on Home and Topics; Home is behind it). 2026-11-24, step 1c.
+  { pattern: '/notifications',             kind: 'page', parent: '/',                        label: 'Notifications', signIn: true,  laysBehind: true },
+
   // ── Shared pages: public, stand alone (no screen is placed behind them)
   { pattern: '/g/:code',                   kind: 'page', parent: '/',                        label: 'Group',        signIn: false, laysBehind: false },
   { pattern: '/r/:code',                   kind: 'page', parent: '/',                        label: 'Roshetta',     signIn: false, laysBehind: false },

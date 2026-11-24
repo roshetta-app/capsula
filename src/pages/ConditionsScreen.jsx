@@ -169,8 +169,9 @@ import AlphabetSectionDivider  from '../components/conditions/AlphabetSectionDiv
 import ConditionsEmptyState    from '../components/conditions/ConditionsEmptyState'
 import SpecialtiesBottomSheet  from '../components/conditions/SpecialtiesBottomSheet'
 import SpecialtySelector       from '../components/conditions/SpecialtySelector'
-import BellSheets              from '../components/ui/BellSheets'
-import { useUnreadNotices }    from '../hooks/useNotices'
+import { useUnreadNotifications } from '../hooks/useNotifications'
+import { useTapGuard }             from '../hooks/useTapGuard'
+import { ROUTES }                  from '../router'
 import { useConditionContext }  from '../context/ConditionContext'
 import { useFavouritesContext } from '../context/FavouritesContext'
 import { useDarkMode }         from '../hooks/useDarkMode'
@@ -381,7 +382,7 @@ function DarkModeToggle({ theme, onCycleTheme }) {
 // The tagline under it is gone (the Drugs header has none).
 
 function BrandRow({ theme, onCycleTheme, onOpenNotifications }) {
-  const unreadNotices = useUnreadNotices()
+  const unreadNotifications = useUnreadNotifications()
   return (
     <div style={{ paddingBottom: 'var(--space-3)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', minHeight: 44 }}>
@@ -396,7 +397,7 @@ function BrandRow({ theme, onCycleTheme, onOpenNotifications }) {
         {/* Notification bell: opens the persistent status sheet */}
         <button
           onClick={onOpenNotifications}
-          aria-label={unreadNotices > 0 ? 'Notifications, you have unread notices' : 'Notifications'}
+          aria-label={unreadNotifications > 0 ? 'Notifications, you have unread notifications' : 'Notifications'}
           style={{
             position:                'relative',
             width:                   36,
@@ -416,7 +417,7 @@ function BrandRow({ theme, onCycleTheme, onOpenNotifications }) {
           }}
         >
           <Bell size={16} />
-          {unreadNotices > 0 && (
+          {unreadNotifications > 0 && (
             <span style={{
               position: 'absolute', top: 5, right: 6, width: 9, height: 9,
               borderRadius: '50%', backgroundColor: 'var(--color-danger)',
@@ -678,7 +679,7 @@ export default function ConditionsScreen() {
   const { theme, setTheme }                  = useDarkMode()
 
   const [bottomSheetOpen, setBottomSheetOpen]     = useState(false)
-  const [notifSheetOpen, setNotifSheetOpen]       = useState(false)
+  const { openPage }                             = useTapGuard()
   // The slim bar is shown and hidden by ScrollRevealHeader, watching heroRef (the tinted header block).
   const { visible: showBackToTop, scrollToTop: handleBackToTop } = useBackToTop()
   // 12.10: a tap on the Topics tab, or Back to it, brings the place back.
@@ -1015,7 +1016,7 @@ export default function ConditionsScreen() {
           <BrandRow
             theme={theme}
             onCycleTheme={() => setTheme(nextInThemeCycle(theme))}
-            onOpenNotifications={() => setNotifSheetOpen(true)}
+            onOpenNotifications={() => openPage(ROUTES.NOTIFICATIONS)}
           />
         </div>
 
@@ -1080,12 +1081,6 @@ export default function ConditionsScreen() {
 
       {/* Back to top */}
       <BackToTopButton visible={showBackToTop} onClick={handleBackToTop} />
-
-      {/* Notification status sheet — portals to body, placement here doesn't matter */}
-      <BellSheets
-        isOpen={notifSheetOpen}
-        onClose={() => setNotifSheetOpen(false)}
-      />
 
       {/* Specialties bottom sheet */}
       <SpecialtiesBottomSheet

@@ -3,11 +3,10 @@
  * Phase H, step 9.3 — the top bar of Home: the CAPSULA wordmark on the left, the notification bell and
  * the dark mode button on the right (plus an Admin pages button for admin accounts only), drawn the same as the Topics screen's own bar (which keeps its own).
  */
-import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Bell, Sun, Moon, Monitor, LayoutDashboard } from 'lucide-react'
-import BellSheets from '../ui/BellSheets'
-import { useUnreadNotices } from '../../hooks/useNotices'
+import { useTapGuard } from '../../hooks/useTapGuard'
+import { useUnreadNotifications } from '../../hooks/useNotifications'
 import { useDarkMode } from '../../hooks/useDarkMode'
 import { useAuth } from '../../hooks/useAuth'
 import { ROUTES } from '../../router'
@@ -29,10 +28,10 @@ const roundButton = {
 
 export default function HomeTopBar() {
   const { theme, setTheme } = useDarkMode()
-  const [notifOpen, setNotifOpen] = useState(false)
   const navigate = useNavigate()
   const { profile } = useAuth()
-  const unreadNotices = useUnreadNotices()
+  const unreadNotifications = useUnreadNotifications()
+  const { openPage } = useTapGuard()
   // 2026-11-23: the app has no address bar, so admin accounts get a button here that opens /admin.
   // Same rule as AuthGuard (profile.role is 'admin'); everyone else sees nothing.
   const isAdmin = profile?.role === 'admin'
@@ -53,12 +52,12 @@ export default function HomeTopBar() {
         </button>
       )}
       <button
-        onClick={() => setNotifOpen(true)}
-        aria-label={unreadNotices > 0 ? 'Notifications, you have unread notices' : 'Notifications'}
+        onClick={() => openPage(ROUTES.NOTIFICATIONS)}
+        aria-label={unreadNotifications > 0 ? 'Notifications, you have unread notifications' : 'Notifications'}
         style={{ ...roundButton, position: 'relative' }}
       >
         <Bell size={16} />
-        {unreadNotices > 0 && (
+        {unreadNotifications > 0 && (
           <span style={{
             position: 'absolute', top: 5, right: 6, width: 9, height: 9,
             borderRadius: '50%', backgroundColor: 'var(--color-danger)',
@@ -73,7 +72,6 @@ export default function HomeTopBar() {
       >
         <ThemeIcon size={16} />
       </button>
-      <BellSheets isOpen={notifOpen} onClose={() => setNotifOpen(false)} />
     </div>
   )
 }
