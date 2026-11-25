@@ -153,14 +153,14 @@
             root.innerHTML =
               '<div style="padding:48px 24px;text-align:center;font-family:system-ui,sans-serif;color:#57534E">' +
               '<p style="margin-bottom:16px;">Capsula is finishing an update — this is taking longer than usual.</p>' +
-              '<a href="/capsula/" style="color:#0F766E;font-weight:600;text-decoration:underline;">Tap here to reload</a>' +
+              '<a href="%BASE_URL%" style="color:#0F766E;font-weight:600;text-decoration:underline;">Tap here to reload</a>' +
               '</div>';
           }
           return;
         }
         sessionStorage.setItem(key, String(n + 1));
         setTimeout(function () {
-          window.location.replace('/capsula/?boot-retry=' + Date.now());
+          window.location.replace('%BASE_URL%?boot-retry=' + Date.now());
         }, 2500);
       };
     </script>

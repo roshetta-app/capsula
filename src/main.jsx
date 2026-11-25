@@ -162,7 +162,7 @@ if ('serviceWorker' in navigator && !Capacitor.isNativePlatform()) {
 
   window.addEventListener('load', () => {
     navigator.serviceWorker
-      .register('/capsula/sw.js', { updateViaCache: 'none' })
+      .register(`${import.meta.env.BASE_URL}sw.js`, { updateViaCache: 'none' })
       .then(registration => {
         console.log('[SW] Registered:', registration.scope)
 

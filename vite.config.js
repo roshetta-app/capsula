@@ -2,6 +2,15 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import fs from 'fs'
 import path from 'path'
+import process from 'node:process'
+import {
+  normalizeBase, normalizePublicSite, rewriteSitePrefix, rewritePublicSite,
+} from './scripts/siteBase.mjs'
+
+// Where the website lives (S3.1). Default is today's GitHub Pages address; the build can set
+// SITE_BASE (path prefix, e.g. '/') and VITE_PUBLIC_SITE (full address) to build for another host.
+const SITE_BASE = normalizeBase(process.env.SITE_BASE)
+const PUBLIC_SITE = normalizePublicSite(process.env.VITE_PUBLIC_SITE)
 
 // Build stamp used ONLY by the service worker's own cache-busting logic
 // below — unique per build (or per dev-server start), so the SW's
@@ -33,10 +42,12 @@ function swBuildStampPlugin() {
     // During dev: patch sw.js on the fly when requested
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
-        if (req.url === '/capsula/sw.js' || req.url === '/sw.js') {
+        if (req.url === `${SITE_BASE}sw.js` || req.url === '/sw.js') {
           const swPath = path.resolve(__dirname, 'public/sw.js')
-          const content = fs.readFileSync(swPath, 'utf8')
-            .replace(/__BUILD_SHA__/g, `dev-${BUILD_STAMP}`)
+          const content = rewriteSitePrefix(
+            fs.readFileSync(swPath, 'utf8').replace(/__BUILD_SHA__/g, `dev-${BUILD_STAMP}`),
+            SITE_BASE,
+          )
           res.setHeader('Content-Type', 'application/javascript')
           res.end(content)
           return
@@ -45,15 +56,28 @@ function swBuildStampPlugin() {
       })
     },
 
+    // Link-preview pictures in index.html are absolute addresses.
+    transformIndexHtml(html) {
+      return rewritePublicSite(html, PUBLIC_SITE)
+    },
+
     // During build: write patched sw.js into dist/
     closeBundle() {
       const swSrc  = path.resolve(__dirname, 'public/sw.js')
       const swDest = path.resolve(__dirname, 'dist/sw.js')
       if (!fs.existsSync(swSrc)) return
       fs.mkdirSync(path.dirname(swDest), { recursive: true })
-      const content = fs.readFileSync(swSrc, 'utf8')
-        .replace(/__BUILD_SHA__/g, BUILD_STAMP)
+      const content = rewriteSitePrefix(
+        fs.readFileSync(swSrc, 'utf8').replace(/__BUILD_SHA__/g, BUILD_STAMP),
+        SITE_BASE,
+      )
       fs.writeFileSync(swDest, content, 'utf8')
+      // The install file (public/manifest.json) carries the same prefix.
+      const manifestDest = path.join(path.dirname(swDest), 'manifest.json')
+      if (fs.existsSync(manifestDest)) {
+        const text = fs.readFileSync(manifestDest, 'utf8')
+        fs.writeFileSync(manifestDest, rewriteSitePrefix(text, SITE_BASE), 'utf8')
+      }
       console.log(`[sw-build-stamp] CACHE_VERSION stamped: capsula-v${BUILD_STAMP}`)
     },
   }
@@ -68,7 +92,7 @@ export default defineConfig(({ mode }) => ({
   // make every asset request 404 (see App.jsx's matching basename
   // change). `npm run build:capacitor` passes --mode capacitor to pick
   // this branch; the normal `npm run build` (GitHub Pages) is unaffected.
-  base: mode === 'capacitor' ? '/' : '/capsula/',
+  base: mode === 'capacitor' ? '/' : SITE_BASE,
   // strictPort (added 2026-08-13): without this, if port 5173 is already
   // in use, Vite silently falls back to the next free port (5174, 5175,
   // ...) and only shows the real port in this terminal's own output —

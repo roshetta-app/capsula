@@ -11,9 +11,12 @@
  */
 
 import { Capacitor } from '@capacitor/core'
+import { PUBLIC_SITE } from '../lib/siteAddress'
 import { toTitleCase, getDrugTitleSuffix, TITLE_HIDDEN_MODIFIER_TAGS } from './drugTitleFormat'
 
-export const PUBLIC_SITE = 'https://roshetta-app.github.io/capsula'
+// The public site address lives in one place now (src/lib/siteAddress.js); re-exported here
+// because other files already import it from this module.
+export { PUBLIC_SITE }
 
 export function buildDrugLink(drug) {
   const slug = encodeURIComponent(drug.slug || drug.id)

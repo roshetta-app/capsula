@@ -9,8 +9,8 @@
  */
 import { Capacitor } from '@capacitor/core'
 import { copyText } from './shareDrugLink'
+import { PUBLIC_SITE } from '../lib/siteAddress'
 
-const PUBLIC_SITE = 'https://roshetta-app.github.io/capsula'
 
 export function buildConditionLink(condition) {
   const slug = encodeURIComponent(condition.slug || condition.id)

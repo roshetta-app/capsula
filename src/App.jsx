@@ -197,7 +197,9 @@ import ErrorBoundary from './components/ErrorBoundary'
 import { useVisualViewport } from './hooks/useVisualViewport'
 import { initDeviceSessionTracking } from './analytics/deviceSession'
 
-const ROUTER_BASENAME = import.meta.env.MODE === 'capacitor' ? '' : '/capsula'
+// The prefix comes from the build's base setting (SITE_BASE in vite.config.js): '/capsula' on
+// GitHub Pages today, '' on the native build and on a host at the root.
+const ROUTER_BASENAME = import.meta.env.BASE_URL.replace(/\/$/, '')
 
 // How long to wait after a check before a resume is allowed to trigger
 // another one — a quick app-switcher flick backgrounds/foregrounds Capsula

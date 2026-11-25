@@ -268,7 +268,9 @@ self.addEventListener('notificationclick', event => {
   // the stored data itself (native's consumer of the same stored value
   // never wants this prefix).
   const rawTarget = event.notification.data?.url ?? '/'
-  const target = `/capsula${rawTarget}`
+  // The prefix is '/capsula' here and '' on a host at the root: the build rewrites the '/capsula/'
+  // text below to the real base (scripts/siteBase.mjs), and slice drops its closing slash.
+  const target = `${'/capsula/'.slice(0, -1)}${rawTarget}`
   const logId  = event.notification.data?.log_id ?? null
 
   // Reports the tap back against its notification_log row (Phase F4 Stage

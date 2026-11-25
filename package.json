@@ -11,7 +11,8 @@
     "preview": "vite preview",
     "catalog:build": "node scripts/build-catalog.mjs",
     "launch:check": "node --test src/utils/launchSwitches.check.js",
-    "catalog:check": "node --test src/utils/catalogChunks.check.js scripts/build-catalog.check.mjs scripts/catalog-publish.check.mjs src/lib/catalogStatic.check.js"
+    "catalog:check": "node --test src/utils/catalogChunks.check.js scripts/build-catalog.check.mjs scripts/catalog-publish.check.mjs src/lib/catalogStatic.check.js",
+    "site:check": "node --test scripts/siteBase.check.mjs"
   },
   "dependencies": {
     "@capacitor-firebase/messaging": "^8.3.0",

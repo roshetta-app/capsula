@@ -13,9 +13,8 @@
 
 import { Capacitor } from '@capacitor/core'
 import { copyText } from './shareDrugLink'
+import { PUBLIC_SITE } from '../lib/siteAddress'
 
-// Same address shareDrugLink.js uses for the Android app.
-const PUBLIC_SITE = 'https://roshetta-app.github.io/capsula'
 
 export { copyText }
 
