@@ -1,0 +1,67 @@
+name: Publish drug catalog to Cloudflare Pages
+# Rebuilds the catalog files (scripts/build-catalog.mjs) and uploads them to the free Cloudflare Pages
+# project. Runs every night and by hand ("Run workflow"; tick Force to rebuild even if nothing changed).
+# The night run first asks one tiny question (the version stamp); if the published files are already
+# up to date it stops there and downloads nothing. Public key only: no service key anywhere.
+on:
+  schedule:
+    - cron: '15 3 * * *'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Rebuild and publish even if nothing changed'
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: catalog-publish
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CATALOG_PROJECT: capsula-catalog
+      CATALOG_HOST: https://capsula-catalog.pages.dev
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Decide if a rebuild is needed
+        id: plan
+        run: node scripts/catalog-publish.mjs plan ${{ inputs.force && '--force' || '' }}
+      - name: Build the catalog files (with the row-by-row check)
+        if: steps.plan.outputs.needs_build == 'true'
+        run: npm run catalog:build
+      - name: Add the headers file
+        if: steps.plan.outputs.needs_build == 'true'
+        run: node scripts/catalog-publish.mjs prepare
+      - name: Create the Pages project if it does not exist yet
+        if: steps.plan.outputs.needs_build == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if npx --yes wrangler@4 pages project list 2>/dev/null | grep -q "$CATALOG_PROJECT"; then
+            echo "Project $CATALOG_PROJECT already exists"
+          else
+            npx --yes wrangler@4 pages project create "$CATALOG_PROJECT" --production-branch main
+          fi
+      - name: Upload to Cloudflare Pages
+        if: steps.plan.outputs.needs_build == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --yes wrangler@4 pages deploy catalog-dist --project-name "$CATALOG_PROJECT" --branch main --commit-dirty=true
+      - name: Read the live site back and check every file
+        if: steps.plan.outputs.needs_build == 'true'
+        run: node scripts/catalog-publish.mjs verify
