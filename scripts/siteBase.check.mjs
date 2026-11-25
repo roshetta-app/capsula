@@ -103,3 +103,21 @@ test('public site constant: default is today\'s address', async () => {
   const mod = await import('../src/lib/siteAddress.js')
   assert.equal(mod.PUBLIC_SITE, DEFAULT_PUBLIC_SITE)
 })
+
+test('S3.4a: the official public address is the new one everywhere it is written', () => {
+  assert.equal(DEFAULT_PUBLIC_SITE, 'https://capsula-app.pages.dev')
+  const site = read('../src/lib/siteAddress.js')
+  assert.ok(site.includes("FALLBACK = '" + DEFAULT_PUBLIC_SITE + "'"), 'siteAddress.js fallback')
+  const bell = read('../supabase/functions/telegram-doorbell/index.ts')
+  assert.ok(bell.includes("'" + DEFAULT_PUBLIC_SITE + "/admin/reports'"), 'doorbell reports link')
+  assert.ok(bell.includes("'" + DEFAULT_PUBLIC_SITE + "/admin/pro-requests'"), 'doorbell pro link')
+  assert.ok(!bell.includes('github.io'), 'doorbell still has an old address')
+  const tags = read('../index.html').replace(/<!--[\s\S]*?-->/g, '')
+  assert.ok(!tags.includes('github.io'), 'a link-preview tag still points at github.io')
+})
+
+test('S3.4a: the new host builds on every push to main', () => {
+  const wf = read('../.github/workflows/deploy-app-cloudflare.yml')
+  assert.ok(/on:\s*\n\s*push:\s*\n\s*branches:\s*\[main\]/.test(wf), 'no push trigger')
+  assert.ok(wf.includes('workflow_dispatch'), 'by-hand run is gone')
+})

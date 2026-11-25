@@ -9,7 +9,8 @@
 // Used by vite.config.js and checked by scripts/siteBase.check.mjs.
 
 export const DEFAULT_SITE_BASE = '/capsula/'
-export const DEFAULT_PUBLIC_SITE = 'https://roshetta-app.github.io/capsula'
+// S3.4a: the official public address is now the Cloudflare Pages one.
+export const DEFAULT_PUBLIC_SITE = 'https://capsula-app.pages.dev'
 
 // Always starts and ends with '/'. Empty, missing or '/' mean "the root of the host".
 export function normalizeBase(raw) {

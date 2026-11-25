@@ -37,8 +37,8 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const RESEND_API_KEY            = (Deno.env.get('RESEND_API_KEY') ?? '').trim()
 const ALERT_EMAIL               = (Deno.env.get('ALERT_EMAIL') ?? '').trim()
 
-const CMS_REPORTS_URL = 'https://roshetta-app.github.io/capsula/admin/reports'
-const CMS_PRO_URL = 'https://roshetta-app.github.io/capsula/admin/pro-requests'
+const CMS_REPORTS_URL = 'https://capsula-app.pages.dev/admin/reports'
+const CMS_PRO_URL = 'https://capsula-app.pages.dev/admin/pro-requests'
 const MAX_MESSAGES_PER_HOUR = 20
 const MAX_ROWS_PER_RUN = 200
 const MAX_LINES = 15
