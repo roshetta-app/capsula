@@ -5,6 +5,7 @@ import { readDrugsCache, writeDrugsCache, touchDrugsCache } from '../utils/cache
 import { patchDrugDoses } from '../utils/patchDrugDoses'
 import { CACHE_SAFETY_REFRESH_MS, CACHE_RESTAMP_AFTER_MS } from '../constants/cache'
 import { logCrash } from '../utils/crashLogger'
+import { isStaticCatalogEnabled, fetchStaticCatalog } from '../lib/catalogStatic'
 
 // Phase F14 Stage 3 (delta sync): if a background check finds more than
 // this many audit_log entries since the device's last cursor, delta-
@@ -43,8 +44,32 @@ export function useDrugs() {
   // ignored instead of overwriting a newer one.
   const attemptIdRef = useRef(0)
 
+  // 2026-11-25 (Track S, S2.3): a full download can come from the static host
+  // (Cloudflare) instead of Supabase, but only while the remote switch in
+  // cms_config is on. Returns { drugs, drugsUpdatedAt, auditCursor } on success,
+  // or null when the switch is off or anything at all goes wrong, in which case
+  // the caller carries on with today's Supabase download unchanged. The saved
+  // copy gets the files' own version stamp and bookmark, so the normal
+  // change-log update brings it up to date from exactly where the files were built.
+  async function tryStaticCatalog(onProgress) {
+    try {
+      if (!(await isStaticCatalogEnabled(supabase))) return null
+      return await fetchStaticCatalog({ onProgress })
+    } catch (err) {
+      logCrash(err, 'useDrugs.tryStaticCatalog')
+      return null
+    }
+  }
+
   async function fetchAndCache() {
     try {
+      const viaStatic = await tryStaticCatalog()
+      if (viaStatic) {
+        setDrugs(viaStatic.drugs)
+        await writeDrugsCache(viaStatic.drugs, viaStatic.drugsUpdatedAt, viaStatic.auditCursor)
+        return
+      }
+
       // 2026-08-31: fetched together instead of one after another — this
       // used to wait for the full drug fetch to finish before even asking
       // "is there anything new," adding one avoidable extra wait to every
@@ -111,6 +136,20 @@ export function useDrugs() {
     setProgress(null)
 
     try {
+      // 2026-11-25 (Track S, S2.3): the static host first, when the switch is on.
+      // Progress is chunks loaded out of chunks in all, the same loaded/total shape
+      // as the page count below. Any problem falls through to the Supabase download.
+      const viaStatic = await tryStaticCatalog((loaded, total) => {
+        if (attemptIdRef.current !== myAttempt) return // a newer attempt has taken over
+        setProgress({ loaded, total })
+      })
+      if (viaStatic) {
+        if (attemptIdRef.current !== myAttempt) return // stale — a newer attempt owns the result
+        setDrugs(viaStatic.drugs)
+        await writeDrugsCache(viaStatic.drugs, viaStatic.drugsUpdatedAt, viaStatic.auditCursor)
+        return
+      }
+
       // Phase F14 Stage 3: capture the audit cursor up front, before paging
       // starts — see fetchAndCache's matching comment above for why (a
       // write landing mid-fetch just gets picked up again on the next

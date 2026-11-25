@@ -10,7 +10,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "catalog:build": "node scripts/build-catalog.mjs",
-    "catalog:check": "node --test src/utils/catalogChunks.check.js scripts/build-catalog.check.mjs scripts/catalog-publish.check.mjs"
+    "catalog:check": "node --test src/utils/catalogChunks.check.js scripts/build-catalog.check.mjs scripts/catalog-publish.check.mjs src/lib/catalogStatic.check.js"
   },
   "dependencies": {
     "@capacitor-firebase/messaging": "^8.3.0",
