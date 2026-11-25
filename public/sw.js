@@ -110,7 +110,25 @@ const STATIC_CACHE  = CACHE_VERSION + '-static'
 
 // Do NOT precache index.html — it must always be fetched fresh from the network
 // so the browser gets the correct Vite-hashed asset filenames after each deploy.
-const URLS_TO_PRECACHE = []
+//
+// 2026-11-25: the two app icons ARE saved at install. The notification prompt
+// shows icon-192, and it used to be saved only the first time it was shown
+// online, so a phone that went offline before that never had it.
+const URLS_TO_PRECACHE = [
+  '/capsula/icons/icon-192.png',
+  '/capsula/icons/badge-192.png',
+]
+
+// 2026-11-25: the custom category icons (SVG files uploaded in the CMS) live in
+// the specialty-icons bucket on Supabase, which is another address, so the
+// handler below used to skip them and they only showed while online. They are
+// now kept on the phone. Each upload has its own unique file name (a timestamp
+// plus random letters), so a saved file never goes stale. This cache is NOT
+// wiped on deploy (see activate), so a deploy does not make them disappear
+// offline; it is trimmed to the newest ICON_CACHE_MAX files.
+const ICON_CACHE         = 'capsula-category-icons-v1'
+const ICON_CACHE_MAX     = 80
+const ICON_PATH_PREFIX   = '/storage/v1/object/public/specialty-icons/'
 
 // Static files served directly from public/ (no Vite content hash) that are
 // safe to cache-first: they're small, rarely change, and CACHE_VERSION nukes
@@ -138,7 +156,8 @@ self.addEventListener('install', event => {
   self.skipWaiting()
   event.waitUntil(
     caches.open(STATIC_CACHE).then(cache =>
-      cache.addAll(URLS_TO_PRECACHE).then(() =>
+      // One missing file must not stop the install, so each is added on its own.
+      Promise.all(URLS_TO_PRECACHE.map(url => cache.add(url).catch(() => {}))).then(() =>
         // Offline-app-shell fix (see file header): fetch a genuinely fresh
         // copy of the shell (no-store, same as the navigate fetch below)
         // and store it under the exact URL the fetch handler's offline
@@ -165,7 +184,7 @@ self.addEventListener('activate', event => {
       .then(keys =>
         Promise.all(
           keys
-            .filter(key => key !== STATIC_CACHE)
+            .filter(key => key !== STATIC_CACHE && key !== ICON_CACHE)
             .map(key => caches.delete(key))
         )
       )
@@ -327,6 +346,37 @@ function withCacheHeader(response) {
 self.addEventListener('fetch', event => {
   const { request } = event
   const url = new URL(request.url)
+
+  // Custom category icons from the Supabase storage bucket: saved on first sight,
+  // served from the phone after that (see ICON_CACHE above). Only this one
+  // folder of this one project is handled; every other address is left alone.
+  if (
+    request.method === 'GET' &&
+    url.origin === SUPABASE_URL &&
+    url.pathname.startsWith(ICON_PATH_PREFIX)
+  ) {
+    event.respondWith(
+      caches.open(ICON_CACHE).then(cache =>
+        cache.match(request.url).then(cached => {
+          if (cached) return cached
+          return fetch(request).then(response => {
+            // Save only a real answer (an ordinary one, or the opaque kind an image tag gets).
+            if (response && (response.ok || response.type === 'opaque')) {
+              cache.put(request.url, response.clone())
+                .then(() => cache.keys())
+                .then(keys => {
+                  if (keys.length > ICON_CACHE_MAX) return cache.delete(keys[0])
+                  return undefined
+                })
+                .catch(() => {})
+            }
+            return response
+          })
+        })
+      )
+    )
+    return
+  }
 
   if (url.origin !== location.origin) return
 
