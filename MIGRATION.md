@@ -56,7 +56,7 @@ Purpose: if Capsula ever has to leave Supabase, this is the checklist. Each row 
 
 ## 3. What is NOT locked in
 - The data itself (plain Postgres).
-- The drug catalog download (becomes static files in S2, host-independent).
+- The drug catalog download (static files since S2, host-independent). Where it lives: a separate small Cloudflare Pages project, `capsula-catalog`, at `https://capsula-catalog.pages.dev` (a `manifest.json` plus 32 chunk files), published by the GitHub Action "Publish drug catalog to Cloudflare Pages" (`.github/workflows/publish-catalog.yml`; runs every night at 03:15 and can be run by hand; scripts `scripts/build-catalog.mjs`, `scripts/catalog-publish.mjs`). The Action needs two repository secrets, `CLOUDFLARE_API_TOKEN` (Pages-only) and `CLOUDFLARE_ACCOUNT_ID`, besides the Supabase ones it already uses. The app reads it in `src/lib/catalogStatic.js`, only while the `cms_config` row `catalog_static_enabled` is `true`; delete that row or set another value and every phone goes back to downloading from Supabase, with no app release. To point it at another host, change `CATALOG_HOST` in `src/lib/catalogStatic.js` (a new app build), or later through the remote address book (S10). After a big data job, run that workflow by hand (about 2 minutes): until it has run, phones that open the app in that gap keep their saved copy, and new phones use the Supabase download.
 - Backups (weekly dump, S8; restore proven in A1 and A1b).
 
 ## 4. Exit drill (S12, not done yet)

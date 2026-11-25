@@ -9,7 +9,7 @@ import { buildChunks, compareFlatLists, CATALOG_CHUNK_COUNT } from '../utils/cat
 import { makeTables } from '../../scripts/catalogFixture.mjs'
 import { CATALOG_FORMAT as BUILD_FORMAT } from '../../scripts/build-catalog.mjs'
 import {
-  CATALOG_FORMAT, CATALOG_SWITCH_KEY, StaticCatalogError, fetchStaticCatalog, isStaticCatalogEnabled,
+  CATALOG_FORMAT, CATALOG_SWITCH_KEY, StaticCatalogError, fetchStaticCatalog, isStaticCatalogEnabled, manifestCanCatchUp,
 } from './catalogStatic.js'
 
 const sha256 = text => createHash('sha256').update(text).digest('hex')
@@ -226,6 +226,74 @@ test('the switch is off when the row is missing, says anything else, errors, thr
   assert.equal(await isStaticCatalogEnabled(fakeSupabase({ data: null, error: { message: 'boom' } })), false)
   assert.equal(await isStaticCatalogEnabled(fakeSupabase(() => { throw new Error('boom') })), false)
   assert.equal(await isStaticCatalogEnabled(fakeSupabase(() => new Promise(() => {})), 20), false)
+})
+
+// ─── Stale files (S2.5) ─────────────────────────────────────────────────────
+
+/** A fake client for the stale check: app_metadata gives the server stamp, audit_log gives the changes. */
+function fakeServer({ stamp, changes = [], failOn = null }) {
+  const asked = []
+  return {
+    asked,
+    from(table) {
+      const b = {
+        select() { return b },
+        eq() { return b },
+        single() {
+          if (failOn === 'stamp') return Promise.resolve({ data: null, error: new Error('down') })
+          return Promise.resolve({ data: { drugs_updated_at: stamp, conditions_updated_at: null }, error: null })
+        },
+        in() { return b },
+        gt(col, val) { asked.push([table, col, val]); return b },
+        order() {
+          if (failOn === 'log') return Promise.resolve({ data: null, error: new Error('down') })
+          return Promise.resolve({ data: changes, error: null })
+        },
+      }
+      return b
+    },
+  }
+}
+const rows = (n, table = 'brands') => Array.from({ length: n }, (_, i) => ({ id: i, action: 'UPDATE', table_name: table, record_id: 'x' + i, created_at: '2026-11-21T00:00:00+00:00' }))
+const MANIFEST = { drugsUpdatedAt: '2026-11-20T10:00:00', auditCursor: '2026-11-20T09:59:00+00:00' }
+
+test('files with the server version stamp are fine (no change-log read needed)', async () => {
+  const server = fakeServer({ stamp: MANIFEST.drugsUpdatedAt })
+  assert.equal(await manifestCanCatchUp(server, MANIFEST, 200), true)
+  assert.equal(server.asked.length, 0)
+})
+
+test('files a few drug changes behind can be caught up from the manifest bookmark', async () => {
+  const server = fakeServer({ stamp: '2026-11-21T08:00:00', changes: rows(12) })
+  assert.equal(await manifestCanCatchUp(server, MANIFEST, 200), true)
+  assert.deepEqual(server.asked[0], ['audit_log', 'created_at', MANIFEST.auditCursor])
+  assert.equal(await manifestCanCatchUp(fakeServer({ stamp: 'x', changes: rows(200) }), MANIFEST, 200), true)
+})
+
+test('files too far behind after a bulk job are stale', async () => {
+  assert.equal(await manifestCanCatchUp(fakeServer({ stamp: 'x', changes: rows(201) }), MANIFEST, 200), false)
+})
+
+test('a moved stamp with no drug change in the log (a direct database edit) is stale', async () => {
+  assert.equal(await manifestCanCatchUp(fakeServer({ stamp: 'x', changes: [] }), MANIFEST, 200), false)
+  assert.equal(await manifestCanCatchUp(fakeServer({ stamp: 'x', changes: rows(5, 'conditions') }), MANIFEST, 200), false)
+})
+
+test('a database error in the stale check is thrown, never answered as fresh or stale', async () => {
+  await assert.rejects(manifestCanCatchUp(fakeServer({ stamp: 'x', failOn: 'stamp' }), MANIFEST, 200))
+  await assert.rejects(manifestCanCatchUp(fakeServer({ stamp: 'x', failOn: 'log' }), MANIFEST, 200))
+})
+
+test('when the manifest is declined, no chunk is downloaded and the code is declined', async () => {
+  const host = publish(makeTables())
+  const fake = fakeHost(host)
+  await assert.rejects(
+    fetchStaticCatalog({ ...options(), fetchImpl: fake.fetchImpl, acceptManifest: async () => false }),
+    err => err instanceof StaticCatalogError && err.code === 'declined',
+  )
+  assert.deepEqual(fake.calls, ['manifest.json'])
+  const ok = await fetchStaticCatalog({ ...options(), fetchImpl: fakeHost(host).fetchImpl, acceptManifest: async m => m.chunks.length === CATALOG_CHUNK_COUNT })
+  assert.equal(ok.drugs.length, host.stats.brands)
 })
 
 // The nested rows the database would return, built straight from the tables (the independent route).

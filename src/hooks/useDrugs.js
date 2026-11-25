@@ -5,7 +5,7 @@ import { readDrugsCache, writeDrugsCache, touchDrugsCache } from '../utils/cache
 import { patchDrugDoses } from '../utils/patchDrugDoses'
 import { CACHE_SAFETY_REFRESH_MS, CACHE_RESTAMP_AFTER_MS } from '../constants/cache'
 import { logCrash } from '../utils/crashLogger'
-import { isStaticCatalogEnabled, fetchStaticCatalog } from '../lib/catalogStatic'
+import { isStaticCatalogEnabled, fetchStaticCatalog, manifestCanCatchUp } from '../lib/catalogStatic'
 
 // Phase F14 Stage 3 (delta sync): if a background check finds more than
 // this many audit_log entries since the device's last cursor, delta-
@@ -51,20 +51,40 @@ export function useDrugs() {
   // the caller carries on with today's Supabase download unchanged. The saved
   // copy gets the files' own version stamp and bookmark, so the normal
   // change-log update brings it up to date from exactly where the files were built.
+  //
+  // 2026-11-25 (Track S, S2.5, stale-file rule): when a big data job has just run
+  // and the files are not republished yet, the files are older than the server by
+  // more than the change-log update can bridge. The check happens right after the
+  // small manifest is read and before any chunk is downloaded, and then this
+  // returns { stale: true } instead of data. What each caller does with that:
+  // a phone that has a saved copy keeps it and tries again on its next open; a
+  // phone with nothing saved, or one whose copy is over 60 days old, falls
+  // through to the Supabase download as before.
   async function tryStaticCatalog(onProgress) {
     try {
       if (!(await isStaticCatalogEnabled(supabase))) return null
-      return await fetchStaticCatalog({ onProgress })
+      return await fetchStaticCatalog({
+        onProgress,
+        acceptManifest: manifest => manifestCanCatchUp(supabase, manifest, DELTA_FALLBACK_CHANGE_COUNT),
+      })
     } catch (err) {
+      if (err?.code === 'declined') return { stale: true }
       logCrash(err, 'useDrugs.tryStaticCatalog')
       return null
     }
   }
 
-  async function fetchAndCache() {
+  // options.keepIfStale: used by the change-log update only. With stale files it
+  // leaves the saved copy exactly as it is (nothing downloaded, nothing written,
+  // so the version check fires again on the next open) instead of falling back
+  // to the 30 MB Supabase download. 'refresh' is handed out below and may be
+  // called with an event object, so only an explicit true counts.
+  async function fetchAndCache(options) {
     try {
       const viaStatic = await tryStaticCatalog()
-      if (viaStatic) {
+      if (viaStatic?.stale) {
+        if (options?.keepIfStale === true) return
+      } else if (viaStatic) {
         setDrugs(viaStatic.drugs)
         await writeDrugsCache(viaStatic.drugs, viaStatic.drugsUpdatedAt, viaStatic.auditCursor)
         return
@@ -143,7 +163,9 @@ export function useDrugs() {
         if (attemptIdRef.current !== myAttempt) return // a newer attempt has taken over
         setProgress({ loaded, total })
       })
-      if (viaStatic) {
+      // Stale files (a bulk job ran, not republished yet) are not used for a phone with
+      // nothing saved: it falls through to the Supabase download below.
+      if (viaStatic && !viaStatic.stale) {
         if (attemptIdRef.current !== myAttempt) return // stale — a newer attempt owns the result
         setDrugs(viaStatic.drugs)
         await writeDrugsCache(viaStatic.drugs, viaStatic.drugsUpdatedAt, viaStatic.auditCursor)
@@ -193,9 +215,13 @@ export function useDrugs() {
   // is built from cachedRecord.data (the just-read cache) rather than the
   // 'drugs' state variable, since this can run before that state has
   // actually committed.
+  // 2026-11-25 (Track S, S2.5): every full-download fallback below passes
+  // keepIfStale. With the static path on and its files stale (a bulk job ran, not
+  // republished yet) the phone keeps its saved copy and asks again on its next open,
+  // rather than starting a 30 MB Supabase download. Switch off or files fine: as before.
   async function applyDrugsDelta(cachedRecord, drugsUpdatedAt) {
     if (!cachedRecord.auditCursor) {
-      await fetchAndCache()
+      await fetchAndCache({ keepIfStale: true })
       return
     }
 
@@ -203,7 +229,7 @@ export function useDrugs() {
       const changes = await fetchAuditLogSince(supabase, cachedRecord.auditCursor)
 
       if (changes.length > DELTA_FALLBACK_CHANGE_COUNT) {
-        await fetchAndCache()
+        await fetchAndCache({ keepIfStale: true })
         return
       }
 
@@ -234,7 +260,7 @@ export function useDrugs() {
       // clock. With no way to know what changed, do a full download instead.
       // This also covers a log that only has condition changes in it.
       if (genericIds.size === 0 && formulationIds.size === 0 && brandIds.size === 0) {
-        await fetchAndCache()
+        await fetchAndCache({ keepIfStale: true })
         return
       }
 
@@ -258,7 +284,7 @@ export function useDrugs() {
       await writeDrugsCache(nextDrugs, drugsUpdatedAt, newCursor)
     } catch (err) {
       logCrash(err, 'useDrugs.applyDrugsDelta')
-      await fetchAndCache()
+      await fetchAndCache({ keepIfStale: true })
     }
   }
 

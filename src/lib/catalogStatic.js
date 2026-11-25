@@ -18,10 +18,16 @@
  * normal change-log update brings the phone up to date from exactly the point the files were
  * built at.
  *
- * No Supabase data is read here except the one small switch row.
+ * Stale files (S2.5, decision D6): after a big data job the files are older than the server
+ * until the publish workflow runs. manifestCanCatchUp below says whether files are still
+ * good enough to start from; when they are not, fetchStaticCatalog (given acceptManifest)
+ * stops before downloading any chunk and throws code 'declined'.
+ *
+ * Supabase is read here only for the one small switch row and, for the stale check, the
+ * version stamp and the short list of changes since the files were built.
  */
 
-import { FLAT_DRUG_SCHEMA_VERSION } from './queries.js'
+import { FLAT_DRUG_SCHEMA_VERSION, fetchMetadataTimestamps, fetchAuditLogSince } from './queries.js'
 import { flattenChunks } from '../utils/catalogChunks.js'
 
 /** Where the files live (S2.2, Cloudflare Pages). */
@@ -73,6 +79,30 @@ export async function isStaticCatalogEnabled(supabase, timeoutMs = SWITCH_TIMEOU
   } finally {
     clearTimeout(timer)
   }
+}
+
+// ─── Stale files ────────────────────────────────────────────────────────────
+
+/**
+ * Are the published files good enough to start a phone from? Yes when they carry the
+ * server's current version stamp, or when they are behind by a small, known set of drug
+ * changes (1 to maxChanges rows in the change log since the files were built), because the
+ * normal change-log update then brings the phone up to date from the manifest bookmark.
+ * No otherwise: a bulk job moved the stamp by more than maxChanges changes, or the stamp
+ * moved with no drug change in the log (a direct database edit), and the files have not been
+ * republished yet. Network and database errors are thrown, not answered.
+ *
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @param {{ drugsUpdatedAt: string, auditCursor: string }} manifest
+ * @param {number} maxChanges
+ * @returns {Promise<boolean>}
+ */
+export async function manifestCanCatchUp(supabase, manifest, maxChanges) {
+  const { drugsUpdatedAt } = await fetchMetadataTimestamps(supabase)
+  if (drugsUpdatedAt === manifest.drugsUpdatedAt) return true
+  const changes = await fetchAuditLogSince(supabase, manifest.auditCursor)
+  if (changes.length === 0 || changes.length > maxChanges) return false
+  return changes.some(c => c.table_name === 'generics' || c.table_name === 'formulations' || c.table_name === 'brands')
 }
 
 // ─── Small helpers ──────────────────────────────────────────────────────────
@@ -218,6 +248,8 @@ async function readAllChunks(base, fetchImpl, manifest, { concurrency, onProgres
  *
  * @param {object} [options]
  * @param {(loaded: number, total: number) => void} [options.onProgress] chunks loaded so far / chunks in all
+ * @param {(manifest: object) => Promise<boolean>} [options.acceptManifest] asked once the manifest is read,
+ *   before any chunk; answering false stops the download with code 'declined' (the files are too stale)
  * @param {string} [options.host]
  * @param {typeof fetch} [options.fetchImpl]
  * @returns {Promise<{ drugs: object[], drugsUpdatedAt: string, auditCursor: string, manifest: object }>}
@@ -229,6 +261,7 @@ export async function fetchStaticCatalog({
   host = CATALOG_HOST,
   fetchImpl = (...args) => globalThis.fetch(...args),
   onProgress,
+  acceptManifest,
   schemaVersion = FLAT_DRUG_SCHEMA_VERSION,
   concurrency = 4,
   chunkAttempts = 3,
@@ -240,6 +273,9 @@ export async function fetchStaticCatalog({
 
   for (let round = 1; round <= manifestRounds; round++) {
     const manifest = await readManifest(base, fetchImpl, schemaVersion)
+    if (acceptManifest && !(await acceptManifest(manifest))) {
+      throw new StaticCatalogError('declined', 'The files are older than the server and too far behind to catch up from')
+    }
     try {
       const chunks = await readAllChunks(base, fetchImpl, manifest, {
         concurrency, onProgress, attempts: chunkAttempts, retryDelayMs, verifyHashes,
