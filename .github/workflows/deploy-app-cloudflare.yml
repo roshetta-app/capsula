@@ -1,8 +1,8 @@
 name: Deploy Capsula to Cloudflare Pages
 # S3.2. Builds the website for a host at the ROOT address (no /capsula/ prefix) and uploads it to the
-# free Cloudflare Pages project below. Also by hand ("Run workflow"): the old GitHub Pages
-# site (deploy.yml) is untouched until the forwarder step (S3.4b). From S3.4a it also runs on every push
-# to main, so this address is the official one and always current. After the upload it reads the new
+# free Cloudflare Pages project below. Also by hand ("Run workflow"). From S3.4a it runs on every push
+# to main, so this address is the official one and always current. Since S3.4b the old GitHub Pages
+# site (deploy.yml) only forwards old links here and builds nothing. After the upload it reads the new
 # address back and checks it (deep links, install file, worker file, headers).
 # Uses the same two Cloudflare secrets as the catalog workflow; the app's own secrets stay in GitHub.
 on:

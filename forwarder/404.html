@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Capsula</title>
+  <!--
+    S3.4b. GitHub Pages serves this file for every old deep link (/capsula/drugs/x, /capsula/r/code ...). The old address holds only three
+    files: this page, 404.html (the same page for every old deep link) and sw.js (a worker that
+    removes itself). Every old link lands on the same path at the new address.
+    Keep the script below identical in index.html and 404.html (scripts/forwarder.check.mjs checks it).
+  -->
+  <meta name="robots" content="noindex" />
+  <meta name="description" content="Drug reference for Egyptian GPs" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Capsula" />
+  <meta property="og:title" content="Capsula" />
+  <meta property="og:description" content="Drug reference for Egyptian GPs" />
+  <meta property="og:image" content="https://capsula-app.pages.dev/icons/icon-512.png" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="Capsula" />
+  <meta name="twitter:description" content="Drug reference for Egyptian GPs" />
+  <meta name="twitter:image" content="https://capsula-app.pages.dev/icons/icon-512.png" />
+  <script>
+    (function () {
+      var NEW_SITE = 'https://capsula-app.pages.dev';
+      var OLD_PREFIX = '/capsula';
+      var l = window.location;
+      var path = l.pathname || '/';
+      if (path === OLD_PREFIX || path === OLD_PREFIX + '/') path = '/';
+      else if (path.indexOf(OLD_PREFIX + '/') === 0) path = path.slice(OLD_PREFIX.length);
+      else path = '/';
+      l.replace(NEW_SITE + path + (l.search || '') + (l.hash || ''));
+    }());
+  </script>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 0; padding: 48px 24px; text-align: center; color: #1f2933; }
+    a { color: #1d4ed8; }
+  </style>
+</head>
+<body>
+  <p>Capsula has moved to <a href="https://capsula-app.pages.dev/">capsula-app.pages.dev</a>.</p>
+  <p>Taking you there now.</p>
+  <noscript><p>Please open <a href="https://capsula-app.pages.dev/">capsula-app.pages.dev</a>.</p></noscript>
+</body>
+</html>

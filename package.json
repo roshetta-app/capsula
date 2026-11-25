@@ -13,7 +13,8 @@
     "launch:check": "node --test src/utils/launchSwitches.check.js",
     "catalog:check": "node --test src/utils/catalogChunks.check.js scripts/build-catalog.check.mjs scripts/catalog-publish.check.mjs src/lib/catalogStatic.check.js",
     "site:check": "node --test scripts/siteBase.check.mjs",
-    "app:check": "node --test scripts/app-publish.check.mjs"
+    "app:check": "node --test scripts/app-publish.check.mjs",
+    "forwarder:check": "node --test scripts/forwarder.check.mjs"
   },
   "dependencies": {
     "@capacitor-firebase/messaging": "^8.3.0",

@@ -1,7 +1,17 @@
-name: Deploy Capsula to GitHub Pages
+name: Publish old-address forwarder (GitHub Pages)
+# S3.4b. The app no longer lives on GitHub Pages (it is built and uploaded by "Deploy Capsula to
+# Cloudflare Pages"). This workflow only publishes the three small files in forwarder/ so that old
+# links and installed old copies move to https://capsula-app.pages.dev. It needs no build and no
+# app secrets, and it runs only when those files change (or by hand: "Run workflow").
+# To undo the whole move: revert the S3.4b commit; this file then builds the app again.
 on:
   push:
     branches: [main]
+    paths:
+      - 'forwarder/**'
+      - '.github/workflows/deploy.yml'
+      - 'scripts/forwarder.check.mjs'
+  workflow_dispatch:
 permissions:
   contents: read
   pages: write
@@ -10,8 +20,9 @@ concurrency:
   group: pages
   cancel-in-progress: false
 jobs:
-  build-and-deploy:
+  publish:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url || steps.deployment_retry.outputs.page_url }}
@@ -21,33 +32,15 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: npm
-      - name: Install dependencies
-        run: npm ci
-      - name: Inject build SHA into service worker
-        run: |
-          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-8)
-          sed -i "s/__BUILD_SHA__/${SHORT_SHA}/g" public/sw.js
-      - name: Build
-        run: npm run build
-        env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
-          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
-          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
-          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
-          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
-          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
-          VITE_FIREBASE_MEASUREMENT_ID: ${{ secrets.VITE_FIREBASE_MEASUREMENT_ID }}
-          VITE_FCM_VAPID_KEY: ${{ secrets.VITE_FCM_VAPID_KEY }}
+          node-version: 22
+      - name: Checks for the forwarder
+        run: node --test scripts/forwarder.check.mjs
       - name: Setup Pages
         uses: actions/configure-pages@v4
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: forwarder
       # GitHub sometimes cannot find the uploaded site for a few seconds ("Found 0 artifact(s)").
       # The first try is allowed to fail; if it does, wait and try once more.
       - name: Deploy to GitHub Pages
