@@ -23,6 +23,7 @@ import ConfirmModal from '../../components/admin/ConfirmModal'
 import DrugPickerModal from '../../components/admin/DrugPickerModal'
 import ConditionPickerModal from '../../components/admin/ConditionPickerModal'
 import AdminPageHeader from '../../components/admin/AdminPageHeader'
+import { resizeAndCompressImage } from '../../utils/imageResize'
 import {
   fetchPendingNotifications,
   fetchSentNotifications,
@@ -233,11 +234,21 @@ export default function NotificationsPanel() {
     setUploadingImage(true)
     setImagePreview(URL.createObjectURL(file))
     try {
-      const { url, error } = await uploadNotificationImage(file)
+      // S5b: shrink in the browser first (notification-images bucket has a
+      // 1 MB limit; a phone photo would otherwise be refused).
+      const small = await resizeAndCompressImage(file, { maxDimension: 1280, quality: 0.8 })
+      const { url, error } = await uploadNotificationImage(small)
       if (error) throw error
       setImageUrl(url)
     } catch (err) {
-      setImageError(err.message ?? 'Failed to upload image')
+      const m = String(err?.message ?? '').toLowerCase()
+      setImageError(
+        m.includes('exceeded') || m.includes('size') || m.includes('413')
+          ? 'This picture is too large (limit 1 MB). Try a smaller picture.'
+          : m.includes('mime') || m.includes('read selected image')
+            ? 'This file is not a supported picture. Use JPEG, PNG or WebP.'
+            : (err?.message ?? 'Failed to upload image')
+      )
       setImagePreview(null)
       setImageUrl(null)
     } finally {
