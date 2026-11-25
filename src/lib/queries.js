@@ -130,7 +130,7 @@ const BRAND_PAGE_BATCH_SIZE = 4
 
 // Full select — every field either the list screens or the detail page
 // reads. Used by fetchFlatDrugs.
-const FULL_BRAND_SELECT = `
+export const FULL_BRAND_SELECT = `
   id, slug, name, name_ar, name_ar_full, tradename_clean, manufacturer, price, pack_size, fill_volume, is_published,
   formulations (
     id, slug, concentration, strength_value, strength_unit, strength_basis, form, form_modifier, route, route_details, doses_structured, default_dose_override, is_published,
@@ -333,7 +333,7 @@ async function fetchAllBrandRows(supabase, selectString, onProgress) {
  * @param {Array} rows — raw rows from a brands select using FULL_BRAND_SELECT or SCOPED_BRAND_SELECT
  * @returns {FlatDrug[]}
  */
-function mapFlatDrugRows(rows) {
+export function mapFlatDrugRows(rows) {
   return rows
     .filter(b => b.formulations?.is_published === true && b.formulations?.generics?.is_published === true)
     .map(b => {

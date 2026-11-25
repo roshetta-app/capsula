@@ -8,7 +8,9 @@
     "build": "vite build",
     "build:capacitor": "vite build --mode capacitor",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "catalog:build": "node scripts/build-catalog.mjs",
+    "catalog:check": "node --test src/utils/catalogChunks.check.js scripts/build-catalog.check.mjs"
   },
   "dependencies": {
     "@capacitor-firebase/messaging": "^8.3.0",

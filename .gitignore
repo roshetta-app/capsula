@@ -46,3 +46,6 @@ android/captures/
 android/keystore.properties
 android/app/*.jks
 android/app/*.keystore
+
+# Catalog build output (Track S, S2.1)
+catalog-dist/
