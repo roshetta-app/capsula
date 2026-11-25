@@ -9,6 +9,20 @@ import { FLAT_DRUG_SCHEMA_VERSION, CONDITIONS_SCHEMA_VERSION } from '../lib/quer
 /** 7 days in milliseconds */
 export const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 
+/**
+ * 2026-11-25 (Track S, step S0): the drugs and conditions saved copies no
+ * longer do a full re-download every 7 days. An old copy first asks the
+ * version stamp; unchanged = nothing downloaded, the date is just re-stamped
+ * (touch*Cache in utils/cache.js); changed = the normal change-log update.
+ * A full download only happens as a long safety refresh after this many days
+ * without any re-stamp. CACHE_TTL_MS above still governs the small
+ * localStorage slices (categories, icons, class keywords).
+ */
+export const CACHE_SAFETY_REFRESH_MS = 60 * 24 * 60 * 60 * 1000
+
+/** Re-stamp a saved copy's date only when it is older than this (avoids a write on every open). */
+export const CACHE_RESTAMP_AFTER_MS = 24 * 60 * 60 * 1000
+
 /** localStorage key names for each cache slice */
 export const CACHE_KEYS = {
   DRUGS:         'capsula_drugs_cache',

@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { fetchFlatDrugs, fetchMetadataTimestamps, fetchAuditLogSince, fetchAuditCursorNow, fetchFlatDrugsByScope, fetchFlatDrugsByBrandId } from '../lib/queries'
-import { readDrugsCache, writeDrugsCache } from '../utils/cache'
+import { readDrugsCache, writeDrugsCache, touchDrugsCache } from '../utils/cache'
 import { patchDrugDoses } from '../utils/patchDrugDoses'
-import { CACHE_TTL_MS } from '../constants/cache'
+import { CACHE_SAFETY_REFRESH_MS, CACHE_RESTAMP_AFTER_MS } from '../constants/cache'
 import { logCrash } from '../utils/crashLogger'
 
 // Phase F14 Stage 3 (delta sync): if a background check finds more than
@@ -269,8 +269,11 @@ export function useDrugs() {
       setDrugs(cached.data)
       setLoading(false)
 
-      // Expired — re-fetch regardless of version match
-      const isExpired = !cached.fetchedAt || (Date.now() - new Date(cached.fetchedAt).getTime()) > CACHE_TTL_MS
+      // 2026-11-25 (Track S, S0): only a very old copy (60 days with no check)
+      // is fully re-downloaded. An older-than-a-week copy now asks the version
+      // stamp first, below: unchanged = re-stamp the date and download nothing.
+      const ageMs = cached.fetchedAt ? Date.now() - new Date(cached.fetchedAt).getTime() : Infinity
+      const isExpired = ageMs > CACHE_SAFETY_REFRESH_MS
       if (isExpired) {
         await fetchAndCache()
         return
@@ -284,6 +287,8 @@ export function useDrugs() {
         const { drugsUpdatedAt } = await fetchMetadataTimestamps(supabase)
         if (drugsUpdatedAt !== cached.version) {
           await applyDrugsDelta(cached, drugsUpdatedAt)
+        } else if (ageMs > CACHE_RESTAMP_AFTER_MS) {
+          await touchDrugsCache()
         }
       } catch {
         // Network error on the background check — keep showing cached data

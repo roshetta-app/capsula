@@ -1,9 +1,9 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { fetchConditions, fetchMetadataTimestamps, fetchAuditLogSince, fetchAuditCursorNow, fetchConditionById } from '../lib/queries'
-import { readConditionsCache, writeConditionsCache, getCachedPhoto, savePhotoToCache, pruneOrphanedPhotos } from '../utils/cache'
+import { readConditionsCache, writeConditionsCache, touchConditionsCache, getCachedPhoto, savePhotoToCache, pruneOrphanedPhotos } from '../utils/cache'
 import { getAllGalleryUrls } from '../utils/galleryImageUrls'
-import { CACHE_TTL_MS } from '../constants/cache'
+import { CACHE_SAFETY_REFRESH_MS, CACHE_RESTAMP_AFTER_MS } from '../constants/cache'
 import { logCrash } from '../utils/crashLogger'
 
 const UNCATEGORIZED_ID = '00000000-0000-0000-0000-000000000001'
@@ -371,8 +371,11 @@ export function useConditions() {
       setConditions(cached.data)
       setLoading(false)
 
-      // TTL expired (>7 days) — re-fetch regardless of version
-      const isExpired = !cached.fetchedAt || (Date.now() - new Date(cached.fetchedAt).getTime()) > CACHE_TTL_MS
+      // 2026-11-25 (Track S, S0): same rule as useDrugs.js — only a copy with no
+      // check for 60 days is fully re-downloaded; an older-than-a-week copy asks
+      // the version stamp first and just re-stamps its date if nothing moved.
+      const ageMs = cached.fetchedAt ? Date.now() - new Date(cached.fetchedAt).getTime() : Infinity
+      const isExpired = ageMs > CACHE_SAFETY_REFRESH_MS
       if (isExpired) {
         await fetchAndCache()
         return
@@ -400,6 +403,7 @@ export function useConditions() {
           // involved, so this reliably completes on every normal app
           // open instead of only on a real data refresh.
           syncGalleryPhotos(cached.data, attemptIdRef.current)
+          if (ageMs > CACHE_RESTAMP_AFTER_MS) await touchConditionsCache()
         }
       } catch {
         // Network error — keep cached data, don't crash

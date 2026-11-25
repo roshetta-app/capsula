@@ -422,6 +422,35 @@ export async function writeDrugsCache(data, version, auditCursor = null) {
 }
 
 /**
+ * 2026-11-25 (Track S, S0): mark the saved drugs copy as checked today without
+ * downloading or rewriting the catalog. Called when the server's version stamp
+ * has not moved. Only the date changes; data, version and cursor stay as saved.
+ */
+export async function touchDrugsCache() {
+  let db
+  try {
+    db = await openCapsulaDB()
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(DRUGS_STORE, 'readwrite')
+      const store = tx.objectStore(DRUGS_STORE)
+      const req = store.get(DRUGS_KEY)
+      req.onsuccess = () => {
+        const rec = req.result
+        if (rec && Array.isArray(rec.data) && rec.data.length > 0) {
+          store.put({ ...rec, fetchedAt: new Date().toISOString() }, DRUGS_KEY)
+        }
+      }
+      tx.oncomplete = () => resolve()
+      tx.onerror    = () => reject(tx.error)
+    })
+  } catch (err) {
+    logCrash(err, 'utils/cache.js: touchDrugsCache')
+  } finally {
+    db?.close()
+  }
+}
+
+/**
  * Read the full stored drugs record — { data, version, fetchedAt,
  * auditCursor } — or null if nothing valid is saved yet. auditCursor is
  * undefined on a record saved before Phase F14 Stage 3 — callers already
@@ -500,6 +529,35 @@ export async function writeConditionsCache(data, version, auditCursor = null) {
     })
   } catch (err) {
     logCrash(err, 'utils/cache.js: writeConditionsCache')
+  } finally {
+    db?.close()
+  }
+}
+
+/**
+ * 2026-11-25 (Track S, S0): mark the saved conditions copy as checked today without
+ * downloading or rewriting the catalog. Called when the server's version stamp
+ * has not moved. Only the date changes; data, version and cursor stay as saved.
+ */
+export async function touchConditionsCache() {
+  let db
+  try {
+    db = await openCapsulaDB()
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(CONDITIONS_STORE, 'readwrite')
+      const store = tx.objectStore(CONDITIONS_STORE)
+      const req = store.get(CONDITIONS_KEY)
+      req.onsuccess = () => {
+        const rec = req.result
+        if (rec && Array.isArray(rec.data) && rec.data.length > 0) {
+          store.put({ ...rec, fetchedAt: new Date().toISOString() }, CONDITIONS_KEY)
+        }
+      }
+      tx.oncomplete = () => resolve()
+      tx.onerror    = () => reject(tx.error)
+    })
+  } catch (err) {
+    logCrash(err, 'utils/cache.js: touchConditionsCache')
   } finally {
     db?.close()
   }
