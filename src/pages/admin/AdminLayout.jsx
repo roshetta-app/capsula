@@ -79,6 +79,7 @@ const NAV_GROUPS = [
       { path: '/admin/releases', label: 'Releases', faIcon: faRocket },
       { path: '/admin/messages', label: 'Messages',  faIcon: faBullhorn },
       { path: '/admin/home-card', label: 'Home card', faIcon: faRectangleList },
+      { path: '/admin/launch-switches', label: 'Launch switches', faIcon: faSliders },
     ],
   },
   {

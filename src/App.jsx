@@ -181,6 +181,7 @@ import OnboardingGate from './components/ui/OnboardingGate'
 import AppGate from './components/ui/AppGate'
 import ProfileSetupRedirect from './components/ProfileSetupRedirect'
 import SignInNudge from './components/SignInNudge'
+import SignInReturnNotice from './components/SignInReturnNotice'
 import { AuthProvider } from './context/AuthContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { ConditionProvider } from './context/ConditionContext'
@@ -364,6 +365,7 @@ export default function App() {
                                     </OnboardingGate>
                                   </ProfileSetupRedirect>
                                   <SignInNudge />
+                                  <SignInReturnNotice />
                                 </AppGateProvider>
                               </PushSubscriptionProvider>
                             </PushBannerProvider>
