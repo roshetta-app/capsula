@@ -1,13 +1,22 @@
 import { createClient } from '@supabase/supabase-js'
 import { Capacitor } from '@capacitor/core'
 import { Preferences } from '@capacitor/preferences'
+import { chooseServer, refreshRemoteConfig, CONFIG_EVENT } from './remoteConfig'
 
-const SUPABASE_URL  = import.meta.env.VITE_SUPABASE_URL
-const SUPABASE_ANON = import.meta.env.VITE_SUPABASE_ANON_KEY
+const BUILT_IN_URL  = import.meta.env.VITE_SUPABASE_URL
+const BUILT_IN_ANON = import.meta.env.VITE_SUPABASE_ANON_KEY
 
-if (!SUPABASE_URL || !SUPABASE_ANON) {
+if (!BUILT_IN_URL || !BUILT_IN_ANON) {
   throw new Error('Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY in .env')
 }
+
+// Track S, step S10 (2026-11-26) - remote address book. The server pair is the one saved on the
+// phone from an earlier read of config.json on the static host, or the built-in pair. Chosen
+// right here from what is already on the phone, so the app never waits for the network.
+const browserStorage = (() => { try { return window.localStorage } catch { return null } })()
+const SERVER = chooseServer({ url: BUILT_IN_URL, anon: BUILT_IN_ANON }, browserStorage)
+const SUPABASE_URL  = SERVER.url
+const SUPABASE_ANON = SERVER.anon
 
 // Stage 3 (F6) bug fix, 2026-08-13 — confirmed on-device: Supabase's
 // default auth storage is the browser's localStorage. Android can (and,
@@ -52,3 +61,17 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON, {
       : {}),
   },
 })
+
+// After the app is up, read the address book in the background. A changed pair is only saved for
+// the NEXT start; a new message is announced to the pop-up box (RemoteMessageNotice).
+if (typeof window !== 'undefined' && browserStorage) {
+  setTimeout(() => {
+    refreshRemoteConfig({
+      fetchFn: (u, o) => fetch(u, o),
+      storage: browserStorage,
+      builtIn: { url: BUILT_IN_URL, anon: BUILT_IN_ANON },
+    }).then(() => {
+      try { window.dispatchEvent(new Event(CONFIG_EVENT)) } catch { /* nothing to do */ }
+    })
+  }, 3000)
+}

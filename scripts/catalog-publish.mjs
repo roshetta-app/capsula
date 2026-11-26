@@ -2,7 +2,7 @@
  * catalog-publish.mjs — the glue around the catalog build and the Cloudflare upload (Track S, S2.2)
  *
  *   node scripts/catalog-publish.mjs plan [--force]   decide if a rebuild is needed (cheap: one tiny read)
- *   node scripts/catalog-publish.mjs prepare          add the headers file to catalog-dist
+ *   node scripts/catalog-publish.mjs prepare          add the headers file and config.json (S10) to catalog-dist
  *   node scripts/catalog-publish.mjs verify           read the LIVE site back and check every file
  *
  * The build itself is scripts/build-catalog.mjs (S2.1, unchanged). The upload is done by
@@ -32,6 +32,8 @@ export const HEADERS_FILE = [
   '  X-Content-Type-Options: nosniff',
   '  X-Robots-Tag: noindex',
   '/manifest.json',
+  '  Cache-Control: no-cache, must-revalidate',
+  '/config.json',
   '  Cache-Control: no-cache, must-revalidate',
   '/chunk-*',
   '  Cache-Control: public, max-age=31536000, immutable',
@@ -113,10 +115,21 @@ async function plan(args) {
   await summary(d.needsBuild ? `Rebuilding: ${d.reason}.` : `Nothing to do: ${d.reason}.`)
 }
 
+/** S10: the remote address book file. The pair is the one the workflow already holds (public key
+ *  only). CONFIG_MESSAGE is optional (a repository variable); empty means no message. */
+export function buildConfigFile(env) {
+  const url = String(env.VITE_SUPABASE_URL ?? '').trim()
+  const anon = String(env.VITE_SUPABASE_ANON_KEY ?? '').trim()
+  if (!/^https:\/\//.test(url) || anon.length < 20) throw new Error('config.json: the server address or key is missing or not valid. Not publishing.')
+  const message = String(env.CONFIG_MESSAGE ?? '').trim().slice(0, 300)
+  return JSON.stringify({ v: 1, url, anon, message }) + '\n'
+}
+
 async function prepare(outDir) {
   const manifest = JSON.parse(await readFile(path.join(outDir, 'manifest.json'), 'utf8'))
   if (!Array.isArray(manifest.chunks) || manifest.chunks.length === 0) throw new Error('The manifest has no chunks. Not publishing.')
   await writeFile(path.join(outDir, '_headers'), HEADERS_FILE)
+  await writeFile(path.join(outDir, 'config.json'), buildConfigFile(process.env))
   log(`Added _headers to ${outDir} (${manifest.chunks.length} chunk files, built ${manifest.builtAt})`)
 }
 
@@ -140,6 +153,12 @@ async function verify(outDir) {
   const head = await fetch(`${host}/manifest.json?nocache=${Date.now()}`, { cache: 'no-store' })
   const cors = head.headers.get('access-control-allow-origin')
   if (cors !== '*') throw new Error(`The live manifest does not allow other websites to read it (Access-Control-Allow-Origin is "${cors}").`)
+
+  // S10: the address book file must be live and identical to the one just built.
+  const localConfig = (await readFile(path.join(outDir, 'config.json'), 'utf8')).trim()
+  const liveConfigRes = await fetch(`${host}/config.json?nocache=${Date.now()}`, { cache: 'no-store' })
+  if (!liveConfigRes.ok) throw new Error(`config.json answered ${liveConfigRes.status} on the live site`)
+  if ((await liveConfigRes.text()).trim() !== localConfig) throw new Error('config.json on the live site is not the one just built')
 
   let bytes = 0
   for (const c of local.chunks) {
