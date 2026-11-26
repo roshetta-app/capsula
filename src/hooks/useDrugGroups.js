@@ -113,11 +113,16 @@ import { useAuth } from './useAuth'
 import { useIsPro } from './useIsPro'
 import { useOnlineStatus } from './useOnlineStatus'
 import { useToast } from '../context/ToastContext'
-import { supabase } from '../lib/supabase'
+import {
+  sendGroupChange, queryGroupsWithItems, queryGroupBySourceCode, insertGroupReturning, insertGroupCopyReturning,
+  insertGroupRow, updateGroupRow, deleteGroupRow, deleteGroupItems, insertGroupItems, queryShareOfGroup,
+  queryOwnShareNameInfo, updateShareShowName, updateAccountShareNameDefault, insertShareLinkReturning,
+  updateShareOnProfile, deleteShareOfGroup,
+} from '../lib/groupQueries'
 import { logUsageEvent } from '../analytics/usageEvents'
 import { readGroupsCache, writeGroupsCache, clearGroupsCache, readGroupChanges, writeGroupChanges } from '../utils/cache'
 import { newId, makeChange, applyChange, applyQueue, addChange, cancelDelete, clearSending, nextToSend, summarizeQueue, retryFailed, discardFailed } from '../utils/groupChanges'
-import { runSync, sendChange, describeEvents, isSourceClash } from '../utils/groupSync'
+import { runSync, describeEvents, isSourceClash } from '../utils/groupSync'
 import { removeWithRetry } from '../utils/groupSaveCleanup'
 import { itemRefusalReason } from '../utils/publicShare'
 import { SAVE_OFFLINE_MESSAGE, SAVE_ERROR_MESSAGE } from '../components/drugs/groups/groupMessages'
@@ -375,10 +380,7 @@ export function useDrugGroups(fav) {
     }
 
     // 3. Live list.
-    const { data, error } = await withLimit(supabase
-      .from('drug_groups')
-      .select('id, name, description, color, created_at, source_code, drug_group_items(brand_id)')
-      .order('created_at', { ascending: false }))
+    const { data, error } = await withLimit(queryGroupsWithItems())
     if (stale()) return
 
     if (error || !data) {
@@ -425,7 +427,7 @@ export function useDrugGroups(fav) {
       result = await runSync({
         getQueue: () => queueRef.current,
         update: fn => updateQueueFor(u.id, fn),
-        send: change => sendChange(supabase, change, withLimit),
+        send: change => sendGroupChange(change, withLimit),
         groupName: id => groupsRef.current.find(g => g.id === id)?.name ?? null,
         canRun: () => userRef.current?.id === u.id && !isOffline(),
         // Analytics: a change counts once, when the server newly takes it. The
@@ -626,11 +628,7 @@ export function useDrugGroups(fav) {
     }
     if (shouldQueue()) return makeLocally()
 
-    const { data, error } = await withLimit(supabase
-      .from('drug_groups')
-      .insert({ id, ...fields })
-      .select('id, name, description, color, created_at')
-      .single())
+    const { data, error } = await withLimit(insertGroupReturning({ id, ...fields }))
 
     if (error || !data) {
       if (isTimeout(error)) {
@@ -679,7 +677,7 @@ export function useDrugGroups(fav) {
     }
     setGroups(prev => prev.map(g => (g.id === id ? { ...g, ...patch } : g)))
 
-    const { error } = await withLimit(supabase.from('drug_groups').update(fields).eq('id', id))
+    const { error } = await withLimit(updateGroupRow(id, fields))
     if (isTimeout(error) && await queueChanges([change])) return { ok: true, queued: true }
     if (error) {
       setGroups(prev => prev.map(g => (g.id === id ? { ...g, name: before.name, description: before.description, color: before.color } : g)))
@@ -707,7 +705,7 @@ export function useDrugGroups(fav) {
       return { ok: true, group, index, queued: true }
     }
     setGroups(list.filter(g => g.id !== id))
-    const { error } = await withLimit(supabase.from('drug_groups').delete().eq('id', id))
+    const { error } = await withLimit(deleteGroupRow(id))
     if (isTimeout(error) && await queueChanges([change])) return { ok: true, group, index, queued: true }
     if (error) {
       setGroups(prev => (prev.some(g => g.id === id) ? prev : newestFirst([...prev, group])))
@@ -753,13 +751,11 @@ export function useDrugGroups(fav) {
 
     let error = null
     if (toRemove.length > 0) {
-      const res = await withLimit(supabase
-        .from('drug_group_items').delete().eq('group_id', id).in('brand_id', toRemove))
+      const res = await withLimit(deleteGroupItems(id, toRemove))
       error = res.error
     }
     if (!error && toAdd.length > 0) {
-      const res = await withLimit(supabase
-        .from('drug_group_items').insert(toAdd.map(brand_id => ({ group_id: id, brand_id }))))
+      const res = await withLimit(insertGroupItems(toAdd.map(brand_id => ({ group_id: id, brand_id }))))
       error = res.error
     }
 
@@ -842,14 +838,14 @@ export function useDrugGroups(fav) {
       created_at: group.createdAt,
       ...(group.sourceCode ? { source_code: group.sourceCode } : {}),
     }
-    let { error } = await withLimit(supabase.from('drug_groups').insert(restoreRow))
+    let { error } = await withLimit(insertGroupRow(restoreRow))
     // The same link was saved again after this copy was deleted (step 13.8): the restored group
     // is made without the link, as an ordinary group, so the restore never fails over it.
     let linkDropped = false
     if (isSourceClash(error) && restoreRow.source_code) {
       delete restoreRow.source_code
       linkDropped = true
-      ;({ error } = await withLimit(supabase.from('drug_groups').insert(restoreRow)))
+      ;({ error } = await withLimit(insertGroupRow(restoreRow)))
     }
     if (error) {
       if (isTimeout(error)) {
@@ -864,11 +860,9 @@ export function useDrugGroups(fav) {
     }
 
     if (group.brandIds?.length > 0) {
-      const { error: itemsError } = await withLimit(supabase
-        .from('drug_group_items')
-        .insert(group.brandIds.map(brand_id => ({ group_id: group.id, brand_id }))))
+      const { error: itemsError } = await withLimit(insertGroupItems(group.brandIds.map(brand_id => ({ group_id: group.id, brand_id }))))
       if (itemsError) {
-        await removeWithRetry(() => withLimit(supabase.from('drug_groups').delete().eq('id', group.id)))
+        await removeWithRetry(() => withLimit(deleteGroupRow(group.id)))
         toast.error("Couldn't restore the group. Check your connection and try again.")
         return { ok: false, reason: 'error' }
       }
@@ -906,11 +900,7 @@ export function useDrugGroups(fav) {
     let data = null
     let error = null
     for (let attempt = 0; attempt < 3; attempt += 1) {
-      const res = await withLimit(supabase
-        .from('drug_groups')
-        .insert({ ...fields, name: copyName, ...(sourceCode ? { source_code: sourceCode } : {}) })
-        .select('id, name, description, color, created_at, source_code')
-        .single())
+      const res = await withLimit(insertGroupCopyReturning({ ...fields, name: copyName, ...(sourceCode ? { source_code: sourceCode } : {}) }))
       data = res.data
       error = res.error
       if (!isNameClash(error)) break
@@ -924,11 +914,7 @@ export function useDrugGroups(fav) {
       if (sourceCode && isSourceClash(error)) {
         // Another phone (or tab) already saved this link (step 13.8). No second copy is made: the
         // copy that exists is brought into the list, so the bar says "Already in your groups".
-        const { data: existing } = await withLimit(supabase
-          .from('drug_groups')
-          .select('id, name, description, color, created_at, source_code, drug_group_items(brand_id)')
-          .eq('source_code', sourceCode)
-          .maybeSingle())
+        const { data: existing } = await withLimit(queryGroupBySourceCode(sourceCode))
         if (existing) {
           const found = mapGroupRow(existing)
           setGroups(prev => (prev.some(g => g.id === found.id) ? prev : newestFirst([found, ...prev])))
@@ -940,13 +926,11 @@ export function useDrugGroups(fav) {
     }
 
     if (kept.length > 0) {
-      const { error: itemsError } = await withLimit(supabase
-        .from('drug_group_items')
-        .insert(kept.map(brand_id => ({ group_id: data.id, brand_id }))))
+      const { error: itemsError } = await withLimit(insertGroupItems(kept.map(brand_id => ({ group_id: data.id, brand_id }))))
       if (itemsError) {
         // The delete is checked and tried again: an empty group with its link set must not stay
         // behind (step 13.8). If every try fails, the bar still shows it as "0 of N drugs".
-        await removeWithRetry(() => withLimit(supabase.from('drug_groups').delete().eq('id', data.id)))
+        await removeWithRetry(() => withLimit(deleteGroupRow(data.id)))
         if (isTimeout(itemsError)) return timedOut(SAVE_OFFLINE_MESSAGE, quiet)
         if (!quiet) toast.error(SAVE_ERROR_MESSAGE)
         return { ok: false, reason: 'error' }
@@ -967,11 +951,7 @@ export function useDrugGroups(fav) {
   const getShareCode = useCallback(async (groupId) => {
     if (!userRef.current) return { ok: false, reason: 'guest' }
     if (isOffline()) return { ok: false, reason: 'offline' }
-    const { data, error } = await withLimit(supabase
-      .from('drug_group_shares')
-      .select('share_code, show_name, on_profile')
-      .eq('group_id', groupId)
-      .maybeSingle())
+    const { data, error } = await withLimit(queryShareOfGroup(groupId))
     if (isTimeout(error)) return { ok: false, reason: 'offline' }
     if (error) return { ok: false, reason: 'error' }
     // showName: true / false = the owner chose for this group; null = follows the account setting.
@@ -985,11 +965,7 @@ export function useDrugGroups(fav) {
     const u = userRef.current
     if (!u) return { ok: false, reason: 'guest' }
     if (isOffline()) return { ok: false, reason: 'offline' }
-    const { data, error } = await withLimit(supabase
-      .from('profiles')
-      .select('full_name, share_name_default, handle')
-      .eq('id', u.id)
-      .maybeSingle())
+    const { data, error } = await withLimit(queryOwnShareNameInfo(u.id))
     if (isTimeout(error)) return { ok: false, reason: 'offline' }
     if (error) return { ok: false, reason: 'error' }
     // hasHandle (14.5a): the public card is set up (a username exists), so something may be made public.
@@ -1001,10 +977,7 @@ export function useDrugGroups(fav) {
     if (userRef.current && isOffline()) return { ok: false, reason: 'offline' }
     const refused = refuseChange()
     if (refused) return refused
-    const { error } = await withLimit(supabase
-      .from('drug_group_shares')
-      .update({ show_name: !!show })
-      .eq('group_id', groupId))
+    const { error } = await withLimit(updateShareShowName(groupId, !!show))
     if (isTimeout(error)) return { ok: false, reason: 'offline' }
     if (error) return { ok: false, reason: 'error' }
     return { ok: true }
@@ -1015,10 +988,7 @@ export function useDrugGroups(fav) {
     const u = userRef.current
     if (!u) return { ok: false, reason: 'guest' }
     if (isOffline()) return { ok: false, reason: 'offline' }
-    const { error } = await withLimit(supabase
-      .from('profiles')
-      .update({ share_name_default: !!show })
-      .eq('id', u.id))
+    const { error } = await withLimit(updateAccountShareNameDefault(u.id, !!show))
     if (isTimeout(error)) return { ok: false, reason: 'offline' }
     if (error) return { ok: false, reason: 'error' }
     return { ok: true }
@@ -1029,15 +999,11 @@ export function useDrugGroups(fav) {
     const refused = refuseChange()
     if (refused) return refused
     if (!groupsRef.current.some(g => g.id === groupId)) return { ok: false, reason: 'missing' }
-    const { data, error } = await withLimit(supabase
-      .from('drug_group_shares')
-      .insert({
-        group_id: groupId,
-        ...(typeof showName === 'boolean' ? { show_name: showName } : {}),
-        ...(onProfile === true ? { on_profile: true } : {}),
-      })
-      .select('share_code')
-      .single())
+    const { data, error } = await withLimit(insertShareLinkReturning({
+      group_id: groupId,
+      ...(typeof showName === 'boolean' ? { show_name: showName } : {}),
+      ...(onProfile === true ? { on_profile: true } : {}),
+    }))
     if (isTimeout(error)) return { ok: false, reason: 'offline' }
     if (!error && data?.share_code) {
       // Analytics (step 9.5): only a link that was really made now, not one found again.
@@ -1063,11 +1029,7 @@ export function useDrugGroups(fav) {
     if (userRef.current && isOffline()) return { ok: false, reason: 'offline' }
     const refused = refuseChange()
     if (refused) return refused
-    const { data, error } = await withLimit(supabase
-      .from('drug_group_shares')
-      .update({ on_profile: true })
-      .eq('group_id', groupId)
-      .select('group_id'))
+    const { data, error } = await withLimit(updateShareOnProfile(groupId))
     if (isTimeout(error)) return { ok: false, reason: 'offline' }
     const item = itemRefusalReason(error)
     if (item) return { ok: false, reason: item }
@@ -1080,7 +1042,7 @@ export function useDrugGroups(fav) {
     if (userRef.current && isOffline()) return { ok: false, reason: 'offline' }
     const refused = refuseChange()
     if (refused) return refused
-    const { error } = await withLimit(supabase.from('drug_group_shares').delete().eq('group_id', groupId))
+    const { error } = await withLimit(deleteShareOfGroup(groupId))
     if (isTimeout(error)) return { ok: false, reason: 'offline' }
     if (error) return { ok: false, reason: 'error' }
     return { ok: true }

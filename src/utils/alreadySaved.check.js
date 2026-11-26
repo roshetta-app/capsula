@@ -114,10 +114,13 @@ test('the bar says Already saved with View when a copy of this link exists', () 
 test('groups: the copy is saved with its source code, read back, and kept when restored', () => {
   const hook = read('../hooks/useDrugGroups.js');
   assert.match(hook, /sourceCode: typeof r\.source_code === 'string'/);
-  assert.match(hook, /\.select\('id, name, description, color, created_at, source_code, drug_group_items\(brand_id\)'\)/);
+  // S11 (2026-11-26): the two group queries moved from the hook into src/lib/groupQueries.js, so they are read there.
+  const queries = read('../lib/groupQueries.js');
+  assert.match(queries, /GROUP_WITH_ITEMS = 'id, name, description, color, created_at, source_code, drug_group_items\(brand_id\)'/);
+  assert.match(queries, /\.select\(GROUP_WITH_ITEMS\)\s*\.eq\('source_code', sourceCode\)/);
   assert.match(hook, /source_code: sourceCode/);
   assert.match(hook, /saveSharedGroup = useCallback\(async \(\{[^}]*sourceCode/);
-  assert.match(hook, /\.select\('id, name, description, color, created_at, source_code'\)/);
+  assert.match(queries, /\.select\('id, name, description, color, created_at, source_code'\)/);
 });
 
 test('both shared pages pass the link code when saving and show Already saved', () => {
