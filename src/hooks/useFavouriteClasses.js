@@ -32,7 +32,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from './useAuth'
 import { useIsPro } from './useIsPro'
 import { useToast } from '../context/ToastContext'
-import { supabase } from '../lib/supabase'
+import { fetchFavouriteClassRows, writeFavouriteClass } from '../lib/favouriteQueries'
 import { FAVOURITES_CAP_CLASSES } from '../constants/features'
 
 // One string per item, used for the pending favourite and for comparing.
@@ -69,10 +69,7 @@ export function useFavouriteClasses(fav) {
     if (authLoading) return
     if (!user) { setFavClasses([]); return }
     let cancelled = false
-    supabase
-      .from('favourite_classes')
-      .select('class_name, family_name')
-      .order('created_at', { ascending: true })
+    fetchFavouriteClassRows()
       .then(({ data, error }) => {
         if (cancelled || error || !data) return
         setFavClasses(data.map(r => ({ className: r.class_name, familyName: r.family_name })))
@@ -82,14 +79,8 @@ export function useFavouriteClasses(fav) {
 
   const write = useCallback((className, familyName, nowFavourited) => {
     const userId = user.id
-    return (nowFavourited
-      ? supabase.from('favourite_classes').upsert(
-          { user_id: userId, class_name: className, family_name: familyName },
-          { onConflict: 'user_id,class_name,family_name' }
-        )
-      : supabase.from('favourite_classes').delete()
-          .eq('user_id', userId).eq('class_name', className).eq('family_name', familyName)
-    ).then(({ error }) => { if (error) throw error })
+    return writeFavouriteClass(userId, className, familyName, nowFavourited)
+    .then(({ error }) => { if (error) throw error })
   }, [user])
 
   const toggleClass = useCallback((className, familyName = '', { silent = false } = {}) => {
@@ -147,10 +138,7 @@ export function useFavouriteClasses(fav) {
     if (!user || authLoading) return
     if (!pendingFavourite || pendingFavourite.type !== 'classes') return
     let cancelled = false
-    supabase
-      .from('favourite_classes')
-      .select('class_name, family_name')
-      .order('created_at', { ascending: true })
+    fetchFavouriteClassRows()
       .then(({ data, error }) => {
         if (cancelled) return
         const loaded = !error && data

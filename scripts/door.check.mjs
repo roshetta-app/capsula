@@ -10,6 +10,9 @@ const MOVED = [
   'src/pages/admin/LaunchSwitchesManager.jsx', // 2026-11-26, now uses src/lib/switchQueries.js
   'src/components/SignInReturnNotice.jsx',     // 2026-11-26, now uses src/lib/switchQueries.js
   'src/hooks/useDrugs.js',                     // 2026-11-26, now uses src/lib/catalogData.js
+  'src/hooks/useFavourites.js',                // 2026-11-26, now uses src/lib/favouriteQueries.js
+  'src/hooks/useFavouriteClasses.js',          // 2026-11-26, now uses src/lib/favouriteQueries.js
+  'src/hooks/useNotifications.js',             // 2026-11-26, now uses src/lib/notificationQueries.js
 ]
 
 for (const file of MOVED) {

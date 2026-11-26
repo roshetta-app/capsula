@@ -21,7 +21,7 @@
  */
 
 import { useEffect, useSyncExternalStore } from 'react'
-import { supabase } from '../lib/supabase'
+import { rpcMyUnreadNotificationCount, rpcMyNotifications, rpcMarkNotificationsRead } from '../lib/notificationQueries'
 import { useAuth } from './useAuth'
 
 const POLL_MS = 60 * 1000
@@ -49,7 +49,7 @@ async function refreshUnread() {
   inFlight = true
   lastFetchAt = now
   try {
-    const { data, error } = await supabase.rpc('my_unread_notification_count')
+    const { data, error } = await rpcMyUnreadNotificationCount()
     if (!error && typeof data === 'number') setUnread(data)
   } catch {
     // offline or a blip: keep the number we have
@@ -87,13 +87,13 @@ export function useUnreadNotifications() {
 }
 
 export async function fetchNotifications() {
-  const { data, error } = await supabase.rpc('my_notifications', { p_limit: 30 })
+  const { data, error } = await rpcMyNotifications(30)
   if (error) throw error
   return data ?? []
 }
 
 export async function markNotificationsRead(id = null) {
-  const { error } = await supabase.rpc('mark_notifications_read', { p_id: id })
+  const { error } = await rpcMarkNotificationsRead(id)
   if (error) throw error
   if (id === null) {
     setUnread(0)

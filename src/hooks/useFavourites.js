@@ -3,7 +3,7 @@ import { useAuth } from './useAuth'
 import { useIsPro } from './useIsPro'
 import { useOnlineStatus } from './useOnlineStatus'
 import { useToast } from '../context/ToastContext'
-import { supabase } from '../lib/supabase'
+import { buildFavouriteQuery, fetchFavouriteRows } from '../lib/favouriteQueries'
 import { FAVOURITES_CAP_DRUGS, FAVOURITES_CAP_CONDITIONS } from '../constants/features'
 
 const STORAGE_KEY = 'capsula_favourites'
@@ -146,16 +146,6 @@ function unqueueWrite(userId, itemType, id) {
     delete pending[key]
     writePendingWrites(pending)
   }
-}
-
-function buildFavouriteQuery(userId, itemType, id, nowFavourited) {
-  return nowFavourited
-    ? supabase.from('favourites').upsert(
-        { user_id: userId, item_type: itemType, item_id: id },
-        { onConflict: 'user_id,item_type,item_id' }
-      )
-    : supabase.from('favourites').delete()
-        .eq('user_id', userId).eq('item_type', itemType).eq('item_id', id)
 }
 
 // ─── useFavourites ────────────────────────────────────────────────────────────
@@ -461,17 +451,7 @@ export function useFavourites() {
     if (authLoading) return
     let cancelled = false
 
-    supabase
-      .from('favourites')
-      .select('item_type, item_id')
-      // offline-favourite-sync refinement — explicit order, ascending, so
-      // this array's order (index 0 oldest → last index newest) is always
-      // deterministic. Without this, Postgres returns rows in whatever
-      // scan order it happens to use, which is NOT guaranteed to match
-      // insertion/upsert recency — and FavouritesScreen's "recently added"
-      // tab is just this array's own order, reversed (see that file's
-      // Phase 14 note), so an unordered fetch could silently scramble it.
-      .order('created_at', { ascending: true })
+    fetchFavouriteRows()
       .then(({ data, error }) => {
         if (cancelled || error || !data) return
         const next = {
