@@ -116,13 +116,12 @@ async function plan(args) {
 }
 
 /** S10: the remote address book file. The pair is the one the workflow already holds (public key
- *  only). CONFIG_MESSAGE is optional (a repository variable); empty means no message. */
+ *  only). Announcements are NOT carried here: the app's gate system does that. */
 export function buildConfigFile(env) {
   const url = String(env.VITE_SUPABASE_URL ?? '').trim()
   const anon = String(env.VITE_SUPABASE_ANON_KEY ?? '').trim()
   if (!/^https:\/\//.test(url) || anon.length < 20) throw new Error('config.json: the server address or key is missing or not valid. Not publishing.')
-  const message = String(env.CONFIG_MESSAGE ?? '').trim().slice(0, 300)
-  return JSON.stringify({ v: 1, url, anon, message }) + '\n'
+  return JSON.stringify({ v: 1, url, anon }) + '\n'
 }
 
 async function prepare(outDir) {

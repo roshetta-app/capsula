@@ -2,7 +2,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  validateConfig, readSavedConfig, chooseServer, refreshRemoteConfig, messageToShow, markMessageSeen,
+  validateConfig, readSavedConfig, chooseServer, refreshRemoteConfig,
   CONFIG_STORAGE_KEY,
 } from './remoteConfig.js'
 
@@ -15,8 +15,8 @@ function memory() {
 const ok = body => async () => ({ ok: true, json: async () => body })
 
 test('validateConfig accepts a good pair and tidies the address', () => {
-  const c = validateConfig({ v: 1, url: 'https://new.example.com/', anon: KEY, message: ' hi ' })
-  assert.deepEqual(c, { url: 'https://new.example.com', anon: KEY, message: 'hi' })
+  const c = validateConfig({ v: 1, url: 'https://new.example.com/', anon: KEY })
+  assert.deepEqual(c, { url: 'https://new.example.com', anon: KEY })
 })
 
 test('validateConfig refuses anything unusable', () => {
@@ -38,7 +38,7 @@ test('chooseServer uses the built-in pair when nothing is saved or storage is br
 
 test('a saved pair wins; a damaged saved pair is ignored', () => {
   const s = memory()
-  s.setItem(CONFIG_STORAGE_KEY, JSON.stringify({ v: 1, url: 'https://new.example.com', anon: KEY, message: '' }))
+  s.setItem(CONFIG_STORAGE_KEY, JSON.stringify({ v: 1, url: 'https://new.example.com', anon: KEY }))
   assert.equal(chooseServer(BUILT, s).url, 'https://new.example.com')
   s.setItem(CONFIG_STORAGE_KEY, '{oops')
   assert.equal(chooseServer(BUILT, s).source, 'built-in')
@@ -70,16 +70,4 @@ test('a file that names the built-in pair removes the override', async () => {
   const back = await refreshRemoteConfig({ fetchFn: ok({ v: 1, url: 'https://abc.supabase.co/', anon: KEY }), storage: s, builtIn: BUILT })
   assert.equal(back.changed, true)
   assert.equal(chooseServer(BUILT, s).source, 'built-in')
-})
-
-test('a message shows once, and again only when its text changes', async () => {
-  const s = memory()
-  await refreshRemoteConfig({ fetchFn: ok({ v: 1, url: BUILT.url, anon: KEY, message: 'Back at 5pm' }), storage: s, builtIn: BUILT })
-  assert.equal(messageToShow(s), 'Back at 5pm')
-  markMessageSeen(s, 'Back at 5pm')
-  assert.equal(messageToShow(s), '')
-  await refreshRemoteConfig({ fetchFn: ok({ v: 1, url: BUILT.url, anon: KEY, message: 'Back at 6pm' }), storage: s, builtIn: BUILT })
-  assert.equal(messageToShow(s), 'Back at 6pm')
-  await refreshRemoteConfig({ fetchFn: ok({ v: 1, url: BUILT.url, anon: KEY, message: '' }), storage: s, builtIn: BUILT })
-  assert.equal(messageToShow(s), '')
 })

@@ -14,7 +14,6 @@
  *   - Any problem (host down, wrong format, bad address, no storage) keeps what the phone had:
  *     the saved pair, or the built-in one.
  *   - Only the public key is ever in the file. Never a secret.
- *   - The file may carry a short message (maintenance notice), shown once as a pop-up box.
  *
  * Plain functions with the storage and fetch passed in, so they can be checked with node.
  */
@@ -24,11 +23,8 @@ export const CONFIG_URL = 'https://capsula-catalog.pages.dev/config.json'
 
 export const CONFIG_FORMAT = 1
 export const CONFIG_STORAGE_KEY = 'capsula_remote_config_v1'
-export const CONFIG_SEEN_KEY = 'capsula_remote_message_seen_v1'
-export const CONFIG_EVENT = 'capsula-remote-config'
 
 const FETCH_TIMEOUT_MS = 4000
-const MAX_MESSAGE_LENGTH = 300
 
 /** A usable pair, or null. Needs format 1, an https address without credentials, a plain key. */
 export function validateConfig(raw) {
@@ -40,8 +36,7 @@ export function validateConfig(raw) {
   if (parsed.protocol !== 'https:' || parsed.username || parsed.password) return null
   const anon = raw.anon.trim()
   if (anon.length < 20 || /\s/.test(anon)) return null
-  const message = typeof raw.message === 'string' ? raw.message.trim().slice(0, MAX_MESSAGE_LENGTH) : ''
-  return { url: parsed.origin + parsed.pathname.replace(/\/+$/, ''), anon, message }
+  return { url: parsed.origin + parsed.pathname.replace(/\/+$/, ''), anon }
 }
 
 function readStorage(storage) {
@@ -95,34 +90,15 @@ export async function refreshRemoteConfig({ fetchFn, storage, builtIn, url = CON
     try {
       if (isBuiltIn) {
         if (saved) { storage.removeItem(CONFIG_STORAGE_KEY); changed = true }
-        // Keep the message even when the pair is the built-in one.
-        storage.setItem(CONFIG_STORAGE_KEY + '_msg', incoming.message)
       } else {
-        storage.setItem(CONFIG_STORAGE_KEY, JSON.stringify({ v: CONFIG_FORMAT, url: incoming.url, anon: incoming.anon, message: incoming.message }))
-        storage.setItem(CONFIG_STORAGE_KEY + '_msg', incoming.message)
+        storage.setItem(CONFIG_STORAGE_KEY, JSON.stringify({ v: CONFIG_FORMAT, url: incoming.url, anon: incoming.anon }))
         changed = !sameServer(saved, incoming)
       }
     } catch {
       return { changed: false, reason: 'no-storage' }
     }
-    return { changed, reason: 'ok', message: incoming.message }
+    return { changed, reason: 'ok' }
   } catch {
     return { changed: false, reason: 'unreachable' }
   }
-}
-
-/** The message to show now, or '' when there is none or this exact message was already shown. */
-export function messageToShow(storage) {
-  try {
-    const msg = (storage.getItem(CONFIG_STORAGE_KEY + '_msg') ?? '').trim()
-    if (!msg) return ''
-    return storage.getItem(CONFIG_SEEN_KEY) === msg ? '' : msg
-  } catch {
-    return ''
-  }
-}
-
-/** Remember that this message was shown, so it is not shown again until the text changes. */
-export function markMessageSeen(storage, message) {
-  try { storage.setItem(CONFIG_SEEN_KEY, message) } catch { /* nothing to do */ }
 }

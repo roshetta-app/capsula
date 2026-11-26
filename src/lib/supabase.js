@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { Capacitor } from '@capacitor/core'
 import { Preferences } from '@capacitor/preferences'
-import { chooseServer, refreshRemoteConfig, CONFIG_EVENT } from './remoteConfig'
+import { chooseServer, refreshRemoteConfig } from './remoteConfig'
 
 const BUILT_IN_URL  = import.meta.env.VITE_SUPABASE_URL
 const BUILT_IN_ANON = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -63,15 +63,13 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON, {
 })
 
 // After the app is up, read the address book in the background. A changed pair is only saved for
-// the NEXT start; a new message is announced to the pop-up box (RemoteMessageNotice).
+// the NEXT start.
 if (typeof window !== 'undefined' && browserStorage) {
   setTimeout(() => {
     refreshRemoteConfig({
       fetchFn: (u, o) => fetch(u, o),
       storage: browserStorage,
       builtIn: { url: BUILT_IN_URL, anon: BUILT_IN_ANON },
-    }).then(() => {
-      try { window.dispatchEvent(new Event(CONFIG_EVENT)) } catch { /* nothing to do */ }
     })
   }, 3000)
 }

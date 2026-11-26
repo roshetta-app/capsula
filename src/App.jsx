@@ -181,7 +181,6 @@ import OnboardingGate from './components/ui/OnboardingGate'
 import AppGate from './components/ui/AppGate'
 import ProfileSetupRedirect from './components/ProfileSetupRedirect'
 import SignInNudge from './components/SignInNudge'
-import RemoteMessageNotice from './components/RemoteMessageNotice'
 import SignInReturnNotice, { returnError as signInReturnError, SIGNIN_ERROR_MESSAGE_TYPE } from './components/SignInReturnNotice'
 import { AuthProvider } from './context/AuthContext'
 import { ThemeProvider } from './context/ThemeContext'
@@ -385,7 +384,6 @@ export default function App() {
                                   </ProfileSetupRedirect>
                                   <SignInNudge />
                                   <SignInReturnNotice />
-                                  <RemoteMessageNotice />
                                 </AppGateProvider>
                               </PushSubscriptionProvider>
                             </PushBannerProvider>

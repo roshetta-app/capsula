@@ -46,11 +46,10 @@ test('the headers file allows other websites and caches chunks for ever, not the
 
 // S10: the remote address book file
 import { buildConfigFile } from './catalog-publish.mjs'
-test('buildConfigFile writes the pair and an optional message, and refuses a bad pair', () => {
+test('buildConfigFile writes the pair and refuses a bad pair', () => {
   const key = 'k'.repeat(40)
-  const ok = JSON.parse(buildConfigFile({ VITE_SUPABASE_URL: 'https://abc.supabase.co', VITE_SUPABASE_ANON_KEY: key, CONFIG_MESSAGE: ' hi ' }))
-  assert.deepEqual(ok, { v: 1, url: 'https://abc.supabase.co', anon: key, message: 'hi' })
-  assert.equal(JSON.parse(buildConfigFile({ VITE_SUPABASE_URL: 'https://abc.supabase.co', VITE_SUPABASE_ANON_KEY: key })).message, '')
+  const ok = JSON.parse(buildConfigFile({ VITE_SUPABASE_URL: 'https://abc.supabase.co', VITE_SUPABASE_ANON_KEY: key }))
+  assert.deepEqual(ok, { v: 1, url: 'https://abc.supabase.co', anon: key })
   assert.throws(() => buildConfigFile({ VITE_SUPABASE_URL: 'http://abc', VITE_SUPABASE_ANON_KEY: key }))
   assert.throws(() => buildConfigFile({ VITE_SUPABASE_URL: 'https://abc.supabase.co', VITE_SUPABASE_ANON_KEY: 'x' }))
 })
