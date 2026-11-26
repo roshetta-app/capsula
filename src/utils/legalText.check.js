@@ -37,9 +37,12 @@ test('both documents have a title, a date and several sections, all plain words'
 });
 
 test('who runs Capsula and the contact line appear only when they are set; nothing is invented', () => {
-  assert.equal(OPERATOR_NAME, '', 'not known yet: fill in legalText.js');
-  assert.equal(CONTACT_EMAIL, '', 'not known yet: fill in legalText.js');
-  const none = textOf(termsSections()).concat(textOf(privacySections())).join('\n');
+  assert.equal(OPERATOR_NAME, 'the Capsula team');
+  assert.equal(CONTACT_EMAIL, 'app.capsula.med@gmail.com');
+  const filled = textOf(termsSections()).concat(textOf(privacySections())).join('\n');
+  assert.match(filled, /Capsula is run by the Capsula team\./);
+  assert.match(filled, /contact us at app\.capsula\.med@gmail\.com\./);
+  const none = textOf(termsSections({ operator: '', email: '' })).concat(textOf(privacySections({ operator: '', email: '' }))).join('\n');
   assert.doesNotMatch(none, /run by|contact us at/);
   const set = textOf(termsSections({ operator: 'Acme', email: 'hi@example.com' })).join('\n');
   assert.match(set, /Capsula is run by Acme\./);

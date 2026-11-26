@@ -24,13 +24,14 @@
  * a copy stores the code of the link it came from; one copy per person per link; the owner gets a number only through
  * owner_item_views, never a name or id; a deleted copy or account stops counting).
  *
- * Who runs Capsula and how to reach them are not known to the app. Fill in OPERATOR_NAME and
- * CONTACT_EMAIL below; while they are empty their lines are simply left out (nothing invented).
+ * 2026-11-27: OPERATOR_NAME and CONTACT_EMAIL filled in (needed for Google's branding review of the sign-in screen).
+ * Who runs Capsula and how to reach them: OPERATOR_NAME and CONTACT_EMAIL below; if one is emptied again
+ * its line is simply left out (nothing invented).
  */
 
-export const LEGAL_UPDATED = '2026-11-23'
-export const OPERATOR_NAME = ''
-export const CONTACT_EMAIL = ''
+export const LEGAL_UPDATED = '2026-11-27'
+export const OPERATOR_NAME = 'the Capsula team'
+export const CONTACT_EMAIL = 'app.capsula.med@gmail.com'
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 
