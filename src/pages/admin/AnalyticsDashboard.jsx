@@ -62,7 +62,11 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { RefreshCw, Download } from 'lucide-react'
-import { supabase } from '../../lib/supabase'
+import {
+  queryEventNamesPage, queryConditionsForDashboard, countBrandsForDashboard, queryActiveSpecialties,
+  countUsageEventsOfType, queryGateEvents, queryProfilesForDashboard, queryGenericsForDashboard,
+  queryFormulationDoses, querySearchGapsSince, queryUsageEventsSince,
+} from '../../lib/analyticsQueries'
 import AdminPageHeader from '../../components/admin/AdminPageHeader'
 
 import IdentitySegmentTab  from './analytics/IdentitySegmentTab'
@@ -106,12 +110,7 @@ async function fetchAllEventNames(eventType) {
   let rows = []
   let from = 0
   for (;;) {
-    const { data, error } = await supabase
-      .from('usage_events')
-      .select('entity_name')
-      .eq('event_type', eventType)
-      .not('entity_name', 'is', null)
-      .range(from, from + EVENT_PAGE_SIZE - 1)
+    const { data, error } = await queryEventNamesPage(eventType, from, from + EVENT_PAGE_SIZE - 1)
     if (error) throw error
     rows = rows.concat(data ?? [])
     if (!data || data.length < EVENT_PAGE_SIZE) break
@@ -157,21 +156,13 @@ async function fetchAllAnalytics() {
   ] = await Promise.all([
 
     // Conditions: total + published counts + needs_review + missing definition
-    supabase
-      .from('conditions')
-      .select('id, is_published, needs_review, definition, specialty_id, specialties!conditions_specialty_id_fkey(name_en)'),
+    queryConditionsForDashboard(),
 
     // Total brands
-    supabase
-      .from('brands')
-      .select('id', { count: 'exact', head: true }),
+    countBrandsForDashboard(),
 
     // Specialties for coverage table
-    supabase
-      .from('specialties')
-      .select('id, name_en, is_active')
-      .eq('is_active', true)
-      .order('sort_order', { ascending: true }),
+    queryActiveSpecialties(),
 
     // Usage totals — F10 audit fix: four separate head-only counts
     // instead of one query that fetched actual rows for all four event
@@ -179,31 +170,16 @@ async function fetchAllAnalytics() {
     // Supabase's default cap, undercounting every total on this tab by
     // roughly 90%). head: true returns just a number, no rows, so there
     // is no cap to hit no matter how large usage_events grows.
-    supabase
-      .from('usage_events')
-      .select('*', { count: 'exact', head: true })
-      .eq('event_type', 'condition_view'),
+    countUsageEventsOfType('condition_view'),
 
-    supabase
-      .from('usage_events')
-      .select('*', { count: 'exact', head: true })
-      .eq('event_type', 'drug_view'),
+    countUsageEventsOfType('drug_view'),
 
-    supabase
-      .from('usage_events')
-      .select('*', { count: 'exact', head: true })
-      .eq('event_type', 'condition_search'),
+    countUsageEventsOfType('condition_search'),
 
-    supabase
-      .from('usage_events')
-      .select('*', { count: 'exact', head: true })
-      .eq('event_type', 'drug_search'),
+    countUsageEventsOfType('drug_search'),
 
     // App Gate events: impressions, dismisses, maybe-laters, CTA clicks
-    supabase
-      .from('usage_events')
-      .select('event_type, entity_name')
-      .in('event_type', ['gate_impression', 'gate_dismiss', 'gate_maybe_later', 'gate_cta_click']),
+    queryGateEvents(),
 
     // F10 Batch D (D38), step 8b — identity/segment fields already
     // collected at sign-up. Direct table read, not through the
@@ -211,9 +187,7 @@ async function fetchAllAnalytics() {
     // email/last-sign-in-at, not needed here). Powers the Identity/
     // Segment tab. `id` added in step 8e so Retention can link a signup
     // to that person's later usage_events rows.
-    supabase
-      .from('profiles')
-      .select('id, specialty, country, occupation, created_at'),
+    queryProfilesForDashboard(),
   ])
 
   // F10 usage-tracking audit fix — every query here needs every matching
@@ -237,31 +211,21 @@ async function fetchAllAnalytics() {
 
     // Generics: category grouping + has any real (published, not-flagged)
     // brands/doses. 7,270 rows live — was silently capped to ~1,000.
-    fetchAllRows(() => supabase
-      .from('generics')
-      .select('id, category, is_published, formulations(id, doses_structured, brands(id, is_published, needs_review))')),
+    fetchAllRows(() => queryGenericsForDashboard()),
 
     // Formulations with no dose data. 11,817 rows live — was silently
     // capped to ~1,000.
-    fetchAllRows(() => supabase
-      .from('formulations')
-      .select('id, doses_structured')),
+    fetchAllRows(() => queryFormulationDoses()),
 
     // Search gaps: last 14 days. 2,410 rows live in that window — was
     // silently capped to ~1,000.
-    fetchAllRows(() => supabase
-      .from('search_gaps')
-      .select('term, context, created_at')
-      .gte('created_at', new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString())),
+    fetchAllRows(() => querySearchGapsSince(new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString())),
 
     // F10 Batch D (D38), step 8a — full usage_events rows with device/
     // session/user context, bounded to the last 90 days. Powers the
     // Engagement tab (8d), Retention tab (8e), and Monetization (8f).
     // 9,080 rows live in that window — was silently capped to ~1,000.
-    fetchAllRows(() => supabase
-      .from('usage_events')
-      .select('event_type, entity_name, device_id, user_id, session_id, created_at')
-      .gte('created_at', new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString())),
+    fetchAllRows(() => queryUsageEventsSince(new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString())),
   ])
 
   // ── Content Health ───────────────────────────────────────────────────────────

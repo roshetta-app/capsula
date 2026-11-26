@@ -58,6 +58,7 @@ const MOVED = [
   'src/hooks/usePushSubscription.js',  // 2026-11-26, S11 batch 2, now uses src/lib/userDataQueries.js
   'src/pages/admin/AdminSummary.jsx',  // 2026-11-26, S11 batch 2, now uses src/lib/userDataQueries.js
   'src/pages/admin/DrugEditor.jsx',  // 2026-11-26, S11 batch 2, now uses src/lib/userDataQueries.js
+  'src/pages/admin/AnalyticsDashboard.jsx',  // 2026-11-26, S11 batch 3, now uses src/lib/analyticsQueries.js
 ]
 
 for (const file of MOVED) {
