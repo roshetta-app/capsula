@@ -18,7 +18,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { RefreshCw, Receipt } from 'lucide-react'
 import AdminPageHeader from '../../components/admin/AdminPageHeader'
 import ConfirmModal from '../../components/admin/ConfirmModal'
-import { supabase } from '../../lib/supabase'
+import { createReceiptSignedUrl, fetchAdminProRequests, decideProRequest } from '../../lib/proQueries'
 import {
   STATUS_TABS, REJECT_REASONS, PLAN_NAMES, waitTone, waitText, approveCopy, rejectCopy, errorText,
 } from '../../utils/proRequestsAdmin'
@@ -51,7 +51,7 @@ function RequestCard({ row, busy, onApprove, onReject }) {
 
   async function viewReceipt() {
     setReceiptError('')
-    const { data, error } = await supabase.storage.from('pro-receipts').createSignedUrl(row.receipt_path, 120)
+    const { data, error } = await createReceiptSignedUrl(row.receipt_path, 120)
     if (error || !data?.signedUrl) { setReceiptError('Could not open the receipt.'); return }
     setReceiptUrl(data.signedUrl)
   }
@@ -148,7 +148,7 @@ export default function ProRequestsManager() {
 
   const load = useCallback(async (which) => {
     setState('loading')
-    const { data, error } = await supabase.rpc('admin_pro_requests', { p_status: which, p_limit: 100 })
+    const { data, error } = await fetchAdminProRequests(which, 100)
     if (error) {
       setState(String(error.message).includes('forbidden') ? 'forbidden' : 'error')
       return
@@ -164,9 +164,7 @@ export default function ProRequestsManager() {
     const { action, row, reason } = pending
     setBusy(true)
     setPending(null)
-    const { error } = action === 'approve'
-      ? await supabase.rpc('admin_approve_pro_request', { p_id: row.id })
-      : await supabase.rpc('admin_reject_pro_request', { p_id: row.id, p_reason: reason })
+    const { error } = await decideProRequest(action, row.id, reason)
     setBusy(false)
     if (error) setNotice({ ok: false, text: errorText(error) })
     else setNotice({ ok: true, text: action === 'approve' ? 'Approved. Pro is on and the person was notified.' : 'Rejected. The person was notified.' })

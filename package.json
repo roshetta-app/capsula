@@ -12,6 +12,7 @@
     "catalog:build": "node scripts/build-catalog.mjs",
     "launch:check": "node --test src/utils/launchSwitches.check.js",
     "config:check": "node --test src/lib/remoteConfig.check.js",
+    "door:check": "node --test scripts/door.check.mjs",
     "catalog:check": "node --test src/utils/catalogChunks.check.js scripts/build-catalog.check.mjs scripts/catalog-publish.check.mjs src/lib/catalogStatic.check.js",
     "site:check": "node --test scripts/siteBase.check.mjs",
     "app:check": "node --test scripts/app-publish.check.mjs",

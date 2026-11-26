@@ -92,3 +92,39 @@ export async function cancelProRequest(id) {
   if (error) throw error
   return data
 }
+
+// ─── Admin side (CMS: Pro requests and Pro settings) ─────────────────────────
+// S11 (2026-11-26): these were direct Supabase calls inside the two CMS pages. They live here now so
+// the Pro and payments area talks to the server from one file. Each returns what the page already
+// expected ({ data, error } or { error }); behaviour is unchanged.
+
+/** A short-lived link to one receipt picture (private folder). */
+export async function createReceiptSignedUrl(receiptPath, seconds = 120) {
+  return supabase.storage.from('pro-receipts').createSignedUrl(receiptPath, seconds)
+}
+
+/** @returns {Promise<{data: object[]|null, error: object|null}>} */
+export async function fetchAdminProRequests(status, limit = 100) {
+  return supabase.rpc('admin_pro_requests', { p_status: status, p_limit: limit })
+}
+
+/** @param {'approve'|'reject'} action @returns {Promise<{error: object|null}>} */
+export async function decideProRequest(action, id, reason) {
+  return action === 'approve'
+    ? supabase.rpc('admin_approve_pro_request', { p_id: id })
+    : supabase.rpc('admin_reject_pro_request', { p_id: id, p_reason: reason })
+}
+
+/** The settings row and the price rows, both as { data, error }. */
+export async function fetchAdminProSettings() {
+  const [settings, prices] = await Promise.all([
+    supabase.from('pro_settings').select('wallet_name, wallet_number, payments_open').maybeSingle(),
+    supabase.from('pro_plan_prices').select('plan, amount_egp'),
+  ])
+  return { settings, prices }
+}
+
+/** @returns {Promise<{error: object|null}>} */
+export async function saveAdminProSettings(args) {
+  return supabase.rpc('admin_save_pro_settings', args)
+}

@@ -11,7 +11,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 import AdminPageHeader from '../../components/admin/AdminPageHeader'
-import { supabase } from '../../lib/supabase'
+import { fetchAdminProSettings, saveAdminProSettings } from '../../lib/proQueries'
 import { PLAN_KEYS, PLAN_NAMES, checkProSettings, saveErrorText } from '../../utils/proSettingsAdmin'
 
 const card = {
@@ -34,10 +34,7 @@ export default function ProSettingsManager() {
 
   const load = useCallback(async () => {
     setState('loading')
-    const [settings, prices] = await Promise.all([
-      supabase.from('pro_settings').select('wallet_name, wallet_number, payments_open').maybeSingle(),
-      supabase.from('pro_plan_prices').select('plan, amount_egp'),
-    ])
+    const { settings, prices } = await fetchAdminProSettings()
     if (settings.error || prices.error || !settings.data) { setState('error'); return }
     const byPlan = Object.fromEntries((prices.data ?? []).map(p => [p.plan, String(p.amount_egp)]))
     setForm({
@@ -56,7 +53,7 @@ export default function ProSettingsManager() {
     const result = checkProSettings(form)
     if (!result.ok) { setNotice({ ok: false, text: result.message }); return }
     setBusy(true)
-    const { error } = await supabase.rpc('admin_save_pro_settings', result.args)
+    const { error } = await saveAdminProSettings(result.args)
     setBusy(false)
     if (error) {
       if (String(error.message).includes('forbidden')) setState('forbidden')
