@@ -15,35 +15,66 @@
  * Public branch only (mounted next to SignInNudge in App.jsx).
  */
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { useToast } from '../context/ToastContext'
+import InfoSheet from './ui/InfoSheet'
 import {
   readSignInReturnError, looksLikeRefusedSignup, withoutSignInReturnError,
   isSwitchOn, SIGNUPS_PAUSED_KEY, SIGNUPS_PAUSED_MESSAGE,
 } from '../utils/launchSwitches'
 
-const returnError = typeof window !== 'undefined' ? readSignInReturnError(window.location.href) : null
+export const returnError = typeof window !== 'undefined' ? readSignInReturnError(window.location.href) : null
+
+// 2026-11-26: the message of a refused sign-up used to be a short toast that was easy to miss, and
+// when Google's sign-in popup was used, the popup stayed on 'Signing you in' forever. Now the popup
+// sends the error to the main window (message type below) and closes itself, and the main window
+// shows a pop-up box that stays until the person closes it.
+export const SIGNIN_ERROR_MESSAGE_TYPE = 'capsula-signin-error'
+
+async function switchIsOn() {
+  try {
+    const { data } = await supabase.from('cms_config').select('value').eq('key', SIGNUPS_PAUSED_KEY).maybeSingle()
+    return isSwitchOn(data?.value)
+  } catch {
+    // The switch could not be read: say nothing.
+    return false
+  }
+}
 
 export default function SignInReturnNotice() {
-  const { toast } = useToast()
+  const [open, setOpen] = useState(false)
 
   useEffect(() => {
-    if (!returnError || !looksLikeRefusedSignup(returnError.description)) return undefined
     let cancelled = false
-    ;(async () => {
-      try {
-        const { data } = await supabase.from('cms_config').select('value').eq('key', SIGNUPS_PAUSED_KEY).maybeSingle()
-        if (cancelled || !isSwitchOn(data?.value)) return
-        toast.warning(SIGNUPS_PAUSED_MESSAGE, 9000)
-        window.history.replaceState(window.history.state, '', withoutSignInReturnError(window.location.href))
-      } catch {
-        // The switch could not be read: say nothing and change nothing.
-      }
-    })()
-    return () => { cancelled = true }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
+    async function maybeShow(description) {
+      if (!looksLikeRefusedSignup(description)) return
+      if (!(await switchIsOn()) || cancelled) return
+      setOpen(true)
+    }
+
+    // Full-page route: the error is in the address when the app loads.
+    if (returnError) {
+      maybeShow(returnError.description).then(() => {
+        if (!cancelled && looksLikeRefusedSignup(returnError.description)) {
+          window.history.replaceState(window.history.state, '', withoutSignInReturnError(window.location.href))
+        }
+      })
+    }
+
+    // Popup route: the popup posts the error here and closes itself.
+    function onMessage(e) {
+      if (e.origin !== window.location.origin) return
+      if (e.data?.type !== SIGNIN_ERROR_MESSAGE_TYPE) return
+      maybeShow(String(e.data.description ?? ''))
+    }
+    window.addEventListener('message', onMessage)
+    return () => { cancelled = true; window.removeEventListener('message', onMessage) }
   }, [])
 
-  return null
+  return (
+    <InfoSheet isOpen={open} onClose={() => setOpen(false)} title="Sign-ups are paused">
+      {SIGNUPS_PAUSED_MESSAGE}
+    </InfoSheet>
+  )
 }

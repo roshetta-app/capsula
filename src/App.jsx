@@ -181,7 +181,7 @@ import OnboardingGate from './components/ui/OnboardingGate'
 import AppGate from './components/ui/AppGate'
 import ProfileSetupRedirect from './components/ProfileSetupRedirect'
 import SignInNudge from './components/SignInNudge'
-import SignInReturnNotice from './components/SignInReturnNotice'
+import SignInReturnNotice, { returnError as signInReturnError, SIGNIN_ERROR_MESSAGE_TYPE } from './components/SignInReturnNotice'
 import { AuthProvider } from './context/AuthContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { ConditionProvider } from './context/ConditionContext'
@@ -247,6 +247,22 @@ function isOAuthSignInPopup() {
 // window is never meant to be looked at, just to finish the OAuth
 // exchange and disappear.
 function OAuthPopupNotice() {
+  // 2026-11-26: if Google sent the popup back with an error (for example a refused new sign-up while
+  // sign-ups are paused), nothing would ever close this window. Tell the main window, then close.
+  useEffect(() => {
+    if (!signInReturnError) return undefined
+    try {
+      window.opener?.postMessage(
+        { type: SIGNIN_ERROR_MESSAGE_TYPE, description: signInReturnError.description },
+        window.location.origin,
+      )
+    } catch {
+      // The main window is gone: nothing to tell.
+    }
+    const t = setTimeout(() => window.close(), 300)
+    return () => clearTimeout(t)
+  }, [])
+
   return (
     <div style={{
       position:        'fixed',
