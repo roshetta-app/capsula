@@ -1,11 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { supabase } from '../lib/supabase'
-import { fetchFlatDrugs, fetchMetadataTimestamps, fetchAuditLogSince, fetchAuditCursorNow, fetchFlatDrugsByScope, fetchFlatDrugsByBrandId } from '../lib/queries'
+import { fetchFlatDrugs, fetchMetadataTimestamps, fetchAuditLogSince, fetchAuditCursorNow, fetchFlatDrugsByScope, fetchFlatDrugsByBrandId, isStaticCatalogEnabled, manifestCanCatchUp } from '../lib/catalogData'
 import { readDrugsCache, writeDrugsCache, touchDrugsCache } from '../utils/cache'
 import { patchDrugDoses } from '../utils/patchDrugDoses'
 import { CACHE_SAFETY_REFRESH_MS, CACHE_RESTAMP_AFTER_MS } from '../constants/cache'
 import { logCrash } from '../utils/crashLogger'
-import { isStaticCatalogEnabled, fetchStaticCatalog, manifestCanCatchUp } from '../lib/catalogStatic'
+import { fetchStaticCatalog } from '../lib/catalogStatic'
 
 // Phase F14 Stage 3 (delta sync): if a background check finds more than
 // this many audit_log entries since the device's last cursor, delta-
@@ -62,10 +61,10 @@ export function useDrugs() {
   // through to the Supabase download as before.
   async function tryStaticCatalog(onProgress) {
     try {
-      if (!(await isStaticCatalogEnabled(supabase))) return null
+      if (!(await isStaticCatalogEnabled())) return null
       return await fetchStaticCatalog({
         onProgress,
-        acceptManifest: manifest => manifestCanCatchUp(supabase, manifest, DELTA_FALLBACK_CHANGE_COUNT),
+        acceptManifest: manifest => manifestCanCatchUp(manifest, DELTA_FALLBACK_CHANGE_COUNT),
       })
     } catch (err) {
       if (err?.code === 'declined') return { stale: true }
@@ -105,9 +104,9 @@ export function useDrugs() {
       // background check falls back to a full fetch again too, which is a
       // safe, if slightly redundant, default.
       const [auditCursor, fresh, { drugsUpdatedAt }] = await Promise.all([
-        fetchAuditCursorNow(supabase).catch(() => null),
-        fetchFlatDrugs(supabase),
-        fetchMetadataTimestamps(supabase),
+        fetchAuditCursorNow().catch(() => null),
+        fetchFlatDrugs(),
+        fetchMetadataTimestamps(),
       ])
       setDrugs(fresh)
       await writeDrugsCache(fresh, drugsUpdatedAt, auditCursor)
@@ -176,13 +175,13 @@ export function useDrugs() {
       // starts — see fetchAndCache's matching comment above for why (a
       // write landing mid-fetch just gets picked up again on the next
       // background delta check, safe because that merge is idempotent).
-      const auditCursorPromise = fetchAuditCursorNow(supabase).catch(() => null)
-      const fresh = await fetchFlatDrugs(supabase, (loaded, total) => {
+      const auditCursorPromise = fetchAuditCursorNow().catch(() => null)
+      const fresh = await fetchFlatDrugs((loaded, total) => {
         if (attemptIdRef.current !== myAttempt) return // a newer attempt has taken over
         setProgress({ loaded, total })
       })
       const [{ drugsUpdatedAt }, auditCursor] = await Promise.all([
-        fetchMetadataTimestamps(supabase),
+        fetchMetadataTimestamps(),
         auditCursorPromise,
       ])
       if (attemptIdRef.current !== myAttempt) return // stale — a newer attempt already resolved or is still running
@@ -226,7 +225,7 @@ export function useDrugs() {
     }
 
     try {
-      const changes = await fetchAuditLogSince(supabase, cachedRecord.auditCursor)
+      const changes = await fetchAuditLogSince(cachedRecord.auditCursor)
 
       if (changes.length > DELTA_FALLBACK_CHANGE_COUNT) {
         await fetchAndCache({ keepIfStale: true })
@@ -268,15 +267,15 @@ export function useDrugs() {
 
       for (const id of genericIds) {
         nextDrugs = nextDrugs.filter(d => d.genericId !== id)
-        nextDrugs.push(...await fetchFlatDrugsByScope(supabase, 'generic', id))
+        nextDrugs.push(...await fetchFlatDrugsByScope('generic', id))
       }
       for (const id of formulationIds) {
         nextDrugs = nextDrugs.filter(d => d.formulationId !== id)
-        nextDrugs.push(...await fetchFlatDrugsByScope(supabase, 'formulation', id))
+        nextDrugs.push(...await fetchFlatDrugsByScope('formulation', id))
       }
       for (const id of brandIds) {
         nextDrugs = nextDrugs.filter(d => d.id !== id)
-        nextDrugs.push(...await fetchFlatDrugsByBrandId(supabase, id))
+        nextDrugs.push(...await fetchFlatDrugsByBrandId(id))
       }
 
       const newCursor = changes[changes.length - 1].created_at
@@ -349,7 +348,7 @@ export function useDrugs() {
       // full fetchAndCache — see that function for the delta-merge logic
       // and its fallback rules.
       try {
-        const { drugsUpdatedAt } = await fetchMetadataTimestamps(supabase)
+        const { drugsUpdatedAt } = await fetchMetadataTimestamps()
         if (drugsUpdatedAt !== cached.version) {
           await applyDrugsDelta(cached, drugsUpdatedAt)
         } else if (ageMs > CACHE_RESTAMP_AFTER_MS) {

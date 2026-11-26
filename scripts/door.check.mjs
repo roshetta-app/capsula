@@ -9,6 +9,7 @@ const MOVED = [
   'src/pages/admin/ProSettingsManager.jsx',  // 2026-11-26, now uses src/lib/proQueries.js
   'src/pages/admin/LaunchSwitchesManager.jsx', // 2026-11-26, now uses src/lib/switchQueries.js
   'src/components/SignInReturnNotice.jsx',     // 2026-11-26, now uses src/lib/switchQueries.js
+  'src/hooks/useDrugs.js',                     // 2026-11-26, now uses src/lib/catalogData.js
 ]
 
 for (const file of MOVED) {
