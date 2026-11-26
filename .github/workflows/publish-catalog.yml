@@ -24,8 +24,6 @@ jobs:
     env:
       CATALOG_PROJECT: capsula-catalog
       CATALOG_HOST: https://capsula-catalog.pages.dev
-      # S10: optional notice shown to every phone once (repository variable CAPSULA_MESSAGE; empty = none).
-      CONFIG_MESSAGE: ${{ vars.CAPSULA_MESSAGE }}
       VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
       VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
     steps:
