@@ -7,7 +7,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
-import { buildStaticPages } from './static-pages.mjs'
+import { buildStaticPages, GOOGLE_SITE_VERIFICATION } from './static-pages.mjs'
 import { DEFAULT_PUBLIC_SITE } from './siteBase.mjs'
 
 // Cloudflare Pages shows the app's start page for any address that is not a real file, but ONLY
@@ -53,6 +53,7 @@ export async function verifyLive(host, fetchImpl = fetch) {
   const home = await get(fetchImpl, `${base}/`)
   check(home.status === 200, `Start page answered ${home.status}, not 200`)
   check(home.body.includes('id="root"'), 'Start page does not look like the app')
+  check(home.body.includes(`name="google-site-verification" content="${GOOGLE_SITE_VERIFICATION}"`), 'Start page is missing the Google ownership tag')
   check(home.body.includes(`${base}/icons/icon-512.png`), 'Link-preview picture does not point at the new address')
 
   // The three public pages must be real, readable pages (not the app shell) with their key words.

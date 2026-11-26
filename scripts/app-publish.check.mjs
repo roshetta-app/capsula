@@ -6,12 +6,12 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { HEADERS_TEXT, prepareDist, verifyLive } from './app-publish.mjs'
-import { aboutPageHtml, legalPageHtml, esc, STATIC_PAGES } from './static-pages.mjs'
+import { aboutPageHtml, legalPageHtml, esc, STATIC_PAGES, GOOGLE_SITE_VERIFICATION } from './static-pages.mjs'
 import { CONTACT_EMAIL } from '../src/utils/legalText.js'
 
 const HOST = 'https://capsula-app.pages.dev'
 const GOOD = {
-  home: `<html><meta property="og:image" content="${HOST}/icons/icon-512.png"><div id="root"></div></html>`,
+  home: `<html><meta name="google-site-verification" content="${GOOGLE_SITE_VERIFICATION}"><meta property="og:image" content="${HOST}/icons/icon-512.png"><div id="root"></div></html>`,
   manifest: JSON.stringify({ id: '/', start_url: '/', scope: '/', icons: [{ src: '/icons/icon-192.png' }, { src: '/icons/icon-512.png' }] }),
   sw: "const PRE = ['/icons/icon-192.png']\nconst target = `${'/'.slice(0, -1)}${rawTarget}`",
 }
@@ -119,4 +119,15 @@ test('public pages need no script, name the operator contact, and link to each o
 test('page text is escaped', () => {
   assert.equal(esc('a<b>&"c'), 'a&lt;b&gt;&amp;&quot;c')
   assert.ok(legalPageHtml('terms', HOST).includes('&quot;Not available&quot;'))
+})
+
+test('the Google ownership tag is on the start page file and every plain page', () => {
+  const tag = `name="google-site-verification" content="${GOOGLE_SITE_VERIFICATION}"`
+  assert.ok(fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8').includes(tag))
+  for (const html of [aboutPageHtml(HOST), legalPageHtml('privacy', HOST), legalPageHtml('terms', HOST)]) assert.ok(html.includes(tag))
+})
+
+test('a start page without the Google ownership tag is caught', async () => {
+  const p = await verifyLive(HOST, fakeSite({ home: GOOD.home.replace(/<meta name="google-site-verification"[^>]*>/, '') }))
+  assert.ok(p.some(t => t.includes('Google ownership tag')), p.join('|'))
 })

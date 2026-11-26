@@ -11,6 +11,9 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { legalDocument, OPERATOR_NAME, CONTACT_EMAIL, updatedLine } from '../src/utils/legalText.js'
 
+// Google Search Console ownership tag (also in index.html, the root page Google reads).
+export const GOOGLE_SITE_VERIFICATION = 'cKxJuE8kDjeQ0VtXQ20BjB4PxH6G5WcymS91CY2Q5V4'
+
 export const STATIC_PAGES = ['about.html', 'account/privacy.html', 'account/terms.html']
 
 export function esc(text) {
@@ -47,6 +50,7 @@ export function renderPage({ site, pathname, title, description, bodyHtml }) {
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="google-site-verification" content="${GOOGLE_SITE_VERIFICATION}">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(title)} · Capsula</title>
 <meta name="description" content="${esc(description)}">
