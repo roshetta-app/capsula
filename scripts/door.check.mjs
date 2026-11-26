@@ -7,6 +7,8 @@ import { readFileSync } from 'node:fs'
 const MOVED = [
   'src/pages/admin/ProRequestsManager.jsx',  // 2026-11-26, now uses src/lib/proQueries.js
   'src/pages/admin/ProSettingsManager.jsx',  // 2026-11-26, now uses src/lib/proQueries.js
+  'src/pages/admin/LaunchSwitchesManager.jsx', // 2026-11-26, now uses src/lib/switchQueries.js
+  'src/components/SignInReturnNotice.jsx',     // 2026-11-26, now uses src/lib/switchQueries.js
 ]
 
 for (const file of MOVED) {

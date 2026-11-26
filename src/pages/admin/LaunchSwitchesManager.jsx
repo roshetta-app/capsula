@@ -14,7 +14,7 @@
 import { useEffect, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 import AdminPageHeader from '../../components/admin/AdminPageHeader'
-import { supabase } from '../../lib/supabase'
+import { fetchSwitchRows } from '../../lib/switchQueries'
 import { updateCmsConfig } from '../../lib/adminQueries'
 import { CATALOG_SWITCH_KEY } from '../../lib/catalogStatic'
 import { SIGNUPS_PAUSED_KEY, isSwitchOn, switchValue } from '../../utils/launchSwitches'
@@ -38,7 +38,7 @@ export default function LaunchSwitchesManager() {
 
   useEffect(() => {
     let cancelled = false
-    supabase.from('cms_config').select('key, value').in('key', [SIGNUPS_PAUSED_KEY, CATALOG_SWITCH_KEY])
+    fetchSwitchRows([SIGNUPS_PAUSED_KEY, CATALOG_SWITCH_KEY])
       .then(({ data, error }) => {
         if (cancelled) return
         if (error) { setState('error'); return }

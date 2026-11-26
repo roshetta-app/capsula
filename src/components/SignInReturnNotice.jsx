@@ -16,7 +16,7 @@
  */
 
 import { useEffect, useState } from 'react'
-import { supabase } from '../lib/supabase'
+import { fetchSwitchValue } from '../lib/switchQueries'
 import InfoSheet from './ui/InfoSheet'
 import {
   readSignInReturnError, looksLikeRefusedSignup, withoutSignInReturnError,
@@ -33,8 +33,7 @@ export const SIGNIN_ERROR_MESSAGE_TYPE = 'capsula-signin-error'
 
 async function switchIsOn() {
   try {
-    const { data } = await supabase.from('cms_config').select('value').eq('key', SIGNUPS_PAUSED_KEY).maybeSingle()
-    return isSwitchOn(data?.value)
+    return isSwitchOn(await fetchSwitchValue(SIGNUPS_PAUSED_KEY))
   } catch {
     // The switch could not be read: say nothing.
     return false
