@@ -103,8 +103,7 @@
 
 import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react'
 import { App as CapacitorApp } from '@capacitor/app'
-import { supabase } from '../lib/supabase'
-import { fetchMetadataTimestamps } from '../lib/queries'
+import { fetchMetadataTimestamps } from '../lib/catalogData'
 
 // "Short timeout" per plan §2.1 — no exact number specified there, so
 // defaulting to a 5s reachability timeout for each individual check.
@@ -195,7 +194,7 @@ export function OnlineStatusProvider({ children }) {
   // immediately or waiting out the full recheck interval.
   const checkReachable = useCallback(async () => {
     const myAttempt = ++attemptIdRef.current
-    const reachable = await withTimeout(fetchMetadataTimestamps(supabase), REACHABILITY_TIMEOUT_MS)
+    const reachable = await withTimeout(fetchMetadataTimestamps(), REACHABILITY_TIMEOUT_MS)
     if (attemptIdRef.current !== myAttempt) return // a newer check has taken over
 
     if (confirmRetryTimerRef.current) {

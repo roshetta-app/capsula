@@ -27,7 +27,7 @@
  *                         "Did you mean" also has nothing (mode: 'brand'|'generic')
  */
 
-import { supabase } from '../lib/supabase'
+import { insertSearchGap } from '../lib/logQueries'
 
 /**
  * Log a zero-result search term.
@@ -39,7 +39,7 @@ import { supabase } from '../lib/supabase'
  */
 export async function logSearchGap(term, context, mode = null) {
   if (!term || term.trim().length < 2) return
-  const { error } = await supabase.from('search_gaps').insert({
+  const { error } = await insertSearchGap({
     term:    term.trim().toLowerCase(),
     context,
     mode,

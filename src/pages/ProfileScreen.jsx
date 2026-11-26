@@ -34,7 +34,7 @@ import { fetchPublicProfile } from '../utils/publicProfile'
 import { PROFILE_WORDS } from '../utils/profileView'
 import { shimmer } from '../components/drugs/home/shimmer'
 import { ROUTES } from '../router'
-import { supabase } from '../lib/supabase'
+import { deleteShareByCode } from '../lib/screenQueries'
 import {
   profileTabView, statusForFailure, heroLines, detailsPercent, TAB_WORDS,
 } from '../utils/profileTab'
@@ -158,7 +158,7 @@ export default function ProfileScreen() {
   // item off the profile; it throws on failure so the confirm sheet stays open and says so.
   async function makePrivate(tabKey, item) {
     const table = tabKey === 'groups' ? 'drug_group_shares' : 'roshetta_shares'
-    const { error } = await supabase.from(table).delete().eq('share_code', item.code)
+    const { error } = await deleteShareByCode(table, item.code)
     if (error) throw error
     reloadPub()
   }

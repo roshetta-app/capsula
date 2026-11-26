@@ -5,11 +5,11 @@
  * that person's own hidden things.
  */
 
-import { supabase } from '../lib/supabase'
+import { callRpc } from '../lib/serverCalls'
 import { loadMyFlags, askForReview } from './hiddenRules'
 
 const deps = () => ({
-  rpc: (fn, args) => (args === undefined ? supabase.rpc(fn) : supabase.rpc(fn, args)),
+  rpc: callRpc,
   isOnline: () => !(typeof navigator !== 'undefined' && navigator.onLine === false),
 })
 

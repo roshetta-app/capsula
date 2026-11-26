@@ -9,7 +9,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { RefreshCw, ChevronDown, ChevronUp, ClipboardList } from 'lucide-react'
-import { supabase } from '../../lib/supabase'
+import { queryRecentAuditLog } from '../../lib/screenQueries'
 import AdminPageHeader from '../../components/admin/AdminPageHeader'
 
 // ─── Action badge colours ─────────────────────────────────────────────────────
@@ -84,11 +84,7 @@ export default function AuditLog() {
     setError(null)
     setExpanded(null)
 
-    const { data, error: err } = await supabase
-      .from('audit_log')
-      .select('id, action, table_name, record_id, record_name, changes, created_at')
-      .order('created_at', { ascending: false })
-      .limit(100)
+    const { data, error: err } = await queryRecentAuditLog()
 
     if (err) {
       setError(err.message)

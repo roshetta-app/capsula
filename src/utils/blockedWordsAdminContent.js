@@ -5,16 +5,18 @@
  * account: the row rules on both tables let nobody else read or write them.
  */
 
-import { supabase } from '../lib/supabase'
+import {
+  listBlockedWords, listProfileNameFlags, insertBlockedWord, deleteBlockedWord, deleteProfileNameFlags,
+} from '../lib/moderationQueries'
 import { logAudit } from './auditLogger'
 import { loadBlockedWords, addBlockedWord, removeBlockedWord, dismissFlags } from './blockedWordsAdmin'
 
 const deps = () => ({
-  listWords: () => supabase.from('blocked_words').select('id, word').order('created_at', { ascending: false }),
-  listFlags: () => supabase.from('profile_name_flags').select('profile_id, word_id, created_at, profiles(full_name, handle)'),
-  addWord: (word) => supabase.from('blocked_words').insert({ word }).select('id, word').single(),
-  removeWord: (id) => supabase.from('blocked_words').delete().eq('id', id).select('id'),
-  dismissFlags: (profileId) => supabase.from('profile_name_flags').delete().eq('profile_id', profileId).select('profile_id'),
+  listWords: listBlockedWords,
+  listFlags: listProfileNameFlags,
+  addWord: insertBlockedWord,
+  removeWord: deleteBlockedWord,
+  dismissFlags: deleteProfileNameFlags,
   audit: logAudit,
   isOnline: () => !(typeof navigator !== 'undefined' && navigator.onLine === false),
 })

@@ -8,11 +8,11 @@
  *   fetchHandleAvailable (handle)     see checkHandleAvailable (signed in only)
  */
 
-import { supabase } from '../lib/supabase'
+import { callRpc } from '../lib/serverCalls'
 import { loadPublicProfile, checkHandleAvailable } from './publicProfileFetch'
 
 const deps = () => ({
-  rpc: (fn, args) => supabase.rpc(fn, args),
+  rpc: callRpc,
   isOnline: () => !(typeof navigator !== 'undefined' && navigator.onLine === false),
 })
 

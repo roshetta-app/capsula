@@ -63,7 +63,7 @@
  * — not from SearchBar's submit handler.
  */
 
-import { supabase } from '../lib/supabase'
+import { insertUsageEvent } from '../lib/logQueries'
 import { getDeviceId, getSessionId, getPlatform, getCurrentUserId } from './deviceSession'
 
 /**
@@ -77,7 +77,7 @@ import { getDeviceId, getSessionId, getPlatform, getCurrentUserId } from './devi
  *   Omit or pass null for event types with no mode concept.
  */
 export async function logUsageEvent(eventType, entityId = null, entityName = null, mode = null) {
-  const { error } = await supabase.from('usage_events').insert({
+  const { error } = await insertUsageEvent({
     event_type:  eventType,
     entity_id:   entityId,
     entity_name: entityName,

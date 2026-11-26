@@ -1,8 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
-import { supabase } from '../lib/supabase'
-import { updateOwnProfile } from '../lib/queries'
+import { updateOwnProfile } from '../lib/appData'
 
 /**
  * src/context/ThemeContext.jsx
@@ -167,7 +166,7 @@ export function ThemeProvider({ children }) {
       // profile-sync effect above knows not to overwrite this choice
       // with the still-old server value in the meantime.
       pendingSyncRef.current = { userId: user.id, value: newTheme }
-      updateOwnProfile(supabase, user.id, { themePreference: newTheme })
+      updateOwnProfile(user.id, { themePreference: newTheme })
         .then(() => {
           if (pendingSyncRef.current?.value === newTheme) pendingSyncRef.current = null
           refreshProfile()
@@ -186,7 +185,7 @@ export function ThemeProvider({ children }) {
     if (!isOnline) return
     const pending = pendingSyncRef.current
     if (!pending || !user || pending.userId !== user.id) return
-    updateOwnProfile(supabase, user.id, { themePreference: pending.value })
+    updateOwnProfile(user.id, { themePreference: pending.value })
       .then(() => {
         if (pendingSyncRef.current?.value === pending.value) pendingSyncRef.current = null
         refreshProfile()

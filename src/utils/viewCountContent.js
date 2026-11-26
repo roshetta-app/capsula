@@ -4,11 +4,11 @@
  * countViewWhenSeen (viewCount.js). Nothing is written to the phone.
  */
 
-import { supabase } from '../lib/supabase'
+import { callRpc } from '../lib/serverCalls'
 import { countViewWhenSeen } from './viewCount'
 
 const deps = () => ({
-  rpc: (fn, args) => supabase.rpc(fn, args),
+  rpc: callRpc,
   isOnline: () => !(typeof navigator !== 'undefined' && navigator.onLine === false),
   isVisible: () => typeof document === 'undefined' || document.visibilityState !== 'hidden',
   listen: fn => {

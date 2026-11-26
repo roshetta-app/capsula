@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '../lib/supabase'
 import { fetchCategoriesForCMS } from '../lib/adminQueries'
-import { fetchMetadataTimestamps } from '../lib/queries'
+import { fetchMetadataTimestamps } from '../lib/catalogData'
 import { getCacheData, getCacheTimestamp, writeCache, isCacheExpired } from '../utils/cache'
 
 /**
@@ -30,7 +29,7 @@ export function useCategories() {
     try {
       const { data: fresh, error: fetchErr } = await fetchCategoriesForCMS()
       if (fetchErr) throw fetchErr
-      const { drugsUpdatedAt } = await fetchMetadataTimestamps(supabase)
+      const { drugsUpdatedAt } = await fetchMetadataTimestamps()
       setCategories(fresh)
       writeCache('categories', fresh, drugsUpdatedAt)
     } catch (err) {
@@ -58,7 +57,7 @@ export function useCategories() {
 
       // Silently check if server version is newer
       try {
-        const { drugsUpdatedAt } = await fetchMetadataTimestamps(supabase)
+        const { drugsUpdatedAt } = await fetchMetadataTimestamps()
         if (drugsUpdatedAt !== cachedTs) {
           await fetchAndCache()
         }

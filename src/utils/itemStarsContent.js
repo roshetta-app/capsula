@@ -4,11 +4,11 @@
  * Same pattern as ownerViewsContent.js. Needs a signed-in person.
  */
 
-import { supabase } from '../lib/supabase'
+import { callRpc } from '../lib/serverCalls'
 import { sendStar } from './itemStars'
 
 const deps = () => ({
-  rpc: (fn, args) => supabase.rpc(fn, args),
+  rpc: callRpc,
   isOnline: () => !(typeof navigator !== 'undefined' && navigator.onLine === false),
 })
 

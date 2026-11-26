@@ -15,6 +15,10 @@ import {
   fetchMetadataTimestamps as fetchMetadataTimestampsWith,
   fetchAuditLogSince as fetchAuditLogSinceWith,
   fetchAuditCursorNow as fetchAuditCursorNowWith,
+  fetchClassKeywords as fetchClassKeywordsWith,
+  fetchConditions as fetchConditionsWith,
+  fetchConditionById as fetchConditionByIdWith,
+  fetchAllConditions as fetchAllConditionsWith,
 } from './queries'
 import {
   isStaticCatalogEnabled as isStaticCatalogEnabledWith,
@@ -29,3 +33,7 @@ export const fetchAuditLogSince = (sinceTimestamp) => fetchAuditLogSinceWith(sup
 export const fetchAuditCursorNow = () => fetchAuditCursorNowWith(supabase)
 export const isStaticCatalogEnabled = (timeoutMs) => isStaticCatalogEnabledWith(supabase, timeoutMs)
 export const manifestCanCatchUp = (manifest, maxChanges) => manifestCanCatchUpWith(supabase, manifest, maxChanges)
+export const fetchClassKeywords = () => fetchClassKeywordsWith(supabase)
+export const fetchConditions = (onProgress) => fetchConditionsWith(supabase, onProgress)
+export const fetchConditionById = (id) => fetchConditionByIdWith(supabase, id)
+export const fetchAllConditions = () => fetchAllConditionsWith(supabase)

@@ -4,11 +4,11 @@
  * (libraryReportRules.js). Same pattern as reportContent.js. Sending needs a signed-in person.
  */
 
-import { supabase } from '../lib/supabase'
+import { callRpc } from '../lib/serverCalls'
 import { sendLibraryReport } from './libraryReportRules'
 
 const deps = () => ({
-  rpc: (fn, args) => supabase.rpc(fn, args),
+  rpc: callRpc,
   isOnline: () => !(typeof navigator !== 'undefined' && navigator.onLine === false),
 })
 

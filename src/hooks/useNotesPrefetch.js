@@ -75,7 +75,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react'
-import { supabase } from '../lib/supabase'
+import { queryNotesOfUser } from '../lib/screenQueries'
 import { saveNotePhotoToCache } from '../utils/cache'
 
 function storageKeyFor(conditionId) {
@@ -141,10 +141,7 @@ async function downloadNotePhoto(imageUrl) {
 export async function prefetchAllNotes(userId) {
   if (!userId) return
 
-  const { data, error } = await supabase
-    .from('notes')
-    .select('condition_id, body, image_url, updated_at')
-    .eq('user_id', userId)
+  const { data, error } = await queryNotesOfUser(userId)
 
   if (error || !data) return
 

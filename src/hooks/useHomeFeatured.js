@@ -8,7 +8,7 @@
  * show (no card is drawn, no empty box).
  */
 import { useEffect, useMemo, useState } from 'react'
-import { supabase } from '../lib/supabase'
+import { queryActiveHomeFeatured } from '../lib/screenQueries'
 import { resolveFromLibrary, pickFeatured, canShow } from '../utils/homeFeatured'
 
 const SAVED_KEY = 'capsula_home_featured_v1'
@@ -45,11 +45,7 @@ export function useHomeFeatured(conditions, drugs, libraryReady) {
 
   useEffect(() => {
     let alive = true
-    supabase
-      .from('home_featured')
-      .select('id, kind, condition_id, brand_id, tagline, is_active')
-      .eq('is_active', true)
-      .order('created_at', { ascending: true })
+    queryActiveHomeFeatured()
       .then(({ data, error }) => {
         if (!alive) return
         if (error || !Array.isArray(data)) { setFailed(true); return }

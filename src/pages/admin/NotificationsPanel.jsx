@@ -18,7 +18,7 @@ import {
   Send, RefreshCw, Bell, Clock, Pencil, X, Check, ChevronDown, ChevronUp,
   Image as ImageIcon, Link2, Bookmark, Trash2,
 } from 'lucide-react'
-import { supabase } from '../../lib/supabase'
+import { invokeSendNotification } from '../../lib/screenQueries'
 import ConfirmModal from '../../components/admin/ConfirmModal'
 import DrugPickerModal from '../../components/admin/DrugPickerModal'
 import ConditionPickerModal from '../../components/admin/ConditionPickerModal'
@@ -208,7 +208,7 @@ export default function NotificationsPanel() {
         body.scheduled_send_at = fromDatetimeLocal(customScheduleAt)
       }
 
-      const { data, error } = await supabase.functions.invoke('send-notification', { body })
+      const { data, error } = await invokeSendNotification(body)
       if (error) throw error
       setTitle('')
       setMessage('')

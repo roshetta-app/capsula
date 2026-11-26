@@ -55,8 +55,7 @@ import RichTextEditorBox from './RichTextEditorBox'
 import StickyBar from './StickyBar'
 import { canEditVisually } from '../../../lib/richTextConvert'
 import { repairMarkdown } from '../../../lib/markdownRepair'
-import { supabase } from '../../../lib/supabase'
-import { fetchCmsConfig } from '../../../lib/queries'
+import { fetchCmsConfig } from '../../../lib/appData'
 
 // ─── View mode toggle ──────────────────────────────────────────────────────────
 
@@ -345,7 +344,7 @@ export default function FreeTextPostEditor({ data, onChange, disabled = false })
 
   // Fetch the AI prompt once on mount — cached in state for the session.
   useEffect(() => {
-    fetchCmsConfig(supabase, 'directive_ai_prompt')
+    fetchCmsConfig('directive_ai_prompt')
       .then(value => setAiPrompt(value ?? ''))
       .catch(() => setAiPrompt(''))   // silent fail — button will show error on click
   }, [])
@@ -433,7 +432,7 @@ export default function FreeTextPostEditor({ data, onChange, disabled = false })
     if (aiPrompt === null) {
       setCopyStatus('loading')
       try {
-        const value = await fetchCmsConfig(supabase, 'directive_ai_prompt')
+        const value = await fetchCmsConfig('directive_ai_prompt')
         setAiPrompt(value ?? '')
         await navigator.clipboard.writeText(value ?? '')
         setCopyStatus('copied')

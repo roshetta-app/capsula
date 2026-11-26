@@ -52,7 +52,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Image as ImageIcon, Search, ImageOff, ZoomIn } from 'lucide-react'
-import { supabase } from '../../lib/supabase'
+import { rpcBrandImageUrl } from '../../lib/screenQueries'
 import { openInAppBrowser } from '../../utils/openInAppBrowser'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
 import { useCachedImage } from '../../hooks/useCachedImage'
@@ -112,7 +112,7 @@ export default function DrugMediaStrip({ drug }) {
   useEffect(() => {
     if (!isOnline) return undefined
     let cancelled = false
-    Promise.resolve(supabase.rpc('brand_image_url', { p_brand_id: drug.id }))
+    Promise.resolve(rpcBrandImageUrl(drug.id))
       .then(({ data, error }) => {
         if (cancelled) return
         if (error) {

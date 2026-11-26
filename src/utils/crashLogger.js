@@ -7,7 +7,7 @@
  * Fails silently — must never cause secondary errors.
  */
 
-import { supabase } from '../lib/supabase'
+import { insertCrashLog } from '../lib/logQueries'
 
 const APP_VERSION = import.meta.env.VITE_APP_VERSION ?? 'unknown'
 
@@ -19,7 +19,7 @@ const APP_VERSION = import.meta.env.VITE_APP_VERSION ?? 'unknown'
  */
 export async function logCrash(error, componentStack) {
   try {
-    await supabase.from('crash_logs').insert({
+    await insertCrashLog({
       error_message:   error?.message   ?? String(error),
       error_stack:     error?.stack     ?? null,
       component_stack: componentStack   ?? null,

@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '../lib/supabase'
-import { fetchClassKeywords, fetchMetadataTimestamps } from '../lib/queries'
+import { fetchClassKeywords, fetchMetadataTimestamps } from '../lib/catalogData'
 import { getCacheData, getCacheTimestamp, writeCache, isCacheExpired } from '../utils/cache'
 
 /**
@@ -33,8 +32,8 @@ export function useClassKeywords() {
   async function fetchAndCache() {
     try {
       const [fresh, { drugsUpdatedAt }] = await Promise.all([
-        fetchClassKeywords(supabase),
-        fetchMetadataTimestamps(supabase),
+        fetchClassKeywords(),
+        fetchMetadataTimestamps(),
       ])
       setClassKeywords(fresh)
       writeCache('classKeywords', fresh, drugsUpdatedAt)
@@ -61,7 +60,7 @@ export function useClassKeywords() {
 
       // Quietly check whether the server moved on
       try {
-        const { drugsUpdatedAt } = await fetchMetadataTimestamps(supabase)
+        const { drugsUpdatedAt } = await fetchMetadataTimestamps()
         if (drugsUpdatedAt !== cachedTs) {
           await fetchAndCache()
         }

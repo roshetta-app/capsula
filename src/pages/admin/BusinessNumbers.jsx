@@ -11,7 +11,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Download, RefreshCw } from 'lucide-react'
 import AdminPageHeader from '../../components/admin/AdminPageHeader'
-import { supabase } from '../../lib/supabase'
+import { rpcAdminBusinessNumbers } from '../../lib/screenQueries'
 import {
   PERIODS, PATH_STEPS, normalizeNumbers, needsAttention, pathPercent, formatCount, formatEgp,
   buildCsvRows, csvText, csvFileName, loadErrorText,
@@ -58,7 +58,7 @@ export default function BusinessNumbers() {
   const load = useCallback(async () => {
     const mine = ++latest.current
     setState('loading')
-    const { data, error } = await supabase.rpc('admin_business_numbers', { p_period: period })
+    const { data, error } = await rpcAdminBusinessNumbers(period)
     if (mine !== latest.current) return   // an older answer arriving late is ignored
     if (error) {
       setState(String(error.message ?? '').includes('forbidden') ? 'forbidden' : 'error')

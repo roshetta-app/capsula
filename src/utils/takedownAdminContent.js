@@ -5,12 +5,13 @@
  * 'forbidden' from the database itself.
  */
 
-import { supabase } from '../lib/supabase'
+import { callRpc } from '../lib/serverCalls'
+import { listProfilesByIds } from '../lib/moderationQueries'
 import { loadSharingOff, runTakedown } from './takedownAdmin'
 
 const deps = () => ({
-  rpc: (fn, args) => (args === undefined ? supabase.rpc(fn) : supabase.rpc(fn, args)),
-  listProfiles: (ids) => supabase.from('profiles').select('id, full_name, handle').in('id', ids),
+  rpc: callRpc,
+  listProfiles: listProfilesByIds,
   isOnline: () => !(typeof navigator !== 'undefined' && navigator.onLine === false),
 })
 

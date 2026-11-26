@@ -26,11 +26,8 @@
 
 import { useCallback, useMemo } from 'react'
 import { useAuth } from './useAuth'
-import { supabase } from '../lib/supabase'
-import {
-  fetchProfile, savePublicCardOrWait, applyWaiting, hasWaiting, localProfileStore, saveDetails as sendDetails, removePublicCard,
-} from '../utils/profileData'
-import { readSharedIds } from '../utils/addToProfile'
+import { fetchProfile, savePublicCardOrWait, sendDetails, removePublicCard, readSharedIds } from '../lib/shareData'
+import { applyWaiting, hasWaiting, localProfileStore } from '../utils/profileData'
 
 const REQUEST_TIMEOUT_MS = 8000
 const TIMEOUT_ERROR = { code: 'request_timeout', message: 'request_timeout' }
@@ -53,7 +50,7 @@ export function usePublicProfile() {
 
   const loadProfile = useCallback(async () => {
     if (!userId) return { ok: false, kind: 'retry', code: 'not_signed_in', message: 'Sign in first.' }
-    const res = await fetchProfile(supabase, userId, { limit: withLimit })
+    const res = await fetchProfile(userId, { limit: withLimit })
     if (!res.ok) return res
     const waiting = await store.read(userId)
     return { ok: true, profile: hasWaiting(waiting) ? applyWaiting(res.profile, waiting) : res.profile }
@@ -61,7 +58,7 @@ export function usePublicProfile() {
 
   const savePublicCard = useCallback(async (fields, currentName = '') => {
     if (!userId) return { ok: false, kind: 'retry', code: 'not_signed_in', message: 'Sign in first.' }
-    const res = await savePublicCardOrWait(supabase, userId, fields, { store, currentName, limit: withLimit })
+    const res = await savePublicCardOrWait(userId, fields, { store, currentName, limit: withLimit })
     // Saved for real: whatever was waiting for the public card is now out of date, so it goes.
     if (res.ok && !res.waiting) {
       const record = await store.read(userId)
@@ -75,21 +72,21 @@ export function usePublicProfile() {
 
   const saveDetails = useCallback(async (updates, { hasHandle = false } = {}) => {
     if (!userId) return { ok: false, kind: 'retry', code: 'not_signed_in', message: 'Sign in first.' }
-    return sendDetails(supabase, userId, updates, { hasHandle, limit: withLimit })
+    return sendDetails(userId, updates, { hasHandle, limit: withLimit })
   }, [userId])
 
   // 14.7c-2: Remove public profile. The database ends every on-profile link, clears name, bio, avatar and
   // username (the usernames die for good) and starts the 30-day wait. Not queued: the person must be online.
   const removePublicProfile = useCallback(async () => {
     if (!userId) return { ok: false, kind: 'retry', code: 'not_signed_in', message: 'Sign in first.' }
-    return removePublicCard(supabase, { limit: withLimit })
+    return removePublicCard({ limit: withLimit })
   }, [userId])
 
   const loadSharedIds = useCallback(async () => {
     if (!userId) return { ok: false, kind: 'retry', code: 'not_signed_in', message: 'Sign in first.' }
     const [r, g] = await Promise.all([
-      readSharedIds(supabase, 'roshetta_shares', 'roshetta_id', withLimit),
-      readSharedIds(supabase, 'drug_group_shares', 'group_id', withLimit),
+      readSharedIds('roshetta_shares', 'roshetta_id', withLimit),
+      readSharedIds('drug_group_shares', 'group_id', withLimit),
     ])
     if (r.ok && g.ok) return { ok: true, roshettas: r.ids, groups: g.ids }
     const offline = r.reason === 'offline' || g.reason === 'offline'

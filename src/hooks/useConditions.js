@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
-import { supabase } from '../lib/supabase'
-import { fetchConditions, fetchMetadataTimestamps, fetchAuditLogSince, fetchAuditCursorNow, fetchConditionById } from '../lib/queries'
+import { fetchConditions, fetchMetadataTimestamps, fetchAuditLogSince, fetchAuditCursorNow, fetchConditionById } from '../lib/catalogData'
 import { readConditionsCache, writeConditionsCache, touchConditionsCache, getCachedPhoto, savePhotoToCache, pruneOrphanedPhotos } from '../utils/cache'
 import { getAllGalleryUrls } from '../utils/galleryImageUrls'
 import { CACHE_SAFETY_REFRESH_MS, CACHE_RESTAMP_AFTER_MS } from '../constants/cache'
@@ -213,8 +212,8 @@ export function useConditions() {
       // this device with a working baseline for the next background delta
       // check regardless of why this particular fetch was a full one.
       const [auditCursor, fresh, { conditionsUpdatedAt }] = await Promise.all([
-        fetchAuditCursorNow(supabase).catch(() => null),
-        fetchConditions(supabase, (loaded, total) => {
+        fetchAuditCursorNow().catch(() => null),
+        fetchConditions((loaded, total) => {
           // 2026-09-12 (onboarding-progress-parity): same staleness guard
           // as every other attempt-tagged callback in this file — a page
           // landing from a superseded attempt (e.g. after a Retry tap)
@@ -222,7 +221,7 @@ export function useConditions() {
           if (attemptIdRef.current !== myAttempt) return
           setProgress({ loaded, total })
         }),
-        fetchMetadataTimestamps(supabase),
+        fetchMetadataTimestamps(),
       ])
       if (attemptIdRef.current !== myAttempt) return // a newer attempt has taken over
       setConditions(fresh)
@@ -275,7 +274,7 @@ export function useConditions() {
     }
 
     try {
-      const changes = await fetchAuditLogSince(supabase, cachedRecord.auditCursor)
+      const changes = await fetchAuditLogSince(cachedRecord.auditCursor)
 
       if (changes.length > DELTA_FALLBACK_CHANGE_COUNT) {
         await fetchAndCache()
@@ -305,7 +304,7 @@ export function useConditions() {
       let nextConditions = [...cachedRecord.data]
       for (const id of conditionIds) {
         nextConditions = nextConditions.filter(c => c.id !== id)
-        const fresh = await fetchConditionById(supabase, id)
+        const fresh = await fetchConditionById(id)
         if (fresh) nextConditions.push(fresh)
       }
 
@@ -386,7 +385,7 @@ export function useConditions() {
       // fetchAndCache — see that function for the delta-merge logic and
       // its fallback rules.
       try {
-        const { conditionsUpdatedAt } = await fetchMetadataTimestamps(supabase)
+        const { conditionsUpdatedAt } = await fetchMetadataTimestamps()
         if (conditionsUpdatedAt !== cached.version) {
           await applyConditionsDelta(cached, conditionsUpdatedAt)
         } else {

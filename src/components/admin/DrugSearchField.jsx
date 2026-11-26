@@ -142,7 +142,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Search, X } from 'lucide-react'
 import { faPills } from '@fortawesome/free-solid-svg-icons'
 import Icon from '../ui/Icon'
-import { supabase } from '../../lib/supabase'
+import { queryPublishedFormulations } from '../../lib/screenQueries'
 import { searchDrugsForPicker } from '../../lib/adminQueries'
 
 // ─── Search queries (reused from DrugPickerModal) ─────────────────────────
@@ -155,16 +155,7 @@ import { searchDrugsForPicker } from '../../lib/adminQueries'
 // and avoid touching DrugPickerModal.jsx's existing call sites.
 
 async function searchFormulations(query) {
-  const { data, error } = await supabase
-    .from('formulations')
-    .select(`
-      id, slug, concentration, form, route,
-      doses_structured, default_dose_override,
-      generics ( id, name_en, slug, category ),
-      brands ( id, name, is_published )
-    `)
-    .eq('is_published', true)
-    .order('concentration')
+  const { data, error } = await queryPublishedFormulations()
 
   if (error) return { data: null, error }
   if (!query || query.trim().length < 2) return { data: [], error: null }

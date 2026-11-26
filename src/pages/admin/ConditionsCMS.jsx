@@ -26,8 +26,7 @@ import { Plus, Trash2 } from 'lucide-react'
 import { useConditionContext } from '../../context/ConditionContext'
 import { useToast } from '../../context/ToastContext'
 import { deleteCondition, toggleConditionPublished, fetchSpecialtiesForCMS } from '../../lib/adminQueries'
-import { fetchAllConditions } from '../../lib/queries'
-import { supabase } from '../../lib/supabase'
+import { fetchAllConditions } from '../../lib/catalogData'
 import ConfirmModal from '../../components/admin/ConfirmModal'
 import AdminPageHeader from '../../components/admin/AdminPageHeader'
 import ConditionCard from '../../components/ConditionCard'
@@ -60,7 +59,7 @@ export default function ConditionsCMS() {
   async function loadAll() {
     setLoadingList(true)
     try {
-      const data = await fetchAllConditions(supabase)
+      const data = await fetchAllConditions()
       setConditions(data)
     } catch (err) {
       toast.error(err.message ?? 'Failed to load topics')

@@ -72,7 +72,7 @@
  */
 
 import { useEffect, useState } from 'react'
-import { supabase } from '../../lib/supabase'
+import { rpcBrandPriceLink } from '../../lib/screenQueries'
 import { Capacitor } from '@capacitor/core'
 import { Tag } from 'lucide-react'
 import { openInAppBrowser } from '../../utils/openInAppBrowser'
@@ -121,8 +121,7 @@ export default function CheckPriceButton({ drug, wide = false }) {
     // The drug page keys its sheet by drug id, so this component starts fresh
     // (link undefined) for every drug; no reset is needed here.
     let cancelled = false
-    supabase
-      .rpc('brand_price_link', { p_brand_id: drug.id })
+    rpcBrandPriceLink(drug.id)
       .then(({ data, error }) => {
         if (cancelled) return
         setLink(!error && typeof data === 'string' && data ? data : null)

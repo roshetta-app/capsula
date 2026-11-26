@@ -5,11 +5,11 @@
  * else gets 'forbidden' from the database itself. 14.9c-2 adds fetchPreview (admin_report_preview).
  */
 
-import { supabase } from '../lib/supabase'
+import { callRpc } from '../lib/serverCalls'
 import { loadReports, loadReportCount, runAction, loadPreview } from './reportsAdmin'
 
 const deps = () => ({
-  rpc: (fn, args) => (args === undefined ? supabase.rpc(fn) : supabase.rpc(fn, args)),
+  rpc: callRpc,
   isOnline: () => !(typeof navigator !== 'undefined' && navigator.onLine === false),
 })
 

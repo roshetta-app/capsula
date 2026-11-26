@@ -25,7 +25,7 @@
  * Fields a card never reads are left out.
  */
 
-import { supabase } from '../lib/supabase'
+import { callRpc } from '../lib/serverCalls'
 import { readCredit } from './shareCredit'
 import { readStars } from './itemStars'
 
@@ -76,7 +76,7 @@ export async function fetchSharedGroup(code) {
   let timer
   try {
     res = await Promise.race([
-      supabase.rpc('get_shared_group', { p_code: clean }),
+      callRpc('get_shared_group', { p_code: clean }),
       new Promise(resolve => { timer = setTimeout(() => resolve({ data: null, error: { code: 'request_timeout' } }), 8000) }),
     ])
   } catch {

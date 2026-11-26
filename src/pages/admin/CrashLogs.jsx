@@ -9,7 +9,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { RefreshCw, ChevronDown, ChevronUp, CheckCircle } from 'lucide-react'
-import { supabase } from '../../lib/supabase'
+import { queryRecentCrashLogs } from '../../lib/screenQueries'
 import AdminPageHeader from '../../components/admin/AdminPageHeader'
 
 function formatDate(iso) {
@@ -124,11 +124,7 @@ export default function CrashLogs() {
     else           setLoading(true)
     setError(null)
     try {
-      const { data, error: err } = await supabase
-        .from('crash_logs')
-        .select('id, error_message, error_stack, component_stack, app_version, created_at')
-        .order('created_at', { ascending: false })
-        .limit(50)
+      const { data, error: err } = await queryRecentCrashLogs()
       if (err) throw err
       setLogs(data ?? [])
     } catch (e) {

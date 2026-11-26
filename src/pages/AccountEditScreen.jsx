@@ -30,8 +30,7 @@ import { useOnlineStatus } from '../hooks/useOnlineStatus'
 import { useBackClose } from '../hooks/useBackClose'
 import { useToast } from '../context/ToastContext'
 import { usePublicProfile } from '../hooks/usePublicProfile'
-import { supabase } from '../lib/supabase'
-import { deleteOwnAccount } from '../lib/queries'
+import { deleteOwnAccount } from '../lib/appData'
 import { ROUTES } from '../router'
 import PublicAvatar from '../components/ui/PublicAvatar'
 import DeleteAccountSheet from '../components/ui/DeleteAccountSheet'
@@ -245,7 +244,7 @@ export default function AccountEditScreen() {
   async function handleDeleteAccount() {
     if (isOffline) { toast.error("You're offline. Reconnect to delete your account."); return }
     setDeleting(true)
-    const { error } = await deleteOwnAccount(supabase)
+    const { error } = await deleteOwnAccount()
     if (error) {
       toast.error('Could not delete your account. Please try again.')
       setDeleting(false)

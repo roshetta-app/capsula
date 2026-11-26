@@ -14,12 +14,12 @@
  * asks again after a sign-in.
  */
 
-import { supabase } from '../lib/supabase'
+import { callRpc } from '../lib/serverCalls'
 import { loadSharedRoshetta } from './roshettaSharedFetch'
 
 export function fetchSharedRoshetta(code) {
   return loadSharedRoshetta(code, {
-    rpc: (fn, args) => supabase.rpc(fn, args),
+    rpc: callRpc,
     isOnline: () => !(typeof navigator !== 'undefined' && navigator.onLine === false),
   })
 }

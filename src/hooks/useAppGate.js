@@ -76,8 +76,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { Capacitor } from '@capacitor/core'
 import { App as CapacitorApp } from '@capacitor/app'
 import { Preferences } from '@capacitor/preferences'
-import { supabase } from '../lib/supabase'
-import { fetchActiveGates, fetchMinimumSupportedVersion } from '../lib/queries'
+import { fetchActiveGates, fetchMinimumSupportedVersion } from '../lib/appData'
 import { logUsageEvent } from '../analytics/usageEvents'
 
 const DISMISSED_GATES_KEY  = 'capsula_dismissed_gate_ids'
@@ -199,8 +198,8 @@ export function useAppGate() {
       const platform = Capacitor.getPlatform() // 'android' | 'ios' | 'web'
 
       const [gates, minimumSupported, runningVersion, dismissedIds, maybeLaterState] = await Promise.all([
-        fetchActiveGates(supabase, platform),
-        fetchMinimumSupportedVersion(supabase, platform),
+        fetchActiveGates(platform),
+        fetchMinimumSupportedVersion(platform),
         CapacitorApp.getInfo().then(info => info.version).catch(() => null),
         getDismissedIds(),
         getMaybeLaterState(),

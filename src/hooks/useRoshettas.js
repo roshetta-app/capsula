@@ -90,14 +90,13 @@ import { useAuth } from './useAuth'
 import { useIsPro } from './useIsPro'
 import { useOnlineStatus } from './useOnlineStatus'
 import { useToast } from '../context/ToastContext'
-import { supabase } from '../lib/supabase'
+import { fetchRoshettas, sendRoshettaChange, readShareCode, createShare, removeShare, setShareName, setOnProfile } from '../lib/shareData'
 import { logUsageEvent } from '../analytics/usageEvents'
 import { readRoshettasCache, writeRoshettasCache, clearRoshettasCache, readRoshettaChanges, writeRoshettaChanges } from '../utils/cache'
-import { loadRoshettas, fetchRoshettas, withTimeLimit, viewFor } from '../utils/roshettaLoad'
+import { loadRoshettas, withTimeLimit, viewFor } from '../utils/roshettaLoad'
 import { summarizeQueue, sameSummary, nextToSend, retryFailed, discardFailed } from '../utils/roshettaChanges'
-import { runSync, sendChange } from '../utils/roshettaSync'
+import { runSync } from '../utils/roshettaSync'
 import { prepareCreate, prepareSave, prepareDelete, commitChange } from '../utils/roshettaEdit'
-import { readShareCode, createShare, removeShare, setShareName, setOnProfile } from '../utils/roshettaShare'
 import { isItemRefusal } from '../utils/publicShare'
 import { isReadOnly as listIsReadOnly, canCreate, roshettaCap, roshettaDrugCap, tapRefusal, rowsRefusal, afterRun } from '../utils/roshettaLimits'
 
@@ -197,7 +196,7 @@ export function useRoshettas() {
       queue: h0.userId === u.id ? h0.queue : null,
       readQueue: readRoshettaChanges,
       readCache: readRoshettasCache,
-      fetchLive: () => fetchRoshettas(supabase, withTimeLimit),
+      fetchLive: () => fetchRoshettas(withTimeLimit),
       isOffline,
       isStale: () => seq !== loadSeqRef.current || userRef.current?.id !== u.id,
       getQueue: () => (holderRef.current.userId === u.id ? holderRef.current.queue : null),
@@ -240,7 +239,7 @@ export function useRoshettas() {
       result = await runSync({
         getQueue: () => holderRef.current.queue,
         update: fn => updateQueueFor(u.id, fn),
-        send: change => sendChange(supabase, change, withTimeLimit),
+        send: change => sendRoshettaChange(change, withTimeLimit),
         roshettaName: id => holderRef.current.list.find(r => r.id === id)?.name ?? null,
         canRun: () => userRef.current?.id === u.id && !isOffline(),
         // Analytics: a roshetta counts once, when the server newly takes it. Its id only.
@@ -412,7 +411,7 @@ export function useRoshettas() {
   const getRoshettaShareCode = useCallback(async (id) => {
     if (!userRef.current) return { ok: false, reason: 'guest' }
     if (isOffline()) return { ok: false, reason: 'offline' }
-    return readShareCode(supabase, id, withTimeLimit)
+    return readShareCode(id, withTimeLimit)
   }, [isOffline])
 
   const createRoshettaShare = useCallback(async (id, showName, onProfile = false) => {
@@ -423,7 +422,7 @@ export function useRoshettas() {
     if (!h.list.some(r => r.id === id)) return { ok: false, reason: 'missing' }
     if (h.queue.some(c => c.type === 'create' && c.roshettaId === id)) return { ok: false, reason: 'not_sent' }
     if (listIsReadOnly(h.list, isProRef.current)) return { ok: false, reason: 'read_only' }
-    const made = await createShare(supabase, id, withTimeLimit, showName, onProfile)
+    const made = await createShare(id, withTimeLimit, showName, onProfile)
     if (made.ok) {
       // Analytics: only a link that was really made now, not one found again. Id only.
       if (made.created) logUsageEvent('roshetta_share_create', id)
@@ -443,7 +442,7 @@ export function useRoshettas() {
     const h = holderRef.current
     if (!h.list.some(r => r.id === id)) return { ok: false, reason: 'missing' }
     if (listIsReadOnly(h.list, isProRef.current)) return { ok: false, reason: 'read_only' }
-    return setOnProfile(supabase, id, withTimeLimit)
+    return setOnProfile(id, withTimeLimit)
   }, [refuseChange, isOffline])
 
   // 2026-11-21 (Phase L, step 13.5): the owner's choice for one link (true = show my name, false =
@@ -457,7 +456,7 @@ export function useRoshettas() {
     const h = holderRef.current
     if (!h.list.some(r => r.id === id)) return { ok: false, reason: 'missing' }
     if (listIsReadOnly(h.list, isProRef.current)) return { ok: false, reason: 'read_only' }
-    return setShareName(supabase, id, show, withTimeLimit)
+    return setShareName(id, show, withTimeLimit)
   }, [refuseChange, isOffline])
 
   // Allowed for a read only account too (like delete): turning a link off is never refused.
@@ -465,7 +464,7 @@ export function useRoshettas() {
     if (userRef.current && isOffline()) return { ok: false, reason: 'offline' }
     const refused = refuseChange()
     if (refused) return refused
-    return removeShare(supabase, id, withTimeLimit)
+    return removeShare(id, withTimeLimit)
   }, [refuseChange, isOffline])
 
   return {

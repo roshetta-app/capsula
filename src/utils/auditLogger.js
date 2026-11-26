@@ -18,7 +18,7 @@
  *   await logAudit('unpublish', 'generics',   id,      name)
  */
 
-import { supabase } from '../lib/supabase'
+import { insertAuditLog } from '../lib/logQueries'
 
 /**
  * Insert one row into audit_log.
@@ -32,7 +32,7 @@ import { supabase } from '../lib/supabase'
  */
 export async function logAudit(action, tableName, recordId, recordName = null, changes = null) {
   try {
-    const { error } = await supabase.from('audit_log').insert({
+    const { error } = await insertAuditLog({
       action,
       table_name:  tableName,
       record_id:   recordId,

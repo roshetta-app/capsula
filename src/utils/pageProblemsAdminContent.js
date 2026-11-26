@@ -5,11 +5,11 @@
  * admin account; anyone else gets 'forbidden' from the database itself.
  */
 
-import { supabase } from '../lib/supabase'
+import { callRpc } from '../lib/serverCalls'
 import { loadPageProblems, loadPageProblemCount, runPageAction } from './pageProblemsAdmin'
 
 const deps = () => ({
-  rpc: (fn, args) => (args === undefined ? supabase.rpc(fn) : supabase.rpc(fn, args)),
+  rpc: callRpc,
   isOnline: () => !(typeof navigator !== 'undefined' && navigator.onLine === false),
 })
 
