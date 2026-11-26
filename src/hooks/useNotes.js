@@ -142,7 +142,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from './useAuth'
 import { useOnlineStatus } from './useOnlineStatus'
-import { supabase } from '../lib/supabase'
+import { upsertNoteText, upsertNoteImage, queryOwnNote } from '../lib/userDataQueries'
 import { uploadNoteImage } from '../lib/noteQueries'
 import { savePendingNotePhoto, getPendingNotePhoto, clearPendingNotePhoto } from '../utils/cache'
 
@@ -253,24 +253,14 @@ function unqueueImageWrite(userId, conditionId) {
 }
 
 function buildNoteTextUpsert(userId, conditionId, body, updatedAt) {
-  return supabase
-    .from('notes')
-    .upsert(
-      { user_id: userId, condition_id: conditionId, body, updated_at: updatedAt },
-      { onConflict: 'user_id,condition_id' }
-    )
+  return upsertNoteText(userId, conditionId, body, updatedAt)
 }
 
 // Only touches image_url/updated_at — body is deliberately omitted from
 // this object (not set to '' or null) so an image-only save can never
 // wipe out an existing, unrelated note body on the same row.
 function buildNoteImageUpsert(userId, conditionId, imageUrl, updatedAt) {
-  return supabase
-    .from('notes')
-    .upsert(
-      { user_id: userId, condition_id: conditionId, image_url: imageUrl, updated_at: updatedAt },
-      { onConflict: 'user_id,condition_id' }
-    )
+  return upsertNoteImage(userId, conditionId, imageUrl, updatedAt)
 }
 
 export function useNotes(conditionId) {
@@ -340,12 +330,7 @@ export function useNotes(conditionId) {
     let cancelled = false
     editedSinceLoadRef.current = false
 
-    supabase
-      .from('notes')
-      .select('body, image_url, updated_at')
-      .eq('user_id', user.id)
-      .eq('condition_id', conditionId)
-      .maybeSingle()
+    queryOwnNote(user.id, conditionId)
       .then(({ data, error }) => {
         if (cancelled || error || editedSinceLoadRef.current) return
         const value    = data?.body ?? ''

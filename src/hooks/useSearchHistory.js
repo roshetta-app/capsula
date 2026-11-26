@@ -21,7 +21,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from './useAuth'
-import { supabase } from '../lib/supabase'
+import { querySearchHistory, upsertSearchHistory, deleteSearchHistoryEntry, deleteAllSearchHistory } from '../lib/userDataQueries'
 
 const KEY   = 'capsula_drug_search_history'
 const TABLE = 'drug_search_history'
@@ -70,11 +70,7 @@ export function useSearchHistory() {
     if (!userId) return
     let cancelled = false
 
-    supabase
-      .from(TABLE)
-      .select('search_text, mode, searched_at')
-      .order('searched_at', { ascending: false })
-      .limit(MAX * 3)
+    querySearchHistory(TABLE, MAX * 3)
       .then(({ data, error }) => {
         if (cancelled || error || !data) return
         const fromDb = data.map(r => ({ text: r.search_text, mode: r.mode }))
@@ -88,17 +84,16 @@ export function useSearchHistory() {
         const toSend = extra.filter(e => merged.some(m => same(m, e)))
         if (toSend.length === 0) return
         const oldest = data.length ? new Date(data[data.length - 1].searched_at).getTime() : Date.now()
-        supabase
-          .from(TABLE)
-          .upsert(
-            toSend.map((e, i) => ({
-              user_id:     userId,
-              search_text: e.text,
-              mode:        e.mode,
-              searched_at: new Date(oldest - (i + 1) * 1000).toISOString(),
-            })),
-            { onConflict: CONFLICT }
-          )
+        upsertSearchHistory(
+          TABLE,
+          toSend.map((e, i) => ({
+            user_id:     userId,
+            search_text: e.text,
+            mode:        e.mode,
+            searched_at: new Date(oldest - (i + 1) * 1000).toISOString(),
+          })),
+          CONFLICT
+        )
           .then(({ error: upErr }) => {
             if (upErr) console.error('Failed to sync search history:', upErr)
           })
@@ -118,12 +113,11 @@ export function useSearchHistory() {
       return next
     })
     if (userId) {
-      supabase
-        .from(TABLE)
-        .upsert(
-          { user_id: userId, search_text: t.slice(0, 100), mode, searched_at: new Date().toISOString() },
-          { onConflict: CONFLICT }
-        )
+      upsertSearchHistory(
+        TABLE,
+        { user_id: userId, search_text: t.slice(0, 100), mode, searched_at: new Date().toISOString() },
+        CONFLICT
+      )
         .then(({ error }) => {
           if (error) console.error('Failed to sync search history:', error)
         })
@@ -137,12 +131,7 @@ export function useSearchHistory() {
       return next
     })
     if (userId) {
-      supabase
-        .from(TABLE)
-        .delete()
-        .eq('user_id', userId)
-        .eq('mode', entry.mode)
-        .eq('text_key', keyOf(entry))
+      deleteSearchHistoryEntry(TABLE, userId, entry.mode, keyOf(entry))
         .then(({ error }) => {
           if (error) console.error('Failed to remove search from history:', error)
         })
@@ -153,10 +142,7 @@ export function useSearchHistory() {
     write([])
     setHistory([])
     if (userId) {
-      supabase
-        .from(TABLE)
-        .delete()
-        .eq('user_id', userId)
+      deleteAllSearchHistory(TABLE, userId)
         .then(({ error }) => {
           if (error) console.error('Failed to clear search history:', error)
         })

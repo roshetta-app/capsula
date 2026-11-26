@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faUsers, faCapsules, faNotesMedical, faFlag, faTriangleExclamation, faCreditCard, faCoins } from '@fortawesome/free-solid-svg-icons'
-import { supabase } from '../../lib/supabase'
+import { rpcAdminProRequests, countRows } from '../../lib/userDataQueries'
 import { fetchAllUsers } from '../../lib/adminQueries'
 import { fetchReportCount } from '../../utils/reportsAdminContent'
 import { fetchPageProblemCount } from '../../utils/pageProblemsAdminContent'
@@ -46,7 +46,7 @@ export default function AdminSummary() {
     let cancelled = false
     fetchReportCount().then((r) => { if (!cancelled) setReports({ status: r.status, count: r.count ?? 0 }) })
     fetchPageProblemCount().then((r) => { if (!cancelled) setPageProblems({ status: r.status, count: r.count ?? 0 }) })
-    supabase.rpc('admin_pro_requests', { p_status: 'waiting', p_limit: 200 }).then(({ data, error }) => {
+    rpcAdminProRequests('waiting', 200).then(({ data, error }) => {
       if (cancelled) return
       if (error) { setProWaiting({ status: 'error', count: 0, late: 0 }); return }
       const rows = data ?? []
@@ -64,8 +64,8 @@ export default function AdminSummary() {
 
       const [usersResult, drugsCount, conditionsCount] = await Promise.all([
         fetchAllUsers(),
-        supabase.from('generics').select('id', { count: 'exact', head: true }),
-        supabase.from('conditions').select('id', { count: 'exact', head: true }),
+        countRows('generics'),
+        countRows('conditions'),
       ])
 
       if (cancelled) return

@@ -52,6 +52,12 @@ const MOVED = [
   'src/utils/sharedRoshetta.js',  // 2026-11-26, S11 bunch
   'src/utils/takedownAdminContent.js',  // 2026-11-26, S11 bunch
   'src/utils/viewCountContent.js',  // 2026-11-26, S11 bunch
+  'src/hooks/useSearchHistory.js',  // 2026-11-26, S11 batch 2, now uses src/lib/userDataQueries.js
+  'src/hooks/useRecentlyViewed.js',  // 2026-11-26, S11 batch 2, now uses src/lib/userDataQueries.js
+  'src/hooks/useNotes.js',  // 2026-11-26, S11 batch 2, now uses src/lib/userDataQueries.js
+  'src/hooks/usePushSubscription.js',  // 2026-11-26, S11 batch 2, now uses src/lib/userDataQueries.js
+  'src/pages/admin/AdminSummary.jsx',  // 2026-11-26, S11 batch 2, now uses src/lib/userDataQueries.js
+  'src/pages/admin/DrugEditor.jsx',  // 2026-11-26, S11 batch 2, now uses src/lib/userDataQueries.js
 ]
 
 for (const file of MOVED) {

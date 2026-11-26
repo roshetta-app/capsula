@@ -55,7 +55,7 @@ import {
   deleteBrand,
   touchAppMetadata,
 } from '../../lib/adminQueries'
-import { supabase } from '../../lib/supabase'
+import { queryGenericForEditor, queryFormulationsOfGeneric, queryFormulationById, queryGenericSlug } from '../../lib/userDataQueries'
 import AdminPageHeader from '../../components/admin/AdminPageHeader'
 import { setPageTitle } from '../../utils/pageTitle'
 import { UndoRedoButton, ToolButton } from '../../components/admin/EditorToolbarButtons'
@@ -181,31 +181,12 @@ export default function DrugEditor() {
     setLoading(true)
     setFetchErr(null)
 
-    const { data: gData, error: gErr } = await supabase
-      .from('generics')
-      .select(`
-        id, slug, name_en, ingredients, category, class, subclass, is_published,
-        mechanism_of_action,
-        uses_structured,
-        warnings_legacy,
-        side_effects,
-        pregnancy_category, breastfeeding_safety,
-        crosses_placenta, crosses_bbb,
-        contraindications, drug_interactions, dose_adjustments,
-        pharmacokinetics, clinical_relevance, sources,
-        textbook_doses, textbook_dose_notes
-      `)
-      .eq('id', genericId)
-      .single()
+    const { data: gData, error: gErr } = await queryGenericForEditor(genericId)
 
     if (gErr) { setFetchErr(gErr.message); setLoading(false); return }
     setGeneric(gData)
 
-    const { data: fData, error: fErr } = await supabase
-      .from('formulations')
-      .select(FORMULATION_SELECT)
-      .eq('generic_id', genericId)
-      .order('concentration')
+    const { data: fData, error: fErr } = await queryFormulationsOfGeneric(genericId, FORMULATION_SELECT)
 
     if (fErr) { setFetchErr(fErr.message); setLoading(false); return }
 
@@ -375,8 +356,7 @@ export default function DrugEditor() {
 
     // Re-read only THIS formulation (to pick up new brand ids). The rest of the page, including
     // unsaved edits in other cards, is left alone.
-    const { data: freshRow } = await supabase
-      .from('formulations').select(FORMULATION_SELECT).eq('id', f.id).single()
+    const { data: freshRow } = await queryFormulationById(f.id, FORMULATION_SELECT)
     if (freshRow) {
       const fresh = toFormulationState(freshRow)
       baseForms.current[f.id] = snapForm(fresh)
@@ -398,8 +378,7 @@ export default function DrugEditor() {
     setGlobalError(null)
 
     // Generate a slug: generic slug + timestamp for uniqueness
-    const { data: gRow } = await supabase
-      .from('generics').select('slug').eq('id', genericId).single()
+    const { data: gRow } = await queryGenericSlug(genericId)
     const base = gRow?.slug ?? genericId
     const slug = `${base}-new-${Date.now()}`
 
@@ -425,8 +404,7 @@ export default function DrugEditor() {
     if (error) { setGlobalError(`Add formulation: ${error.message}`); return }
 
     // Add just the new formulation (a full reload would throw away unsaved edits elsewhere) and open it
-    const { data: row } = await supabase
-      .from('formulations').select(FORMULATION_SELECT).eq('id', newF.id).single()
+    const { data: row } = await queryFormulationById(newF.id, FORMULATION_SELECT)
     if (row) {
       const fresh = toFormulationState(row)
       baseForms.current[fresh.id] = snapForm(fresh)

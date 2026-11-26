@@ -243,7 +243,7 @@ import { useState, useEffect, useRef } from 'react'
 import { initializeApp, getApps } from 'firebase/app'
 import { Capacitor } from '@capacitor/core'
 import { FirebaseMessaging } from '@capacitor-firebase/messaging'
-import { supabase } from '../lib/supabase'
+import { rpcIncrementNotificationClick, getSignedInUser, rpcClaimPushToken, deletePushTokenByToken, queryPushTokenId } from '../lib/userDataQueries'
 import { useOnlineStatus } from './useOnlineStatus'
 import { useOpenFromOutside } from './useOpenFromOutside'
 import { usePushBanner } from '../context/PushBannerContext'
@@ -450,7 +450,7 @@ export function usePushSubscription() {
 
     function reportClick(logId) {
       if (!logId) return
-      supabase.rpc('increment_notification_click', { log_id: logId })
+      rpcIncrementNotificationClick(logId)
         .then(({ error: rpcErr }) => {
           if (rpcErr) console.warn('[push] Failed to report notification click:', rpcErr.message)
         })
@@ -534,8 +534,8 @@ export function usePushSubscription() {
   // can update the existing row for a known device instead of always
   // inserting a new one keyed only on the (reinstall-rotated) token.
   async function saveToken(fetchedToken) {
-    const { data: { user } } = await supabase.auth.getUser()
-    const { error: dbErr } = await supabase.rpc('claim_push_token', {
+    const { data: { user } } = await getSignedInUser()
+    const { error: dbErr } = await rpcClaimPushToken({
       p_token: fetchedToken,
       p_platform: Capacitor.getPlatform(), // 'android' | 'ios' | 'web'
       p_user_id: user?.id ?? null,
@@ -619,10 +619,7 @@ export function usePushSubscription() {
 
       if (currentToken) {
         await FirebaseMessaging.deleteToken()
-        const { error: dbErr } = await supabase
-          .from('push_tokens')
-          .delete()
-          .eq('token', currentToken)
+        const { error: dbErr } = await deletePushTokenByToken(currentToken)
         if (dbErr) throw dbErr
       }
 
@@ -672,11 +669,7 @@ export function usePushSubscription() {
       try {
         const fetchedToken = await getCurrentToken()
         if (!fetchedToken || cancelled) return
-        const { data: existing } = await supabase
-          .from('push_tokens')
-          .select('id')
-          .eq('token', fetchedToken)
-          .maybeSingle()
+        const { data: existing } = await queryPushTokenId(fetchedToken)
         if (cancelled) return
         if (existing) {
           setToken(fetchedToken)

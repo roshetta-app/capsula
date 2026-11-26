@@ -64,7 +64,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useAuth } from './useAuth'
-import { supabase } from '../lib/supabase'
+import { queryRecentlyViewed, upsertRecentlyViewed, clearRecentlyViewed } from '../lib/userDataQueries'
 
 const MAX_CHIP_ITEMS = 5 // entries shown in the RecentlyViewedChips strip (conditions only)
 
@@ -101,12 +101,7 @@ export function useRecentlyViewed(itemType = 'condition') {
     if (!user) return
     let cancelled = false
 
-    supabase
-      .from('recently_viewed')
-      .select('item_id, item_name, item_slug, viewed_at')
-      .eq('item_type', itemType)
-      .order('viewed_at', { ascending: false })
-      .limit(maxHistory)
+    queryRecentlyViewed(itemType, maxHistory)
       .then(({ data, error }) => {
         if (cancelled || error || !data) return
         const next = data.map(r => ({ id: r.item_id, name: r.item_name, slug: r.item_slug }))
@@ -139,19 +134,14 @@ export function useRecentlyViewed(itemType = 'condition') {
     })
 
     if (user) {
-      supabase
-        .from('recently_viewed')
-        .upsert(
-          {
-            user_id:    user.id,
-            item_type:  itemType,
-            item_id:    item.id,
-            item_name:  item.name,
-            item_slug:  item.slug,
-            viewed_at:  new Date().toISOString(),
-          },
-          { onConflict: 'user_id,item_type,item_id' }
-        )
+      upsertRecentlyViewed({
+        user_id:    user.id,
+        item_type:  itemType,
+        item_id:    item.id,
+        item_name:  item.name,
+        item_slug:  item.slug,
+        viewed_at:  new Date().toISOString(),
+      })
         .then(({ error }) => {
           if (error) console.error('Failed to sync recently viewed:', error)
         })
@@ -166,11 +156,7 @@ export function useRecentlyViewed(itemType = 'condition') {
     setHistory([])
 
     if (user) {
-      supabase
-        .from('recently_viewed')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('item_type', itemType)
+      clearRecentlyViewed(user.id, itemType)
         .then(({ error }) => {
           if (error) console.error('Failed to clear recently viewed:', error)
         })
