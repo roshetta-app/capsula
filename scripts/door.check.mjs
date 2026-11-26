@@ -60,6 +60,7 @@ const MOVED = [
   'src/pages/admin/DrugEditor.jsx',  // 2026-11-26, S11 batch 2, now uses src/lib/userDataQueries.js
   'src/pages/admin/AnalyticsDashboard.jsx',  // 2026-11-26, S11 batch 3, now uses src/lib/analyticsQueries.js
   'src/hooks/useDrugGroups.js',  // 2026-11-26, S11 batch 4, now uses src/lib/groupQueries.js
+  'src/context/AuthContext.jsx',  // 2026-11-27, S11 batch 5, now uses src/lib/authQueries.js
 ]
 
 for (const file of MOVED) {

@@ -8,7 +8,7 @@
  *
  * Added (auth-shared-context fix) to solve a real, confirmed cost of
  * useAuth() not having a shared Context before this: every mounted copy
- * of the hook ran its own separate supabase.auth.getSession() + profile
+ * of the hook ran its own separate session check (getSession) + profile
  * fetch, so navigating between two screens that both call useAuth() (e.g.
  * Account → Edit Profile) re-ran the whole sign-in check from scratch on
  * the second screen even though the first screen had just finished it a
@@ -120,7 +120,10 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
 import { Capacitor } from '@capacitor/core'
 import { Browser } from '@capacitor/browser'
 import { App } from '@capacitor/app'
-import { supabase } from '../lib/supabase'
+import {
+  getAuthSession, onAuthChange, exchangeCodeForSession, signInWithEmailPassword, startGoogleOAuth,
+  freePushTokensOfDevice, signOutOfServer, queryOwnProfileForAuth,
+} from '../lib/authQueries'
 import { isStandalonePwa } from '../utils/standalonePwa'
 import {
   MARKER_KEY, REWOUND_KEY, WAIT_FOR_SIGN_IN_MS,
@@ -279,11 +282,11 @@ function seedProfileFromCache(currentUser) {
 }
 
 async function exchangeCodeWithRetry(code) {
-  const first = await supabase.auth.exchangeCodeForSession(code)
+  const first = await exchangeCodeForSession(code)
   if (!first.error || !isNetworkTimingError(first.error)) return first
 
   await new Promise(resolve => setTimeout(resolve, OAUTH_EXCHANGE_RETRY_DELAY_MS))
-  return supabase.auth.exchangeCodeForSession(code)
+  return exchangeCodeForSession(code)
 }
 
 // Phase F3 bug fix — both notes and recently-viewed clear their own local
@@ -389,11 +392,7 @@ export function AuthProvider({ children }) {
       setProfile(prev => prev ?? seedForLoad)
     }
 
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('role, tier, full_name, theme_preference, phone_number, occupation, country, specialty, profile_setup_dismissed, gender, phone_country_code, occupation_other, student_type, pro_plan, pro_end')
-      .eq('id', currentUser.id)
-      .single()
+    const { data, error } = await queryOwnProfileForAuth(currentUser.id)
 
     // theme_preference rides along on this same already-happening request —
     // no extra round-trip — so useDarkMode's account-sync effect has it as
@@ -557,7 +556,7 @@ export function AuthProvider({ children }) {
     // already correctly holds `loading` until the real fetch finishes —
     // this fix just brings this mount-time path in line with that
     // already-correct behavior.
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    getAuthSession().then(async ({ data: { session } }) => {
       if (cancelled) return
       userIdRef.current = session?.user?.id ?? null
       // F10 Stage 2, Batch C — links this device's analytics events to
@@ -598,7 +597,7 @@ export function AuthProvider({ children }) {
     // like everything else here closes that gap.
     // Scoped to SIGNED_IN only, not TOKEN_REFRESHED/other events, so a
     // routine background token refresh doesn't re-trigger a loading gate.
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = onAuthChange((event, session) => {
       const incomingUserId = session?.user?.id ?? null
       // F10 Stage 2, Batch C — keeps analytics events linked to whichever
       // account (if any) is actually signed in, covering every branch
@@ -742,7 +741,7 @@ export function AuthProvider({ children }) {
         let finished = false
         let giveUpTimer = null
         let settleTimer = null
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+        const { data: { subscription } } = onAuthChange((event, session) => {
           // INITIAL_SESSION covers a sign-in that finished before this effect subscribed.
           if (finished || !session?.user) return
           if (event !== 'SIGNED_IN' && event !== 'INITIAL_SESSION') return
@@ -804,14 +803,14 @@ export function AuthProvider({ children }) {
     if (Capacitor.isNativePlatform()) return
     if (!window.opener || window.opener === window) return
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+    const { data: { subscription } } = onAuthChange((event) => {
       if (event === 'SIGNED_IN') window.close()
     })
     return () => subscription.unsubscribe()
   }, [])
 
   async function signIn(email, password) {
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    const { error } = await signInWithEmailPassword(email, password)
     return { error }
   }
 
@@ -859,12 +858,9 @@ export function AuthProvider({ children }) {
   // popup without finishing, whichever happens first.
   async function signInWithGoogle() {
     if (Capacitor.isNativePlatform()) {
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: NATIVE_AUTH_CALLBACK_URL,
-          skipBrowserRedirect: true,
-        },
+      const { data, error } = await startGoogleOAuth({
+        redirectTo: NATIVE_AUTH_CALLBACK_URL,
+        skipBrowserRedirect: true,
       })
       if (error) return { error }
       await Browser.open({ url: data.url })
@@ -880,10 +876,7 @@ export function AuthProvider({ children }) {
     // the sign-in return effect above jumps back to that page once sign-in has finished. If that
     // jump is not possible, the person simply stays on the page they returned to.
     if (isStandalonePwa()) {
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: { redirectTo: window.location.href, skipBrowserRedirect: true },
-      })
+      const { data, error } = await startGoogleOAuth({ redirectTo: window.location.href, skipBrowserRedirect: true })
       if (error) return { error }
       rememberSignInDeparture()
       window.location.assign(data.url)
@@ -895,12 +888,9 @@ export function AuthProvider({ children }) {
     removeNote(MARKER_KEY)
     const popup = window.open('', 'capsula-google-signin', 'width=480,height=640')
 
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: window.location.href,
-        skipBrowserRedirect: true,
-      },
+    const { data, error } = await startGoogleOAuth({
+      redirectTo: window.location.href,
+      skipBrowserRedirect: true,
     })
 
     if (error) {
@@ -923,7 +913,7 @@ export function AuthProvider({ children }) {
     return new Promise((resolve) => {
       let settled = false
 
-      const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      const { data: { subscription } } = onAuthChange((event) => {
         if (event !== 'SIGNED_IN' || settled) return
         settled = true
         subscription.unsubscribe()
@@ -958,7 +948,7 @@ export function AuthProvider({ children }) {
   // Offline-sign-out bug fix (2026-09-01) — this used to wipe the local
   // notes/recently-viewed storage AND the remembered Pro-status snapshot
   // (authSnapshot.js) unconditionally, before even attempting the real
-  // supabase.auth.signOut() call below. That snapshot is the one thing a
+  // signOutOfServer() call below. That snapshot is the one thing a
   // cold app restart has to go on for "is this person Pro" while offline
   // (see authSnapshot.js's header) — wiping it the instant Sign Out is
   // tapped, regardless of whether the account was actually signed out,
@@ -983,11 +973,11 @@ export function AuthProvider({ children }) {
     // signed out. The phone still gets notices meant for everyone. Best effort:
     // a failure here never blocks the sign-out.
     try {
-      await supabase.from('push_tokens').update({ user_id: null }).eq('device_id', getDeviceId())
+      await freePushTokensOfDevice(getDeviceId())
     } catch {
       // ignore
     }
-    const { error } = await supabase.auth.signOut()
+    const { error } = await signOutOfServer()
     if (error && isNetworkTimingError(error)) return { error }
 
     clearAllNotesStorage()
