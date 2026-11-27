@@ -117,7 +117,11 @@ export function useCachedImage(url, { store = 'gallery' } = {}) {
       saveCached(url, blob) // fire-and-forget — self-heals the cache
     } catch (err) {
       if (attemptIdRef.current !== myAttempt) return
-      logCrash(err, 'useCachedImage: network fetch')
+      // 2026-11-27: no crash entry here any more. This failure is expected
+      // for pictures still hosted by DawaaGate (it refuses the app's
+      // download-for-offline), and the plain-address fallback below still
+      // shows the picture. A picture that really fails to show is logged by
+      // the screen that shows it (with the picture address).
       // Fallback: fetch() failed (commonly CORS — the hosting site allows
       // normal <img> display but not letting other apps read/copy the
       // bytes) or something else blocked the request (e.g. a browser

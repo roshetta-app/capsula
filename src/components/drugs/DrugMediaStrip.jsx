@@ -56,6 +56,7 @@ import { rpcBrandImageUrl } from '../../lib/screenQueries'
 import { openInAppBrowser } from '../../utils/openInAppBrowser'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
 import { useCachedImage } from '../../hooks/useCachedImage'
+import { logCrash } from '../../utils/crashLogger'
 import { getDrugPictureAddress, saveDrugPictureAddress, deleteDrugPicture } from '../../utils/cache'
 import { useToast } from '../../context/ToastContext'
 import { usePressed } from '../../hooks/usePressed'
@@ -63,6 +64,19 @@ import { splitArabicName } from '../../utils/arabicName'
 import { toTitleCase, getDrugTitleSuffix, TITLE_HIDDEN_MODIFIER_TAGS } from '../../utils/drugTitleFormat'
 import Lightbox from '../ui/Lightbox'
 import CheckPriceButton from './CheckPriceButton'
+
+// 2026-11-27: a drug picture that really fails to show is recorded once per
+// picture address per session, with the address, so the crash log shows
+// which picture is broken. Skipped while offline (a failure then is expected).
+const loggedPictureFailures = new Set()
+function logPictureFailure(address) {
+  try {
+    if (typeof address !== 'string' || loggedPictureFailures.has(address)) return
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return
+    loggedPictureFailures.add(address)
+    logCrash(new Error(`Drug picture failed to load: ${address}`), 'DrugMediaStrip: picture failed')
+  } catch { /* never break the page */ }
+}
 
 const THUMB = 46 // px
 const NAME_MAX = 16 // px, Arabic name size when it is short
@@ -329,7 +343,7 @@ export default function DrugMediaStrip({ drug }) {
               src={imgSrc}
               alt={`${drug.tradenameClean} pack`}
               onLoad={() => setImgState('loaded')}
-              onError={() => setImgState('error')}
+              onError={() => { logPictureFailure(picture); setImgState('error') }}
               style={{
                 width: '100%', height: '100%', objectFit: 'contain',
                 opacity: imgState === 'loaded' ? 1 : 0,
