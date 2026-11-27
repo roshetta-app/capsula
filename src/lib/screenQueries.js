@@ -48,12 +48,10 @@ export const invokeSendNotification = (body) => supabase.functions.invoke('send-
 /** CMS: the business numbers for one period. */
 export const rpcAdminBusinessNumbers = (period) => supabase.rpc('admin_business_numbers', { p_period: period })
 
-/** CMS: the latest 100 change-log entries. */
-export const queryRecentAuditLog = () => supabase
-  .from('audit_log')
-  .select('id, action, table_name, record_id, record_name, changes, created_at')
-  .order('created_at', { ascending: false })
-  .limit(100)
+/** CMS: the latest 100 change-log entries, in full. Goes through an admin-only database function
+ *  (admin_recent_audit_log, newest first) because the full text and names of the log are no longer
+ *  readable straight from the table by guests or signed-in people (plan LR1.14, F11). */
+export const queryRecentAuditLog = () => supabase.rpc('admin_recent_audit_log')
 
 /** CMS: the latest 50 crash logs. */
 export const queryRecentCrashLogs = () => supabase
