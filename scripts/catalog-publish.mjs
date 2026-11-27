@@ -44,8 +44,11 @@ export const HEADERS_FILE = [
  * Decide if the files must be rebuilt. Pure function (checked in catalog-publish.check.mjs).
  * `published` is the manifest now on the host, or null when none can be read.
  */
-export function decidePlan({ published, drugsUpdatedAt, schemaVersion, catalogFormat, force }) {
+export function decidePlan({ published, drugsUpdatedAt, schemaVersion, catalogFormat, force, configMatches = true }) {
   if (force) return { needsBuild: true, reason: 'run by hand with force' }
+  // 2026-11-27: after a key change the address book (config.json) must be republished, or every
+  // phone keeps the old key it saved. A config.json that differs from the pair in use means build.
+  if (configMatches === false) return { needsBuild: true, reason: 'config.json on the host differs from the address and key in use' }
   if (!published || typeof published !== 'object') return { needsBuild: true, reason: 'nothing is published yet' }
   if (published.catalogFormat !== catalogFormat) return { needsBuild: true, reason: 'the file format changed' }
   if (published.schemaVersion !== schemaVersion) return { needsBuild: true, reason: 'the app list shape changed' }
@@ -91,6 +94,25 @@ async function fetchLiveManifest(host) {
   }
 }
 
+async function fetchLiveConfig(host) {
+  try {
+    const res = await fetch(`${host}/config.json?nocache=${Date.now()}`, { cache: 'no-store' })
+    if (!res.ok) return null
+    return await res.json()
+  } catch {
+    return null
+  }
+}
+
+/** True when the live config.json carries exactly the address and key in use. A file that cannot
+ *  be read counts as different, so it gets republished. Pure function (checked in the check file). */
+export function configMatches(live, env) {
+  if (!live || typeof live !== 'object') return false
+  const want = JSON.parse(buildConfigFile(env))
+  const strip = u => String(u ?? '').trim().replace(/\/+$/, '')
+  return live.v === want.v && strip(live.url) === strip(want.url) && String(live.anon ?? '').trim() === want.anon
+}
+
 async function plan(args) {
   const host = hostBase()
   const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL
@@ -101,12 +123,15 @@ async function plan(args) {
   const supabase = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
   const { drugsUpdatedAt } = await fetchMetadataTimestamps(supabase)
   const published = await fetchLiveManifest(host)
+  const configOk = configMatches(await fetchLiveConfig(host), process.env)
+  log(`config.json on the host matches the key in use: ${configOk ? 'yes' : 'NO'}`)
   const d = decidePlan({
     published,
     drugsUpdatedAt,
     schemaVersion: FLAT_DRUG_SCHEMA_VERSION,
     catalogFormat: CATALOG_FORMAT,
     force: args.includes('--force'),
+    configMatches: configOk,
   })
   log(`Version stamp now: ${drugsUpdatedAt}`)
   log(`Published stamp:   ${published?.drugsUpdatedAt ?? '(none)'}`)

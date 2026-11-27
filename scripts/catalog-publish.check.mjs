@@ -45,11 +45,27 @@ test('the headers file allows other websites and caches chunks for ever, not the
 })
 
 // S10: the remote address book file
-import { buildConfigFile } from './catalog-publish.mjs'
+import { buildConfigFile, configMatches } from './catalog-publish.mjs'
 test('buildConfigFile writes the pair and refuses a bad pair', () => {
   const key = 'k'.repeat(40)
   const ok = JSON.parse(buildConfigFile({ VITE_SUPABASE_URL: 'https://abc.supabase.co', VITE_SUPABASE_ANON_KEY: key }))
   assert.deepEqual(ok, { v: 1, url: 'https://abc.supabase.co', anon: key })
   assert.throws(() => buildConfigFile({ VITE_SUPABASE_URL: 'http://abc', VITE_SUPABASE_ANON_KEY: key }))
   assert.throws(() => buildConfigFile({ VITE_SUPABASE_URL: 'https://abc.supabase.co', VITE_SUPABASE_ANON_KEY: 'x' }))
+})
+
+// 2026-11-27: a changed key or address republishes config.json by itself
+test('a config.json that differs from the pair in use means build', () => {
+  assert.equal(decidePlan({ ...now, configMatches: false }).needsBuild, true)
+  assert.equal(decidePlan({ ...now, configMatches: true }).needsBuild, false)
+  assert.equal(decidePlan(now).needsBuild, false)
+})
+test('configMatches compares address and key, and treats an unreadable file as different', () => {
+  const key = 'k'.repeat(40)
+  const env = { VITE_SUPABASE_URL: 'https://abc.supabase.co', VITE_SUPABASE_ANON_KEY: key }
+  assert.equal(configMatches({ v: 1, url: 'https://abc.supabase.co', anon: key }, env), true)
+  assert.equal(configMatches({ v: 1, url: 'https://abc.supabase.co/', anon: key }, env), true)
+  assert.equal(configMatches({ v: 1, url: 'https://abc.supabase.co', anon: 'o'.repeat(40) }, env), false)
+  assert.equal(configMatches({ v: 1, url: 'https://zzz.supabase.co', anon: key }, env), false)
+  assert.equal(configMatches(null, env), false)
 })
