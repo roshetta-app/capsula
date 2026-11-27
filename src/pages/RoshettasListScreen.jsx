@@ -11,7 +11,7 @@ import RoshettaRow from '../components/roshettas/RoshettaRow'
 import RoshettaStateCard from '../components/roshettas/RoshettaStateCard'
 import RoshettaDetailsSheet from '../components/roshettas/RoshettaDetailsSheet'
 import { shimmer } from '../components/drugs/home/shimmer'
-import { useConditionContext } from '../context/ConditionContext'
+import { useRoshettaSpecialties } from '../hooks/useRoshettaSpecialties'
 import { useFavouritesContext } from '../context/FavouritesContext'
 import { useAuth } from '../hooks/useAuth'
 import { useBackLabel } from '../hooks/useBackLabel'
@@ -39,7 +39,7 @@ export default function RoshettasListScreen() {
   useDeepLinkParent()
   const backLabel = useBackLabel() || 'Home'
   const { roshettasApi } = useFavouritesContext()
-  const { specialties } = useConditionContext()
+  const specialties = useRoshettaSpecialties()
   const {
     roshettas = [], roshettasStatus = 'loading', roshettasLoadError = false, isGuest = false,
     reloadRoshettas, waitingRoshettaIds = [], waitingCount = 0, failedCount = 0, syncState = 'idle',

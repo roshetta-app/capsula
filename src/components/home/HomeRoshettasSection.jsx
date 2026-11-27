@@ -22,7 +22,7 @@ import { HomeRoshettaStateCard, HomeRoshettaSkeletonCards } from './HomeStateCar
 import RoshettaDetailsSheet from '../roshettas/RoshettaDetailsSheet'
 import HomeSyncLine from './HomeSyncLine'
 import RoshettaFailedChangesSheet from '../roshettas/RoshettaFailedChangesSheet'
-import { useConditionContext } from '../../context/ConditionContext'
+import { useRoshettaSpecialties } from '../../hooks/useRoshettaSpecialties'
 import { findSpecialty } from '../../utils/roshettaSpecialty'
 import { HomeRoshettaCard } from './HomeRoshettaCard'
 import HomeNewCard from './HomeNewCard'
@@ -60,7 +60,7 @@ function SkeletonRow() {
 
 function HomeRoshettasSection({ onOpenRoshetta, onSeeAll }) {
   const { roshettasApi } = useFavouritesContext()
-  const { specialties } = useConditionContext()
+  const specialties = useRoshettaSpecialties()
   const {
     roshettas = [], roshettasStatus = 'loading', roshettasLoadError = false, isGuest = false,
     reloadRoshettas, waitingRoshettaIds = [], waitingCount = 0, failedCount = 0, syncState = 'idle',

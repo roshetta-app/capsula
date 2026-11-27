@@ -64,7 +64,7 @@ import { useOwnerViews } from '../hooks/useOwnerViews'
 import RoshettaDetailsSheet from '../components/roshettas/RoshettaDetailsSheet'
 import PrescriptionSheetBlock from '../components/conditions/PrescriptionSheetBlock'
 import RoshettaPageSkeleton from '../components/roshettas/RoshettaPageSkeleton'
-import { useConditionContext } from '../context/ConditionContext'
+import { useRoshettaSpecialties } from '../hooks/useRoshettaSpecialties'
 import { useFavouritesContext } from '../context/FavouritesContext'
 import { useAuth } from '../hooks/useAuth'
 import { useIsPro } from '../hooks/useIsPro'
@@ -96,7 +96,7 @@ export default function RoshettaScreen() {
   const backLabel = useBackLabel() || 'Home'
 
   const { roshettasApi } = useFavouritesContext()
-  const { specialties } = useConditionContext()
+  const specialties = useRoshettaSpecialties()
   const {
     roshettas = [], roshettasStatus = 'loading', isGuest = false, reloadRoshettas,
     waitingCount = 0, failedCount = 0, syncState = 'idle', deleteRoshetta,

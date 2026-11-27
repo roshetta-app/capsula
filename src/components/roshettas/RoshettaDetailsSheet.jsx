@@ -49,7 +49,7 @@ import SheetShell from '../ui/SheetShell'
 import ConfirmSheet from '../ui/ConfirmSheet'
 import SpecialtiesBottomSheet from '../conditions/SpecialtiesBottomSheet'
 import { SpecialtyIcon, useIsDark } from '../../utils/specialtyIcon'
-import { useConditionContext } from '../../context/ConditionContext'
+import { useRoshettaSpecialties } from '../../hooks/useRoshettaSpecialties'
 import { useFavouritesContext } from '../../context/FavouritesContext'
 import { useIsPro } from '../../hooks/useIsPro'
 import { useDirtyState } from '../../hooks/useDirtyState'
@@ -81,7 +81,7 @@ export default function RoshettaDetailsSheet({ isOpen, onClose, roshetta = null,
   const { roshettasApi } = useFavouritesContext()
   const { createRoshetta, saveRoshetta } = roshettasApi
   const isPro = useIsPro()
-  const { specialties } = useConditionContext()
+  const specialties = useRoshettaSpecialties()
   const isDark = useIsDark()
   const isEdit = !!roshetta
 
