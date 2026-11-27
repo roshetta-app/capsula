@@ -32,8 +32,21 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+// Key rotation (LR1.5, 2026-11-27): use the new-style key when Supabase provides one, else the old one.
+// SUPABASE_SECRET_KEYS / SUPABASE_PUBLISHABLE_KEYS hold a small JSON object of named keys ("default").
+function pickKey(newVar: string, oldVar: string, name = 'default'): string {
+  try {
+    const raw = Deno.env.get(newVar)
+    if (raw) {
+      const k = JSON.parse(raw)?.[name]
+      if (typeof k === 'string' && k) return k
+    }
+  } catch { /* not JSON: use the old key */ }
+  return Deno.env.get(oldVar)!
+}
+
 const SUPABASE_URL              = Deno.env.get('SUPABASE_URL')!
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+const SUPABASE_SERVICE_ROLE_KEY = pickKey('SUPABASE_SECRET_KEYS', 'SUPABASE_SERVICE_ROLE_KEY')
 const RESEND_API_KEY            = (Deno.env.get('RESEND_API_KEY') ?? '').trim()
 const ALERT_EMAIL               = (Deno.env.get('ALERT_EMAIL') ?? '').trim()
 

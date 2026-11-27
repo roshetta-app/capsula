@@ -146,9 +146,9 @@ const PUBLIC_ROOT_CACHE_FIRST = [
 ]
 
 // Hardcoded Supabase project values for tap-tracking (see Phase F4 Stage 4
-// addition note above). Same anon key already used client-side app-wide.
+// addition note above). The public (publishable) key, the same one used client-side app-wide.
 const SUPABASE_URL      = 'https://szzsqjpmcqsmvkvncgln.supabase.co'
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN6enNxanBtY3FzbXZrdm5jZ2xuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2ODU0MjcsImV4cCI6MjA5NjI2MTQyN30.OkSXQ_yul-PblXAU7Y6M8PdXomzGX58vaT-NPq396Kc'
+const SUPABASE_ANON_KEY = 'sb_publishable_vOzoIzM_FWoHd_b1OiSewg_i_Nc3HOd'
 
 // ─── Install ──────────────────────────────────────────────────────────────────
 
@@ -282,7 +282,9 @@ self.addEventListener('notificationclick', event => {
         headers: {
           'Content-Type': 'application/json',
           'apikey': SUPABASE_ANON_KEY,
-          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          // The new publishable key (sb_publishable_...) is not a token, so it goes in apikey only;
+          // an old-style key (a token starting eyJ) is also sent as Authorization. (Key rotation, 2026-11-27.)
+          ...(SUPABASE_ANON_KEY.startsWith('eyJ') ? { 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } : {}),
         },
         body: JSON.stringify({ log_id: logId }),
       }).catch(() => { /* best-effort only — a failed report shouldn't break the tap */ })

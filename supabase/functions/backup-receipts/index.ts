@@ -24,6 +24,19 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+// Key rotation (LR1.5, 2026-11-27): use the new-style key when Supabase provides one, else the old one.
+// SUPABASE_SECRET_KEYS / SUPABASE_PUBLISHABLE_KEYS hold a small JSON object of named keys ("default").
+function pickKey(newVar: string, oldVar: string, name = 'default'): string {
+  try {
+    const raw = Deno.env.get(newVar)
+    if (raw) {
+      const k = JSON.parse(raw)?.[name]
+      if (typeof k === 'string' && k) return k
+    }
+  } catch { /* not JSON: use the old key */ }
+  return Deno.env.get(oldVar)!
+}
+
 const BUCKET = 'pro-receipts'
 const PATH_SHAPE = /^[0-9a-f-]{36}\/[0-9a-f-]{36}\.(jpg|jpeg|png|webp)$/
 const FOLDER_SHAPE = /^[0-9a-f-]{36}$/
@@ -111,7 +124,7 @@ export async function handle(req: Request): Promise<Response> {
   let body: { action?: unknown; paths?: unknown }
   try { body = await req.json() } catch { return json({ error: 'bad_request' }, 400) }
 
-  const db = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false } })
+  const db = createClient(Deno.env.get('SUPABASE_URL')!, pickKey('SUPABASE_SECRET_KEYS', 'SUPABASE_SERVICE_ROLE_KEY'), { auth: { persistSession: false } })
 
   try {
     if (body.action === 'list') {
