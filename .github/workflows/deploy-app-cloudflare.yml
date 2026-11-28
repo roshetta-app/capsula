@@ -31,8 +31,10 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
-      - name: Checks for this workflow
-        run: npm run app:check && npm run site:check
+      # LR2.3 (2026-11-28): run EVERY automatic check (all *.check.js / *.check.mjs files) before
+      # anything is built or published. A red check stops this job, so nothing reaches the live site.
+      - name: All checks (red means stop)
+        run: npm run check:all
       - name: Inject build SHA into service worker
         run: |
           SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-8)
